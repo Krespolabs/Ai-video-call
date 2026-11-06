@@ -1,0 +1,156 @@
+{
+	"id": "drive-copilot",
+	"scenarioHash": "39b08ba9a116dc0d39f99e700e0b331d5913fc575023df1f5b2f9e3e0edcb2df",
+	"ranAt": "2026-09-29T09:38:36.616Z",
+	"target": {
+		"commit": "f2081d946",
+		"revision": "three-ws-api-00460-4j6"
+	},
+	"passed": true,
+	"steps": [
+		{
+			"index": 1,
+			"kind": "goto",
+			"target": "https://three.ws/drive?avatar=13f259c7-7024-4d68-b1f0-dbbf52c06209",
+			"detail": "loaded https://three.ws/drive?avatar=13f259c7-7024-4d68-b1f0-dbbf52c06209",
+			"ok": true,
+			"ms": 11198,
+			"frames": 0
+		},
+		{
+			"index": 2,
+			"kind": "expect",
+			"target": "Ready",
+			"detail": "appeared after 0.6 s",
+			"ok": true,
+			"ms": 563,
+			"frames": 0
+		},
+		{
+			"index": 3,
+			"kind": "hold",
+			"target": "1800",
+			"detail": "1800 ms",
+			"ok": true,
+			"ms": 25386,
+			"frames": 54
+		},
+		{
+			"index": 4,
+			"kind": "hover",
+			"target": "Driving",
+			"detail": "hovered",
+			"ok": true,
+			"ms": 8649,
+			"frames": 18
+		},
+		{
+			"index": 5,
+			"kind": "hold",
+			"target": "1200",
+			"detail": "1200 ms",
+			"ok": true,
+			"ms": 17696,
+			"frames": 36
+		},
+		{
+			"index": 6,
+			"kind": "click",
+			"target": "Driving",
+			"detail": "clicked",
+			"ok": true,
+			"ms": 10015,
+			"frames": 21
+		},
+		{
+			"index": 7,
+			"kind": "expect",
+			"target": "Parked",
+			"detail": "appeared after 0.0 s",
+			"ok": true,
+			"ms": 7,
+			"frames": 0
+		},
+		{
+			"index": 8,
+			"kind": "click",
+			"target": "Type",
+			"detail": "clicked",
+			"ok": true,
+			"ms": 10547,
+			"frames": 21
+		},
+		{
+			"index": 9,
+			"kind": "type",
+			"target": "What should I listen to on a long drive?",
+			"detail": "typed 40 characters",
+			"ok": true,
+			"ms": 48143,
+			"frames": 96
+		},
+		{
+			"index": 10,
+			"kind": "press",
+			"target": "Enter",
+			"detail": "pressed Enter; POST /api/chat answered 200 in 6.8 s",
+			"ok": true,
+			"ms": 7222,
+			"frames": 6
+		},
+		{
+			"index": 11,
+			"kind": "expect",
+			"target": "Speaking",
+			"detail": "appeared after 6.4 s",
+			"ok": true,
+			"ms": 6404,
+			"frames": 0
+		},
+		{
+			"index": 12,
+			"kind": "hold",
+			"target": "5000",
+			"detail": "5000 ms",
+			"ok": true,
+			"ms": 78060,
+			"frames": 150
+		}
+	],
+	"facts": {},
+	"saw": [
+		"Ready",
+		"Parked",
+		"Speaking"
+	],
+	"responses": [
+		{
+			"method": "POST",
+			"path": "/api/chat",
+			"status": 200,
+			"seconds": 6.8
+		}
+	],
+	"cuts": [
+		{
+			"afterStep": 10,
+			"seconds": 3.9
+		},
+		{
+			"afterStep": 11,
+			"seconds": 6.3
+		}
+	],
+	"video": {
+		"path": "public/x-media/drive-copilot/reel.mp4",
+		"sha256": "1004c28f71433eab82766f3c5e6fb55cfb6b94a236be69ce186666e2e8460205",
+		"frames": 402,
+		"motion": 1,
+		"durationSec": 13.4,
+		"width": 1280,
+		"height": 720,
+		"fps": 30,
+		"videoCodec": "h264",
+		"pixFmt": "yuv420p"
+	}
+}

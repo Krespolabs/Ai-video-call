@@ -1,0 +1,279 @@
+<!doctype html>
+<html lang="en">
+	<head>
+		<meta charset="utf-8" />
+		<meta name="viewport" content="width=device-width, initial-scale=1" />
+		<title data-i18n="demos_react_sdk.meta_title">@three-ws/avatar/react · three.ws lab</title>
+		<meta name="robots" content="noindex" />
+		<link rel="stylesheet" href="/style.css" />
+		<link rel="stylesheet" href="/nav.css" />
+		<style>
+			:root { color-scheme: dark; }
+			body { background: #060606; color: #eee; font: 15px/1.5 -apple-system, system-ui, sans-serif; margin: 0; }
+			.stage { max-width: 1000px; margin: 0 auto; padding: 48px 24px 80px; }
+			.crumb a { color: #8a8d98; text-decoration: none; }
+			.crumb a:hover { color: #3dc1ff; }
+			h1 { font-size: 28px; font-weight: 600; letter-spacing: -0.015em; margin: 14px 0 8px; }
+			.sub { color: #8a8d98; max-width: 64ch; margin: 0 0 30px; }
+			pre {
+				background: #080808; border: 1px solid #202020; border-radius: 9px;
+				padding: 14px 16px; font-family: ui-monospace, monospace; font-size: 12.5px;
+				color: #3dc1ff; overflow-x: auto;
+			}
+			.card {
+				background: #101010; border: 1.5px solid #202020; border-radius: 14px;
+				padding: 22px; margin: 16px 0;
+			}
+			.viewer-host {
+				min-height: 460px;
+				background: #0b0b0b; border-radius: 10px; overflow: hidden;
+				margin-top: 14px; height: 460px;
+			}
+			.viewer-host three-ws-viewer,
+			.viewer-host agent-3d { width: 100%; height: 460px; display: block; }
+			button {
+				background: #3dc1ff; color: #0a0a0a; border: 0; border-radius: 9px;
+				padding: 10px 14px; font-weight: 600; cursor: pointer; font: inherit;
+			}
+			button.secondary { background: #202020; color: #eee; }
+			.row { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+			.log {
+				margin-top: 14px;
+				background: #080808; border: 1px solid #202020; border-radius: 9px;
+				padding: 12px; font-family: ui-monospace, monospace; font-size: 12px;
+				color: #8a8d98; max-height: 200px; overflow: auto; white-space: pre-wrap;
+			}
+			.log .ok { color: #3dc1ff; }
+			.log .err { color: #ff6b6b; }
+			.log .info { color: #66d9ef; }
+			input[type="text"] {
+				background: #080808; border: 1px solid #202020; border-radius: 9px;
+				color: #eee; padding: 9px 12px; font: inherit; min-width: 280px;
+			}
+		</style>
+		<!-- Import map lets the React subpath module resolve `react` to a CDN copy
+		     without needing a bundler. Skypack ships proper ESM builds. -->
+		<script type="importmap">
+		{
+			"imports": {
+				"react": "https://esm.sh/react@18.3.1?dev",
+				"react/jsx-runtime": "https://esm.sh/react@18.3.1/jsx-runtime?dev",
+				"react-dom": "https://esm.sh/react-dom@18.3.1?dev&deps=react@18.3.1",
+				"react-dom/client": "https://esm.sh/react-dom@18.3.1/client?dev&deps=react@18.3.1",
+				"three": "https://esm.sh/three@0.169.0",
+				"three/addons/": "https://esm.sh/three@0.169.0/examples/jsm/"
+			}
+		}
+		</script>
+	</head>
+	<body>
+		<header><div id="nav-container"></div></header>
+
+		<main class="stage">
+			<p class="crumb" data-i18n-html="demos_react_sdk.lab"><a href="/demos">&larr; lab</a></p>
+			<h1 data-i18n="demos_react_sdk.three_ws_avatar_react">@three-ws/avatar/react</h1>
+			<p class="sub" data-i18n-html="demos_react_sdk.the_react_wrapper_around_the_sdk_imports">
+				The React wrapper around the SDK. Imports <code>Avatar</code>,
+				<code>AgentAvatar</code>, <code>AvatarCreator</code>, and
+				<code>useAvatar</code> directly from
+				<code>/avatar-sdk/src/react.js</code>. React is loaded from a CDN
+				via an import map so this page works without a bundler step.
+			</p>
+
+			<section class="card">
+				<h2 style="margin-top:0;font-size:18px" data-i18n="demos_react_sdk.1_light_viewer">1. &lt;Avatar&gt; — light viewer</h2>
+				<pre>import { Avatar } from '@three-ws/avatar/react';
+
+&lt;Avatar src="/avatars/default.glb" alt="Default three.ws avatar" /&gt;</pre>
+				<div id="mount-avatar" class="viewer-host"></div>
+				<div class="log" id="avatar-log">mounting React tree…</div>
+			</section>
+
+			<section class="card">
+				<h2 style="margin-top:0;font-size:18px" data-i18n="demos_react_sdk.2_full_runtime">2. &lt;AgentAvatar&gt; — full runtime</h2>
+				<pre>import { AgentAvatar } from '@three-ws/avatar/react';
+
+&lt;AgentAvatar src="/avatars/default.glb" /&gt;</pre>
+				<div id="mount-agent" class="viewer-host"></div>
+				<div class="log" id="agent-log">waiting for SDK monolith…</div>
+			</section>
+
+			<section class="card">
+				<h2 style="margin-top:0;font-size:18px" data-i18n="demos_react_sdk.3_declarative_modal">3. &lt;AvatarCreator&gt; — declarative modal</h2>
+				<pre>import { AvatarCreator } from '@three-ws/avatar/react';
+
+&lt;AvatarCreator open={open} onExport={blob =&gt; ...} onClose={() =&gt; setOpen(false)} /&gt;</pre>
+				<div id="mount-creator"></div>
+				<div class="log" id="creator-log">click the button to open the three.ws Avatar Creator.</div>
+			</section>
+
+			<section class="card">
+				<h2 style="margin-top:0;font-size:18px" data-i18n="demos_react_sdk.4_useavatar_id_hook">4. useAvatar(id) — hook</h2>
+				<pre>import { useAvatar } from '@three-ws/avatar/react';
+
+const { avatar, loading, error } = useAvatar(id);</pre>
+				<div id="mount-hook"></div>
+				<div class="log" id="hook-log">enter a three.ws avatar id to fetch its record.</div>
+			</section>
+		</main>
+
+		<script src="/nav.js" defer></script>
+
+		<script type="module">
+			// Absolute CDN URLs on purpose, matching the import map above exactly.
+			// The dev server rewrites bare specifiers in an inline module script to
+			// its own optimized copy of React while serving /avatar-sdk/src/*.js
+			// untouched, which loads two React instances and throws "Invalid hook
+			// call" locally. Naming the same URL in both places keeps one instance
+			// in dev and in production.
+			import { createRoot } from 'https://esm.sh/react-dom@18.3.1/client?dev&deps=react@18.3.1';
+			import { createElement as h, useState, useCallback } from 'https://esm.sh/react@18.3.1?dev';
+			import {
+				Avatar,
+				AgentAvatar,
+				AvatarCreator,
+				useAvatar,
+			} from '/avatar-sdk/src/react.js';
+
+			const $ = (id) => document.getElementById(id);
+			const stamp = () => new Date().toTimeString().slice(0, 8);
+			const line = (el, msg, cls = '') => {
+				el.innerHTML += `\n<span class="${cls}">[${stamp()}] ${msg}</span>`;
+			};
+
+			// 1. <Avatar>
+			(() => {
+				const root = createRoot($('mount-avatar'));
+				const log = $('avatar-log');
+				root.render(
+					h(Avatar, {
+						src: '/avatars/default.glb',
+						alt: 'Default three.ws avatar',
+						background: 'transparent',
+						style: { width: '100%', height: '460px', display: 'block' },
+						onLoad: ({ url }) => line(log, `✓ <Avatar> loaded ${url}`, 'ok'),
+						onError: ({ url, error }) => line(log, `✗ <Avatar> failed ${url}: ${error?.message || error}`, 'err'),
+					}),
+				);
+				line(log, '✓ React tree mounted', 'ok');
+			})();
+
+			// 2. <AgentAvatar>
+			(() => {
+				const root = createRoot($('mount-agent'));
+				const log = $('agent-log');
+				root.render(
+					h(AgentAvatar, {
+						src: '/avatars/default.glb',
+						style: { width: '100%', height: '460px', display: 'block' },
+					}),
+				);
+				// Watch for the monolith to register the element.
+				const start = performance.now();
+				const tick = () => {
+					if (customElements.get('agent-3d')) {
+						line(log, `✓ <agent-3d> registered in ${Math.round(performance.now() - start)} ms`, 'ok');
+					} else if (performance.now() - start < 15000) {
+						setTimeout(tick, 200);
+					} else {
+						line(log, '✗ <agent-3d> did not register within 15s', 'err');
+					}
+				};
+				tick();
+			})();
+
+			// 3. <AvatarCreator>
+			(() => {
+				const root = createRoot($('mount-creator'));
+				const log = $('creator-log');
+				function CreatorDemo() {
+					const [open, setOpen] = useState(false);
+					const handleExport = useCallback((blob) => {
+						line(log, `✓ export received (${blob.size} bytes, ${blob.type})`, 'ok');
+						setOpen(false);
+					}, []);
+					const handleClose = useCallback(() => {
+						line(log, 'modal closed without export', 'info');
+						setOpen(false);
+					}, []);
+					return h('div', { className: 'row' }, [
+						h('button', {
+							key: 'open',
+							onClick: () => {
+								line(log, 'opening three.ws Avatar Creator…', 'info');
+								setOpen(true);
+							},
+						}, 'Open three.ws Avatar Creator'),
+						h(AvatarCreator, {
+							key: 'creator',
+							open,
+							onExport: handleExport,
+							onClose: handleClose,
+						}),
+					]);
+				}
+				root.render(h(CreatorDemo));
+			})();
+
+			// 4. useAvatar
+			(() => {
+				const root = createRoot($('mount-hook'));
+				const log = $('hook-log');
+				function HookDemo() {
+					const [draft, setDraft] = useState('');
+					const [id, setId] = useState(null);
+					const { avatar, loading, error } = useAvatar(id);
+
+					if (loading) {
+						return h('div', null, [
+							renderForm(draft, setDraft, setId, log),
+							h('p', { key: 'p', style: { color: '#66d9ef' } }, `loading /api/avatars/${id}…`),
+						]);
+					}
+					if (error) {
+						return h('div', null, [
+							renderForm(draft, setDraft, setId, log),
+							h('p', { key: 'p', style: { color: '#ff6b6b' } }, `error: ${error.message}`),
+						]);
+					}
+					return h('div', null, [
+						renderForm(draft, setDraft, setId, log),
+						avatar
+							? h('pre', { key: 'pre', style: { color: '#3dc1ff', maxHeight: '240px', overflow: 'auto' } },
+								JSON.stringify(avatar, null, 2))
+							: null,
+					]);
+				}
+				function renderForm(draft, setDraft, setId, log) {
+					return h('form', {
+						key: 'form',
+						className: 'row',
+						style: { marginBottom: 12 },
+						onSubmit: (e) => {
+							e.preventDefault();
+							const v = draft.trim();
+							if (!v) return;
+							setId(v);
+							line(log, `fetching /api/avatars/${v}…`, 'info');
+						},
+					}, [
+						h('input', {
+							key: 'in',
+							type: 'text',
+							placeholder: 'avatar UUID or slug',
+							value: draft,
+							onChange: (e) => setDraft(e.target.value),
+						}),
+						h('button', { key: 'go', type: 'submit' }, 'Fetch'),
+					]);
+				}
+				root.render(h(HookDemo));
+			})();
+		</script>
+		<script src="/brand.js" defer></script>
+		<div id="footer-container"></div>
+		<script src="/footer.js"></script>
+	<!-- Runtime i18n: detects locale, swaps annotated copy, mounts <lang-switcher>. -->
+	<script type="module" src="/i18n.js"></script>
+</body>
+</html>

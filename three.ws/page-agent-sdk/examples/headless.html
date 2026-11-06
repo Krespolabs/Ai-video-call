@@ -1,0 +1,129 @@
+<!doctype html>
+<html lang="en">
+<head>
+	<meta charset="utf-8" />
+	<meta name="viewport" content="width=device-width, initial-scale=1" />
+	<title>@three-ws/page-agent — building blocks (headless) demo</title>
+	<!--
+		ADVANCED EXAMPLE — compose AvatarStage + SpeechNarrator + AvatarPicker with
+		your OWN UI. No PageAgent, no default chrome. This is the pattern from
+		docs/guide-building-blocks.md. Run it with any static server from the
+		package root, e.g.  `npx serve .`  then open /examples/headless.html
+	-->
+	<style>
+		:root { color-scheme: dark; }
+		* { box-sizing: border-box; }
+		body { margin: 0; font: 16px/1.5 system-ui, sans-serif; background: #0b0c10; color: #e9eaf0; }
+		.wrap { max-width: 760px; margin: 0 auto; padding: 48px 24px; }
+		h1 { font-size: 28px; margin: 0 0 6px; }
+		p.sub { color: #9aa; margin: 0 0 28px; }
+		.panel {
+			display: grid; grid-template-columns: 240px 1fr; gap: 20px;
+			border: 1px solid #23252f; border-radius: 18px; padding: 20px; background: #101218;
+		}
+		#stage { width: 240px; height: 300px; border-radius: 14px; overflow: hidden;
+			background: radial-gradient(120% 100% at 50% 0%, #1a1d27, #0c0e14); }
+		.controls { display: flex; flex-direction: column; gap: 12px; }
+		.row { display: flex; gap: 8px; flex-wrap: wrap; }
+		button { cursor: pointer; border: 1px solid #2a2c38; background: #15161e; color: #e9eaf0;
+			padding: 9px 14px; border-radius: 10px; font: inherit; font-weight: 600; }
+		button:hover { background: #1d1f29; }
+		button[aria-pressed="true"] { border-color: var(--accent, #6366f1); color: var(--accent, #818cf8); }
+		textarea { width: 100%; min-height: 84px; resize: vertical; border-radius: 10px;
+			border: 1px solid #2a2c38; background: #0d0e14; color: #e9eaf0; padding: 10px; font: inherit; }
+		.caption { min-height: 1.5em; color: #aab; font-style: italic; }
+		.who { font-weight: 700; } .who small { color: #8a8f9e; font-weight: 500; }
+		[data-speaking="true"] #stage { box-shadow: 0 0 0 2px var(--accent, #6366f1); }
+	</style>
+</head>
+<body>
+	<div class="wrap">
+		<h1>Headless building blocks</h1>
+		<p class="sub">A custom guide built directly on <code>AvatarStage</code> +
+			<code>SpeechNarrator</code> + <code>AvatarPicker</code> — your UI, our engine.</p>
+
+		<div class="panel" id="panel">
+			<div id="stage" aria-label="3D avatar"></div>
+			<div class="controls">
+				<div class="who"><span id="name">—</span> <small id="tag"></small></div>
+				<textarea id="text">Hi! I'm a fully custom guide, built from the page-agent building blocks. Edit this text and press Speak.</textarea>
+				<div class="row">
+					<button id="speak">▶ Speak</button>
+					<button id="stop">⏹ Stop</button>
+					<button id="mute" aria-pressed="false">🔊 Mute</button>
+					<button id="pick">🔀 Choose guide</button>
+				</div>
+				<div class="caption" id="caption" aria-live="polite"></div>
+			</div>
+		</div>
+	</div>
+
+	<!-- Map the bare `three` specifier so the unbundled ESM source runs from disk. -->
+	<script type="importmap">
+	{
+		"imports": {
+			"three": "https://unpkg.com/three@0.184.0/build/three.module.js",
+			"three/addons/": "https://unpkg.com/three@0.184.0/examples/jsm/"
+		}
+	}
+	</script>
+	<script type="module">
+		import {
+			AvatarStage, SpeechNarrator, AvatarPicker,
+			AGENTS, getAgent, agentUrl,
+		} from '../src/index.js';
+
+		const panel = document.getElementById('panel');
+		const stageEl = document.getElementById('stage');
+		const nameEl = document.getElementById('name');
+		const tagEl = document.getElementById('tag');
+		const captionEl = document.getElementById('caption');
+
+		// 1) The 3D surface.
+		const stage = new AvatarStage(stageEl, { background: 'transparent' });
+
+		// 2) Speech + lipsync, wired to our own caption + speaking state.
+		const narrator = new SpeechNarrator(stage, {
+			onCaption: (t) => (captionEl.textContent = t || ''),
+			onState:   (s) => (panel.dataset.speaking = String(s === 'speaking')),
+			onError:   (e) => console.warn('[headless] speech error', e),
+		});
+
+		// 3) A picker over the full catalog.
+		const picker = new AvatarPicker(AGENTS, {
+			onSelect: (id) => use(id),
+			getCurrent: () => current?.id,
+			title: 'Choose your guide',
+		});
+		picker.mount();
+
+		let current = null;
+		async function use(id) {
+			current = getAgent(id) || AGENTS[0];
+			narrator.setAgent(current);                 // adopt its voice profile
+			AvatarPicker.persist(current.id);
+			nameEl.textContent = current.name;
+			tagEl.textContent = current.tagline;
+			panel.style.setProperty('--accent', current.accent);
+			await stage.load(agentUrl(current), { framing: current.framing });
+		}
+
+		document.getElementById('speak').onclick = () =>
+			narrator.speak(document.getElementById('text').value, { interrupt: true });
+		document.getElementById('stop').onclick = () => narrator.cancel();
+		document.getElementById('mute').onclick = (e) => {
+			const on = e.currentTarget.getAttribute('aria-pressed') !== 'true';
+			e.currentTarget.setAttribute('aria-pressed', String(on));
+			e.currentTarget.textContent = on ? '🔇 Muted' : '🔊 Mute';
+			narrator.setMuted(on);
+		};
+		document.getElementById('pick').onclick = () => picker.open();
+
+		// Start with the visitor's saved choice, else the default.
+		use(AvatarPicker.restore() || 'sol');
+
+		// Tidy up if this view is ever torn down.
+		addEventListener('beforeunload', () => { narrator.dispose(); stage.dispose(); picker.dispose(); });
+	</script>
+</body>
+</html>

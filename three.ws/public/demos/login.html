@@ -1,0 +1,259 @@
+<!doctype html>
+<html lang="en">
+	<head>
+		<meta charset="utf-8" />
+		<meta name="viewport" content="width=device-width, initial-scale=1" />
+		<title data-i18n="demos_login.meta_title">three.ws — login demo</title>
+		<meta name="robots" content="noindex" />
+		<link rel="stylesheet" href="/fonts/fonts.css" />
+		<style>
+			:root { color-scheme: dark; }
+			*, *::before, *::after { box-sizing: border-box; }
+			html, body { height: 100%; margin: 0; background: #050505; color: #eee; font: 15px/1.5 'Inter', -apple-system, system-ui, sans-serif; }
+
+			#avatar-canvas {
+				position: fixed; inset: 0;
+				width: 100vw; height: 100vh;
+				pointer-events: none; z-index: 999;
+			}
+
+			.nav {
+				position: fixed; top: 0; left: 0; right: 0; z-index: 20;
+				display: flex; align-items: center; gap: 16px; padding: 14px 28px;
+				background: rgba(4,5,13,0.55); backdrop-filter: blur(14px);
+				border-bottom: 1px solid rgba(255,255,255,0.04);
+			}
+			.nav .brand { font: 700 15px/1 'Space Grotesk','Inter',sans-serif; color:#fff; text-decoration:none; display:flex; align-items:center; gap:7px; }
+			.brand-dot { width:8px; height:8px; border-radius:50%; background:linear-gradient(135deg,#3dc1ff,#aacc00); box-shadow:0 0 10px rgba(61, 193, 255,0.6); }
+			.nav a.link { color:#555870; text-decoration:none; font-size:13px; margin-left:auto; }
+			.nav a.link:hover { color:#3dc1ff; }
+
+			.page {
+				min-height: 100vh;
+				display: flex; align-items: center; justify-content: center;
+				padding: 100px 24px 60px;
+			}
+			.card {
+				position: relative;
+				width: 100%; max-width: 420px;
+				background: rgba(12,14,28,0.72);
+				border: 1px solid rgba(255,255,255,0.06);
+				border-radius: 20px;
+				padding: 40px 36px 32px;
+				backdrop-filter: blur(18px);
+				box-shadow:
+					inset 0 1.5px 0 rgba(255,255,255,0.18),
+					inset 0 -1px 0 rgba(0,0,0,0.35),
+					0 28px 60px -16px rgba(0,0,0,0.55),
+					0 6px 14px -4px rgba(0,0,0,0.35);
+			}
+			/* 3D ledge: a thin lip extending above the card top so the avatar
+			   has a visible surface to stand on. Top highlight + bottom shadow
+			   gives it bevel without needing perspective. */
+			.card::before {
+				content: '';
+				position: absolute;
+				left: 10px; right: 10px;
+				top: -5px;
+				height: 9px;
+				background: linear-gradient(180deg,
+					rgba(255,255,255,0.22) 0%,
+					rgba(255,255,255,0.05) 45%,
+					rgba(0,0,0,0.45) 100%);
+				border-radius: 6px 6px 4px 4px;
+				box-shadow:
+					0 1px 0 rgba(255,255,255,0.10),
+					0 4px 8px -2px rgba(0,0,0,0.5);
+				pointer-events: none;
+			}
+			.eyebrow {
+				display: inline-flex; align-items: center; gap: 9px;
+				font-size: 11px; font-weight: 600;
+				letter-spacing: 0.17em; text-transform: uppercase;
+				color: #3dc1ff; margin-bottom: 18px;
+				font-family: 'Space Grotesk', 'Inter', sans-serif;
+			}
+			.eyebrow-dot {
+				width: 7px; height: 7px; border-radius: 50%;
+				background: #3dc1ff; box-shadow: 0 0 8px rgba(61, 193, 255,0.7);
+			}
+			h1 {
+				font-family: 'Space Grotesk', 'Inter', sans-serif;
+				font-size: 28px; font-weight: 800; letter-spacing: -0.02em;
+				line-height: 1.15; margin: 0 0 8px; color: #fff;
+			}
+			.sub { color: #6b6e88; font-size: 14px; margin: 0 0 28px; }
+
+			label { display: block; font-size: 12px; font-weight: 600; color: #8b8fae; margin: 0 0 6px; letter-spacing: 0.04em; }
+			.field { margin-bottom: 18px; }
+			.input {
+				width: 100%;
+				padding: 13px 14px;
+				font: 500 15px/1.2 'Inter', inherit;
+				background: rgba(255,255,255,0.04);
+				border: 1.5px solid rgba(255,255,255,0.08);
+				border-radius: 10px;
+				color: #fff;
+				outline: none;
+				transition: border-color 140ms ease, background 140ms ease, box-shadow 140ms ease;
+			}
+			.input:focus {
+				border-color: #3dc1ff;
+				background: rgba(61, 193, 255,0.04);
+				box-shadow: 0 0 0 3px rgba(61, 193, 255,0.12);
+			}
+			.input.error {
+				border-color: #ff5a6a;
+				background: rgba(255,90,106,0.05);
+				box-shadow: 0 0 0 3px rgba(255,90,106,0.14);
+				animation: nudge 0.4s ease;
+			}
+			@keyframes nudge {
+				0%,100% { transform: translateX(0); }
+				25% { transform: translateX(-4px); }
+				75% { transform: translateX(4px); }
+			}
+
+			.btn {
+				display: inline-flex; align-items: center; justify-content: center;
+				gap: 10px; width: 100%;
+				padding: 14px 24px; border: none; border-radius: 12px;
+				font: 700 15px/1 'Inter', inherit; cursor: pointer;
+				background: linear-gradient(160deg, #5ad1ff, #2cb0ef);
+				color: #0b0b0b;
+				box-shadow: 0 6px 0 0 #005a8a, 0 8px 24px rgba(61, 193, 255,0.25);
+				transform-origin: bottom center;
+				will-change: transform;
+				margin-top: 8px;
+			}
+			.btn:hover { filter: brightness(1.06); }
+
+			.foot { margin: 22px 0 0; text-align: center; color: #54576f; font-size: 12.5px; }
+			.foot a { color: #8a8eaa; }
+		</style>
+		<!-- Resolve the bare @three-ws/agent-ui specifier without a bundler (this
+		     file is served verbatim from public/). esm.sh ships the package's ESM
+		     build and resolves its peer deps (three, etc.) transitively. -->
+		<script type="importmap">
+			{ "imports": { "@three-ws/agent-ui": "https://esm.sh/@three-ws/agent-ui@0.2.1" } }
+		</script>
+	</head>
+	<body>
+		<div class="nav">
+			<a href="/" class="brand">
+				<img src="/three.svg" width="20" height="20" alt="" />
+				<span class="brand-dot"></span>
+				three.ws
+			</a>
+			<a href="/demos/" class="link" data-i18n="demos_login.lab">← lab</a>
+		</div>
+
+		<div class="page">
+			<form class="card" id="login-form" novalidate>
+				<div class="eyebrow"><span class="eyebrow-dot"></span><span data-i18n="demos_login.declarative_agent_interactions">Declarative agent interactions</span></div>
+				<h1 data-i18n="demos_login.sign_in">Sign in</h1>
+				<p class="sub" data-i18n="demos_login.your_agent_will_read_along_and_look">Your agent will read along — and look away when it shouldn't.</p>
+
+				<div class="field">
+					<label for="email" data-i18n="demos_login.email">Email</label>
+					<input
+						class="input"
+						id="email"
+						name="email"
+						type="email"
+						autocomplete="email"
+						placeholder="you@three.ws"
+						data-agent-target="stand-on"
+						data-agent-action="track-typing"
+					/>
+				</div>
+
+				<div class="field">
+					<label for="password" data-i18n="demos_login.password">Password</label>
+					<input
+						class="input"
+						id="password"
+						name="password"
+						type="password"
+						autocomplete="current-password"
+						placeholder="••••••••"
+						data-agent-target="stand-on"
+						data-agent-action="privacy-mode"
+					/>
+				</div>
+
+				<button
+					class="btn"
+					id="submit-btn"
+					type="submit"
+				 data-i18n="demos_login.sign_in_2">Sign in</button>
+
+				<p class="foot" data-i18n-html="demos_login.no_account_build_an_agent">No account? <a href="/create">Build an agent →</a></p>
+			</form>
+		</div>
+
+		<canvas id="avatar-canvas"></canvas>
+
+		<script type="module">
+			import { createAgentUI } from '@three-ws/agent-ui';
+
+			const form = document.getElementById('login-form');
+
+			const agent = await createAgentUI({
+				canvas: document.getElementById('avatar-canvas'),
+				clips: ['idle', 'walk', 'lookdown', 'covereyes', 'reaction', 'silly', 'defeated', 'angry', 'facepalm'],
+				subclips: {
+					// covereyes is 219 frames; only the first 48 settle the hands on
+					// the face — hold that pose while the password field is focused.
+					covereyes: { start: 0, end: 48, fps: 30 },
+				},
+			});
+
+			// Park the avatar centered above the form card, feet on the ledge.
+			agent.standOn(form, { anchor: 'top-center' });
+
+			// Wire the declarative attributes on the form (track-typing, privacy-mode).
+			agent.scan(form);
+
+			// Form-validation reactions live here because credential logic belongs to
+			// the page, not the SDK. The SDK just exposes pickFrom() and play().
+			const pickFail = agent.pickFrom(['reaction', 'defeated', 'angry', 'facepalm']);
+			function disapprove() {
+				const pick = pickFail();
+				agent.play(pick, { loop: false });
+				const dur = agent.clip(pick) * 1000;
+				setTimeout(() => {
+					if (agent.currentClip === pick) agent.play('idle', { loop: true });
+				}, dur - 150);
+			}
+
+			form.addEventListener('submit', (ev) => {
+				ev.preventDefault();
+				const email = form.elements.email;
+				const password = form.elements.password;
+				email.classList.remove('error');
+				password.classList.remove('error');
+
+				const empty = [];
+				if (!email.value.trim()) empty.push(email);
+				if (!password.value) empty.push(password);
+				if (empty.length) {
+					empty.forEach((i) => i.classList.add('error'));
+					disapprove();
+					return;
+				}
+
+				if (password.value === 'admin') {
+					agent.play('silly', { loop: true });
+					setTimeout(() => { window.location.href = '/marketplace'; }, 2000);
+				} else {
+					password.classList.add('error');
+					disapprove();
+				}
+			});
+		</script>
+		<script src="/brand.js" defer></script>
+	<!-- Runtime i18n: detects locale, swaps annotated copy, mounts <lang-switcher>. -->
+	<script type="module" src="/i18n.js"></script>
+</body>
+</html>

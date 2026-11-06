@@ -1,0 +1,132 @@
+<!doctype html>
+<html lang="en">
+	<head>
+		<script>/* three.ws theme boot — no-flash; runtime in /theme-switcher.js */(function(){try{var m=localStorage.getItem('twx_theme');var l=m==='auto'?(window.matchMedia&&window.matchMedia('(prefers-color-scheme: light)').matches):m==='light';document.documentElement.setAttribute('data-theme',l?'light':'dark');}catch(e){document.documentElement.setAttribute('data-theme','dark');}})();</script>
+		<meta charset="utf-8" />
+		<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+		<title data-i18n="strategies.meta_title">Strategy Objects · three.ws</title>
+		<meta name="description" content="Trading know-how as a collectible. Equip a real, rule-based strategy on your agent and it trades for real, on-chain, strictly within your spend policy. Publish yours, fork the best, ranked by verified live performance."  data-i18n-attr="content:strategies.meta_description"/>
+		<meta property="og:type" content="website" />
+		<meta property="og:site_name" content="three.ws" />
+		<meta property="og:url" content="https://three.ws/strategies" />
+		<meta property="og:title" content="Strategy Objects · three.ws"  data-i18n-attr="content:strategies.meta_og_title"/>
+		<meta property="og:description" content="Equip a real, rule-based strategy on your agent and it trades on-chain within your spend policy. Publish, fork, and rank by verified live performance."  data-i18n-attr="content:strategies.meta_og_description"/>
+		<meta property="og:image" content="https://three.ws/api/page-og?s=crypto&amp;t=Strategy+Objects&amp;d=A+marketplace+of+how+agents+trade%3A+ownable%2C+forkable%2C+leaderboard-ranked+trade+strategies+your+agent+can+equip+and+run+on-chain+within+your+spend+policy.&amp;p=%2Fstrategies" />
+		<meta property="og:image:width" content="1200" />
+		<meta property="og:image:height" content="630" />
+		<meta name="twitter:card" content="summary_large_image" />
+		<meta name="twitter:site" content="@trythreews" />
+		<meta name="twitter:title" content="Strategy Objects · three.ws"  data-i18n-attr="content:strategies.meta_twitter_title"/>
+		<meta name="twitter:description" content="Ownable, forkable, leaderboard-ranked trade strategies, proven on real chain data. Equip one on your agent."  data-i18n-attr="content:strategies.meta_twitter_description"/>
+		<meta name="theme-color" content="#0a0a0a" />
+		<link rel="icon" href="/favicon.ico" sizes="any" />
+		<link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+		<link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+		<link rel="manifest" href="/manifest.webmanifest" />
+		<link rel="stylesheet" href="/fonts/fonts.css" />
+		<link rel="stylesheet" href="/tokens.css" />
+		<link rel="stylesheet" href="/nav.css" />
+		<link rel="stylesheet" href="/footer.css" />
+		<link rel="canonical" href="https://three.ws/strategies" />
+		<style>
+			body { background: var(--bg-0, #0a0a0a); color: var(--ink, #e8e8e8); margin: 0; font-family: var(--font-body, system-ui); }
+			.sp-shell { max-width: 960px; margin: 0 auto; padding: var(--space-lg, 24px) var(--space-md, 16px) var(--space-2xl, 64px); }
+			.sp-hero { text-align: center; padding: var(--space-xl, 42px) 0 var(--space-lg, 24px); }
+			.sp-kicker { display: inline-flex; align-items: center; gap: 8px; font-size: var(--text-2xs, .66rem); text-transform: uppercase; letter-spacing: .1em; color: #aaa; margin: 0 0 12px; }
+			.sp-live-dot { width: 7px; height: 7px; border-radius: 50%; background: #fff; box-shadow: 0 0 0 0 rgba(255,255,255,.4); animation: sp-pulse 1.8s ease infinite; }
+			@keyframes sp-pulse { 0%,100% { box-shadow: 0 0 0 0 rgba(255,255,255,.4); } 70% { box-shadow: 0 0 0 7px rgba(255,255,255,0); } }
+			.sp-title { font-family: var(--font-display, system-ui); font-size: clamp(1.8rem, 5vw, 2.8rem); margin: 0 0 12px; color: #fff; letter-spacing: -.02em; }
+			.sp-sub { max-width: 640px; margin: 0 auto; font-size: var(--text-md, .95rem); line-height: 1.6; color: #aaa; }
+			.sp-sub b { color: #fff; }
+			.sp-safety { display: flex; gap: 14px; flex-wrap: wrap; justify-content: center; margin-top: var(--space-md, 18px); }
+			.sp-safety span { display: inline-flex; align-items: center; gap: 6px; font-size: var(--text-2xs, .68rem); color: var(--ink-dim); }
+			.sp-safety b { color: #ccc; }
+			.sp-bar { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin: var(--space-lg, 24px) 0 var(--space-md, 16px); }
+			.sp-seg { display: inline-flex; gap: 4px; background: rgba(255,255,255,.03); padding: 4px; border-radius: var(--radius-pill, 999px); border: 1px solid rgba(255,255,255,.1); }
+			.sp-seg button { font: inherit; font-size: var(--text-2xs, .68rem); padding: 6px 14px; border-radius: 999px; border: none; background: transparent; color: var(--ink-dim); cursor: pointer; transition: background var(--duration-fast), color var(--duration-fast); }
+			.sp-seg button[aria-pressed="true"] { background: var(--accent); color: var(--bg-0); font-weight: 700; }
+			.sp-seg button:focus-visible { outline: 2px solid rgba(255,255,255,.6); outline-offset: 2px; }
+			.sp-spacer { flex: 1 1 auto; }
+			.sp-new { font: inherit; font-size: var(--text-2xs, .72rem); font-weight: 700; padding: 9px 16px; border-radius: var(--radius-pill, 999px); border: none; background: var(--accent); color: var(--bg-0); cursor: pointer; transition: background var(--duration-fast); }
+			.sp-new:hover { background: #d4d4d4; }
+			.sp-new:focus-visible { outline: 2px solid rgba(255,255,255,.5); outline-offset: 2px; }
+			.sp-search { flex: 1 1 180px; min-width: 140px; font: inherit; font-size: var(--text-sm, .82rem); padding: 8px 12px; border-radius: var(--radius-pill, 999px); border: 1px solid rgba(255,255,255,.1); background: rgba(255,255,255,.03); color: #fff; }
+			.sp-search:focus { outline: none; border-color: rgba(255,255,255,.35); }
+			.sp-search:focus-visible { outline: 2px solid rgba(255,255,255,.5); outline-offset: 2px; }
+			.sp-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: var(--space-md, 14px); }
+			.sp-card { display: flex; flex-direction: column; gap: 8px; border: 1px solid rgba(255,255,255,.08); border-radius: var(--radius-lg, 14px); background: rgba(255,255,255,.025); padding: var(--space-md, 16px); transition: border-color var(--duration-fast), transform var(--duration-fast); }
+			.sp-card:hover { border-color: rgba(255,255,255,.25); transform: translateY(-1px); }
+			.sp-card-top { display: flex; align-items: flex-start; gap: 8px; }
+			.sp-card-name { flex: 1 1 auto; min-width: 0; font-family: var(--font-display, inherit); font-size: var(--text-md, 1rem); font-weight: 700; color: #fff; }
+			.sp-badge { flex: 0 0 auto; font-size: var(--text-2xs, .58rem); text-transform: uppercase; letter-spacing: .05em; padding: 3px 8px; border-radius: 999px; font-family: var(--font-mono, monospace); }
+			.sp-badge.proven { color: #fff; background: rgba(255,255,255,.1); border: 1px solid rgba(255,255,255,.3); }
+			.sp-badge.unproven { color: var(--ink-dim); background: rgba(255,255,255,.04); border: 1px solid rgba(255,255,255,.12); }
+			.sp-desc { font-size: var(--text-xs, .74rem); color: #aaa; line-height: 1.45; min-height: 1.4em; }
+			.sp-rules { font-size: var(--text-2xs, .66rem); color: var(--ink-dim); font-family: var(--font-mono, monospace); line-height: 1.5; }
+			.sp-stats { display: flex; gap: 12px; flex-wrap: wrap; font-family: var(--font-mono, monospace); font-size: var(--text-2xs, .68rem); color: var(--ink-dim); padding-top: 4px; border-top: 1px solid rgba(255,255,255,.06); }
+			.sp-stats .pos { color: var(--ink); }
+			.sp-stats .neg { color: #666; }
+			.sp-meta { display: flex; align-items: center; gap: 8px; font-size: var(--text-2xs, .64rem); color: #666; }
+			.sp-meta a { color: #aaa; text-decoration: none; }
+			.sp-meta a:hover { color: #fff; }
+			.sp-actions { display: flex; gap: 6px; margin-top: 2px; }
+			.sp-btn { flex: 1; font: inherit; font-size: var(--text-2xs, .7rem); padding: 8px 10px; border-radius: var(--radius-sm, 8px); border: 1px solid rgba(255,255,255,.14); background: rgba(255,255,255,.05); color: var(--ink); cursor: pointer; transition: border-color var(--duration-fast), color var(--duration-fast), background var(--duration-fast); white-space: nowrap; }
+			.sp-btn:hover { border-color: rgba(255,255,255,.35); color: #fff; }
+			.sp-btn:focus-visible { outline: 2px solid rgba(255,255,255,.5); outline-offset: 2px; }
+			.sp-btn-primary { background: var(--accent); color: var(--bg-0); border-color: transparent; font-weight: 700; }
+			.sp-btn-primary:hover { background: #d4d4d4; }
+			.sp-sk { height: 168px; border-radius: var(--radius-lg, 14px); background: linear-gradient(90deg, rgba(255,255,255,.03) 25%, rgba(255,255,255,.05) 50%, rgba(255,255,255,.03) 75%); background-size: 200% 100%; animation: sp-sh 1.3s infinite; }
+			@keyframes sp-sh { from { background-position: 200% 0; } to { background-position: -200% 0; } }
+			.sp-empty { grid-column: 1 / -1; text-align: center; padding: var(--space-xl, 42px) var(--space-md, 16px); color: var(--ink-dim); font-size: var(--text-sm, .82rem); line-height: 1.6; }
+			.sp-empty strong { display: block; color: #fff; font-family: var(--font-display, inherit); margin-bottom: 6px; }
+			.sp-rank { position: absolute; top: -8px; left: -8px; width: 26px; height: 26px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-family: var(--font-mono, monospace); font-size: var(--text-2xs, .66rem); font-weight: 700; background: var(--accent); color: var(--bg-0); box-shadow: 0 2px 8px rgba(0,0,0,.4); }
+			.sp-card { position: relative; }
+		</style>
+	
+	<meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1">
+	<meta property="og:locale" content="en_US">
+	<meta property="og:image:alt" content="Strategy Objects — three.ws">
+	<meta name="twitter:image" content="https://three.ws/api/page-og?s=crypto&amp;t=Strategy+Objects&amp;d=A+marketplace+of+how+agents+trade%3A+ownable%2C+forkable%2C+leaderboard-ranked+trade+strategies+your+agent+can+equip+and+run+on-chain+within+your+spend+policy.&amp;p=%2Fstrategies">
+	<script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"WebPage","name":"Strategy Objects","description":"A marketplace of how agents trade: ownable, forkable, leaderboard-ranked trade strategies your agent can equip and run on-chain within your spend policy.","url":"https://three.ws/strategies","isPartOf":{"@type":"WebSite","name":"three.ws","url":"https://three.ws"},"primaryImageOfPage":"https://three.ws/api/page-og?s=crypto&t=Strategy+Objects&d=A+marketplace+of+how+agents+trade%3A+ownable%2C+forkable%2C+leaderboard-ranked+trade+strategies+your+agent+can+equip+and+run+on-chain+within+your+spend+policy.&p=%2Fstrategies"}]}</script>
+</head>
+	<body>
+		<header><div id="nav-container"></div></header>
+		<script src="/nav.js"></script>
+
+		<main class="sp-shell">
+			<section class="sp-hero">
+				<p class="sp-kicker" data-i18n-html="strategies.ownable_alpha_proven_on_real_chain_data"><span class="sp-live-dot" aria-hidden="true"></span> Ownable alpha · proven on real chain data</p>
+				<h1 class="sp-title" data-i18n="strategies.equip_a_strategy_not_a_spreadsheet">Equip a strategy, not a spreadsheet</h1>
+				<p class="sp-sub" data-i18n-html="strategies.a_strategy_object_is_a_real_rule">A Strategy Object is a real, rule-based plan (entry conditions, sizing, take-profit, stop-loss) made into a <b>thing you own</b>. Equip it on your agent and it trades for real, on-chain, strictly inside your spend policy. Publish yours, fork the best, and watch the leaderboard rank them by <b>verified live performance</b>: numbers no one can fake.</p>
+				<div class="sp-safety">
+					<span data-i18n-html="strategies.spend_policy_gated_every_trade"><b>Spend-policy gated</b>: every trade</span>
+					<span data-i18n-html="strategies.real_on_chain_no_backtested_fiction"><b>Real on-chain</b>: no backtested fiction</span>
+					<span data-i18n-html="strategies.forkable_rules_only_never_wallet_access"><b>Forkable</b>: rules only, never wallet access</span>
+					<span data-i18n-html="strategies.kill_switch_halt_all_at_once"><b>Kill switch</b>: halt all at once</span>
+				</div>
+			</section>
+
+			<div class="sp-bar">
+				<div class="sp-seg" role="group" aria-label="Strategy view" id="sp-scope">
+					<button data-scope="published" aria-pressed="true" data-i18n="strategies.marketplace">Marketplace</button>
+					<button data-scope="leaderboard" aria-pressed="false" data-i18n="strategies.leaderboard">Leaderboard</button>
+					<button data-scope="mine" aria-pressed="false" data-i18n="strategies.my_library">My library</button>
+				</div>
+				<input class="sp-search" id="sp-search" type="search" placeholder="Search strategies…" aria-label="Search strategies" />
+				<div class="sp-spacer"></div>
+				<button class="sp-new" id="sp-new" data-i18n="strategies.new_strategy">+ New strategy</button>
+			</div>
+
+			<div class="sp-grid" id="sp-grid">
+				<div class="sp-sk"></div><div class="sp-sk"></div><div class="sp-sk"></div>
+			</div>
+		</main>
+
+		<script type="module" src="/src/strategies.js"></script>
+		<script src="/brand.js" defer></script>
+		<div id="footer-container"></div>
+		<script src="/footer.js"></script>
+		<!-- Runtime i18n: detects locale, swaps annotated copy, mounts <lang-switcher>. -->
+	<script type="module" src="/i18n.js"></script>
+</body>
+</html>

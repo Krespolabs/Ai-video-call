@@ -1,0 +1,329 @@
+// agent-sniper — pure exit decision. No I/O, no time source of its own.
+//
+// The single source of truth for "should this position exit, and why". The live
+// position loop (positions.js) calls it every tick with a freshly re-quoted SOL
+// value + high-water mark; the historical backtester (api/_lib/strategy-backtest.js)
+// calls it at the recorded peak and terminal price points so a projected strategy
+// is evaluated with the EXACT stop-loss / trailing-stop / take-profit / timeout
+// priority that governs real money. Keeping it here means the two can never drift.
+
+/** Coerce to a finite number, or null. A null/blank input is "disabled" (null) —
+ * NOT 0. (Number(null) === 0, so a missing take-profit / trailing-stop would
+ * otherwise fire immediately; the schema documents null as "no TP / no trailing
+ * stop", and this is the single source of truth that honors that.) */
+export function pct(n) {
+	if (n == null || n === '') return null;
+	const x = Number(n);
+	return Number.isFinite(x) ? x : null;
+}
+
+/**
+ * Decide the exit reason for a position, or null to hold. Evaluated in priority
+ * order: stop-loss → signal-flip → trailing-stop → take-profit → timeout.
+ *
+ * The hard stop-loss always wins. signal_flip is an EARLY warning that cuts a
+ * losing position before it reaches the stop, driven by the per-coin x402
+ * sentiment the worker already pays for — so it only fires while the position is
+ * underwater and never overrides a take-profit. It is inert unless the caller
+ * passes a `sentiment` (the live loop does so only when SNIPER_EXIT_ON_BEARISH
+ * is set); the backtester omits it, so replays are byte-for-byte unchanged.
+ *
+ * @param {object} pos   position-like: { entry_quote_lamports, stop_loss_pct,
+ *                        trailing_stop_pct, take_profit_pct, max_hold_seconds, opened_at }
+ * @param {number} value current SOL value of the position (lamports)
+ * @param {number} peak  high-water mark of `value` since entry (lamports)
+ * @param {number} [now] epoch ms for the timeout clock (defaults to Date.now()).
+ *                        Pass an explicit clock from a replay to keep it pure.
+ * @param {{ signal?: string, confidence?: number, minConfidence?: number }|null} [sentiment]
+ *                        live x402 sentiment read; null/omitted disables signal_flip.
+ * @returns {'stop_loss'|'signal_flip'|'trailing_stop'|'take_profit'|'timeout'|null}
+ */
+export function decideExit(pos, value, peak, now = Date.now(), sentiment = null) {
+	const entry = BigInt(pos.entry_quote_lamports || '0');
+	if (entry <= 0n) return null;
+	const ev = Number(entry);
+	const sl = pct(pos.stop_loss_pct);
+	const ts = pct(pos.trailing_stop_pct);
+	const tp = pct(pos.take_profit_pct);
+
+	if (sl != null && value <= ev * (1 - sl / 100)) return 'stop_loss';
+	if (isBearishFlip(sentiment) && value < ev) return 'signal_flip';
+	// The trailing stop arms only once the position has been green (peak above
+	// entry). Armed underwater it is a machine for realizing small losses: across
+	// the fleet's first 90 real trades, every below-breakeven trail converted a
+	// recoverable dip into a locked loss while protecting nothing (the hard
+	// stop-loss above still caps the downside). Measured 2026-07-23.
+	if (ts != null && peak > ev && value <= peak * (1 - ts / 100)) return 'trailing_stop';
+	if (tp != null && value >= ev * (1 + tp / 100)) return 'take_profit';
+
+	const heldS = (now - new Date(pos.opened_at).getTime()) / 1000;
+	if (pos.max_hold_seconds != null && heldS >= pos.max_hold_seconds) return 'timeout';
+	return null;
+}
+
+/**
+ * Liquidity-decay clock. A bonding-curve quote only moves when someone trades,
+ * so a position whose re-quoted value is EXACTLY unchanged sweep after sweep is
+ * a coin nobody is trading: dead liquidity. The July 2026 fleet audit found
+ * these squatting on concurrency slots for the full 30-minute timeout, the only
+ * exit that ever fired on them. This clock times them out in minutes instead.
+ *
+ * Semantics:
+ *   - The clock runs only while the position is UNDERWATER. A quiet coin above
+ *     entry is a winner consolidating, and the trailing stop / take-profit /
+ *     moon-bag machinery owns that case.
+ *   - Any value movement (any trade at all) resets the clock: one buyer is not
+ *     dead liquidity.
+ *   - Returns the new stale_since (epoch ms or null). Pure, no I/O.
+ *
+ * @param {number|null} prevValue  last sweep's quoted value (lamports), null on first sweep
+ * @param {number} value           this sweep's quoted value (lamports)
+ * @param {number} entry           cost basis (lamports)
+ * @param {number|null} staleSince current clock start (epoch ms) or null
+ * @param {number} now             epoch ms
+ * @returns {number|null}
+ */
+export function updateStaleClock(prevValue, value, entry, staleSince, now) {
+	const underwater = value < entry;
+	const unchanged = prevValue != null && Number(prevValue) === Number(value);
+	if (!underwater || !unchanged) return null;
+	return staleSince ?? now;
+}
+
+/**
+ * Should the position exit for dead liquidity? True once the stale clock has
+ * run for `decaySeconds`. The position is underwater by definition (the clock
+ * never runs in profit), so this is a full exit while the stake is still at
+ * risk; the caller keeps the moon-bag floor when the initials were already
+ * recovered (house money stays free even in a dead market).
+ */
+export function decideLiquidityDecay(staleSince, decaySeconds, now) {
+	if (staleSince == null || !(decaySeconds > 0)) return false;
+	return (now - staleSince) / 1000 >= decaySeconds;
+}
+
+/** A confident bearish sentiment read. minConfidence defaults to 0.7. */
+function isBearishFlip(sentiment) {
+	if (!sentiment || sentiment.signal !== 'bearish') return false;
+	const conf = Number(sentiment.confidence);
+	const floor = Number(sentiment.minConfidence);
+	return Number.isFinite(conf) && conf >= (Number.isFinite(floor) ? floor : 0.7);
+}
+
+/** The take-initials multiple (× entry) or null when the ladder is off. Must be
+ * > 1 to make sense (you can't recover initials below cost). */
+export function ladderMultiple(n) {
+	const x = pct(n);
+	return x != null && x > 1 ? x : null;
+}
+
+/** Moon-bag floor as a fraction of the position that must ALWAYS be kept on any
+ * exit that is in profit. Default 15%, clamped to [0, 0.95] so a sell can never
+ * be the whole bag. */
+export function moonbagFraction(n) {
+	const x = pct(n);
+	const frac = x == null ? 15 : x;
+	return Math.max(0, Math.min(0.95, frac / 100));
+}
+
+/**
+ * Is the never-full-exit rule active for this position? Default ON, fleet-wide.
+ * Only an explicit `moonbag_always === false` turns it off, so every existing
+ * strategy row (where the column is null) gets the rule without a backfill.
+ */
+export function moonbagAlways(pos) {
+	return pos?.moonbag_always !== false;
+}
+
+/**
+ * How much of the remaining position to sell on a terminal exit that is allowed
+ * to keep a moon bag. Never returns 1: a bag always rides.
+ *
+ *   - House money (the stake is already recovered): the whole remainder is free,
+ *     so bank the gain down to the floor and keep the floor riding.
+ *   - Still carrying cost basis but exiting in profit: sell exactly enough to
+ *     return the stake (entry/value), capped by the floor. This is the case the
+ *     rule exists for. A trailing stop at +40% used to dump 100% of the bag for a
+ *     few thousandths of a SOL; now it recovers the cost and the rest rides free.
+ *
+ * Pure. Exported for tests.
+ *
+ * @param {number} entry   cost basis of the remaining position (lamports)
+ * @param {number} value   current value of the remaining position (lamports)
+ * @param {number} moonbag floor as a fraction (0..0.95)
+ * @param {boolean} houseMoney true once initials have been recovered
+ */
+export function moonbagExitFraction(entry, value, moonbag, houseMoney) {
+	const cap = 1 - moonbag;
+	if (!(value > 0)) return cap;
+	const target = houseMoney ? cap : entry / value;
+	return Math.max(0, Math.min(target, cap));
+}
+
+/**
+ * Laddered exit decision: the reason AND what fraction of the CURRENT remaining
+ * position to sell. This is the live-trading source of truth (positions.js);
+ * `decideExit` above stays the single-shot decider the backtester replays.
+ *
+ * With no `initials_out_multiple` set this is byte-for-byte the classic
+ * full-exit behavior (sellFraction 1 on any decideExit reason). Since
+ * 2026-07-25 the fleet default is 2 (schema default + strategy-API default);
+ * a null is an explicit per-arm opt-out. When set, it encodes the owner's rule:
+ *
+ *   - Protective exits are always FULL exits of whatever remains, and the hard
+ *     stop-loss still wins: stop_loss → signal_flip → trailing_stop.
+ *   - The FIRST time the position reaches `initials_out_multiple`× entry (e.g.
+ *     2×), sell exactly enough to return the initial cost basis (fraction =
+ *     entry/value), but NEVER more than 1 − moonbag floor — so a moon bag always
+ *     rides. At 2× that is a 0.5 sell (keep half); at 5× a 0.2 sell (keep 80%).
+ *   - After initials are recovered, the moon bag runs, protected by the trailing
+ *     stop; an optional classic `take_profit_pct` acts as a ceiling that exits
+ *     the remainder. Timeout exits the remainder.
+ *
+ * It NEVER returns a full take-PROFIT exit before initials are recovered — that
+ * is the "sold too much too soon" mistake the rule exists to prevent.
+ *
+ * @param {object} pos position-like; adds `initials_out_multiple`,
+ *                      `moonbag_min_pct`, and the `initials_recovered` state flag
+ *                      to the fields `decideExit` reads.
+ * @param {number} value current SOL value of the remaining position (lamports)
+ * @param {number} peak  high-water mark of `value` since entry (lamports)
+ * @param {number} [now] epoch ms for the timeout clock
+ * @param {object|null} [sentiment] live x402 sentiment; null disables signal_flip
+ * @returns {{ reason: string, sellFraction: number, recoversInitials?: boolean }|null}
+ */
+export function decideLadderedExit(pos, value, peak, now = Date.now(), sentiment = null) {
+	const entry = Number(BigInt(pos.entry_quote_lamports || '0'));
+	if (!(entry > 0)) return null;
+
+	const mult = ladderMultiple(pos.initials_out_multiple);
+	const moonbag = moonbagFraction(pos.moonbag_min_pct);
+	const always = moonbagAlways(pos);
+	const recovered = pos.initials_recovered === true;
+	const sl = pct(pos.stop_loss_pct);
+	const ts = pct(pos.trailing_stop_pct);
+	const tp = pct(pos.take_profit_pct);
+
+	// ── 1. Which reason fires. Priority is unchanged and the hard stop still wins.
+	let reason = null;
+	if (sl != null && value <= entry * (1 - sl / 100)) {
+		reason = 'stop_loss';
+	} else if (isBearishFlip(sentiment) && value < entry) {
+		reason = 'signal_flip';
+	} else if (ts != null && peak > entry && value <= peak * (1 - ts / 100)) {
+		// `peak > entry`, not `peak > 0`: the trailing stop arms only once the
+		// position has actually been green. Armed underwater it is a machine for
+		// realizing small losses (measured across the fleet's first 90 real trades),
+		// and the hard stop-loss above already caps the downside. decideExit has
+		// always done this; the ladder path used to arm at any peak, so every
+		// ladder-on strategy carried the below-breakeven trail this rules out.
+		reason = 'trailing_stop';
+	} else if (mult != null && !recovered && value >= entry * mult) {
+		// Take-initials: the proactive first profit event, fired once.
+		const sellFraction = Math.max(0, Math.min(entry / value, 1 - moonbag));
+		if (sellFraction > 0) return { reason: 'take_initials', sellFraction, recoversInitials: true };
+	}
+
+	if (reason == null) {
+		// A take-profit ceiling. With a ladder armed it only applies after the
+		// initials are out, so the ceiling can never pre-empt the ladder, and it is
+		// measured from the price the ladder fired at, not from the original entry.
+		// After the initials leg `entry` is the moon bag's scaled-down basis, so
+		// value/entry is the price multiple (~2x at that moment): measuring the
+		// ceiling from entry meant any take_profit_pct <= 100 was already met and
+		// the very next sweep sold the bag the ladder had just set free. Measured
+		// from the ladder price, TP 60 means "the next +60% above 2x", i.e. 3.2x.
+		const tpBase = recovered && mult != null ? entry * mult : entry;
+		if (tp != null && value >= tpBase * (1 + tp / 100) && (recovered || mult == null)) {
+			reason = 'take_profit';
+		} else if (!recovered) {
+			// The clock only runs on money still at risk. A recovered bag is house
+			// money: runners peak a median 12-37 minutes after the entry band and the
+			// largest 4-41 hours later, so a 30-60 minute max hold sold exactly the
+			// tail the ladder exists to keep (one bag was timed out at 24.7x).
+			const heldS = (now - new Date(pos.opened_at).getTime()) / 1000;
+			if (pos.max_hold_seconds != null && heldS >= pos.max_hold_seconds) reason = 'timeout';
+		}
+	}
+	if (reason == null) return null;
+
+	// ── 2. How much to sell. The owner's rule: we never sell 100% of a position
+	// that is in profit, and we never sell 100% of a position whose stake is
+	// already recovered. Once the cost basis is back, the remainder is free: a bag
+	// that goes to zero cost us nothing, and a bag that runs is the whole point.
+	// Selling the last 15% to bank a few thousandths of a SOL trades away all of
+	// that upside for a rounding error.
+	if (!always) return { reason, sellFraction: 1 };
+
+	// Kill switch and a stop-loss on money still at risk stay full exits. Before
+	// the stake is recovered the position is OUR money, not house money, so
+	// "hold a free bag" does not apply: there is nothing free about it yet, and
+	// the hard downside cap is the one rule the ladder never overrides.
+	const houseMoney = recovered;
+	const inProfit = value > entry;
+	if (!houseMoney && !inProfit) return { reason, sellFraction: 1 };
+	if (!houseMoney && reason === 'stop_loss') return { reason, sellFraction: 1 };
+
+	const sellFraction = moonbagExitFraction(entry, value, moonbag, houseMoney);
+	if (!(sellFraction > 0)) return null; // nothing worth selling; let the bag ride
+	return { reason, sellFraction, keepsMoonbag: true };
+}
+
+/**
+ * Has an unreconcilable position waited long enough to give up on?
+ *
+ * A position parks as `reconcile_pending` when its bag is provably gone from the
+ * wallet but the transaction that emptied it cannot be found in chain history.
+ * That park used to be unbounded, so a bag whose emptying tx never surfaced
+ * re-parked every sweep forever — and because countOpenPositions() counts it,
+ * the position held one of its arm's concurrency slots permanently. Observed in
+ * production: five positions wedged at once, one for over 40 hours, with the
+ * fleet unable to take new trades.
+ *
+ * Giving up books the position closed with UNKNOWN proceeds (realized P&L left
+ * null, never invented) purely to release the slot. Returns false when nothing
+ * is pending, so a healthy position can never trip it.
+ *
+ * @param {string|Date|null} pendingSince when the position first parked
+ * @param {number} giveUpMs how long a park may last
+ * @param {number} [now] epoch ms
+ */
+export function shouldGiveUpReconcile(pendingSince, giveUpMs, now = Date.now()) {
+	if (pendingSince == null || !(giveUpMs > 0)) return false;
+	const since = pendingSince instanceof Date ? pendingSince.getTime() : new Date(pendingSince).getTime();
+	if (!Number.isFinite(since)) return false;
+	return now - since >= giveUpMs;
+}
+
+/**
+ * When a position's reconcile park started, for the give-up bound above.
+ *
+ * `reconcile_pending_since` is the answer whenever it is set. It is NOT always
+ * set: a row parked by a revision that predates the column carries the
+ * `reconcile_pending` marker with no timestamp, and because
+ * shouldGiveUpReconcile() reads a null as "nothing is pending" those rows are
+ * unreapable forever. That is precisely the permanent wedge the bound exists to
+ * prevent, reintroduced through the back door. Observed in production: four arms
+ * frozen for 37 to 57 hours against a 30-minute max hold, each arm capped at one
+ * concurrent position, so each was fully stopped.
+ *
+ * For an already-parked row, fall back to the last moment the sweep could still
+ * evaluate it (`stale_since`), then to `opened_at`. Both are sound lower bounds
+ * on when the park began, so the fallback can only ever under-estimate the wait,
+ * never cut a park short.
+ *
+ * A row that is NOT parked returns its raw `reconcile_pending_since` (normally
+ * null), so a first park still gets its full window before the bound applies.
+ *
+ * Pure.
+ *
+ * @param {{reconcile_pending_since?: string|Date|null, error?: string|null,
+ *          stale_since?: string|Date|null, opened_at?: string|Date|null}} position
+ * @returns {string|Date|null} the anchor to measure the park from
+ */
+export function reconcileParkAnchor(position) {
+	const p = position || {};
+	if (p.reconcile_pending_since != null) return p.reconcile_pending_since;
+	if (p.error !== 'reconcile_pending') return null;
+	return p.stale_since ?? p.opened_at ?? null;
+}

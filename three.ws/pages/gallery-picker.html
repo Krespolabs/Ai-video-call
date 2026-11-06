@@ -1,0 +1,131 @@
+<!doctype html>
+<html lang="en">
+	<head>
+		<script>/* three.ws theme boot — no-flash; runtime in /theme-switcher.js */(function(){try{var m=localStorage.getItem('twx_theme');var l=m==='auto'?(window.matchMedia&&window.matchMedia('(prefers-color-scheme: light)').matches):m==='light';document.documentElement.setAttribute('data-theme',l?'light':'dark');}catch(e){document.documentElement.setAttribute('data-theme','dark');}})();</script>
+		<meta charset="utf-8" />
+		<title data-i18n="gallery_picker.meta_title">Avatar Gallery — three.ws</title>
+		<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+		<meta name="theme-color" content="#000000" />
+		<meta name="robots" content="noindex" />
+
+		<meta property="og:type" content="website" />
+		<meta property="og:url" content="https://three.ws/gallery-picker" />
+		<meta property="og:title" content="Avatar Gallery — three.ws"  data-i18n-attr="content:gallery_picker.meta_og_title"/>
+		<meta
+			property="og:description"
+			content="Browse, preview, and grab any public 3D avatar on three.ws."
+		 data-i18n-attr="content:gallery_picker.meta_og_description"/>
+		<meta property="og:image" content="https://three.ws/og-image.png" />
+		<meta property="og:image:width" content="1200" />
+		<meta property="og:image:height" content="630" />
+		<meta name="twitter:card" content="summary_large_image" />
+		<meta name="twitter:image" content="https://three.ws/og-image.png" />
+
+		<link rel="icon" href="/favicon.ico" sizes="any" />
+		<link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+		<link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png" />
+		<link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png" />
+		<link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+		<link rel="manifest" href="/manifest.webmanifest" />
+		<link rel="stylesheet" href="/style.css" />
+		<link rel="stylesheet" href="/nav.css" />
+		<link rel="stylesheet" href="/fonts/fonts.css" />
+		<script
+			type="module"
+			src="https://cdn.jsdelivr.net/npm/@google/model-viewer@4.4.0/dist/model-viewer.min.js"
+			integrity="sha384-wjsPzEO+lXOf7d9csIDfAQpPt2OKuUU3m0K9qsdKIuzX4N8czSF6hdh23eAbZa3p"
+			crossorigin="anonymous"
+		></script>
+		<style>
+			body {
+				overflow: auto;
+				display: flex;
+				flex-direction: column;
+				min-height: 100vh;
+			}
+			.gp-wrap {
+				flex: 1;
+				max-width: 1200px;
+				width: 100%;
+				margin: 0 auto;
+				padding: 0 24px 80px;
+			}
+			.gp-hero {
+				padding: 48px 0 28px;
+			}
+			.gp-crumb {
+				font-size: 13px;
+				margin: 0 0 12px;
+			}
+			.gp-crumb a {
+				color: var(--ink-dim);
+				text-decoration: none;
+			}
+			.gp-crumb a:hover {
+				color: var(--ink);
+			}
+			.gp-title {
+				font-size: clamp(1.6rem, 3.5vw, 2.2rem);
+				font-weight: 700;
+				letter-spacing: -0.02em;
+				color: var(--ink);
+				margin: 0 0 8px;
+				line-height: 1.15;
+			}
+			.gp-sub {
+				color: var(--ink-dim);
+				font-size: 15px;
+				max-width: 60ch;
+				margin: 0;
+				line-height: 1.5;
+			}
+			.gp-picker-host {
+				width: 100%;
+			}
+			/* Override shell borders in inline mode since we have our own page chrome */
+			.gp-picker-host .agp-shell--inline {
+				border: 1px solid var(--stroke);
+			}
+		</style>
+		<script src="/model-viewer-meshopt.js"></script>
+	</head>
+	<body>
+		<header><div id="nav-container"></div></header>
+
+		<main class="gp-wrap">
+			<div class="gp-hero">
+				<p class="gp-crumb" data-i18n-html="gallery_picker.home_gallery"><a href="/">Home</a> / <a href="/gallery">Gallery</a></p>
+				<h1 class="gp-title" data-i18n="gallery_picker.avatar_gallery">Avatar Gallery</h1>
+				<p class="gp-sub" data-i18n="gallery_picker.browse_every_public_3d_avatar_on_three">
+					Browse every public 3D avatar on three.ws. Preview live in 3D, copy share links,
+					GLB URLs, or embed snippets.
+				</p>
+			</div>
+
+			<div class="gp-picker-host" id="picker-host"></div>
+		</main>
+
+		<script src="/nav.js" defer></script>
+		<script type="module">
+			import { AvatarGalleryPicker } from '/src/avatar-gallery-picker.js';
+
+			const host = document.getElementById('picker-host');
+			const params = new URLSearchParams(location.search);
+
+			const picker = new AvatarGalleryPicker({
+				source: 'public',
+				title: 'Public avatars',
+				selectedId: params.get('id') || '',
+				showModes: true,
+				ctaLabel: 'Copy to clipboard',
+			});
+
+			picker.mountInline(host);
+		</script>
+		<script src="/brand.js" defer></script>
+		<div id="footer-container"></div>
+		<script src="/footer.js"></script>
+		<!-- Runtime i18n: detects locale, swaps annotated copy, mounts <lang-switcher>. -->
+	<script type="module" src="/i18n.js"></script>
+</body>
+</html>

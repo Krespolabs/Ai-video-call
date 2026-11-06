@@ -1,0 +1,272 @@
+// Shared validation + serialization for the pump alert rules CRUD endpoints.
+// Underscore-prefixed → not routed by Vercel; imported by rules.js and
+// rules/[id].js so the create and update paths can't drift apart.
+
+import { z } from 'zod';
+import { PROCESSORS, SEVERITIES } from '../_lib/market-anomaly.js';
+import { isValidSolanaAddress, isUuid } from '../_lib/validate.js';
+import { MINT_TARGETED_KINDS, AGENT_TARGETED_KINDS, MARKET_TARGETED_KINDS, THRESHOLD_KINDS, FILTER_KINDS, MARKET_ANOMALY_KINDS, LAUNCH_FILTER_KEYS, LAUNCH_RISK_FLAGS, deriveRuleLabel } from '../_lib/pump-alert-eval.js';
+
+export const RULE_KINDS = ['graduation', 'price_above', 'price_below', 'whale_buy', 'new_mint', 'market_price', 'launch_match', 'market_anomaly'];
+
+// launch_match: a new pump.fun launch scored by coin intel that passes every
+// filter set here (api/_lib/pump-alert-eval.js launchMatchesRule).
+const usdBound = z.coerce.number().min(0).max(1e12);
+export const launchFiltersSchema = z
+	.object({
+		name_pattern: z.string().trim().min(1).max(120).optional(),
+		min_market_cap_usd: usdBound.optional(),
+		max_market_cap_usd: usdBound.optional(),
+		min_safety_score: z.coerce.number().min(0).max(100).optional(),
+		min_creator_graduated: z.coerce.number().int().min(0).max(1000).optional(),
+		max_creator_launches: z.coerce.number().int().min(0).max(100_000).optional(),
+		exclude_risk_flags: z.array(z.enum(LAUNCH_RISK_FLAGS)).max(LAUNCH_RISK_FLAGS.length).optional(),
+		require_socials: z.boolean().optional(),
+	})
+	.strict();
+
+// market_anomaly: events from the market anomaly scanner (api/cron/market-anomalies.js).
+// Every key is optional; no filters means high severity and above from any processor.
+export const marketAnomalyFiltersSchema = z
+	.object({
+		processors: z.array(z.enum(PROCESSORS)).min(1).max(PROCESSORS.length).optional(),
+		min_severity: z.enum(SEVERITIES).optional(),
+		subject: z.string().trim().min(1).max(40).optional(),
+	})
+	.strict();
+
+const telegramChat = z
+	.string()
+	.trim()
+	.max(64)
+	.refine(
+		(v) => /^-?\d{1,32}$/.test(v) || /^@[a-zA-Z0-9_]{4,64}$/.test(v),
+		'telegram_chat must be a numeric chat id or @username',
+	);
+
+const webhookUrl = z
+	.string()
+	.trim()
+	.max(2048)
+	.url()
+	.refine((u) => /^https:\/\//i.test(u), 'webhook_url must be https');
+
+const nullableUrl = webhookUrl.nullable().or(z.literal('').transform(() => null));
+const nullableTelegram = telegramChat.nullable().or(z.literal('').transform(() => null));
+
+// Base shape — refinements that depend on `kind` run in superRefine below.
+const baseShape = {
+	kind: z.enum(RULE_KINDS),
+	target_mint: z
+		.string()
+		.trim()
+		.max(64)
+		.refine((v) => isValidSolanaAddress(v), 'target_mint is not a valid Solana address')
+		.nullable()
+		.optional(),
+	target_agent: z
+		.string()
+		.trim()
+		.refine((v) => isUuid(v), 'target_agent must be a UUID')
+		.nullable()
+		.optional(),
+	// market_price: one outcome of one prediction market (api/_lib/predictions/).
+	target_market: z
+		.string()
+		.trim()
+		.max(128)
+		.regex(/^[A-Za-z0-9._:-]+$/, 'target_market is not a valid market id')
+		.nullable()
+		.optional(),
+	target_side: z.enum(['yes', 'no']).nullable().optional(),
+	direction: z.enum(['above', 'below']).nullable().optional(),
+	threshold: z.coerce.number().positive().max(1e15).nullable().optional(),
+	deliver_in_app: z.boolean().optional(),
+	webhook_url: nullableUrl.optional(),
+	telegram_chat: nullableTelegram.optional(),
+	cooldown_seconds: z.coerce.number().int().min(5).max(86_400).optional(),
+	enabled: z.boolean().optional(),
+	label: z.string().trim().max(80).nullable().optional(),
+	filters: z.union([launchFiltersSchema, marketAnomalyFiltersSchema]).nullable().optional(),
+};
+
+/** Cross-field rules shared by create (strict) and update (after merge). */
+function refineRule(v, ctx) {
+	const mintTargeted = MINT_TARGETED_KINDS.includes(v.kind);
+	const agentTargeted = AGENT_TARGETED_KINDS.includes(v.kind);
+	const marketTargeted = MARKET_TARGETED_KINDS.includes(v.kind);
+
+	if (marketTargeted) {
+		if (!v.target_market) {
+			ctx.addIssue({ code: 'custom', path: ['target_market'], message: `${v.kind} requires a target_market` });
+		}
+		if (!v.target_side) {
+			ctx.addIssue({ code: 'custom', path: ['target_side'], message: `${v.kind} requires a target_side of yes or no` });
+		}
+		if (!v.direction) {
+			ctx.addIssue({ code: 'custom', path: ['direction'], message: `${v.kind} requires a direction of above or below` });
+		}
+		if (Number(v.threshold) >= 1) {
+			ctx.addIssue({ code: 'custom', path: ['threshold'], message: `${v.kind} threshold is a probability below 1 (0.65 means 65%)` });
+		}
+	}
+
+	if (mintTargeted) {
+		if (!v.target_mint) {
+			ctx.addIssue({ code: 'custom', path: ['target_mint'], message: `${v.kind} requires a target_mint` });
+		}
+		if (v.target_agent) {
+			ctx.addIssue({ code: 'custom', path: ['target_agent'], message: `${v.kind} cannot have a target_agent` });
+		}
+	}
+	if (agentTargeted) {
+		if (!v.target_agent) {
+			ctx.addIssue({ code: 'custom', path: ['target_agent'], message: `${v.kind} requires a target_agent` });
+		}
+		if (v.target_mint) {
+			ctx.addIssue({ code: 'custom', path: ['target_mint'], message: `${v.kind} cannot have a target_mint` });
+		}
+	}
+	if (v.kind === 'graduation' && v.target_mint && v.target_agent) {
+		ctx.addIssue({ code: 'custom', path: ['target_agent'], message: 'set either target_mint or target_agent, not both' });
+	}
+	if (FILTER_KINDS.includes(v.kind)) {
+		const f = v.filters || {};
+		const set = LAUNCH_FILTER_KEYS.filter((k) => f[k] != null && f[k] !== false && !(Array.isArray(f[k]) && !f[k].length));
+		if (!set.length) {
+			ctx.addIssue({ code: 'custom', path: ['filters'], message: `${v.kind} needs at least one filter (${LAUNCH_FILTER_KEYS.join(', ')})` });
+		}
+		if (f.min_market_cap_usd != null && f.max_market_cap_usd != null && Number(f.min_market_cap_usd) > Number(f.max_market_cap_usd)) {
+			ctx.addIssue({ code: 'custom', path: ['filters', 'min_market_cap_usd'], message: 'min_market_cap_usd cannot exceed max_market_cap_usd' });
+		}
+		if (v.target_mint || v.target_agent) {
+			ctx.addIssue({ code: 'custom', path: ['kind'], message: `${v.kind} matches every new launch; it takes filters, not a target` });
+		}
+	}
+	if (MARKET_ANOMALY_KINDS.includes(v.kind) && (v.target_mint || v.target_agent)) {
+		ctx.addIssue({ code: 'custom', path: ['kind'], message: `${v.kind} watches the whole market; it takes filters, not a target` });
+	}
+	if (THRESHOLD_KINDS.includes(v.kind) && !(Number(v.threshold) > 0)) {
+		ctx.addIssue({ code: 'custom', path: ['threshold'], message: `${v.kind} requires a positive threshold` });
+	}
+
+	// At least one delivery channel must be active. deliver_in_app defaults true.
+	const inApp = v.deliver_in_app !== false;
+	if (!inApp && !v.webhook_url && !v.telegram_chat) {
+		ctx.addIssue({ code: 'custom', path: ['deliver_in_app'], message: 'enable at least one delivery channel' });
+	}
+}
+
+export const createRuleSchema = z.object(baseShape).superRefine(refineRule);
+
+// Update: every field optional; cross-field validation happens after merging
+// with the existing row (see validateUpdate).
+export const updateRuleSchema = z
+	.object({ ...baseShape, kind: baseShape.kind.optional() })
+	.refine((v) => Object.keys(v).length > 0, 'no fields to update');
+
+/**
+ * Render zod-style issues into one message, using the exact convention
+ * api/_lib/validate.js `parse()` uses on the create path. Both paths validate
+ * through this module, so both must also *report* identically: without this the
+ * update path returned a bare "price_below requires a target_mint" while create
+ * returned "target_mint: price_below requires a target_mint", and a client
+ * parsing the prefix off one envelope mis-read the other.
+ */
+function formatIssues(issues) {
+	return issues.map((i) => `${i.path.join('.') || 'body'}: ${i.message}`).join('; ');
+}
+
+/**
+ * Merge a partial update over the current row, normalize targeting/threshold to
+ * the effective kind, then run the shared cross-field validation.
+ * @returns {{ ok: true, value: object } | { ok: false, issues: any[], message: string }}
+ */
+export function validateUpdate(current, patch) {
+	const merged = {
+		kind: patch.kind ?? current.kind,
+		target_mint: 'target_mint' in patch ? patch.target_mint : current.target_mint,
+		target_agent: 'target_agent' in patch ? patch.target_agent : current.target_agent,
+		target_market: 'target_market' in patch ? patch.target_market : current.target_market,
+		target_side: 'target_side' in patch ? patch.target_side : current.target_side,
+		direction: 'direction' in patch ? patch.direction : current.direction,
+		threshold: 'threshold' in patch ? patch.threshold : current.threshold,
+		deliver_in_app: 'deliver_in_app' in patch ? patch.deliver_in_app : current.deliver_in_app,
+		webhook_url: 'webhook_url' in patch ? patch.webhook_url : current.webhook_url,
+		telegram_chat: 'telegram_chat' in patch ? patch.telegram_chat : current.telegram_chat,
+		cooldown_seconds: 'cooldown_seconds' in patch ? patch.cooldown_seconds : current.cooldown_seconds,
+		enabled: 'enabled' in patch ? patch.enabled : current.enabled,
+		label: 'label' in patch ? patch.label : current.label,
+		filters: 'filters' in patch ? patch.filters : current.filters,
+	};
+	// Normalize first so fields incompatible with the (possibly new) kind are
+	// cleared before validation — e.g. switching to new_mint drops a stale
+	// target_mint instead of failing on it.
+	const normalized = normalizeForKind(merged);
+	const issues = [];
+	refineRule(normalized, { addIssue: (i) => issues.push(i) });
+	if (issues.length) return { ok: false, issues, message: formatIssues(issues) };
+	return { ok: true, value: normalized };
+}
+
+/**
+ * Rules that have a live webhook but no signing secret. Such a rule delivers
+ * UNSIGNED webhooks (api/_lib/alert-delivery.js only sets the
+ * `webhook-signature` header when a secret exists), leaving the receiver with
+ * no way to verify the payload came from us. The create and update paths both
+ * mint a secret alongside the URL, but the legacy backfill in
+ * 2026-06-15-pump-alert-rules.sql copies `user_alert_configs.webhook_url`
+ * without one, so any DB carrying those rows can still hold the combination.
+ */
+export function rulesMissingWebhookSecret(rows) {
+	return rows.filter((r) => r.webhook_url && !r.webhook_secret);
+}
+
+/** Null out fields that don't apply to the rule's kind so stale values can't leak. */
+export function normalizeForKind(v) {
+	const out = { ...v };
+	if (!THRESHOLD_KINDS.includes(out.kind)) out.threshold = null;
+	if (!MINT_TARGETED_KINDS.includes(out.kind) && out.kind !== 'graduation') out.target_mint = null;
+	if (!AGENT_TARGETED_KINDS.includes(out.kind) && out.kind !== 'graduation') out.target_agent = null;
+	if (!MARKET_TARGETED_KINDS.includes(out.kind)) {
+		out.target_market = null;
+		out.target_side = null;
+		out.direction = null;
+	}
+	if (!FILTER_KINDS.includes(out.kind) && !MARKET_ANOMALY_KINDS.includes(out.kind)) out.filters = null;
+	else if (out.filters) out.filters = Object.fromEntries(Object.entries(out.filters).filter(([, val]) => val != null));
+	if (out.deliver_in_app === undefined) out.deliver_in_app = true;
+	if (out.cooldown_seconds === undefined) out.cooldown_seconds = 300;
+	if (out.enabled === undefined) out.enabled = true;
+	return out;
+}
+
+/** Shape a DB row for the API response (includes the user's own webhook secret). */
+export function serializeRule(row) {
+	return {
+		id: row.id,
+		kind: row.kind,
+		target_mint: row.target_mint || null,
+		target_agent: row.target_agent || null,
+		target_market: row.target_market || null,
+		target_side: row.target_side || null,
+		direction: row.direction || null,
+		threshold: row.threshold != null ? Number(row.threshold) : null,
+		filters: row.filters || null,
+		deliver_in_app: row.deliver_in_app,
+		webhook_url: row.webhook_url || null,
+		webhook_secret: row.webhook_secret || null,
+		telegram_chat: row.telegram_chat || null,
+		cooldown_seconds: row.cooldown_seconds,
+		enabled: row.enabled,
+		// `label` is the raw user value (null when auto); `label_display` is what
+		// the UI shows — a derived default when the user didn't name the rule.
+		label: row.label || null,
+		label_display: row.label || deriveRuleLabel(row),
+		last_fired_at: row.last_fired_at || null,
+		recent_failures: row.recent_failures != null ? Number(row.recent_failures) : 0,
+		recent_deliveries: row.recent_deliveries || [],
+		created_at: row.created_at,
+		updated_at: row.updated_at,
+	};
+}

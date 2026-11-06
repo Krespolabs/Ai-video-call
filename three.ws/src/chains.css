@@ -1,0 +1,80 @@
+/*
+ * /chains — cross-chain TVL leaderboard. Layered after coin-pages.css: reuses
+ * the cv-* token system, cards, and table; this file only adds the stat grid
+ * and the inline dominance bar. Both themes inherit from the shared data-theme
+ * tokens.
+ */
+
+.chains-stat-grid {
+	display: grid;
+	gap: 1rem;
+	grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+}
+
+/* Inline dominance bar. Fixed-width track so bars read as a shared scale down
+   the column; the fill is scaled to the leading chain in chains.js. */
+.chains-bar-cell {
+	min-width: 160px;
+}
+.chains-bar {
+	display: block;
+	width: 100%;
+	max-width: 220px;
+	height: 8px;
+	border-radius: 999px;
+	background: var(--cv-surface-3);
+	overflow: hidden;
+}
+.chains-bar-fill {
+	display: block;
+	height: 100%;
+	border-radius: 999px;
+	background: linear-gradient(
+		90deg,
+		var(--cv-accent),
+		color-mix(in srgb, var(--cv-accent) 55%, transparent)
+	);
+	transition: width var(--duration-slow) var(--ease-standard);
+}
+
+@media (prefers-reduced-motion: reduce) {
+	.chains-bar-fill {
+		transition: none;
+	}
+}
+
+/* Below 640px only three columns survive (the rank and the share bar drop out),
+   so the shared 540px table floor buys nothing but a horizontal scroll that
+   parks the TVL and dominance numbers off-screen. Let the table shrink to the
+   viewport and tighten the cell padding so all three read at 320px without
+   scrolling sideways. */
+@media (max-width: 639px) {
+	#chains-table .cv-table {
+		min-width: 0;
+	}
+	#chains-table .cv-table th,
+	#chains-table .cv-table td {
+		padding-left: 0.5rem;
+		padding-right: 0.5rem;
+	}
+	#chains-table .cv-table .name-cell .nm {
+		max-width: 8.5rem;
+	}
+}
+
+/* Phone widths: the "Dominance" header is the widest thing in the table, and at
+   320px it is what pushed the percentages off the edge. Drop a step of type and
+   padding so chain, TVL and dominance all land inside the viewport. */
+@media (max-width: 479px) {
+	#chains-table .cv-table {
+		font-size: 0.8125rem;
+	}
+	#chains-table .cv-table th,
+	#chains-table .cv-table td {
+		padding-left: 0.375rem;
+		padding-right: 0.375rem;
+	}
+	#chains-table .cv-table .name-cell .nm {
+		max-width: 6rem;
+	}
+}

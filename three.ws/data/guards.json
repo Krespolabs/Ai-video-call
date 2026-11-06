@@ -1,0 +1,1887 @@
+{
+	"updated": "2026-10-23",
+	"summary": "Every mechanical guard that protects this repository, and the stage each one runs in. This file is the single source of truth: scripts/audit-guards.mjs proves every entry is real and every stage claim is true, docs/guards.md explains them, and /guards renders them.",
+	"stages": [
+		{
+			"id": "prebuild",
+			"title": "Prebuild",
+			"when": "Every `npm run build`, automatically.",
+			"description": "Runs before any bundle is produced. These guards regenerate the page index and then immediately re-audit it, so a page can never be advertised and unreachable in the same build."
+		},
+		{
+			"id": "gate",
+			"title": "Gate",
+			"when": "`npm run gate`, before you call a feature done.",
+			"description": "The composite correctness sweep: the CLAUDE.md truth check, the critical-path tests, and every offline audit. Ordered cheapest first, so a merge-conflict marker fails in seconds instead of after the test stage."
+		},
+		{
+			"id": "build:gcp",
+			"title": "Deploy build",
+			"when": "`npm run build:gcp`, before an image is submitted to Cloud Build.",
+			"description": "Guards that can only judge a finished artifact: the browser bundle, the contents of dist/, and whether every declared page actually resolves against the route table."
+		},
+		{
+			"id": "deploy:submit",
+			"title": "Deploy submit",
+			"when": "`npm run deploy:gcp:submit`, the step that uploads the build context to Cloud Build.",
+			"description": "The last gate before code leaves the machine. It runs after build:gcp has produced dist/, so a guard here can judge the finished artifact and the schema it is about to ship over, and a failure is still cheap: nothing has been deployed yet."
+		},
+		{
+			"id": "pre-push",
+			"title": "Pre-push",
+			"when": "Automatically, on `git push`.",
+			"description": "Installed into .git/hooks by scripts/setup-git-hooks.mjs on every npm install. Judges exactly the commits leaving the machine and never the shared working tree, so a concurrent agent's in-flight edit can never block your push. Bypass once with SKIP_PUSH_CHECKS=1."
+		},
+		{
+			"id": "manual",
+			"title": "On demand",
+			"when": "Run it yourself when you touch the area it covers.",
+			"description": "Guards that need a browser, live credentials, or a network round trip, so they cannot sit on an automatic path without making it flaky. Each one has an npm script so it is discoverable rather than buried in scripts/."
+		}
+	],
+	"guards": [
+		{
+			"id": "audit-agent-operability",
+			"script": "scripts/audit-agent-operability.mjs",
+			"npm": "audit:agent-operability",
+			"title": "Computer-use operability sweep",
+			"protects": "The primary task on /create, /forge, /connect, an agent profile chat, and /launch stays reachable with accessibility-tree locators alone (getByRole/getByLabel), the way a screen reader or a computer-use agent drives it.",
+			"why": "Grok Bot and any other computer-use agent never clicks a CSS selector or a raw coordinate; it enumerates roles and labels. A control that only works via hover reveal or a mouse-specific gesture is invisible to that kind of agent even though every human-facing test passes, so this drives the real surfaces the same restricted way and records any step that needed something else.",
+			"stages": [
+				"manual"
+			],
+			"needs": "browser",
+			"proof": {
+				"kind": "live",
+				"reason": "Drives five real pages with Playwright role/label locators against a running server, including a signed-in session for avatar-limited steps. A static fixture cannot prove an accessibility-tree locator resolves against live markup."
+			}
+		},
+		{
+			"id": "audit-console",
+			"script": "scripts/audit-console.mjs",
+			"npm": "audit:console",
+			"title": "Console sweep",
+			"protects": "A clean browser console on every canonical route, at desktop and mobile widths.",
+			"why": "A clean console is part of the definition of done, and the only way to prove it is to drive the real pages in a real browser. Environment noise is filtered so the output is signal.",
+			"stages": [
+				"manual"
+			],
+			"needs": "browser",
+			"proof": {
+				"kind": "live",
+				"reason": "Drives a real browser over the live page set and reads the console, so it needs Playwright and a running server. A static fixture cannot produce a runtime console error."
+			}
+		},
+		{
+			"id": "audit-cron-liveness",
+			"script": "scripts/audit-cron-liveness.mjs",
+			"npm": "audit:cron-liveness",
+			"npmAliases": [
+				"audit:cron-liveness:static"
+			],
+			"title": "Every declared cron is actually alive",
+			"protects": "Each cron in vercel.json resolves through the real route table to a handler file that exists, imports without throwing, answers a live request, and refuses an unauthenticated one.",
+			"why": "check-cron-drift answers 'is the schedule valid and is Cloud Scheduler running it?', which a silently dead cron passes: the job shows ENABLED, the schedule matches, the request lands, and the server 404s it or imports a handler that throws at module scope. Nothing anywhere notices. That exact gap killed all 30+ dispatcher jobs (payouts, subscriptions, buybacks, pumpfun monitors) until July 2026, because vercel.json's legacy routes array does not auto-route the [name] dynamic segment. This walks route, handler, load, and run per cron, and reports a cron that answers 200 without a bearer token as UNGATED rather than as a pass.",
+			"stages": [
+				"manual"
+			],
+			"needs": "none",
+			"proof": {
+				"kind": "live",
+				"reason": "The run stage boots the real server on a free port and probes every cron URL, so the check is inherently live. The probe is deliberately unauthenticated and every handler fails closed on CRON_SECRET, so no job body executes: nothing is paid, swapped, minted, transferred, or written. `--static` skips the boot for a route-and-load-only pass."
+			}
+		},
+		{
+			"id": "audit-csp",
+			"script": "scripts/audit-csp.mjs",
+			"npm": "audit:csp",
+			"title": "Live CSP sweep",
+			"protects": "No page violates the Content-Security-Policy the server sends with it.",
+			"why": "server/csp-hashes.mjs derives script-src from the bytes of each response, which is a strong guarantee on paper and a total outage when it is wrong: one missed inline script ships that page blank. Only a browser applies a policy the way a browser applies a policy, so this loads the real pages against a running server and fails on any securitypolicyviolation event. Add --all to sweep every route in data/pages.json.",
+			"stages": [
+				"manual"
+			],
+			"needs": "browser",
+			"proof": {
+				"kind": "live",
+				"reason": "Needs Playwright plus a server serving dist/, because the thing under test is the browser's own policy evaluation against a real response. A static fixture cannot produce a securitypolicyviolation event."
+			}
+		},
+		{
+			"id": "audit-custodial-key-health",
+			"script": "scripts/audit-custodial-key-health.mjs",
+			"npm": "audit:custodial-keys",
+			"title": "No custodial SOL is stranded behind an unreadable key",
+			"protects": "Every stored custodial Solana secret still decrypts under the current WALLET_ENCRYPTION_KEY, and reports the SOL sitting behind any that do not.",
+			"why": "The treasury self-heal reclaims idle SOL from platform-owned agent wallets when the master fee wallet runs short. A wallet whose encrypted_solana_secret fails AES-GCM decryption cannot be signed for, so its balance is invisible to that self-heal and to every other spend path, and the failure is silent by construction: the reclaim leg reports a failed SEND, and a WebCrypto OperationError wearing a Solana costume sends operators after RPC health and funding for a key problem neither can fix. A key rotation is the usual cause; the WALLET_ENCRYPTION_KEY changed during the 2026-07 Vercel to Cloud Run migration and every wallet written under the retired key became unreadable.",
+			"stages": [
+				"manual"
+			],
+			"needs": "credentials",
+			"proof": {
+				"kind": "live",
+				"reason": "It reads the production wallet table and the live encryption key, then decrypts in memory to test each secret against the current key. There is no offline fixture for 'this ciphertext no longer opens' that would prove anything about the real fleet. Read-only: it never writes, signs, or broadcasts."
+			}
+		},
+		{
+			"id": "audit-deploy-artifacts",
+			"script": "scripts/audit-deploy-artifacts.mjs",
+			"npm": "audit:deploy",
+			"title": "Deploy artifact preflight",
+			"protects": "The two artifact failure classes that have taken production down.",
+			"why": "Both are invisible in a diff and obvious in seconds if something looks. Running it before a submit costs nothing next to a failed Cloud Build.",
+			"stages": [
+				"deploy:submit"
+			],
+			"needs": "none",
+			"proof": {
+				"summary": "A symlink committed to the index, which the deploy bundler cannot resolve.",
+				"stage": true,
+				"violation": {
+					"link": {
+						"data/guard-proof-link.md": "../README.md"
+					}
+				},
+				"expect": "guard-proof-link.md"
+			}
+		},
+		{
+			"id": "audit-docs",
+			"script": "scripts/audit-docs.mjs",
+			"npm": "audit:docs",
+			"title": "Documentation integrity",
+			"protects": "No dead relative link, no site link that matches no route, no command naming a script that no longer exists, and no packages or workers directory without a README.",
+			"why": "Docs rot silently: a page gets renamed, a script gets dropped, a directory moves, and the doc that pointed at it keeps looking correct. Renaming or deleting a file is exactly when this earns its keep.",
+			"stages": [
+				"gate"
+			],
+			"needs": "none",
+			"proof": {
+				"summary": "A doc whose relative link points at a file that does not exist.",
+				"violation": {
+					"write": {
+						"docs/guard-proof-dead-link.md": "# Proof fixture\n\nSee [the missing reference](./guard-proof-nowhere.md) for details.\n"
+					}
+				},
+				"expect": "guard-proof-dead-link.md"
+			}
+		},
+		{
+			"id": "audit-empty-handlers",
+			"script": "scripts/audit-empty-handlers.mjs",
+			"npm": "audit:handlers",
+			"title": "API handlers export a body",
+			"protects": "No API handler ships as an empty file or without an export.",
+			"why": "The api tree uses a dispatcher-shim pattern where a real endpoint can be a one-line re-export, which makes an accidentally empty handler look normal in review and return nothing in production.",
+			"stages": [
+				"prebuild",
+				"gate"
+			],
+			"needs": "none",
+			"proof": {
+				"summary": "An API file that is routable but exports nothing, so it can never serve a response.",
+				"violation": {
+					"write": {
+						"api/guard-proof-empty.js": "\n"
+					}
+				},
+				"expect": "api/guard-proof-empty.js"
+			}
+		},
+		{
+			"id": "audit-garments",
+			"script": "scripts/audit-garments.mjs",
+			"npm": "audit:garments",
+			"title": "Wardrobe catalog integrity",
+			"protects": "Every garment in the live catalog validates, and its GLB hash matches its manifest.",
+			"why": "It runs the same validation the closet runs at consume time, against the real fetched asset, so a re-uploaded or corrupted GLB is caught before a user wears it.",
+			"stages": [
+				"manual"
+			],
+			"needs": "network",
+			"proof": {
+				"kind": "live",
+				"reason": "Fetches every published garment asset over the network and inspects the returned GLB, so there is no offline input to mutate."
+			}
+		},
+		{
+			"id": "audit-guards",
+			"script": "scripts/audit-guards.mjs",
+			"npm": "audit:guards",
+			"title": "The guard registry itself",
+			"protects": "Every entry in this file names a real script and a real npm script, every guard on disk is registered, and every stage claim matches the npm chain that would actually run it.",
+			"why": "This registry is rendered by docs/guards.md and by /guards, so a stale stage column does not read as stale, it reads as coverage a reader then stops looking for. Listing itself is not circular: it verifies its own script, npm binding, and gate membership exactly like every other entry.",
+			"stages": [
+				"gate"
+			],
+			"needs": "none",
+			"proof": {
+				"summary": "A registry entry naming a guard script that is not in the repository.",
+				"violation": {
+					"json": [
+						{
+							"file": "data/guards.json",
+							"pointer": "guards.0.script",
+							"set": "scripts/guard-proof-missing.mjs"
+						}
+					]
+				},
+				"expect": "scripts/guard-proof-missing.mjs"
+			}
+		},
+		{
+			"id": "audit-hidden-guard",
+			"script": "scripts/audit-hidden-guard.mjs",
+			"npm": "audit:hidden-guard",
+			"title": "The [hidden] guard",
+			"protects": "Every page resolves the CSS that makes the hidden attribute actually hide.",
+			"why": "The hidden HTML attribute only hides an element while some stylesheet maps it. A page that misses that rule renders its hidden scaffolding to real users. This is the verifier half of an inject-and-audit pair.",
+			"stages": [
+				"prebuild",
+				"gate"
+			],
+			"needs": "none",
+			"proof": {
+				"summary": "A product page that links no shared stylesheet, so [hidden] never hides anything.",
+				"violation": {
+					"write": {
+						"pages/guard-proof-unguarded.html": "<!doctype html>\n<html lang=\"en\">\n<head><meta charset=\"utf-8\"><title>Proof</title></head>\n<body><div hidden class=\"overlay\">covers everything</div></body>\n</html>\n"
+					}
+				},
+				"expect": "guard-proof-unguarded.html"
+			}
+		},
+		{
+			"id": "audit-home-credential-health",
+			"script": "scripts/audit-home-credential-health.mjs",
+			"npm": "audit:home-credentials",
+			"title": "No connected home is sealed behind an unreadable key",
+			"protects": "Every stored Home Assistant long-lived token still decrypts under the current WALLET_ENCRYPTION_KEY, and names the homes that would go dark if one does not.",
+			"why": "home_connections.access_token_enc is the platform second class of at-rest ciphertext under the same key as the custodial wallet secrets, and a rotation that loses the outgoing value seals both. The two failures look nothing alike, which is why one reading cannot cover both: a sealed wallet strands SOL that can never be signed for again, while a sealed home token strands nothing and costs reach. Every connected house simply stops answering at once, with no balance anywhere to notice it by and no signal that says why, until each owner pastes a fresh token. Run it beside the wallet audit on every key rotation.",
+			"stages": [
+				"manual"
+			],
+			"needs": "credentials",
+			"proof": {
+				"kind": "live",
+				"reason": "It reads the production home_connections table and the live encryption key, then decrypts in memory to test each token against the current key. There is no offline fixture for \"this ciphertext no longer opens\" that would prove anything about the real fleet. Read-only: it never writes and never opens a socket to any house."
+			}
+		},
+		{
+			"id": "audit-ibm-hosted-page",
+			"script": "scripts/audit-ibm-hosted-page.mjs",
+			"npm": "audit:ibm-hosted",
+			"title": "The IBM partnership page still works on the host that serves it",
+			"protects": "pages/ibm/hello.html keeps working from a foreign origin: every three.ws file it reads answers with a cross-origin header, the live document it swaps in names no root-relative URL, and the page raises no console error.",
+			"why": "That page is uploaded once onto a domain we do not control, so every asset it names and every document it fetches is a cross-origin request. Both ways it breaks are invisible to audit:console, which loads it from three.ws where all of it is same-origin. A missing access-control-allow-origin froze the hosted copy on its baked baseline, killed the language switcher and left the paid demo unarmed on 2026-09-04 while the same page on three.ws was perfect, and a root-relative URL inside the fetched live document resolves against the publisher, asking their domain for a file only we have. Reproducing the hosted deployment (a throwaway publisher origin, a real network hop to three.ws, no stubs) is the only way a browser applies its real cross-origin rules to it.",
+			"stages": [
+				"manual"
+			],
+			"needs": "browser",
+			"proof": {
+				"kind": "live",
+				"reason": "Serves pages/ibm/ from a throwaway origin and lets it talk to a real three.ws over the network, because the thing under test is the browser enforcing cross-origin rules against live response headers. Any stub or proxy would answer for three.ws and satisfy CORS on the browser behalf, blinding the audit to the only failure it exists to catch."
+			}
+		},
+		{
+			"id": "audit-image-loading",
+			"script": "scripts/audit-image-loading.mjs",
+			"npm": "check:images",
+			"title": "Image loading attributes",
+			"protects": "Every JS-rendered image sets its loading and decoding attributes.",
+			"why": "These images pull remote thumbnails and avatars. Without the attributes the browser blocks rendering on images far below the fold, which shows up as a slow page rather than as an error.",
+			"stages": [
+				"gate"
+			],
+			"needs": "none",
+			"proof": {
+				"summary": "A JS-rendered image with no loading attribute, which fetches eagerly off-screen.",
+				"violation": {
+					"write": {
+						"src/guard-proof-img.js": "export function proofThumb(url) {\n\treturn `<img src=\"${url}\" alt=\"proof\">`;\n}\n"
+					}
+				},
+				"expect": "guard-proof-img.js"
+			}
+		},
+		{
+			"id": "audit-inline-handlers",
+			"script": "scripts/audit-inline-handlers.mjs",
+			"npm": "audit:inline-handlers",
+			"title": "CSP-safe inline markup",
+			"protects": "No served HTML carries an inline event handler attribute or a javascript: URL.",
+			"why": "server/csp-hashes.mjs replaced script-src 'unsafe-inline' with the SHA-256 hashes of the inline <script> blocks in each response. A hash covers a script element and nothing else, so an onclick= attribute or a javascript: href needs 'unsafe-hashes' to run, which hands the mitigation straight back. Reintroducing one does not fail any build or test on its own: it simply stops working in production while passing locally, because a dev server without the header runs it fine.",
+			"stages": [
+				"gate"
+			],
+			"needs": "none",
+			"proof": {
+				"summary": "A page wiring a click through an onclick attribute, which no script hash can cover.",
+				"violation": {
+					"write": {
+						"pages/guard-proof-inline-handler.html": "<!doctype html>\n<html lang=\"en\">\n<head><meta charset=\"utf-8\"><title>Proof</title></head>\n<body><button onclick=\"alert(1)\">Proof</button></body>\n</html>\n"
+					}
+				},
+				"expect": "guard-proof-inline-handler"
+			}
+		},
+		{
+			"id": "audit-interactive-states",
+			"script": "scripts/audit-interactive-states.mjs",
+			"npm": "audit:states",
+			"title": "Interactive-state ratchet",
+			"protects": "A selector that declares cursor:pointer cannot ship without a hover rule behind it.",
+			"why": "public/tokens.css gives every control a focus floor and a disabled floor, but hover is component-specific and a blanket rule would stack on top of components that already style their own. So hover is audited instead: cursor:pointer promises the thing is clickable, and with no :hover rule in the same stylesheet the pointer changes shape and nothing else happens, which reads as a dead control. Counting against a committed baseline and failing only when the count rises makes the debt strictly decreasing, the same contract as the design-token ratchet beside it.",
+			"stages": [
+				"gate"
+			],
+			"needs": "none",
+			"proof": {
+				"summary": "A stylesheet declaring a clickable selector with no hover rule for it.",
+				"violation": {
+					"write": {
+						"public/guard-proof-hover.css": ".proof-clickable { cursor: pointer; color: var(--fg); }\n.proof-other { cursor: pointer; color: var(--fg); }\n"
+					}
+				},
+				"expect": "interactive-state gaps increased"
+			}
+		},
+		{
+			"id": "audit-links",
+			"script": "scripts/audit-links.mjs",
+			"npm": "audit:links",
+			"title": "Site link integrity",
+			"protects": "Every navigable target across pages, public, and src resolves to a real route or file.",
+			"why": "It resolves each link against the real routing model rather than assuming the catch-all rules count as proof, so a dead internal path cannot hide behind a wildcard that would serve a 404 page.",
+			"stages": [
+				"manual"
+			],
+			"needs": "none",
+			"proof": {
+				"summary": "A route in vercel.json whose destination file was never created.",
+				"violation": {
+					"json": [
+						{
+							"file": "vercel.json",
+							"pointer": "routes",
+							"at": 0,
+							"insert": {
+								"src": "/guard-proof-dangling",
+								"dest": "/guard-proof-dangling.html"
+							}
+						}
+					]
+				},
+				"expect": "guard-proof-dangling"
+			}
+		},
+		{
+			"id": "audit-llm-metering",
+			"script": "scripts/audit-llm-metering.mjs",
+			"npm": "audit:llm-metering",
+			"title": "LLM spend metering",
+			"protects": "Every LLM lane that spends money reports a real cost, never exactly $0 and never an unknown.",
+			"why": "A cost lane reporting zero is worse than one reporting nothing: it reads as free traffic. OpenRouter was on the blanket free-provider list while the platform key routed paid vendor mirrors, so a real $30 balance drained with the dashboard showing $0 the whole way down, and nobody noticed until the key stopped working.",
+			"stages": [
+				"manual"
+			],
+			"needs": "credentials",
+			"proof": {
+				"kind": "live",
+				"reason": "Aggregates the usage_events ledger over a time window, so it has no offline input. The rule it applies is unit-tested without a database in tests/llm-metering-rule.test.js."
+			}
+		},
+		{
+			"id": "audit-mcp-catalog",
+			"script": "scripts/build-mcp-catalog.mjs",
+			"npm": "audit:mcp-catalog",
+			"title": "MCP tool catalog freshness",
+			"protects": "public/mcp-catalog.json matches what the MCP servers actually expose.",
+			"why": "The searchable tool index at /mcp-tools renders from the generated catalog. A stale catalog advertises tools that moved, renamed, or no longer exist, which is worse than advertising nothing.",
+			"stages": [
+				"gate"
+			],
+			"needs": "none",
+			"proof": {
+				"summary": "A new MCP tool landing without regenerating the public catalog.",
+				"violation": {
+					"write": {
+						"api/_mcp/tools/guard-proof-catalog.js": "export const guardProofTool = {\n\tname: 'guard_proof_catalog',\n\tdescription: 'Proof fixture tool used only inside the guard sandbox.',\n\tinputSchema: { type: 'object', properties: {}, additionalProperties: false },\n\tannotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },\n};\n"
+					}
+				},
+				"expect": "public/mcp-catalog.json is stale"
+			}
+		},
+		{
+			"id": "audit-mcp-golden",
+			"script": "scripts/audit-mcp-golden.mjs",
+			"npm": "audit:mcp-golden",
+			"title": "MCP golden contracts",
+			"protects": "Tool names, descriptions, annotations, and input schemas of every hosted MCP server, against a committed snapshot.",
+			"why": "That contract is what external agents integrate against, so a well-meaning description edit silently changes how other people's agents route. It parses the sources statically rather than importing them, because importing would pull in database and RPC clients.",
+			"stages": [
+				"gate"
+			],
+			"needs": "none",
+			"proof": {
+				"summary": "A tool contract appearing on the wire without being declared in the golden fixture.",
+				"violation": {
+					"write": {
+						"api/_mcp/tools/guard-proof-golden.js": "export const guardProofGoldenTool = {\n\tname: 'guard_proof_golden',\n\tdescription: 'Proof fixture tool used only inside the guard sandbox.',\n\tinputSchema: { type: 'object', properties: {}, additionalProperties: false },\n\tannotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },\n};\n"
+					}
+				},
+				"expect": "[audit:mcp-golden]"
+			}
+		},
+		{
+			"id": "audit-mcp-listing",
+			"script": "scripts/build-mcp-listing-source.mjs",
+			"npm": "audit:mcp-listing",
+			"title": "MCP directory listing source",
+			"protects": "prompts/store-submissions/_generated/mcp-listing-source.json describes every MCP server we publish, at the version we publish.",
+			"why": "Every third-party directory listing (the official registry, Smithery, Glama, mcp.so, PulseMCP, LobeHub) is written from that one file. While it was kept by hand it drifted six servers short and thirty-five versions behind, and nothing noticed, because a listing nobody reads back looks identical whether it is right or wrong. The generator reads the facts from the manifests and this check fails when the committed file no longer matches them, or when a new server lands with no listing copy at all.",
+			"stages": [
+				"gate"
+			],
+			"needs": "none",
+			"proof": {
+				"summary": "A new MCP server landing with no listing copy, so its directory card would be blank.",
+				"violation": {
+					"write": {
+						"packages/guard-proof-mcp/server.json": "{\n\t\"$schema\": \"https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json\",\n\t\"name\": \"io.github.nirholas/guard-proof-mcp\",\n\t\"title\": \"Guard proof server\",\n\t\"description\": \"Proof fixture server used only inside the guard sandbox.\",\n\t\"websiteUrl\": \"https://three.ws\",\n\t\"repository\": {\n\t\t\"url\": \"https://github.com/nirholas/three.ws\",\n\t\t\"source\": \"github\"\n\t},\n\t\"version\": \"0.0.1\",\n\t\"packages\": [\n\t\t{\n\t\t\t\"registryType\": \"npm\",\n\t\t\t\"identifier\": \"@three-ws/guard-proof-mcp\",\n\t\t\t\"version\": \"0.0.1\",\n\t\t\t\"runtimeHint\": \"npx\",\n\t\t\t\"transport\": {\n\t\t\t\t\"type\": \"stdio\"\n\t\t\t}\n\t\t}\n\t]\n}\n"
+					}
+				},
+				"expect": "no curated listing copy"
+			}
+		},
+		{
+			"id": "audit-mcp-surfaces",
+			"script": "scripts/build-mcp-surfaces.mjs",
+			"npm": "audit:mcp-surfaces",
+			"title": "MCP resource and prompt listings",
+			"protects": "Every hosted MCP server's registry manifest (server*.json) and the public directory at public/.well-known/mcp.json list exactly the resources, resource templates and guided prompts that server really serves.",
+			"why": "Registries and MCP clients decide what a server offers from these listings before they ever connect. The lists are generated from api/_mcp/resources.js and api/_mcp/prompts.js, so a prompt or resource added, renamed or removed in code leaves the published manifests advertising things that do not exist, or hiding things that do, until someone remembers to regenerate. This check fails when any committed listing no longer matches what the code serves.",
+			"stages": [
+				"gate"
+			],
+			"needs": "none",
+			"proof": {
+				"summary": "The public MCP directory advertising no guided prompts for the main server while the code still serves them.",
+				"violation": {
+					"json": [
+						{
+							"file": "public/.well-known/mcp.json",
+							"pointer": "servers.0.prompts",
+							"set": []
+						}
+					]
+				},
+				"expect": "MCP resource/prompt listings are stale"
+			}
+		},
+		{
+			"id": "check-pay-skills",
+			"script": "scripts/build-pay-skills.mjs",
+			"npm": "check:pay-skills",
+			"title": "pay registry provider listings",
+			"protects": "The committed provider files under distributions/pay-skills/ are exactly what api/_lib/service-catalog/pay-skills.js generates from the service catalog today, with no stale or orphaned file.",
+			"why": "Publishing to the pay registry is a copy of this directory, and its paths, schemas and prices are projected from the same catalog and price functions the live 402 challenges use. A catalog change that nobody regenerated would publish listings that quote a price or a route production no longer serves, and an agent paying from that listing would be charged against the wrong contract.",
+			"stages": [
+				"gate"
+			],
+			"needs": "none",
+			"proof": {
+				"summary": "A committed provider listing edited by hand, so it no longer matches what the catalog generates.",
+				"violation": {
+					"write": {
+						"distributions/pay-skills/providers/three-ws/3d/PAY.md": "Hand-edited listing that no catalog generated.\n"
+					}
+				},
+				"expect": "stale: distributions/pay-skills/providers/three-ws/3d/PAY.md"
+			}
+		},
+		{
+			"id": "audit-mcp-manifests",
+			"script": "scripts/audit-mcp-manifests.mjs",
+			"npm": "audit:mcp",
+			"title": "MCP manifests",
+			"protects": "Every MCP registry manifest satisfies the official registry's rules, offline.",
+			"why": "The official registry enforces these rules at publish time, so a manifest that drifts past them blocks the next publish instead of failing here, where it is cheap to fix.",
+			"stages": [
+				"gate"
+			],
+			"needs": "none",
+			"proof": {
+				"summary": "A registry manifest whose description exceeds the 100-character schema limit.",
+				"violation": {
+					"json": [
+						{
+							"file": "server.json",
+							"pointer": "description",
+							"set": "A deliberately overlong registry description used by the guard proof sandbox to exceed the one hundred character schema limit imposed by the registry."
+						}
+					]
+				},
+				"expect": "[audit:mcp]"
+			}
+		},
+		{
+			"id": "audit-mcp-reviewer",
+			"script": "scripts/audit-mcp-reviewer-path.mjs",
+			"npm": "audit:mcp-reviewer",
+			"title": "Connector reviewer path",
+			"protects": "Every paid tool on the published stdio server answers an unpaid call with a clean, priced x402 challenge, and the reviewer entitlement lifts it only for the right secret.",
+			"why": "A Claude Connectors reviewer drives the server with no wallet, so what they see for a paid tool IS the product. A crash, a stack trace or an unexplained JSON blob reads as a broken connector and costs a submission cycle. This drove the whole surface as a reviewer's host does and immediately found the standing evidence was four tools out of date.",
+			"stages": [
+				"manual"
+			],
+			"needs": "network",
+			"proof": {
+				"kind": "live",
+				"reason": "It spawns the real published server over stdio and calls every tool, and several tools reach live upstreams. A static fixture cannot produce a payment challenge from the x402 wrapper, which is the thing under test."
+			}
+		},
+		{
+			"id": "audit-mcp-safety",
+			"script": "scripts/audit-mcp-safety.mjs",
+			"npm": "audit:mcp-safety",
+			"title": "MCP safety annotations",
+			"protects": "Every MCP tool's declared safety annotations match what its handler actually does.",
+			"why": "Annotations are not decoration: clients read readOnlyHint and destructiveHint to decide what may run without asking a human. A tool that writes while claiming to be read-only removes a confirmation the user was relying on.",
+			"stages": [
+				"gate"
+			],
+			"needs": "none",
+			"proof": {
+				"summary": "A tool shipping with no safety annotations at all, so a client cannot judge it.",
+				"violation": {
+					"write": {
+						"api/_mcp/tools/guard-proof-safety.js": "export const guardProofSafetyTool = {\n\tname: 'guard_proof_safety',\n\tdescription: 'Proof fixture tool used only inside the guard sandbox.',\n\tinputSchema: { type: 'object', properties: {}, additionalProperties: false },\n\tasync handler() {\n\t\treturn { ok: true };\n\t},\n};\n"
+					}
+				},
+				"expect": "no annotations"
+			}
+		},
+		{
+			"id": "audit-motion-drift",
+			"script": "scripts/audit-motion-drift.mjs",
+			"npm": "audit:motion-tokens",
+			"title": "Motion ratchet",
+			"protects": "A transition cannot spell its duration or easing as a literal past a committed baseline.",
+			"why": "public/tokens.css names four durations and three easings and collapses the durations to 0ms under prefers-reduced-motion, and none of that reaches a transition written as `150ms ease`. The platform was saying the same thing 41 different ways, which nobody notices on one control and everybody feels as the site not behaving like one product. Counting literals against a baseline and failing only when the count rises makes the debt strictly decreasing, the same contract as the design-token and interactive-state ratchets beside it. @keyframes and `animation` are deliberately out of scope: their durations are intrinsic to the effect, not a control response.",
+			"stages": [
+				"gate"
+			],
+			"needs": "none",
+			"proof": {
+				"summary": "A stylesheet whose transition states its duration and easing as literals instead of tokens.",
+				"violation": {
+					"write": {
+						"public/guard-proof-motion.css": ".proof-motion { transition: opacity 137ms ease, transform 240ms ease-in-out; }\n"
+					}
+				},
+				"expect": "motion drift increased"
+			}
+		},
+		{
+			"id": "audit-overlays",
+			"script": "scripts/audit-overlays.mjs",
+			"npm": "audit:overlays",
+			"title": "Overlapping fixed overlays",
+			"protects": "No persistent floating widget can cover another one's controls.",
+			"why": "Viewport-anchored UI accumulated independently: the walk companion, the corner stack, consent bars, sticky rails, the chat launcher. Each is correct alone and they compete for the same few hundred pixels. The collision only appears on the one page where both are mounted at the one viewport where they touch, which is invisible to unit tests and to whoever built either widget. Every earlier fix was a bug report plus a hand measurement plus a magic offset.",
+			"stages": [
+				"manual"
+			],
+			"needs": "browser",
+			"proof": {
+				"kind": "live",
+				"reason": "Drives a real Chromium over real routes at real viewports and measures painted geometry, so the input is a rendered page rather than a file a fixture could write."
+			}
+		},
+		{
+			"id": "audit-page-index",
+			"script": "scripts/audit-page-index.mjs",
+			"npm": "audit:pages",
+			"title": "Route documentation",
+			"protects": "Every human-facing route in vercel.json is documented in data/pages.json, and every page submitted for indexing is crawlable and index-allowed.",
+			"why": "data/pages.json feeds the sitemap, llms.txt, features.json, and the changelog. A page missing from it is invisible to crawlers and to the changelog, so it ships without ever being announced. It also cross-checks indexability, because the manifest decides what gets submitted while the page itself decides what a crawler may do with it: seventeen pages were being submitted while answering noindex, plus a JSON endpoint submitted as a page while robots.txt disallowed its path. Search Console files that difference as an error against us, and neither half looks wrong on its own.",
+			"stages": [
+				"prebuild",
+				"gate"
+			],
+			"needs": "none",
+			"proof": {
+				"summary": "A public page route in vercel.json that no data/pages.json entry documents.",
+				"violation": {
+					"json": [
+						{
+							"file": "vercel.json",
+							"pointer": "routes",
+							"at": 0,
+							"insert": {
+								"src": "/guard-proof-orphan",
+								"dest": "/guard-proof-orphan.html"
+							}
+						}
+					]
+				},
+				"expect": "guard-proof-orphan"
+			}
+		},
+		{
+			"id": "audit-play-failure-modes",
+			"script": "scripts/audit-play-failure-modes.mjs",
+			"npm": "audit:play-failures",
+			"title": "/play failure-mode audit",
+			"protects": "/play stays usable when its dependencies fail, and hostile deep-link params never execute.",
+			"why": "The clean-path console audit proves nothing about the paths an event crowd actually hits: no session, an ad blocker eating IPFS, a dead GLB, a 500 on the auth nonce, a pass that expires mid-session, a pasted link carrying hostile name/symbol/image params. Each scenario is injected in a real browser and the boot loader must always resolve, into the world or into a designed error card with a recovery action, never a stuck spinner.",
+			"stages": [
+				"manual"
+			],
+			"needs": "browser",
+			"proof": {
+				"kind": "live",
+				"reason": "Needs Playwright plus a running server, because the thing under test is how the page behaves when a specific request is aborted or rewritten mid-load. A static fixture cannot fail a fetch the page has not made yet."
+			}
+		},
+		{
+			"id": "audit-rig-coverage",
+			"script": "scripts/audit-rig-coverage.mjs",
+			"npm": "audit:rig-coverage",
+			"title": "Rig coverage",
+			"protects": "How well the canonicalizer maps the skeletons actually stored in production.",
+			"why": "The bone-name tables grew by anticipating rig conventions, and anticipation is not evidence. This walks real avatars and ranks the unmapped bone names by frequency, so the next mapping to add is a measurement rather than a guess.",
+			"stages": [
+				"manual"
+			],
+			"needs": "credentials",
+			"proof": {
+				"kind": "live",
+				"reason": "Loads real avatar rigs from production storage and retargets clips onto them, which needs live credentials and the model bucket."
+			}
+		},
+		{
+			"id": "audit-route-shadowing",
+			"script": "scripts/audit-route-shadowing.mjs",
+			"npm": "audit:route-shadowing",
+			"title": "No API handler is routed but unreachable",
+			"protects": "Every handler under api/ that looks routed can actually be reached, by replaying the production router's ordered walk of vercel.json against each handler's own canonical URL.",
+			"why": "The route table is evaluated in order, so an earlier catch-all such as /api/agents/([^/]+) swallows every literal sibling declared after it. The handler file exists, the route table appears to mention it, and the endpoint is simply dead: it returns another handler's answer. This is invisible in a diff and in local testing, and has silently killed documented endpoints before. verify-routes covers PAGE routes; this covers API handlers.",
+			"stages": [
+				"gate"
+			],
+			"needs": "none",
+			"proof": {
+				"kind": "live",
+				"reason": "The audit currently reports a real backlog of 46 shadowed handlers, so it exits non-zero against the live repo and cannot yet pass the control half of a sandboxed proof. It stays a manual audit until that backlog is cleared, at which point it can move into the gate with a two-sided proof."
+			}
+		},
+		{
+			"id": "audit-seo",
+			"script": "scripts/audit-seo.mjs",
+			"npm": "audit:seo",
+			"title": "On-page SEO",
+			"protects": "No duplicate title or meta description across indexed pages, every canonical pointing at the page itself, no sitemap entry that answers noindex or a non-200, and structured data that parses.",
+			"why": "Every one of these fails silently: nothing errors, the pages just stop appearing in search. A canonical pointing elsewhere hands a page's ranking away, and structured data that does not parse is dropped whole, which is how the news archive lost its rich result on 2026-09-06.",
+			"stages": [
+				"manual"
+			],
+			"needs": "network",
+			"proof": {
+				"kind": "live",
+				"reason": "Reads the served response from a live origin, because only that proves what a crawler receives after routing, the shell rewrite and the CDN. A local fixture cannot show a canonical or a sitemap status the CDN produced."
+			}
+		},
+		{
+			"id": "audit-service-wallets",
+			"script": "scripts/audit-service-wallets.mjs",
+			"npm": "audit:service-wallets",
+			"title": "Service wallet configuration",
+			"protects": "Every platform wallet's on-chain balance, its floor, and whether the advertised x402 fee payer matches the secret we actually co-sign with.",
+			"why": "An advertised fee-payer that does not match the configured secret silently 502s paid endpoints, and a wallet under its floor pauses its engine. Both look identical from outside and have different fixes.",
+			"stages": [
+				"manual"
+			],
+			"needs": "credentials",
+			"proof": {
+				"kind": "live",
+				"reason": "Reads live balances for the service wallets over RPC using the production keys in .env."
+			}
+		},
+		{
+			"id": "audit-token-drift",
+			"script": "scripts/audit-token-drift.mjs",
+			"npm": "audit:tokens",
+			"title": "Design-token ratchet",
+			"protects": "Hardcoded colour hexes cannot creep back past a committed baseline.",
+			"why": "public/tokens.css is the single source of truth for colour primitives, but a big-bang cleanup of every legacy hex is not possible. Counting violations against a baseline and failing only when the count rises makes the debt strictly decreasing.",
+			"stages": [
+				"gate"
+			],
+			"needs": "none",
+			"proof": {
+				"summary": "A token-covered page hardcoding a hex that is literally a design token.",
+				"violation": {
+					"write": {
+						"pages/guard-proof-token.html": "<!doctype html>\n<html lang=\"en\">\n<head>\n<meta charset=\"utf-8\"><title>Proof</title>\n<link rel=\"stylesheet\" href=\"/style.css\">\n<style>\n.proof-a { color: #4ade80; }\n.proof-b { color: #f87171; }\n</style>\n</head>\n<body><p class=\"proof-a\">fixture</p></body>\n</html>\n"
+					}
+				},
+				"expect": "design-token drift increased"
+			}
+		},
+		{
+			"id": "audit-tour-atlas",
+			"script": "scripts/build-tour-atlas.mjs",
+			"npm": "audit:tour-atlas",
+			"title": "The tour atlas tells the truth",
+			"protects": "public/tour/atlas.json matches a fresh render of data/tour-atlas.json: every stop resolves, every screenshot it promises exists on disk, and the curated anchors still parse.",
+			"why": "The atlas is a committed snapshot of a capture run. Edit the source manifest without re-rendering, delete a screenshot, or rot an anchor selector and the /tour-atlas page keeps promising media and spotlight targets that no longer exist. None of that fails a build on its own; only re-deriving the atlas and comparing catches it.",
+			"stages": [
+				"gate"
+			],
+			"needs": "none",
+			"proof": {
+				"kind": "live",
+				"reason": "The check re-renders the committed atlas from data/tour-atlas.json and verifies 160 captured screenshots exist on disk; a sandbox proof would need the full media tree copied per run, so it is exercised by the real gate instead."
+			}
+		},
+		{
+			"id": "audit-upstreams",
+			"script": "scripts/audit-upstreams.mjs",
+			"npm": "audit:upstreams",
+			"title": "Upstream resilience ratchet",
+			"protects": "No new call to a third-party service can be added without a deadline, and no existing one can quietly get weaker.",
+			"why": "Adding a fallback is easy; knowing it made things better is not. An AST pass grades every outbound call site on five protections (deadline, retry, failover, last-good, breaker) and compares it against data/upstream-baseline.json. A ratchet rather than a threshold: a threshold gets rounded up until it means nothing, while a baseline lets the existing tail be paid down at its own pace and makes adding to it by accident impossible. Improving a call site lowers the baseline automatically; raising it back needs an explicit --accept, which is one reviewable line in a diff. It measures what check:fetch-timeouts cannot: that guard enforces the deadline floor, this one measures everything above it.",
+			"stages": [
+				"gate"
+			],
+			"needs": "none",
+			"proof": {
+				"summary": "A new outbound call to a third-party host with no deadline behind it.",
+				"violation": {
+					"write": {
+						"api/_lib/guard-proof-upstream.js": "// Guard proof fixture: an unbounded third-party call.\nexport async function probeStatus() {\n\treturn fetch('https://guard-proof.example.com/status');\n}\n"
+					}
+				},
+				"expect": "guard-proof.example.com"
+			}
+		},
+		{
+			"id": "audit-wallet-flows",
+			"script": "scripts/audit-wallet-flows.mjs",
+			"npm": "audit:wallet-flows",
+			"title": "Fleet wallet flows",
+			"protects": "Where the platform's SOL is, where it has been going, and whether any of it is leaking.",
+			"why": "Every time the paid rail goes dry the first theory is a leak. This separates the three real answers by measurement: capital dispersed into agent wallets, a starved fee floor, and an actual unexplained debit.",
+			"stages": [
+				"manual"
+			],
+			"needs": "credentials",
+			"proof": {
+				"kind": "live",
+				"reason": "Reconstructs on-chain transfer history for the fleet wallets from live RPC, so it has no offline input."
+			}
+		},
+		{
+			"id": "audit-x402-catalog",
+			"script": "scripts/audit-x402-catalog.mjs",
+			"npm": "audit:x402-catalog",
+			"title": "x402 endpoint catalog",
+			"protects": "Every paid endpoint under api/x402 is documented in the public catalog.",
+			"why": "Each paid endpoint is a sellable product an agent can discover and call. One that exists but is undocumented earns nothing, because no buyer can find it.",
+			"stages": [
+				"gate"
+			],
+			"needs": "none",
+			"proof": {
+				"summary": "A paid x402 endpoint that no buyer can find, because the catalog never mentions it.",
+				"violation": {
+					"write": {
+						"api/x402/guard-proof-endpoint.js": "export default async function handler(req, res) {\n\tres.status(200).json({ ok: true });\n}\n"
+					}
+				},
+				"expect": "guard-proof-endpoint"
+			}
+		},
+		{
+			"id": "build-motion-signatures",
+			"script": "scripts/build-motion-signatures.mjs",
+			"npm": "audit:motion",
+			"title": "Motion signature index",
+			"protects": "public/animations/signatures.json describes the clips that are actually baked.",
+			"why": "Measuring every baked clip takes seconds, so the answer is computed once and stored rather than recomputed per page view. That makes it a cache with no invalidation: rebake a clip without regenerating, and /gestures, the /animations gallery and the walk-layer tests all keep describing motion that no longer exists. --check recomputes the index and fails when the stored copy no longer matches, which is the only thing standing between a rebake and a silently wrong index.",
+			"stages": [
+				"gate"
+			],
+			"needs": "none",
+			"proof": {
+				"summary": "A stored signature index that no longer matches the baked clips.",
+				"violation": {
+					"json": [
+						{
+							"file": "public/animations/signatures.json",
+							"pointer": "count",
+							"set": -1
+						}
+					]
+				},
+				"expect": "signatures.json is stale"
+			}
+		},
+		{
+			"id": "build-openai-skills-bundle",
+			"script": "scripts/build-openai-skills-bundle.mjs",
+			"npm": "check:openai-skills",
+			"title": "Published 3D skill bundle drift",
+			"protects": "public/skills/3d-studio/ is byte-identical to the .agents/skills folders it is generated from, so the bundle anyone downloads is the one this repo ships.",
+			"why": "That directory is a published artifact: it is served at /skills/3d-studio/, fetched by people who never clone the repo, and uploaded verbatim on the Skills tab of an OpenAI Plugin Directory submission. It is also generated, so an edit to a SKILL.md that is not regenerated leaves strangers running an older copy of our instructions against the live endpoints, with no signal that the two disagree. The check regenerates into a temp directory and names every file that differs, is missing, or is published but no longer generated.",
+			"stages": [
+				"gate"
+			],
+			"needs": "none",
+			"proof": {
+				"summary": "A published bundle file edited by hand, so it no longer matches the skill it was generated from.",
+				"violation": {
+					"append": {
+						"public/skills/3d-studio/generate-3d-model/SKILL.md": "\nHand-edited inside the guard sandbox, so the published copy no longer matches .agents/skills.\n"
+					}
+				},
+				"expect": "content differs"
+			}
+		},
+		{
+			"id": "build-skills-pack",
+			"script": "scripts/build-skills-pack.mjs",
+			"npm": "check:skills-pack",
+			"title": "Agent Skills pack manifest drift",
+			"protects": ".agents/skills/SKILLS.md and .agents/skills/skills-pack.json still describe the skill folders on disk, including every category they count.",
+			"why": "The manifest is what a registry, a bundling script, and every external reader see instead of opening 48 folders, and it is generated. A skill added, renamed, or recategorized without regenerating leaves the index advertising a set that does not exist, which is the one thing an index must never do. The same run also fails when a category is counted but has no description, because the counts and the prose are rendered from one map.",
+			"stages": [
+				"gate"
+			],
+			"needs": "none",
+			"proof": {
+				"summary": "A generated manifest edited by hand, so it no longer matches the skill folders.",
+				"violation": {
+					"json": [
+						{
+							"file": ".agents/skills/skills-pack.json",
+							"pointer": "version",
+							"set": "0.0.0-hand-edited"
+						}
+					]
+				},
+				"expect": "skills-pack manifest is stale"
+			}
+		},
+		{
+			"id": "build-skills-seed",
+			"script": "scripts/build-skills-seed.mjs",
+			"npm": "check:skills-seed",
+			"title": "Skills seed drift",
+			"protects": "The marketplace seed at data/skills/seed.json still matches the SKILL.md files it is generated from.",
+			"why": "The seed is a generated mirror of every skill on disk, so a skill used to have to be fixed twice: once in its SKILL.md and once in the seed. They drifted, and the marketplace served the stale half while the file a reader opens said something else. The generator is the single source, and --check regenerates in memory and names each skill whose manifest or body no longer matches, so the mirror can never be quietly wrong.",
+			"stages": [
+				"gate"
+			],
+			"needs": "none",
+			"proof": {
+				"summary": "A seed entry whose stored body no longer matches its SKILL.md.",
+				"violation": {
+					"json": [
+						{
+							"file": "data/skills/seed.json",
+							"pointer": "total",
+							"set": -1
+						}
+					]
+				},
+				"expect": "DRIFT: data/skills/seed.json"
+			}
+		},
+		{
+			"id": "build-standalone-skill-repos",
+			"script": "scripts/build-standalone-skill-repos.mjs",
+			"npm": "check:skill-repos",
+			"title": "Standalone skill repos still resolve",
+			"protects": "Every standalone skill repo we publish selects at least one skill, and every skill it would ship has a SKILL.md to ship.",
+			"why": "The repos at nirholas/three-ws-skills and its two subsets are generated from .agents/skills/ rather than maintained by hand, which is what keeps a published copy from drifting. The failure that buys is silent: a recategorized skill quietly drops out of a selector, and the next publish ships a repo missing the skill people installed it for, or an empty one. This resolves every selector against the real pack and refuses a build that would publish nothing or a folder with no SKILL.md.",
+			"stages": [
+				"gate"
+			],
+			"needs": "none",
+			"proof": {
+				"summary": "A skill folder that lost its SKILL.md while a repo spec still selects it.",
+				"violation": {
+					"delete": [
+						".agents/skills/generate-3d-model/SKILL.md"
+					]
+				},
+				"expect": "missing SKILL.md"
+			}
+		},
+		{
+			"id": "check-announce",
+			"script": "scripts/check-announce.mjs",
+			"npm": "check:announce",
+			"title": "Announcement packs are postable",
+			"protects": "Every announcement pack ships captured media with alt text, a post inside X's real weighted limit, an opening no other pack reuses, and no reference to a crypto project other than $THREE.",
+			"why": "There are 320 shipped surfaces that have never been announced, so the copy gets written in volume, and volume is exactly what turns announcements into templated noise an audience learns to skip. Three failures are invisible in a diff and expensive after posting: a pack whose media was never captured (a post with no image measured 0.875x against our own median), a post over the 280 weighted characters X silently counts URLs as 23 of, and a frame captured from a live trading surface, which bakes whatever third-party tickers were on screen into a committed file and trips the commit gate the operating rules put on other-coin content.",
+			"stages": [
+				"gate"
+			],
+			"needs": "none",
+			"proof": {
+				"summary": "An announcement pack whose post opens with banned marketing copy and declares no media.",
+				"violation": {
+					"write": {
+						"docs/announcements/guard-proof-pack.md": "# Proof fixture\n\nalt text: none, on purpose.\n",
+						"docs/announcements/guard-proof-pack.post.txt": "Introducing our revolutionary new thing, now with seamless everything, at three.ws/guard-proof-pack\n"
+					}
+				},
+				"expect": "guard-proof-pack"
+			}
+		},
+		{
+			"id": "check-api-imports",
+			"script": "scripts/check-api-imports.mjs",
+			"npm": "check:api-imports",
+			"title": "Every API module loads",
+			"protects": "Every handler and shared module under api/ importing without throwing.",
+			"why": "The server imports a handler the first time its route is hit, so a module that throws while loading is not a build error or a boot error. It is a 500 on every request to that route. On 2026-09-18 two merged dependency bumps did exactly that to the paid x402 surface while the build and a stale local test tree both stayed green.",
+			"stages": [
+				"deploy:submit"
+			],
+			"needs": "none",
+			"proof": {
+				"summary": "A shared API module that throws at load time, the way a dependency with a changed constructor does.",
+				"violation": {
+					"write": {
+						"api/_lib/guard-proof-throws-on-load.js": "throw new Error('guard proof: this module throws while loading');\n"
+					}
+				},
+				"expect": "guard-proof-throws-on-load.js"
+			}
+		},
+		{
+			"id": "check-apple-widget",
+			"script": "scripts/check-apple-widget.mjs",
+			"npm": "check:apple-widget",
+			"title": "The Apple glance widget still builds and still speaks the server’s wire",
+			"protects": "Both Xcode projects that build the Agent glance widget are internally consistent, every shared Swift source is a member of the targets that need it, the plists expand only build settings the projects define, and the Swift client still agrees with api/glance/mine.js on the endpoint, the query, the six headers, the four states, the sizes, the scales and the token shape.",
+			"why": "Nothing on a Linux build machine can compile Swift or open an .xcodeproj, so every failure here would otherwise be found on somebody else’s Mac days later. Two classes of them are silent. A Swift file added to apple/GlanceKit and never added to a target simply does not exist at runtime, and an object id in the committed project.pbxproj that no longer resolves breaks the iOS app build outright, on the shipping App Store artifact. The quieter one is drift across the wire: rename a header or a state string in api/glance/mine.js and the widget keeps parsing the old name, draws the wrong card, and nothing anywhere errors. This proves the structure and the contract without a Mac in the room; it does not prove the Swift compiles, and does not claim to.",
+			"stages": [
+				"gate"
+			],
+			"needs": "none",
+			"proof": {
+				"summary": "The Swift client stops reading a header api/glance/mine.js still sets.",
+				"violation": {
+					"write": {
+						"apple/GlanceKit/GlanceClient.swift": "// A client that reads none of the headers the server sets.\nimport Foundation\nstruct GlanceClient {}\n"
+					}
+				},
+				"expect": "no longer reads"
+			}
+		},
+		{
+			"id": "check-asset-encoding",
+			"script": "scripts/check-asset-encoding.mjs",
+			"npm": "check:asset-encoding",
+			"title": "Served asset length matches the bytes delivered",
+			"protects": "The largest compressible files under public/ arrive in full when requested from the live site with the exact Accept-Encoding a current browser sends.",
+			"why": "On 2026-09-11 the CDN held a variant of the 11 MB MediaPipe WASM runtime whose content-length was the uncompressed size while the body was brotli-compressed with no content-encoding header. Every Chrome and Edge that advertises zstd waited forever for bytes that were never coming, and /create/selfie hung at \"Processing your face\". curl with a plain Accept-Encoding saw a healthy response, and every page check reads HTML rather than the largest binary on the site, so nothing else could see it.",
+			"stages": [
+				"manual"
+			],
+			"needs": "network",
+			"proof": {
+				"kind": "live",
+				"reason": "It requests assets from the live CDN and compares the promised length against the bytes that actually arrive, so the failure it catches exists only in a served response. A local file has no content-encoding negotiation to get wrong."
+			}
+		},
+		{
+			"id": "check-awesome",
+			"script": "scripts/build-awesome.mjs",
+			"npm": "check:awesome",
+			"title": "Awesome list freshness",
+			"protects": "awesome/README.md and public/awesome.json match data/awesome.json, which is the single source both are generated from.",
+			"why": "The list is published in two places that people read separately, the GitHub README and the /awesome page. Editing either by hand, or adding an entry to the source without regenerating, ships two versions of the same list that disagree about what is on it.",
+			"stages": [
+				"gate"
+			],
+			"needs": "none",
+			"proof": {
+				"summary": "A generated output edited by hand, so it no longer matches data/awesome.json.",
+				"violation": {
+					"write": {
+						"awesome/README.md": "# Awesome 3D Agents\n\nHand-edited inside the guard sandbox, so this no longer matches data/awesome.json.\n"
+					}
+				},
+				"expect": "out of date"
+			}
+		},
+		{
+			"id": "check-awesome-links",
+			"script": "scripts/check-awesome-links.mjs",
+			"npm": "awesome:links",
+			"title": "Awesome list link health",
+			"protects": "Every url in the Awesome 3D Agents list (data/awesome.json) still answers, and no url is listed twice.",
+			"why": "An awesome list is only worth publishing if its links resolve, and they rot silently as projects move or disappear. Deliberately manual: it calls a hundred-odd third-party hosts, so a flaky CDN must never turn somebody else's deploy red. It separates a bot-filter 403 from a genuinely dead link, because those need different reactions.",
+			"stages": [
+				"manual"
+			],
+			"needs": "network",
+			"proof": {
+				"kind": "live",
+				"reason": "Fetches every listed url from the real hosts, so only the live answer distinguishes a moved link, a bot filter and a dead one. A static fixture cannot produce any of the three."
+			}
+		},
+		{
+			"id": "check-browser-graph",
+			"script": "scripts/check-browser-graph.mjs",
+			"npm": "check:browser-graph",
+			"title": "Browser bundle purity",
+			"protects": "No Node-only module leaks into the browser bundle.",
+			"why": "A Node builtin pulled into browser code does not fail the build, it fails at runtime in the user's tab, usually on a page nobody tested after the import was added.",
+			"stages": [
+				"build:gcp"
+			],
+			"needs": "none",
+			"proof": {
+				"summary": "A Node built-in reaching the browser bundle through a real import chain.",
+				"violation": {
+					"append": {
+						"src/solana/sns.js": "\nimport { promisify } from 'node:util';\nexport const proofPromisify = promisify;\n"
+					}
+				},
+				"expect": "node:util"
+			}
+		},
+		{
+			"id": "check-claude-md",
+			"script": "scripts/check-claude-md.mjs",
+			"npm": "check:claude",
+			"title": "CLAUDE.md truth check",
+			"protects": "Every script, path, count, and runbook step named in CLAUDE.md matches the repo.",
+			"why": "Agents execute CLAUDE.md verbatim, so a stale line does not read as stale, it reads as an instruction. Each claim is re-derived from its source of truth on every run: the cron count from vercel.json, the deploy chain order from the real npm script, the documented git remotes from git itself.",
+			"stages": [
+				"gate"
+			],
+			"needs": "none",
+			"proof": {
+				"summary": "CLAUDE.md telling an agent to run an npm script that does not exist.",
+				"violation": {
+					"append": {
+						"CLAUDE.md": "\n\nProof fixture: verify the toolchain with `npm run guard-proof-nonexistent`.\n"
+					}
+				},
+				"expect": "guard-proof-nonexistent"
+			}
+		},
+		{
+			"id": "check-cron-drift",
+			"script": "scripts/check-cron-drift.mjs",
+			"npm": "check:cron-drift",
+			"npmAliases": [
+				"check:cron-syntax"
+			],
+			"title": "Cron schedule drift",
+			"protects": "Every cron declared in vercel.json is a valid expression, and matches what Cloud Scheduler is actually running.",
+			"why": "vercel.json is a live config file: the scheduler sync seeds Cloud Scheduler from its crons array. A schedule edited without a re-sync, or a job paused by hand during an incident and never resumed, fails silently because the declared config still looks right. The offline half validates expressions and runs in the gate; the live half compares against the running jobs.",
+			"stages": [
+				"gate",
+				"manual"
+			],
+			"needs": "gcloud",
+			"proof": {
+				"kind": "live",
+				"reason": "Compares the crons declared in vercel.json against the jobs actually deployed to Cloud Scheduler, so it needs an authenticated gcloud session and the live project. There is nothing offline to mutate."
+			}
+		},
+		{
+			"id": "check-deps",
+			"script": "scripts/check-deps.mjs",
+			"npm": "audit:deps",
+			"title": "Python worker dependencies",
+			"protects": "No pinned Python dependency in workers/, services/ or packages/ carries a known vulnerability in the OSV database.",
+			"why": "npm audit covers the JavaScript tree and nothing covered the other half of the platform. Twenty requirements files pin the runtime of every GPU and CPU worker, and a pinned version never gets a security bump unless somebody goes looking. The workers that decode caller-supplied images and meshes are exactly where an image-parsing overflow matters.",
+			"stages": [
+				"manual"
+			],
+			"needs": "network",
+			"proof": {
+				"kind": "live",
+				"reason": "Queries the OSV database over its public API for every pinned requirement, so the answer changes as advisories are published and there is nothing offline to mutate. The requirement parsing it depends on is covered by tests/check-deps.test.js instead."
+			}
+		},
+		{
+			"id": "check-dist",
+			"script": "scripts/check-dist.mjs",
+			"npm": "check:dist",
+			"title": "Build output shape",
+			"protects": "dist/ contains every artifact the deploy expects, including the UMD library bundle.",
+			"why": "The frontend build empties dist/, so anything written before it is destroyed. This fails the build when the order was wrong instead of shipping an image missing its pages or its library.",
+			"stages": [
+				"build:gcp"
+			],
+			"needs": "none",
+			"proof": {
+				"summary": "A build that finished without producing the published embed bundle.",
+				"setup": {
+					"dist/agent-3d/latest/agent-3d.js": "export const proof = 1;\n",
+					"dist/agent-3d/latest/agent-3d.umd.cjs": "module.exports = { proof: 1 };\n",
+					"dist/agent-3d/versions.json": "{\"latest\":\"{{pkg.version}}\"}\n",
+					"dist/dist-lib/agent-3d.js": {
+						"fill": 1000001
+					},
+					"dist/dist-lib/agent-3d.umd.cjs": {
+						"fill": 100001
+					},
+					"dist/home.html": "<!doctype html><title>home</title>\n",
+					"dist/dashboard.html": "<!doctype html><title>dashboard</title>\n",
+					"dist/pump-dashboard.html": "<!doctype html><title>pump</title>\n",
+					"dist/dashboard-next.html": "<!doctype html><title>next</title>\n",
+					"dist/create.html": "<!doctype html><title>create</title>\n",
+					"dist/discover.html": "<!doctype html><title>discover</title>\n",
+					"dist/chat.html": "<!doctype html><title>chat</title>\n"
+				},
+				"violation": {
+					"delete": [
+						"dist/dist-lib/agent-3d.umd.cjs"
+					]
+				},
+				"expect": "MISSING: dist/dist-lib/agent-3d.umd.cjs"
+			}
+		},
+		{
+			"id": "check-doc-media",
+			"script": "scripts/check-doc-media.mjs",
+			"npm": "check:doc-media",
+			"title": "Doc figures match their manifest",
+			"protects": "Every figure a doc points at was really captured, still matches its recipe, and carries alt text.",
+			"why": "The capture pipeline can produce a correct image while the docs stay wrong: a tutorial points at a file nobody captured, a recipe outlives the doc that used it, an image gets swapped by hand so it no longer matches what the caption claims, or it ships with no alt text, which is a defect for every reader on a screen reader. None of that is visible in a diff.",
+			"stages": [
+				"gate"
+			],
+			"needs": "none",
+			"proof": {
+				"summary": "A doc figure whose image file does not exist on disk.",
+				"violation": {
+					"write": {
+						"docs/guard-proof-media.md": "# Proof fixture\n\n![a figure that was never captured](/docs/img/guard-proof-missing.png)\n"
+					}
+				},
+				"expect": "guard-proof"
+			}
+		},
+		{
+			"id": "check-docs-freshness",
+			"script": "scripts/doc-freshness.mjs",
+			"npm": "check:docs-freshness",
+			"title": "Documentation drift budget",
+			"protects": "No more docs describe code that changed after they were written than data/docs-freshness-budget.json allows.",
+			"why": "A stale doc does not read as stale, it reads as an instruction, and agents here execute docs verbatim. The dependency graph behind /docs/freshness measures which docs sit downstream of code that moved since their last commit, and the budget is a ratchet: it only goes down, and raising it requires a recorded reason, which is what stops drift from becoming permanently normal.",
+			"stages": [
+				"gate"
+			],
+			"needs": "none",
+			"proof": {
+				"kind": "live",
+				"reason": "The input is git history, not a file: a doc is stale because of the commits that landed after it, which a sandbox cannot fabricate without rewriting history. The corpus is also over its budget of 5 at the time of registering, so the control half of a two-sided proof would fail against the real repo until the queue is refreshed."
+			}
+		},
+		{
+			"id": "check-earnings-board",
+			"script": "scripts/check-earnings-board.mjs",
+			"npm": "check:earnings-board",
+			"title": "Earnings leaderboard agrees with every agent page",
+			"protects": "Every row of GET /api/leaderboard/earnings, in all four windows, matches what GET /api/agents/:id/earnings reports for that agent over the same window: creator fees to the lamport, service income, the total, and the rank. Every total equals its parts and the board is sorted by total.",
+			"why": "The promise to users is that a row on /leaderboard?tab=earned and the Earned card on that agent's page never disagree. Both read one model, and tests/agent-earnings-board.test.js holds that on a seeded database, but only real data exercises the real mix of coins, windows and rounding. A board that ranks an agent on numbers its own page does not show is the fastest way to lose trust in both.",
+			"stages": [
+				"manual"
+			],
+			"needs": "network",
+			"proof": {
+				"kind": "live",
+				"reason": "Pages through the live board and asks each ranked agent for its own earnings over public GET requests, so the rows it compares only exist in a running deployment. It is read-only. The offline half of the same comparison is tests/agent-earnings-board.test.js."
+			}
+		},
+		{
+			"id": "check-erc7710-addresses",
+			"script": "scripts/check-erc7710-addresses.js",
+			"npm": "check:erc7710",
+			"title": "Delegation contract addresses",
+			"protects": "Every address in the delegation-manager deployment table is a deployed contract on its chain.",
+			"why": "A wrong or undeployed address fails only at the moment a user signs, which is the worst possible time to discover a typo in a constant.",
+			"stages": [
+				"manual"
+			],
+			"needs": "network",
+			"proof": {
+				"kind": "live",
+				"reason": "Resolves the delegation-framework contract addresses against live chain RPC, so the values it compares only exist on-chain."
+			}
+		},
+		{
+			"id": "check-event-window",
+			"script": "scripts/check-event-window.mjs",
+			"npm": "check:event",
+			"title": "Live event window",
+			"protects": "public/event.json describes an event that will actually happen, on every surface that reads it.",
+			"why": "One file drives the /play lobby banner, the in-world countdown and meetup layer, the game server's quest gate, the leaderboard endpoints and the souvenir grant. Every one of them treats a bad or expired window as 'there is no event' and mounts nothing, so the failure is silent and total: the page loads, the world runs, and the entire event is simply absent with no error to say why. That has already happened once, when a rehearsal window was left in the file.",
+			"stages": [
+				"manual"
+			],
+			"needs": "none",
+			"proof": {
+				"summary": "An event window whose end has already passed, which every surface reads as 'no event' and mounts nothing.",
+				"violation": {
+					"write": {
+						"public/event.json": "{\n\t\"id\": \"guard-proof-expired\",\n\t\"name\": \"Guard proof expired event\",\n\t\"startsAt\": \"2020-01-01T00:00:00.000Z\",\n\t\"endsAt\": \"2020-01-01T02:00:00.000Z\"\n}\n"
+					}
+				},
+				"expect": "the event window ENDED"
+			}
+		},
+		{
+			"id": "check-fetch-timeouts",
+			"script": "scripts/check-fetch-timeouts.mjs",
+			"npm": "check:fetch-timeouts",
+			"title": "No outbound call without a deadline",
+			"protects": "Every fetch to a third-party host is bounded, so one stalled upstream cannot hold a request open until the platform kills it.",
+			"why": "A fetch with no signal has no deadline at all: undici's defaults run to minutes, so an upstream that accepts a connection and then stalls holds the whole invocation and takes the request budget of every fallback behind it. From the outside that is not a slow provider, it is a dead endpoint, a dead cron, or a page that spins forever. Only the deadline is enforced, because retries, provider ladders and last-good tiers are judgement calls per call site while a deadline never is. The checker balances parentheses to read each call's real extent, since signal is conventionally the last key of an options object and a fixed window would report a bounded call as unbounded exactly when its options are longest.",
+			"stages": [
+				"gate"
+			],
+			"needs": "none",
+			"proof": {
+				"summary": "A fetch to a third-party host added with no signal and no bounding wrapper.",
+				"violation": {
+					"append": {
+						"api/_lib/rugcheck.js": "\n// Proof fixture: an unbounded call to a third-party host.\nexport async function _proofUnboundedFetch() {\n\treturn fetch('https://api.rugcheck.xyz/v1/proof');\n}\n"
+					}
+				},
+				"expect": "rugcheck.js"
+			}
+		},
+		{
+			"id": "check-gcloudignore",
+			"script": "scripts/check-gcloudignore.mjs",
+			"npm": "check:gcloudignore",
+			"title": "Cloud Build upload contents",
+			"protects": "What `gcloud builds submit` would actually upload.",
+			"why": "An over-broad ignore file silently drops a file the build needs; an under-broad one uploads gigabytes of node_modules and times out. Neither is visible until the build runs.",
+			"stages": [
+				"manual"
+			],
+			"needs": "gcloud",
+			"proof": {
+				"summary": "A missing .gcloudignore, which silently hands the upload set back to .gitignore.",
+				"violation": {
+					"delete": [
+						".gcloudignore"
+					]
+				},
+				"expect": "ignore file not found"
+			}
+		},
+		{
+			"id": "check-home-matrix",
+			"script": "scripts/home-version-matrix.mjs",
+			"npm": "check:home-matrix",
+			"title": "The published Home Assistant support table is the one that was measured",
+			"protects": "The version table in docs/smart-home.md is exactly what the last real matrix run wrote into docs/ops/home-version-matrix.json: the same releases, the same roles and install shares, and the same per-capability result for connect, registries, stream and call.",
+			"why": "The home lane's correctness depends on a third party's monthly release, and the table is the only place we tell anyone which Home Assistant versions we support. The measurement is expensive (four containers, thirteen gigabytes, pulled and destroyed one at a time), so it is deliberately not run on every gate; what the gate can afford is proving that the cheap, published half still agrees with the expensive, measured half. Without that, the table decays into a claim: a run whose JSON landed but whose doc edit did not, or a doc edited by hand to say what someone hoped, both read as a supported version to every reader and to us.",
+			"stages": [
+				"gate"
+			],
+			"needs": "none",
+			"proof": {
+				"kind": "mutation",
+				"summary": "The measured matrix says one thing and the published table another.",
+				"violation": {
+					"json": [
+						{
+							"file": "docs/ops/home-version-matrix.json",
+							"pointer": "results.0.tag",
+							"set": "1999.1"
+						}
+					]
+				},
+				"expect": "is stale"
+			}
+		},
+		{
+			"id": "check-home-voice",
+			"script": "scripts/check-home-voice.mjs",
+			"npm": "check:home-voice",
+			"title": "Hands-free voice loop",
+			"protects": "The browser voice loop keeps the properties the feature is sold on: nothing about listening loads before opt-in, an ambient \"yeah\" never confirms a guarded action, and the agent does not wake itself.",
+			"why": "This loop holds a live microphone and can reach a physical actuator, so its claims are the kind that have to be measured rather than reasoned about. It drives a real Chromium with a fake capture device fed from speech the platform synthesized itself, and walks ten scenarios end to end including barge-in, mute at the track, a refused microphone and a deployment with no speech lane. It cannot sit on an automatic path: it needs a browser, a server and the live speech lanes, and a flaky guard on the gate is a guard people learn to skip.",
+			"stages": [
+				"manual"
+			],
+			"needs": "browser",
+			"proof": {
+				"kind": "live",
+				"reason": "Drives a real Chromium against the running voice loop with a synthesized microphone stream. The behaviours under test (a wake word firing, playback stopping on barge-in, a capture track actually ending) only exist at runtime, so there is no static fixture that could stand in for them."
+			}
+		},
+		{
+			"id": "check-ios-app",
+			"script": "scripts/check-ios-app.mjs",
+			"npm": "check:ios-app",
+			"title": "The iOS app's native half still agrees with the web half",
+			"protects": "The iOS share extension is a real, embedded target with every file it needs, every target ships one MARKETING_VERSION, the app and the extension join the same App Group, the .glb type the activation rule names is the one the app imports, and the Swift plugin, quick actions and scene delegate still match the routes and calls the site makes.",
+			"why": "Nothing on a Linux build machine can compile Swift, and the iOS app is two halves that only meet on a phone. Every failure this catches is a name that changed on one side and not the other, and every one is silent on device: a quick action that opens nothing, a share extension that never appears in the share sheet, a plugin call that rejects. App Store Connect also refuses an upload whose extension version differs from the app's. Green means the halves agree; it does not mean the Swift compiles.",
+			"stages": [
+				"gate"
+			],
+			"needs": "none",
+			"proof": {
+				"summary": "The share extension loses the Swift file that hands a shared model to the app.",
+				"violation": {
+					"delete": [
+						"ios/native/App/ShareExtension/ShareViewController.swift"
+					]
+				},
+				"expect": "ShareViewController.swift is missing"
+			}
+		},
+		{
+			"id": "check-ios-icons",
+			"script": "ios/scripts/make-icons.mjs",
+			"npm": "check:ios-icons",
+			"title": "The iOS app icon still is the brand mark",
+			"protects": "The committed app icon and launch images are exactly what the current brand mark produces, and the icon carries no alpha channel.",
+			"why": "The iOS icon is the one asset that cannot be generated at build time: it is compiled into the .ipa from Assets.xcassets, so whatever is committed is what ships to every home screen. Both failure modes are silent. A hand-exported replacement drifts away from public/pwa-512x512.png and nothing anywhere notices, so the app wears a stale mark for a release cycle. And an icon that reaches App Store Connect with an alpha channel is rejected outright, which surfaces at upload time on someone else's Mac, hours after the change that caused it. Re-deriving the assets and comparing bytes catches both before either can leave the repository.",
+			"stages": [
+				"gate"
+			],
+			"needs": "none",
+			"proof": {
+				"summary": "The committed app icon replaced with bytes the brand mark does not produce.",
+				"violation": {
+					"write": {
+						"ios/native/App/App/Assets.xcassets/AppIcon.appiconset/AppIcon-512@2x.png": "not the brand mark\n"
+					}
+				},
+				"expect": "app icon"
+			}
+		},
+		{
+			"id": "check-macos-icon",
+			"script": "apple/scripts/make-macos-icon.mjs",
+			"npm": "check:macos-icon",
+			"title": "The Mac app icon still is the brand mark",
+			"protects": "The ten committed macOS icon sizes and their Contents.json are exactly what the current brand mark produces.",
+			"why": "macOS compiles its icon into the .app from Assets.xcassets, so whatever is committed is what people see in the Dock and in Notification Centre beside the widget. It fails silently in both directions a hand-edit can go: a replacement drifts away from public/pwa-512x512.png and nothing notices, and a missing size in the ladder makes the icon fall back to a blurry upscale that only shows up on a Retina display somebody else owns. Re-deriving all ten and comparing bytes catches both here rather than after a Developer ID build.",
+			"stages": [
+				"gate"
+			],
+			"needs": "none",
+			"proof": {
+				"summary": "A committed Mac icon size replaced with bytes the brand mark does not produce.",
+				"violation": {
+					"write": {
+						"apple/macos/ThreeWSGlance/Assets.xcassets/AppIcon.appiconset/icon_256x256.png": "not the brand mark\n"
+					}
+				},
+				"expect": "DRIFT"
+			}
+		},
+		{
+			"id": "check-mcp-catalog",
+			"script": "scripts/check-mcp-catalog.mjs",
+			"npm": "check:mcp-catalog",
+			"title": "The connectable MCP server catalog is valid",
+			"protects": "data/mcp-catalog.json, the vetted list of external MCP servers an agent owner can connect on /integrations/mcp, parses and passes the same validateCatalog() the API runs at request time, with no tier glob listed under two tiers of one entry.",
+			"why": "The API validates the catalog when /api/integrations/mcp is called, so a malformed entry is not a build error, it is a 500 on the integrations page for every owner. A glob listed under two tiers is quieter still: first match wins, so the second tier silently never applies. Running the runtime validator offline moves both failures to build time.",
+			"stages": [
+				"prebuild",
+				"gate"
+			],
+			"needs": "none",
+			"proof": {
+				"summary": "A catalog file that is no longer valid JSON.",
+				"violation": {
+					"write": {
+						"data/mcp-catalog.json": "{ \"servers\": [ guard proof\n"
+					}
+				},
+				"expect": "is not valid JSON"
+			}
+		},
+		{
+			"id": "check-merge-conflicts",
+			"script": "scripts/check-merge-conflicts.mjs",
+			"npm": "check:conflicts",
+			"title": "Merge-conflict markers",
+			"protects": "No unresolved conflict marker can be built or deployed.",
+			"why": "A stash-pop conflict was once committed wholesale and reached production source. A conflict marker is a syntax error rather than a lint violation, so neither eslint nor vitest caught it. It runs first in both chains because it costs seconds and the build costs minutes.",
+			"stages": [
+				"gate",
+				"build:gcp"
+			],
+			"needs": "none",
+			"proof": {
+				"summary": "A staged source file carrying an unresolved conflict marker.",
+				"stage": true,
+				"violation": {
+					"write": {
+						"src/guard-proof-conflict.js": "export const side = 'resolved';\n<<<<<<< HEAD\nexport const owner = 'ours';\n=======\nexport const owner = 'theirs';\n>>>>>>> feature\n"
+					}
+				},
+				"expect": "src/guard-proof-conflict.js"
+			}
+		},
+		{
+			"id": "check-model-viewer-version",
+			"script": "scripts/check-model-viewer-version.mjs",
+			"npm": "check:model-viewer",
+			"title": "One <model-viewer> build across the whole tree",
+			"protects": "Every model-viewer URL in tracked source names the same version, no version is served under two different integrity hashes, and the vendored copy under pages/ibm/vendor/ hashes to the build the rest of the tree points at.",
+			"why": "model-viewer registers itself as a custom element, so a second customElements.define for it in one document throws and the later surface renders nothing at all. A three.ws embed pasted onto a page that already carries another three.ws surface is exactly that document, so a split pin is a blank viewer for somebody else, on their site, with nothing failing on ours. It had already drifted: eight of eighty-one references sat a major version behind. Integrity is checked alongside the version because the usual way a bump goes wrong is half-finished, the URL moved and its SRI hash left pointing at the old build, which browsers refuse outright. Delivery legitimately differs per surface (a top-level document pins SRI, a server-interpolated embed cannot, the Vite pages walk a CDN failover chain); the version never does.",
+			"stages": [
+				"gate"
+			],
+			"needs": "none",
+			"proof": {
+				"summary": "A model-viewer reference bumped to a version the rest of the tree does not use.",
+				"violation": {
+					"write": {
+						"pages/guard-proof-model-viewer.html": "<!doctype html>\n<script type=\"module\" src=\"https://ajax.googleapis.com/ajax/libs/model-viewer/9.9.9/model-viewer.min.js\"></script>\n"
+					}
+				},
+				"expect": "9.9.9"
+			}
+		},
+		{
+			"id": "check-openai-fields",
+			"script": "scripts/build-openai-portal-fields.mjs",
+			"npm": "check:openai-fields",
+			"title": "OpenAI directory form fields fit their silent limits",
+			"protects": "Every justification, test-case expectation and negative scenario pasted into the OpenAI Plugin Directory form fits under the length the portal truncates at, and each justification is one sentence describing behavior.",
+			"why": "Version 1.0.0 was rejected twice. The portal returned every justification cut at exactly 200 characters and every expected output at 300, mid-word, so the reviewer judged fragments such as \"and the compute\". The form shows no counter and no warning, so the only defense is to measure before pasting.",
+			"stages": [
+				"gate"
+			],
+			"needs": "none",
+			"proof": {
+				"kind": "live",
+				"reason": "The fields it measures are constants defined inside the script itself, so the only way to plant an over-long field is to replace the checker with a modified copy of itself, which would prove the copy rather than the guard. The proof sandbox mutates inputs, and this guard has none outside its own source."
+			}
+		},
+		{
+			"id": "check-pages",
+			"script": "scripts/check-pages.mjs",
+			"npm": "check:pages",
+			"title": "Declared pages resolve",
+			"protects": "Every page declared in data/pages.json is actually reachable.",
+			"why": "Anything listed in pages.json is advertised to crawlers the moment it lands. Two pages shipped as hard 404s in three days, each with a built dist file and no route rewrite. The local mode gates the deploy build; the base-url mode sweeps a live deployment after it.",
+			"stages": [
+				"build:gcp"
+			],
+			"needs": "none",
+			"proof": {
+				"summary": "A page advertised in data/pages.json with no built file behind it.",
+				"setup": {
+					"data/pages.json": "{\n\t\"site\": {\n\t\t\"base\": \"https://three.ws\"\n\t},\n\t\"sections\": [\n\t\t{\n\t\t\t\"id\": \"main\",\n\t\t\t\"title\": \"Main\",\n\t\t\t\"description\": \"Proof fixture section.\",\n\t\t\t\"pages\": [\n\t\t\t\t{\n\t\t\t\t\t\"path\": \"/guards\",\n\t\t\t\t\t\"title\": \"Guards\",\n\t\t\t\t\t\"description\": \"Proof fixture page.\",\n\t\t\t\t\t\"priority\": 0.5,\n\t\t\t\t\t\"changefreq\": \"weekly\",\n\t\t\t\t\t\"added\": \"2026-07-31\"\n\t\t\t\t}\n\t\t\t]\n\t\t}\n\t]\n}\n",
+					"dist/guards.html": "<!doctype html><title>guards</title>\n"
+				},
+				"violation": {
+					"delete": [
+						"dist/guards.html"
+					]
+				},
+				"expect": "not built into dist/"
+			}
+		},
+		{
+			"id": "check-prompt-library",
+			"script": "scripts/build-prompt-library.mjs",
+			"npm": "check:prompt-library",
+			"title": "Prompt library freshness",
+			"protects": "public/prompts.json and public/prompts.txt match data/prompt-library.json, and every prompt in that source is well formed.",
+			"why": "The library is copy people paste into their own assistant, published in three places that are read separately: the /prompts page, the JSON feed an agent fetches, and the plain-text file. Editing a generated copy by hand, or adding a prompt to the source without rebuilding, ships versions that disagree about what the library contains. The same run validates the source itself, so a duplicate id, an unknown category, an unbalanced <placeholder> bracket or a link to a route that does not exist fails the build instead of rendering a broken card.",
+			"stages": [
+				"gate"
+			],
+			"needs": "none",
+			"proof": {
+				"summary": "A generated copy edited by hand, so it no longer matches data/prompt-library.json.",
+				"violation": {
+					"append": {
+						"public/prompts.txt": "\nHand-edited inside the guard sandbox, so this no longer matches data/prompt-library.json.\n"
+					}
+				},
+				"expect": "stale"
+			}
+		},
+		{
+			"id": "check-relayer-balances",
+			"script": "scripts/check-relayer-balances.mjs",
+			"npm": "check:relayer-balances",
+			"title": "Relayer balances",
+			"protects": "Every configured Solana signer is above its documented minimum.",
+			"why": "The operator companion to the balance watchdog cron, run on demand from a machine that holds the signer secrets. Unconfigured signers are listed explicitly so the real deployment's holdings are visible at a glance.",
+			"stages": [
+				"manual"
+			],
+			"needs": "credentials",
+			"proof": {
+				"kind": "live",
+				"reason": "Queries the funded relayer accounts over RPC and compares them against the operating floor, which only exists on-chain."
+			}
+		},
+		{
+			"id": "check-rules",
+			"script": "scripts/check-rules.mjs",
+			"npm": "check:rules",
+			"title": "Hard rules, diff scoped",
+			"protects": "The CLAUDE.md hard rules on the lines you actually changed.",
+			"why": "A repo-wide sweep is impossible because thousands of tracked files predate the rules. Reading added lines only stops the bleeding without rewriting history: your change is held to the bar, the legacy around it is left alone. It also synthesizes hunks for untracked files, which a bare git diff cannot see.",
+			"stages": [
+				"pre-push"
+			],
+			"needs": "none",
+			"proof": {
+				"summary": "A new source file whose added lines break a CLAUDE.md hard rule.",
+				"violation": {
+					"write": {
+						"src/guard-proof-rule.js": "// TODO: wire this up later\nexport function proofFixture() {\n\treturn null;\n}\n"
+					}
+				},
+				"expect": "src/guard-proof-rule.js"
+			}
+		},
+		{
+			"id": "check-runnable-docs",
+			"script": "scripts/check-runnable-docs.mjs",
+			"npm": "check:runnable-docs",
+			"title": "Runnable doc samples still answer",
+			"protects": "Every sample a reader can press Run on still returns what the doc says it returns.",
+			"why": "A curl command in a tutorial can point at an endpoint renamed two quarters ago and nothing notices, because the doc still reads fine. This executes each sample through the same extractor the page uses (public/runnable-extract.js), so the doc and the check can never disagree about what the sample is.",
+			"stages": [
+				"manual"
+			],
+			"needs": "network",
+			"proof": {
+				"kind": "live",
+				"reason": "Executes the documented calls against the live API and compares real response statuses, so there is no offline input to mutate."
+			}
+		},
+		{
+			"id": "check-secrets",
+			"script": "scripts/check-secrets.mjs",
+			"npm": "check:secrets",
+			"title": "Credential material, before it leaves the machine",
+			"protects": "No dotenv file, private key, keystore, or downloaded cloud credential becomes a tracked file, and no added line carries a provider-issued key.",
+			"why": "A leaked key in git is not a bug you fix by deleting the line: every clone, fork, and mirror keeps a copy, so the only real remedy is rotating the credential at the provider. That asymmetry is why it runs before the push rather than after. Filenames are judged repo-wide and absolutely (the tree holds zero of them, so there is no legacy to grandfather); contents are judged diff scoped, because a repo-wide content scan drowns in hex addresses and placeholder docs until someone switches it off.",
+			"stages": [
+				"pre-push"
+			],
+			"needs": "none",
+			"proof": {
+				"summary": "An SSH private key staged as a tracked file.",
+				"stage": true,
+				"violation": {
+					"write": {
+						"id_ed25519": "not a real key: the filename alone is what this guard judges\n"
+					}
+				},
+				"expect": "id_ed25519"
+			}
+		},
+		{
+			"id": "check-sri-pins",
+			"script": "scripts/check-sri-pins.mjs",
+			"npm": "check:sri-pins",
+			"title": "Documented embed SRI pins match the release ledger",
+			"protects": "Every <agent-3d> script tag in the docs, specs, blog, examples, skills and package READMEs that pins a released version with an integrity hash carries the hash data/agent-3d-releases.json recorded for that release, and pins only versions that were actually released. `--fix` rewrites stale hashes from the ledger.",
+			"why": "An embedder copies the snippet from our docs. A pin whose hash disagrees with the bytes we serve makes the browser refuse the script, so the avatar never appears on their page and nothing on our side errors. On 2026-10-01 rebuilding a released version on every deploy broke every published pin at once. check-dist runs the same check on every deploy build; this entry point is the one to run while editing docs, and the one that repairs them.",
+			"stages": [
+				"manual"
+			],
+			"needs": "none",
+			"proof": {
+				"summary": "A doc snippet pinning a released version to a hash that is not the released one.",
+				"violation": {
+					"write": {
+						"docs/guard-proof-sri-pin.md": "# Proof fixture\n\n<script type=\"module\" src=\"https://three.ws/agent-3d/1.5.2/agent-3d.js\" integrity=\"sha384-AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA\" crossorigin=\"anonymous\"></script>\n"
+					}
+				},
+				"expect": "browsers will refuse it"
+			}
+		},
+		{
+			"id": "check-tdz-bootstrap",
+			"script": "scripts/check-tdz-bootstrap.mjs",
+			"npm": "check:tdz-bootstrap",
+			"title": "Bootstrap ordering",
+			"protects": "No page calls its own entry point above the state that entry point writes.",
+			"why": "JavaScriptCore checks an assignment target's temporal dead zone before it evaluates the right-hand side and V8 checks it afterwards, so a module that bootstraps itself above its own `let`s renders correctly in Chrome and throws \"Cannot access uninitialized variable.\" in every Safari. That shipped: each /avatars/:id page was dead on iOS and macOS while review, the page audit and the production smoke sweep all stayed green, because every one of them looks only at V8. A synchronous read of a later-declared binding is worse still and throws everywhere.",
+			"stages": [
+				"gate",
+				"build:gcp"
+			],
+			"needs": "none",
+			"proof": {
+				"summary": "A page whose top-level bootstrap writes a `let` declared further down the module.",
+				"stage": true,
+				"violation": {
+					"write": {
+						"src/guard-proof-tdz.js": "init().catch(() => {});\n\nasync function init() {\n\tavatar = await Promise.resolve(null);\n}\n\nlet avatar = null;\n"
+					}
+				},
+				"expect": "src/guard-proof-tdz.js"
+			}
+		},
+		{
+			"id": "check-vendored-workers",
+			"script": "scripts/check-vendored-workers.mjs",
+			"npm": "check:vendored",
+			"title": "Vendored worker modules stay identical",
+			"protects": "Every copy of a shared worker module (worker_security.py, oin.py, oin_upload.py, gltf_meshopt.py and its test) is byte-identical across all workers.",
+			"why": "A worker's Docker build context is its own directory, so `../` is unreachable and shared code lives as a copy in each worker that needs it. Nothing enforced that, so a fix applied to one copy could leave the other sixteen on the old behaviour, which is the shape of bug this repo has already paid for once. The guard compares every copy against the most common one and names the divergent files and the command that resyncs them.",
+			"stages": [
+				"gate"
+			],
+			"needs": "none",
+			"proof": {
+				"summary": "One worker's copy of worker_security.py edited so it no longer matches the other sixteen.",
+				"violation": {
+					"append": {
+						"workers/stylize/worker_security.py": "\n# Proof fixture: this line exists in one copy only, so the copies have drifted.\n"
+					}
+				},
+				"expect": "worker_security.py"
+			}
+		},
+		{
+			"id": "check-windows-widget",
+			"script": "scripts/check-windows-widget.mjs",
+			"npm": "check:windows-widget",
+			"npmAliases": [
+				"check:windows-widget:live"
+			],
+			"title": "The Windows 11 glance widget still satisfies the board's contract",
+			"protects": "The widgets member in vite.config.js, the glance service worker, the two glance endpoints and the Adaptive Card all agree with each other: every field the board requires is present, the declared icons and screenshots exist at the sizes claimed, the worker handles all six board lifecycle events, fetches the card rather than handing the host its URL, registers the refresh interval the manifest advertises, and the card expands in the board's own templating engine for every state with no unbound expressions and no dead button targets. The `:live` alias asks the same questions of a deployed origin instead of this disk: that the served manifest declares the widget this tree does, that the served worker is byte-identical to public/glance-sw.js, that the picker assets are really served as images, and that the Adaptive Card the board would fetch expands in that engine when bound with the deployed worker's own payload builder.",
+			"why": "The widgets board is the one surface nothing in this repository can open: it needs Windows 11, Edge, and the PWA installed. A broken slot renders as nothing at all rather than as an error, so every defect here is silent twice over, invisible locally and invisible to the user. Four have already reached that state while every other check stayed green: the worker passing the host a template URL where the card belonged, no periodic sync ever registered, a slot pinned before the worker activated staying empty, and a card written with JavaScript array paths that the board's expression engine refuses to parse. That last one is why this runs the real engine instead of reading the template with our own idea of a path: `${stats.0.label}` resolves in JavaScript and is a syntax error in Adaptive Expression Language, and the engine throws away the whole card rather than skipping the one binding, so a single dotted index empties the widget. A fifth class stands behind those four, and it is what the `:live` alias exists for: a fix that is green in this tree and absent from the deploy. On 2026-09-09 every check on this disk passed while production served the unparseable card, so the widget stayed broken for exactly as long as nobody thought to ask the deployed origin. Offline agreement is not evidence that a pinned slot draws; only the served bytes are.",
+			"stages": [
+				"gate"
+			],
+			"needs": "none",
+			"proof": {
+				"kind": "mutation",
+				"summary": "A screenshot the manifest advertises to the widget picker is gone from the tree.",
+				"violation": {
+					"delete": [
+						"public/screenshots/glance-widget.png"
+					]
+				},
+				"expect": "is declared but"
+			}
+		},
+		{
+			"id": "check-xai-models",
+			"script": "scripts/check-xai-models.mjs",
+			"npm": "check:xai-models",
+			"title": "Grok model catalog matches xAI",
+			"protects": "Every Grok model id in GROK_MODELS (api/_lib/chat-models.js) is one xAI still serves, every chat model xAI serves is catalogued, and each catalogued price, context window, image input, tool calling and reasoning-effort set matches xAI's own figures.",
+			"why": "xAI ships new model ids often and retires old ones in batches. A retired id in the catalog turns the Grok rung of every LLM failover chain into a guaranteed error, a new id nobody catalogued is a better or cheaper model no one on the platform can pick, and llm-pricing.js meters Grok spend from the catalog's prices, so a stale price is a wrong spend ledger. It reads the xAI models API when GROK_API_KEY or XAI_API_KEY is set and xAI's public model docs otherwise, and exits 2 rather than 1 when neither source can be read, so an outage is never reported as drift.",
+			"stages": [
+				"manual"
+			],
+			"needs": "network",
+			"proof": {
+				"kind": "live",
+				"reason": "The thing under test is what xAI serves today, read from its models API or its public model docs. There is no offline input whose mutation proves anything about a third party's live catalog, and the comparison never sends a prompt or spends a token. The key, when set, is only ever sent to api.x.ai."
+			}
+		},
+		{
+			"id": "check-mcp-counts",
+			"script": "scripts/check-mcp-counts.mjs",
+			"npm": "check:mcp-counts",
+			"title": "Quoted MCP counts match the census",
+			"protects": "Every tool, resource and prompt count a living doc quotes for a three.ws MCP server equals the census in public/tools.json.",
+			"why": "MCP tools are added weekly and the same number is quoted in READMEs, plugin docs and the architecture overview. Without a check each quote drifts on its own schedule, and a buyer reads 22 tools on a server that serves 40. Counts are written through a marker, so a stale number fails the gate and `--fix` rewrites it from the census.",
+			"stages": [
+				"gate"
+			],
+			"needs": "none",
+			"proof": {
+				"summary": "A living doc whose marker claims a tool count the census does not have.",
+				"violation": {
+					"write": {
+						"docs/guard-proof-mcp-count.md": "# Proof fixture\n\nThe 3D server has <!-- mcp-count:mcp-3d.tools -->9999<!-- /mcp-count --> tools.\n"
+					}
+				},
+				"expect": "guard-proof-mcp-count.md"
+			}
+		},
+		{
+			"id": "check-site-builder-embeds",
+			"script": "scripts/check-site-builder-embeds.mjs",
+			"npm": "check:site-builder-embeds",
+			"title": "Site-builder pinned releases match the ledger",
+			"protects": "The WordPress, Framer and Webflow pinned-release files name the same <agent-3d> release as the release ledger.",
+			"why": "Each site-builder integration ships a pinned copy of the agent-3d version it embeds, so a customer's site never floats onto an unreviewed build. When the ledger moves and a pin does not, one integration silently serves an old component. The guard regenerates the expected bytes from the ledger and fails on any difference; `--fix` rewrites them.",
+			"stages": [
+				"gate"
+			],
+			"needs": "none",
+			"proof": {
+				"summary": "A pinned-release file edited by hand so it no longer matches the ledger.",
+				"violation": {
+					"append": {
+						"integrations/webflow/src/pinned-release.ts": "\n// Hand-edited inside the guard sandbox, so the pin no longer matches the ledger.\n"
+					}
+				},
+				"expect": "does not match the ledger"
+			}
+		},
+		{
+			"id": "i18n-home",
+			"script": "scripts/i18n-home-keys.mjs",
+			"npm": "i18n:home",
+			"title": "Every string the connected home speaks has a catalog key",
+			"protects": "Each `t()` and `plural()` call site under the home lane resolves to a key in public/locales/en.json whose English source value is byte-identical to the fallback written in the code, and no source value smuggles a template expression into a translatable string.",
+			"why": "The HTML extractor reads `data-i18n` annotations, which covers the lane's page shells and misses the house itself: the rooms, the devices, the refusals, the confirmation and every spoken announcement are assembled in JS from live data and carry no markup to annotate. A new string added there is simply English forever in all 84 locales, and nothing complains, because the fallback argument renders perfectly. Drift is the quieter half: edit the English in the code and the catalog keeps serving the old sentence to every translated locale, so the product says two different things depending on the reader's language. The template-expression refusal guards a worse outcome, a user's own room or device name baked into a source string and machine-translated on the next run.",
+			"stages": [
+				"gate"
+			],
+			"needs": "none",
+			"proof": {
+				"kind": "mutation",
+				"summary": "The catalog's English keeps a sentence the code no longer says.",
+				"violation": {
+					"json": [
+						{
+							"file": "public/locales/en.json",
+							"pointer": "home_scene.act_close",
+							"set": "Shut"
+						}
+					]
+				},
+				"expect": "drift:"
+			}
+		},
+		{
+			"id": "sync-studio-openapi",
+			"script": "scripts/sync-studio-openapi.mjs",
+			"npm": "check:studio-openapi",
+			"npmAliases": [
+				"sync:studio-openapi"
+			],
+			"title": "3D Studio OpenAPI sync",
+			"protects": "The custom-GPT Actions file in the OpenAI submission kit is byte-identical to the OpenAPI schema three.ws actually serves.",
+			"why": "The served schema at public/.well-known/3d-studio-openapi.yaml is what https://three.ws/.well-known/3d-studio-openapi.yaml returns and what the GPT builder imports by URL, while prompts/store-submissions/_generated/openai-actions.yaml is the copy an OpenAI reviewer reads. Two hand-maintained copies of one contract drift, and the drift shows up as a reviewer reading a document the runtime does not serve. The served file is the source of truth and the copy is regenerated from it.",
+			"stages": [
+				"gate"
+			],
+			"needs": "none",
+			"proof": {
+				"summary": "The submission kit shipping an Actions contract that no longer matches the schema the site serves.",
+				"violation": {
+					"append": {
+						"public/.well-known/3d-studio-openapi.yaml": "\n# drift fixture: served schema edited without regenerating the submission copy\n"
+					}
+				},
+				"expect": "drift"
+			}
+		},
+		{
+			"id": "sync-tour-global",
+			"script": "scripts/sync-tour-global.mjs",
+			"npm": "audit:tour-global",
+			"title": "Tour bundle copy",
+			"protects": "public/tour-builder/tour.global.js is the bundle this repo's tour-sdk actually builds.",
+			"why": "The Tour Builder page previews a real tour rather than a mockup, by loading the same IIFE the package publishes. That file was hand-copied build output with nothing producing it, so it drifted: visitors were served a bundle built against an older walk-sdk than the one in the repo, and the preview stopped matching what a reader would install. --check rebuilds the SDK and fails when the served copy no longer matches it.",
+			"stages": [
+				"gate"
+			],
+			"needs": "none",
+			"proof": {
+				"kind": "live",
+				"reason": "The check is a comparison against a fresh `npm run build` of tour-sdk, so proving it needs that build to reproduce byte-for-byte. It does not inside the proof sandbox, which reports the served copy as stale before any fixture is applied and leaves nothing attributable to the fixture. Run `npm run audit:tour-global` on a real tree instead."
+			}
+		},
+		{
+			"id": "sync-tutorial-pages",
+			"script": "scripts/sync-tutorial-pages.mjs",
+			"npm": "check:tutorials",
+			"title": "Tutorial reachability",
+			"protects": "Every tutorial appears in the library manifest, has its markdown on disk, and is registered in data/pages.json, with no duplicate slugs.",
+			"why": "Three files have to agree for a tutorial to be both reachable and indexable, and nothing checked that they did: forty-one live tutorials were missing from the page index and invisible to search, and three had markdown with no card in the library. Run it with --write to register what is missing.",
+			"stages": [
+				"gate"
+			],
+			"needs": "none",
+			"proof": {
+				"summary": "A tutorial markdown file that no manifest entry points at, so nothing can reach it.",
+				"violation": {
+					"write": {
+						"docs/tutorials/guard-proof-orphan.md": "# Proof fixture tutorial\n\nThis file exists on disk and in no index.\n"
+					}
+				},
+				"expect": "guard-proof-orphan"
+			}
+		},
+		{
+			"id": "verify-routes",
+			"script": "scripts/verify-routes.mjs",
+			"npm": "audit:routes",
+			"title": "Routing and 404 model",
+			"protects": "Every catalog page is reachable, unknown paths reach the designed 404, and no page route is shadowed by an earlier rule.",
+			"why": "The route table is evaluated in order and split at the filesystem marker, so an earlier catch-all can swallow a later literal route. A handler can be routed and still never run, which is invisible until someone reports the endpoint dead.",
+			"stages": [
+				"gate"
+			],
+			"needs": "none",
+			"proof": {
+				"summary": "Deleting the route that serves a catalogued page, so its pretty URL 404s.",
+				"violation": {
+					"json": [
+						{
+							"file": "vercel.json",
+							"pointer": "routes",
+							"removeWhere": {
+								"src": "/guards/?"
+							}
+						}
+					]
+				},
+				"expect": "/guards"
+			}
+		},
+		{
+			"id": "check-trading-routes",
+			"script": "scripts/check-trading-routes.mjs",
+			"npm": "check:trading-routes",
+			"title": "Solana swap route liveness",
+			"protects": "Every swap aggregator behind swap_quote and swap_execute still quotes, builds, passes the wallet-outflow guard and simulates on mainnet, with nothing signed.",
+			"why": "A router that changes its transaction shape would otherwise surface as a refused or failing swap in front of a user. The guard catches it read-only, before anyone signs.",
+			"stages": [
+				"manual"
+			],
+			"needs": "network",
+			"proof": {
+				"kind": "live",
+				"reason": "Quotes and simulates against live aggregators and a mainnet RPC for a funded wallet's public key."
+			}
+		}
+	],
+	"exempt": [
+		{
+			"pattern": "scripts/verify-*.mjs",
+			"reason": "One-off integration verifiers for a specific vendor surface or world build, not repository guards. They prove an external service works, so they belong with that feature rather than in a guard stage."
+		},
+		{
+			"pattern": "scripts/audit-agent-operability.mjs",
+			"reason": "A live-browser walkthrough that needs a running dev server and a real generation, so it is run on demand like the page audit and never inside a repository guard stage."
+		}
+	]
+}

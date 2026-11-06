@@ -1,0 +1,22 @@
+HTTP/2 200 
+access-control-allow-headers: authorization, content-type, mcp-session-id, mcp-protocol-version, x-payment, payment-signature, idempotency-key, x-irl-device, x-irl-fix, x-forge-client, x-forge-seed
+access-control-allow-methods: GET,HEAD,POST,DELETE,OPTIONS
+access-control-allow-origin: *
+access-control-expose-headers: PAYMENT-REQUIRED, x-payment-response, x-payment-network, x-payment-tx, link
+access-control-max-age: 86400
+age: 0
+cache-control: no-store
+content-security-policy: base-uri 'self'; object-src 'none'; script-src 'self' 'unsafe-inline' 'unsafe-eval' blob: https://cdn.jsdelivr.net https://cdnjs.cloudflare.com https://unpkg.com https://esm.sh https://ajax.googleapis.com https://s3.tradingview.com https://platform.twitter.com https://3d-agent.vercel.app https://three.ws; worker-src 'self' blob:; frame-ancestors 'self' https://ibm.com https://*.ibm.com https://*.seismic.com; report-uri /api/client-errors
+content-type: application/json; charset=utf-8
+date: Tue, 07 Jul 2026 11:19:37 GMT
+permissions-policy: accelerometer=(), autoplay=(self), bluetooth=(), camera=(), display-capture=(), encrypted-media=(self), geolocation=(), gyroscope=(), magnetometer=(), microphone=(), midi=(), payment=(self), serial=(), usb=(), xr-spatial-tracking=(self)
+referrer-policy: strict-origin-when-cross-origin
+server: Vercel
+strict-transport-security: max-age=63072000; includeSubDomains; preload
+x-content-type-options: nosniff
+x-frame-options: DENY
+x-vercel-cache: MISS
+x-vercel-id: sfo1::iad1::bl9zs-1783423176978-70e13691d2db
+content-length: 425
+
+{"ok":true,"subsystems":[{"name":"generation","ok":true,"latency_ms":199,"status":400},{"name":"render","ok":true,"latency_ms":187,"poses":28},{"name":"storage","ok":true,"latency_ms":270},{"name":"retarget","ok":true,"latency_ms":183,"clips":103},{"name":"payment-rail","ok":true,"latency_ms":701,"settleable":true,"block":"64654141","token":"USD₮0","facilitator_configured":false}],"checkedAt":"2026-07-07T11:19:37.764Z"}

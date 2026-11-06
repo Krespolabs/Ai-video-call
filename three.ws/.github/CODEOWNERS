@@ -1,0 +1,24 @@
+# CODEOWNERS — default reviewers for three.ws.
+# Order matters: the last matching pattern takes precedence.
+# Docs: https://docs.github.com/articles/about-code-owners
+
+# Default owner for everything in the repo.
+*                       @nirholas
+
+# Operating rules and security policy — review carefully.
+/CLAUDE.md              @nirholas
+/.github/               @nirholas
+/.well-known/           @nirholas
+/public/.well-known/    @nirholas
+
+# Smart contracts and payment rails — high blast radius.
+/contracts/             @nirholas
+/agent-payments-sdk/    @nirholas
+
+# Public SDKs — anything published carries an API contract.
+/sdk/                   @nirholas
+/avatar-sdk/            @nirholas
+/agent-protocol-sdk/    @nirholas
+/agent-ui-sdk/          @nirholas
+/solana-agent-sdk/      @nirholas
+/mcp-server/            @nirholas

@@ -1,0 +1,684 @@
+// Canonical chat model + provider routing — the single source of truth shared
+// by every LLM chat backend (api/chat.js, api/widgets, api/brain, ...).
+//
+// Two design rules drive this file:
+//
+//   1. FREE PROVIDERS FIRST, ALWAYS. The platform holds three free-tier keys —
+//      Groq (fastest, first-attempt-reliable), OpenRouter (:free models), and
+//      NVIDIA NIM (one nvapi key, 100+ hosted models) — and the ladder leads
+//      with them in that order. Paid providers (Anthropic, OpenAI) are
+//      LAST-RESORT backstops only: the prod paid keys are routinely invalid
+//      (Anthropic 401) or out of quota (OpenAI), so any ordering that leads
+//      with them burns a doomed attempt on every request. With three
+//      independent free lanes, a request should never surface a provider
+//      error to the user.
+//
+//   2. CAPABILITY-AWARE ROUTING. Every model is annotated with what it can do
+//      ({ tools, moderationGated }). The router consults MODEL_CATALOG and
+//      skips models a request can't use (e.g. a tool-required request never
+//      selects a non-tool model) instead of round-tripping to the provider to
+//      discover the limitation at call time.
+//
+// Permanently-broken routes have been removed from the catalog rather than
+// carried as dead weight (they would never succeed):
+//   - mistralai/mistral-7b-instruct:free → OpenRouter 404 "No endpoints found"
+//   - meta-llama/llama-3.2-3b-instruct:free → no tool-capable endpoint
+//
+// Open-model roster (Llama, DeepSeek, Kimi, Mistral, Qwen, Gemini) lives in
+// model-roster.js and is merged into MODEL_CATALOG below under provider
+// 'roster': those ids route through their own ordered transports
+// (model-routes.js), not through a single provider lane.
+//
+// Operational note (ops must act): the OpenAI account is over quota and the
+// prod Anthropic key 401s. Both are intentionally ranked at the very END of
+// the ladder — dead final tiers that only burn an attempt after every free
+// lane is exhausted. Fix the keys or remove them to drop them entirely.
+
+import { ROSTER } from './model-roster.js';
+import { isFreeModelId } from './openrouter-free.js';
+
+// ── xAI Grok: the one place a Grok model id is written down ─────────────────
+//
+// xAI ships new ids often and retires old ones in batches (eight slugs on
+// 2026-05-15, including the grok-4-1-fast pair this file used to default to).
+// A retired id turns the Grok rung of every failover chain into a guaranteed
+// error, so every surface that names a Grok model (the shared LLM chain, the
+// /brain menu and the model picker it feeds, the embed proxy, the intent
+// compilers, the static pickers in src/) reads it from here, and
+// tests/grok-model-literals.test.js fails the build if a Grok id is typed as a
+// string literal anywhere else.
+//
+// Source of truth upstream: GET https://api.x.ai/v1/models (key required),
+// else https://docs.x.ai/developers/models.md and the per-model pages under
+// /developers/models/<id>.md. `npm run check:xai-models` diffs this list
+// against it and exits non-zero on drift. Last verified against the docs on
+// 2026-10-08 (no xAI key was configured anywhere to read the API).
+//
+// Fields per model:
+//   id               the slug sent to api.x.ai
+//   label, tier, description   what a model menu shows
+//   contextWindow    tokens
+//   tools            function calling
+//   vision           accepts image input
+//   reasoning        thinks before answering
+//   reasoningEfforts accepted `reasoning_effort` values ([] when not settable)
+//   price            [input, output] USD per 1M tokens below the 200k
+//                    long-context threshold (metered by llm-pricing.js)
+//   openrouterModel  the OpenRouter mirror id, or null when there is none
+//   chatCompletions  false when the model only works through the Responses API
+//   menu             offered in model menus; a live model left out of menus
+//                    names the `supersededBy` model a menu shows instead
+
+export const XAI_API_BASE = 'https://api.x.ai/v1';
+export const XAI_CHAT_COMPLETIONS_URL = `${XAI_API_BASE}/chat/completions`;
+
+const EFFORTS_FLAGSHIP = Object.freeze(['low', 'medium', 'high', 'xhigh']);
+
+export const GROK_MODELS = Object.freeze([
+	{
+		id: 'grok-4.7',
+		label: 'Grok 4.7',
+		tier: 'flagship',
+		description: 'xAI flagship for coding, agentic tasks and knowledge work. Reasons before it answers.',
+		contextWindow: 500_000,
+		tools: true,
+		vision: true,
+		reasoning: true,
+		reasoningEfforts: EFFORTS_FLAGSHIP,
+		price: [2, 6],
+		openrouterModel: 'x-ai/grok-4.7',
+		chatCompletions: true,
+		menu: true,
+	},
+	{
+		id: 'grok-4.6',
+		label: 'Grok 4.6',
+		tier: 'flagship',
+		description: 'Previous xAI flagship, same price as Grok 4.7.',
+		contextWindow: 500_000,
+		tools: true,
+		vision: true,
+		reasoning: true,
+		reasoningEfforts: EFFORTS_FLAGSHIP,
+		price: [2, 6],
+		openrouterModel: 'x-ai/grok-4.6',
+		chatCompletions: true,
+		menu: false,
+		supersededBy: 'grok-4.7',
+	},
+	{
+		id: 'grok-4.5',
+		label: 'Grok 4.5',
+		tier: 'flagship',
+		description: 'Earlier xAI flagship, same price as Grok 4.7.',
+		contextWindow: 500_000,
+		tools: true,
+		vision: true,
+		reasoning: true,
+		reasoningEfforts: EFFORTS_FLAGSHIP,
+		price: [2, 6],
+		openrouterModel: 'x-ai/grok-4.5',
+		chatCompletions: true,
+		menu: false,
+		supersededBy: 'grok-4.7',
+	},
+	{
+		id: 'grok-4.3',
+		label: 'Grok 4.3',
+		tier: 'balanced',
+		description: 'Lowest-priced Grok: 1M-token context and strong tool calling at a third of the flagship price.',
+		contextWindow: 1_000_000,
+		tools: true,
+		vision: true,
+		reasoning: true,
+		reasoningEfforts: Object.freeze(['none', 'low', 'medium', 'high', 'xhigh']),
+		price: [1.25, 2.5],
+		openrouterModel: 'x-ai/grok-4.3',
+		chatCompletions: true,
+		menu: true,
+	},
+	{
+		id: 'grok-4.20-0309-non-reasoning',
+		label: 'Grok 4.20 Fast',
+		tier: 'fast',
+		description: 'Grok with no thinking pass and a 1M-token context. The quickest first token.',
+		contextWindow: 1_000_000,
+		tools: true,
+		vision: true,
+		reasoning: false,
+		reasoningEfforts: Object.freeze([]),
+		price: [1.25, 2.5],
+		openrouterModel: null,
+		chatCompletions: true,
+		menu: true,
+	},
+	{
+		id: 'grok-4.20-0309-reasoning',
+		label: 'Grok 4.20',
+		tier: 'reasoning',
+		description: 'Reasoning Grok 4.20 with a 1M-token context.',
+		contextWindow: 1_000_000,
+		tools: true,
+		vision: true,
+		reasoning: true,
+		reasoningEfforts: Object.freeze([]),
+		price: [1.25, 2.5],
+		openrouterModel: 'x-ai/grok-4.20',
+		chatCompletions: true,
+		menu: false,
+		supersededBy: 'grok-4.3',
+	},
+	{
+		id: 'grok-build-0.1',
+		label: 'Grok Build 0.1',
+		tier: 'coding',
+		description: 'xAI agentic coding and web-dev model, 256K context.',
+		contextWindow: 256_000,
+		tools: true,
+		vision: true,
+		reasoning: true,
+		reasoningEfforts: Object.freeze([]),
+		price: [1, 2],
+		openrouterModel: 'x-ai/grok-build-0.1',
+		chatCompletions: true,
+		menu: true,
+	},
+	{
+		// Leader plus sub-agents; xAI serves it through the Responses API only
+		// (Chat Completions is refused), so no chat-completions surface routes it.
+		// Catalogued so the drift check knows it is accounted for.
+		id: 'grok-4.20-multi-agent-0309',
+		label: 'Grok 4.20 Multi-Agent',
+		tier: 'reasoning',
+		description: 'Several Grok agents collaborating on one request. Responses API only.',
+		contextWindow: 1_000_000,
+		tools: true,
+		vision: true,
+		reasoning: true,
+		reasoningEfforts: Object.freeze([]),
+		price: [1.25, 2.5],
+		openrouterModel: null,
+		chatCompletions: false,
+		menu: false,
+	},
+].map((m) => Object.freeze(m)));
+
+const GROK_BY_ID = new Map(GROK_MODELS.map((m) => [m.id, m]));
+
+/**
+ * Grok slugs xAI retired, mapped to the successor xAI itself redirects them to
+ * (docs.x.ai/developers/migration/may-15-retirement). `grok-4.1-fast` is the
+ * short slug this platform stored as its budget default before the
+ * retirement; agents, embeds and BYOK users saved it, so it maps forward too.
+ */
+export const GROK_RETIRED_ALIASES = Object.freeze({
+	'grok-4.1-fast': 'grok-4.3',
+	'grok-4-1-fast-reasoning': 'grok-4.3',
+	'grok-4-1-fast-non-reasoning': 'grok-4.3',
+	'grok-4-fast-reasoning': 'grok-4.3',
+	'grok-4-fast-non-reasoning': 'grok-4.3',
+	'grok-4-0709': 'grok-4.3',
+	'grok-3': 'grok-4.3',
+	'grok-code-fast-1': 'grok-build-0.1',
+});
+
+/**
+ * List prices of retired Grok slugs while they were live, so usage rows
+ * recorded under them still price. New traffic never carries these ids: it is
+ * resolved to the successor before the call.
+ */
+export const GROK_RETIRED_PRICES = Object.freeze({
+	'grok-4.1-fast': Object.freeze([0.2, 0.5]),
+});
+
+/** Default Grok for a caller who brought their own xAI key: the flagship. */
+export const GROK_DEFAULT_MODEL = 'grok-4.7';
+
+/**
+ * The platform's budget Grok (server key backstop, previews, intent
+ * compilers): the cheapest text model, run with reasoning off, which is
+ * exactly what xAI redirects the retired non-reasoning fast slugs to.
+ */
+export const GROK_BUDGET_MODEL = 'grok-4.3';
+export const GROK_BUDGET_EXTRA_BODY = Object.freeze({ reasoning_effort: 'none' });
+
+/** Grok models a chat-completions transport can route, in catalog order. */
+export const GROK_CHAT_MODELS = Object.freeze(GROK_MODELS.filter((m) => m.chatCompletions));
+
+/** Grok models offered in model menus, in catalog order. */
+export const GROK_MENU_MODELS = Object.freeze(GROK_MODELS.filter((m) => m.menu));
+
+/** Catalog entry for a Grok id (retired ids resolve to their successor), or null. */
+export function grokModel(id) {
+	return GROK_BY_ID.get(resolveGrokModelId(id)) || null;
+}
+
+/** The live Grok id for a stored one: retired slugs map to their successor. */
+export function resolveGrokModelId(id) {
+	return GROK_RETIRED_ALIASES[id] || id;
+}
+
+/**
+ * The Grok id a model menu should show for a stored one: retired slugs and
+ * live models left out of menus resolve to the menu model that replaces them.
+ */
+export function grokMenuModelId(id) {
+	const live = grokModel(id);
+	if (!live) return id;
+	return live.menu ? live.id : live.supersededBy;
+}
+
+/**
+ * The Grok model a chat-completions call should send for a requested id:
+ * retired ids map forward, a Responses-only id or no id falls back to
+ * `fallback`, and an id this catalog has not met yet passes through untouched,
+ * so a BYOK caller can use a model xAI shipped today before the drift check
+ * adds it here.
+ */
+export function routableGrokModelId(id, fallback = GROK_DEFAULT_MODEL) {
+	if (!id) return fallback;
+	const live = resolveGrokModelId(id);
+	const m = GROK_BY_ID.get(live);
+	return m && !m.chatCompletions ? fallback : live;
+}
+
+/**
+ * Capability metadata per chat model id — the routing brain. Only models
+ * listed here are auto-selectable; the router uses these flags to avoid
+ * calling a model a request can't use.
+ *
+ *   provider        — which upstream serves this model id
+ *   tools           — exposes a tool/function-calling endpoint
+ *   moderationGated — upstream intermittently refuses without a moderation /
+ *                     data policy (OpenRouter 403 "requires moderation"). Such
+ *                     models are excluded from auto-built fallback chains but
+ *                     remain usable when a caller names them explicitly.
+ */
+export const MODEL_CATALOG = {
+	// ── Anthropic (paid; host or BYOK key) — most reliable when keyed ──────────
+	'claude-fable-5':             { provider: 'anthropic', tools: true },
+	'claude-opus-5':              { provider: 'anthropic', tools: true },
+	'claude-sonnet-5':            { provider: 'anthropic', tools: true },
+	'claude-opus-4-8':            { provider: 'anthropic', tools: true },
+	// Mythos 5 shares Fable 5's underlying capabilities but is a restricted-access
+	// model — it is never auto-selected into a fallback chain, only used when a
+	// caller names it explicitly (modeled with the same `moderationGated` gate).
+	'claude-mythos-5':            { provider: 'anthropic', tools: true, moderationGated: true },
+	'claude-opus-4-7':            { provider: 'anthropic', tools: true },
+	'claude-opus-4-6':            { provider: 'anthropic', tools: true },
+	'claude-sonnet-4-6':          { provider: 'anthropic', tools: true },
+	'claude-haiku-4-5-20251001':  { provider: 'anthropic', tools: true },
+
+	// ── Groq free tier — fast (sub-second) and first-attempt-reliable ─────────
+	// Groq retired every Llama model (GET /openai/v1/models on 2026-09-22 lists
+	// only GPT-OSS and Qwen); the two Llama ids that sat here 404 and are mapped
+	// forward by RETIRED_MODEL_ALIASES below.
+	'qwen/qwen3.8-27b':           { provider: 'groq', tools: true },
+	'openai/gpt-oss-20b':         { provider: 'groq', tools: true },
+	'openai/gpt-oss-120b':        { provider: 'groq', tools: true },
+
+	// ── OpenRouter free tier — rate-limited per model; tool support varies ────
+	//
+	// OpenRouter retires `:free` endpoints with no notice, and a retired id is
+	// indistinguishable from a typo at call time ("This model is unavailable for
+	// free"). On 2026-07-27 every id this block previously listed was gone at
+	// once — meta-llama/llama-3.3-70b-instruct:free,
+	// nousresearch/hermes-3-llama-3.1-405b:free and openai/gpt-oss-120b:free —
+	// which silently took the whole OpenRouter free lane out of the ladder.
+	//
+	// The ids below were verified live, but treat them as perishable: the
+	// anonymous /chat lane no longer depends on any of them, because
+	// _lib/openrouter-free.js resolves models from OpenRouter's live list at
+	// request time. When one of these starts failing, check that module's live
+	// list first rather than assuming a provider outage.
+	'google/gemma-4-31b-it:free':                 { provider: 'openrouter', tools: true },
+	'nvidia/nemotron-3-super-120b-a12b:free':     { provider: 'openrouter', tools: true },
+	'inclusionai/ling-3.0-flash-fin:free':        { provider: 'openrouter', tools: true },
+	'minimax/minimax-m2.7:free':                  { provider: 'openrouter', tools: true },
+
+	// ── OpenRouter paid Claude mirrors: the no-ANTHROPIC_API_KEY escape hatch ──
+	// api/chat.js and _lib/llm.js reach Anthropic ONLY through api.anthropic.com,
+	// so with no ANTHROPIC_API_KEY set they get no Claude at all (unlike /brain,
+	// which already routes these mirror ids). These entries make the mirror
+	// available to those surfaces, and `paid: true` is what keeps it honest: real
+	// spend on the platform OpenRouter key, so it is metered at the underlying
+	// model's list price in llm-pricing.js and never served to anonymous callers.
+	// Nothing selects them implicitly: llm.js only builds the mirror rung when
+	// OPENROUTER_CLAUDE_MIRROR_MODEL names one (default unset), and they are not
+	// in OPENROUTER_SIBLINGS or any auto-built chain.
+	'anthropic/claude-opus-5':    { provider: 'openrouter', tools: true, paid: true },
+	'anthropic/claude-sonnet-5':  { provider: 'openrouter', tools: true, paid: true },
+	'anthropic/claude-haiku-4.5': { provider: 'openrouter', tools: true, paid: true },
+
+	// ── OpenRouter paid (BYOK, ~$0.05/$0.10 per 1M tok) — IBM Granite lane ─────
+	// Cheap, tool-capable Granite 4.1 for the "embed a Granite agent" surface.
+	// `paid: true` is load-bearing: unlike every other openrouter entry (which is
+	// a free `:free` model), this one draws real spend on the funded key, so it is
+	// gated to authenticated callers (isPaidModel → chat.js anon reject) and metered
+	// in llm-pricing.js. It is never in an auto-built fallback chain (OPENROUTER_SIBLINGS
+	// is free-only), so it is reached only when a signed-in caller names it explicitly.
+	'ibm-granite/granite-4.1-8b': { provider: 'openrouter', tools: true, paid: true },
+
+	// ── NVIDIA NIM free tier — one nvapi key, OpenAI-compatible ───────────────
+	// Checked against GET /v1/models on 2026-09-10, after three of the four ids
+	// registered here turned out to be retired and answering every call with a
+	// 410 Gone. A dead id is worse than a missing one: it is eligible for an
+	// auto-built fallback slot, so the chain spent a retry on a model that could
+	// never answer. Re-check this list against the live catalog before adding an
+	// id, and prefer one the platform's own chat lane already resolves to.
+	'nvidia/nemotron-3-super-120b-a12b':     { provider: 'nvidia', tools: true },
+	'nvidia/nemotron-3.5-lightning-30b-a3b': { provider: 'nvidia', tools: true },
+	'nvidia/nemotron-3-ultra-550b-a55b':     { provider: 'nvidia', tools: true },
+
+	// ── SambaNova Cloud free tier (no card): Llama 3.3 70B, own quota pool ────
+	'Meta-Llama-3.3-70B-Instruct': { provider: 'sambanova', tools: true },
+
+	// ── Mistral Experiment tier: about 1B free tokens/month ───────────────────
+	'mistral-small-latest':       { provider: 'mistral', tools: true },
+
+	// ── Z.AI (Zhipu): permanently free, rate-limited GLM Flash lane ───────────
+	'glm-4.7-flash':              { provider: 'zai', tools: true },
+
+	// ── xAI Grok (paid; host or BYOK key), OpenAI-compatible at api.x.ai ──────
+	// Every chat-completions Grok in GROK_MODELS above; ids live only there.
+	...Object.fromEntries(GROK_CHAT_MODELS.map((m) => [m.id, { provider: 'grok', tools: m.tools }])),
+
+	// ── OpenAI (paid) — see operational note above; ranked last ───────────────
+	'gpt-5.6-sol':                { provider: 'openai', tools: true },
+	'gpt-5.6-terra':              { provider: 'openai', tools: true },
+	'gpt-5.6-luna':               { provider: 'openai', tools: true },
+	'gpt-5.5':                    { provider: 'openai', tools: true },
+	'gpt-5.5-pro':                { provider: 'openai', tools: true },
+	'gpt-5.4':                    { provider: 'openai', tools: true },
+	'gpt-5.4-pro':                { provider: 'openai', tools: true },
+	'gpt-5.4-mini':               { provider: 'openai', tools: true },
+	'gpt-5.4-nano':               { provider: 'openai', tools: true },
+	'gpt-5.3-codex':              { provider: 'openai', tools: true },
+	'o3':                         { provider: 'openai', tools: true },
+	'o3-pro':                     { provider: 'openai', tools: true },
+
+	// ── Open-model roster (model-roster.js). Free rows ride free lanes first and
+	// draw on the daily free-tier allowance (free-tier.js); every other row is a
+	// paid lane gated to signed-in callers and metered at its Vertex price.
+	...Object.fromEntries(
+		ROSTER.map((m) => [m.id, { provider: 'roster', tools: m.tools, ...(m.free ? { free: true } : { paid: true }) }]),
+	),
+};
+
+/**
+ * Model ids an upstream retired, mapped to the live model that replaces them.
+ * Agents and embeds store a model id in their config, so a retirement must not
+ * turn every stored reference into a 404: resolveModelId() maps them forward.
+ */
+export const RETIRED_MODEL_ALIASES = {
+	'llama-3.3-70b-versatile': 'llama-3.3-70b',
+	'llama-3.1-8b-instant': 'qwen3.8-27b',
+	...GROK_RETIRED_ALIASES,
+};
+
+/** The live id for a model: a retired id maps to its successor. */
+export function resolveModelId(modelId) {
+	return RETIRED_MODEL_ALIASES[modelId] || modelId;
+}
+
+/** Whether a model is covered by the daily free-tier allowance. */
+export function isFreeTierModel(modelId) {
+	return MODEL_CATALOG[resolveModelId(modelId)]?.free === true;
+}
+
+/**
+ * Anthropic model ids that the Vertex Claude transport (api/_lib/vertex-claude.js)
+ * can serve when VERTEX_CLAUDE_ENABLED is set. The SAME ids serve both first-party
+ * Anthropic and Vertex — the transport is chosen by flag at request time, not by
+ * the catalog — so these keep their `provider: 'anthropic'` entries above (tools,
+ * gating, capability are identical). This list only tells the routing brain WHICH
+ * Claude ids have a Vertex transport available; `vertexServesModel()` is the gate.
+ * The dated Haiku id maps to Vertex's `@` form via toVertexModelId() at call time.
+ */
+export const VERTEX_ANTHROPIC_MODELS = [
+	'claude-opus-5',
+	'claude-sonnet-5',
+	'claude-opus-4-8',
+	'claude-opus-4-7',
+	'claude-sonnet-4-6',
+	'claude-haiku-4-5-20251001',
+];
+
+/** Whether the Vertex Claude transport can serve a given Anthropic model id. */
+export function vertexServesModel(modelId) {
+	return VERTEX_ANTHROPIC_MODELS.includes(modelId);
+}
+
+/**
+ * Anthropic models that reject sampling parameters (`temperature`, `top_p`,
+ * `top_k`) with a 400 — Opus 4.7 onward and the whole Claude 5 family.
+ * Transports must omit those fields when targeting these ids.
+ */
+const NO_SAMPLING_ANTHROPIC = new Set([
+	'claude-fable-5',
+	'claude-mythos-5',
+	'claude-opus-5',
+	'claude-sonnet-5',
+	'claude-opus-4-8',
+	'claude-opus-4-7',
+]);
+
+/** Whether a model rejects sampling parameters (temperature/top_p/top_k). */
+export function modelRejectsSampling(modelId) {
+	return NO_SAMPLING_ANTHROPIC.has(modelId);
+}
+
+/**
+ * Claude 5 family models run adaptive thinking by default, and `max_tokens`
+ * caps thinking + visible text together. Callers with small token budgets
+ * must raise the ceiling for these ids or risk an all-thinking, truncated
+ * reply.
+ */
+const THINKING_DEFAULT_ANTHROPIC = new Set([
+	'claude-fable-5',
+	'claude-mythos-5',
+	'claude-opus-5',
+	'claude-sonnet-5',
+]);
+
+/** Whether a model thinks by default (budget must cover thinking + text). */
+export function modelThinksByDefault(modelId) {
+	return THINKING_DEFAULT_ANTHROPIC.has(modelId);
+}
+
+/**
+ * Minimum cacheable prefix per model, in TOKENS. Anthropic silently declines to
+ * cache a prefix shorter than this — no error, `cache_creation_input_tokens`
+ * just stays 0 — so a breakpoint below the threshold is dead weight, and a
+ * threshold set too high forfeits caching that was available.
+ *
+ * The values are NOT monotonic across generations, which is the trap: Opus 5
+ * caches from 512 tokens while Haiku 4.5 needs 4096, eight times more. A single
+ * hardcoded threshold is therefore wrong for most of the catalog.
+ */
+const PROMPT_CACHE_MIN_TOKENS = {
+	'claude-opus-5': 512,
+	'claude-fable-5': 512,
+	'claude-mythos-5': 512,
+	'claude-opus-4-8': 1024,
+	'claude-sonnet-5': 1024,
+	'claude-sonnet-4-6': 1024,
+	'claude-sonnet-4-5': 1024,
+	'claude-opus-4-7': 2048,
+	'claude-opus-4-6': 4096,
+	'claude-opus-4-5': 4096,
+	'claude-haiku-4-5': 4096,
+};
+
+// Characters per token, used to turn the token minimums above into a length we
+// can measure on a raw string without tokenizing it.
+//
+// The two error directions are NOT symmetric, so this leans low on purpose. A
+// breakpoint on a too-short prefix is a silent no-op — Anthropic declines to
+// cache it and bills nothing extra — whereas a threshold set too high skips a
+// breakpoint that would have worked, forfeiting real savings on every turn of
+// that conversation. So the cheap mistake is sending a marker that does
+// nothing, and 3.5 (denser than typical English prose, which runs ~4) biases
+// toward that side.
+const CHARS_PER_TOKEN = 3.5;
+
+/**
+ * Minimum system-prompt length in CHARACTERS before a `cache_control`
+ * breakpoint can actually take effect on this model. Callers compare their
+ * prefix length against this to decide whether to split the system prompt.
+ * Unknown/non-Anthropic ids get the most conservative threshold in the table.
+ */
+export function promptCacheMinChars(modelId) {
+	let best = null;
+	for (const key of Object.keys(PROMPT_CACHE_MIN_TOKENS)) {
+		// Longest-prefix match so the dated Haiku alias resolves to its family.
+		if (modelId && modelId.startsWith(key) && (!best || key.length > best.length)) best = key;
+	}
+	const tokens = best ? PROMPT_CACHE_MIN_TOKENS[best] : 4096;
+	return Math.round(tokens * CHARS_PER_TOKEN);
+}
+
+/** Whether a model exposes a tool/function-calling endpoint. Unknown → false. */
+export function modelSupportsTools(modelId) {
+	return MODEL_CATALOG[resolveModelId(modelId)]?.tools === true;
+}
+
+/** Whether a model's upstream is moderation-gated (excluded from auto chains). */
+export function isModelModerationGated(modelId) {
+	return MODEL_CATALOG[modelId]?.moderationGated === true;
+}
+
+/**
+ * Whether a model is a paid/BYOK lane that draws real spend on the platform key.
+ * These are gated to authenticated callers (never exposed to anon free-tier
+ * traffic) and are metered in llm-pricing.js rather than priced to zero.
+ */
+export function isPaidModel(modelId) {
+	return MODEL_CATALOG[resolveModelId(modelId)]?.paid === true;
+}
+
+/**
+ * Whether an anonymous caller may name this model. The platform key pays for it,
+ * so it must be a catalogued non-paid model or an OpenRouter ":free" id. An id
+ * the catalog does not know is NOT treated as free (isPaidModel() is false for
+ * it, which is why it cannot be the only gate): openrouter would otherwise pass
+ * an arbitrary paid id straight to the funded key.
+ */
+export function anonModelAllowed(modelId) {
+	if (!modelId) return true;
+	const entry = MODEL_CATALOG[resolveModelId(modelId)];
+	if (entry) return entry.paid !== true;
+	return isFreeModelId(modelId);
+}
+
+/**
+ * Filter a candidate model list down to those usable for a request.
+ * @param {string[]} models     candidate model ids, in priority order
+ * @param {object}   opts
+ * @param {boolean}  opts.requireTools  drop models with no tool endpoint
+ * @param {boolean}  opts.allowGated    keep moderation-gated models (default false)
+ */
+export function usableModels(models, { requireTools = false, allowGated = false } = {}) {
+	return models.filter((m) => {
+		const meta = MODEL_CATALOG[m];
+		if (!meta) return false;
+		if (requireTools && !meta.tools) return false;
+		if (!allowGated && meta.moderationGated) return false;
+		return true;
+	});
+}
+
+/**
+ * Default OpenRouter free model: tool-capable Gemma 4 31B Instruct. Used as the
+ * platform default wherever a free OpenRouter model is requested.
+ *
+ * Every previous holder of this constant was retired out from under it (Llama
+ * 3.3 70B, then GPT-OSS 120B, then GPT-OSS 20B on 2026-09-04, whose 404 body
+ * says the slug is "unavailable for free" and names the paid one instead). A
+ * retired id 404s the whole OpenRouter rung, and providerChain builds one rung
+ * PER KEY off this constant, so a single dead id took five of the chain's
+ * twelve rungs out at once while Vertex was down for billing. When it happens
+ * again, /api/cron/free-model-audit names the dead id and its every reference.
+ */
+export const DEFAULT_FREE_MODEL = 'google/gemma-4-31b-it:free';
+
+/** Default per-provider model when the caller doesn't name one. */
+export const PROVIDER_MODEL_DEFAULTS = {
+	anthropic: 'claude-sonnet-5',
+	openrouter: DEFAULT_FREE_MODEL,
+	groq: 'qwen/qwen3.8-27b',
+	nvidia: 'nvidia/nemotron-3.5-lightning-30b-a3b',
+	sambanova: 'Meta-Llama-3.3-70B-Instruct',
+	mistral: 'mistral-small-latest',
+	zai: 'glm-4.7-flash',
+	openai: 'gpt-5.4-nano',
+	grok: GROK_DEFAULT_MODEL,
+};
+
+/**
+ * Provider order to try when none is explicitly requested ("auto"). Free
+ * providers always lead; paid keys are last-resort backstops (see design rule
+ * 1 above — the prod paid keys are routinely dead, and three independent free
+ * lanes must absorb everything):
+ *   1. groq       — fastest free tier, answers on the first attempt. Per-minute
+ *                   caps only; the primary for all traffic.
+ *   2. openrouter — free :free models (reliable Llama 3.3 70B; see
+ *                   DEFAULT_FREE_MODEL), multi-key rotation in llm.js.
+ *   3. nvidia     — NVIDIA NIM free tier; an independent third lane on a
+ *                   different account/infra than the first two.
+ *   4. sambanova  - SambaNova Cloud free tier; the same Llama 3.3 70B on a
+ *                   fourth independent quota pool.
+ *   5. mistral    - Mistral Experiment tier; the largest free quota in the
+ *                   ladder (about 1B tokens/month).
+ *   6. zai        - Z.AI's permanently free GLM Flash lane; a sixth
+ *                   independent free quota pool.
+ *   7. anthropic  - paid backstop; only reached when every free lane failed
+ *                   (and currently 401s in prod, see operational note).
+ *   8. openai     - paid backstop; account over quota (see operational note).
+ *   9. grok       - paid backstop (xAI); usually reached only via an explicit
+ *                   provider/model request or a BYOK key.
+ * Providers without a configured key are skipped, so the effective ladder is
+ * short in the common case. A provider in a health cooldown (see
+ * api/_lib/provider-health.js) is also skipped for the cooldown window.
+ */
+export const DEFAULT_PROVIDER_ORDER = ['groq', 'openrouter', 'nvidia', 'sambanova', 'mistral', 'zai', 'anthropic', 'openai', 'grok'];
+
+/**
+ * OpenRouter sibling models for per-model rate-limit failover. OpenRouter's
+ * `:free` tier rate-limits per model, so a burst on the primary free model
+ * degrades to a sibling free model before the chain moves to the next provider.
+ * All entries are tool-capable and non-gated (dead/gated routes removed).
+ */
+export const OPENROUTER_SIBLINGS = [
+	DEFAULT_FREE_MODEL,
+	'nvidia/nemotron-3-super-120b-a12b:free',
+	'inclusionai/ling-3.0-flash-fin:free',
+	'minimax/minimax-m2.7:free',
+];
+
+/**
+ * Providers an anonymous (unauthenticated) caller may use. All but the last
+ * are third-party free tiers; when all of them are rate-limited an anon request
+ * would otherwise 503, so `vertex-gemini` (the credits-funded Vertex anchor,
+ * effectively free to the user and the only rung with no third-party quota to
+ * exhaust) is included as the last-resort anchor. Its rung carries its own
+ * fixed model, so it is never auto-selected as an initial route — it is only
+ * reached via failover once the free tiers are exhausted.
+ */
+export const ANON_PROVIDER_LIST = ['groq', 'openrouter', 'nvidia', 'sambanova', 'mistral', 'zai', 'vertex-gemini'];
+
+/**
+ * Bounds on the fallback chain so a single request can't churn through every
+ * provider and still time out. The router stops failing over once either limit
+ * is hit and returns a clean terminal error.
+ *   MAX_FALLBACK_ATTEMPTS — hard cap on upstream attempts per request.
+ *   TOTAL_BUDGET_MS       — wall-clock budget across all attempts (< the 60s
+ *                           function limit, leaving headroom to stream a reply).
+ *   PER_CALL_TIMEOUT_MS   — per-attempt abort ceiling. A single hung provider
+ *                           must not consume the whole TOTAL_BUDGET_MS; we abort
+ *                           the fetch at this bound (or the remaining budget,
+ *                           whichever is smaller) and fail over to the next route.
+ */
+export const MAX_FALLBACK_ATTEMPTS = 4;
+export const TOTAL_BUDGET_MS = 25_000;
+export const PER_CALL_TIMEOUT_MS = 15_000;

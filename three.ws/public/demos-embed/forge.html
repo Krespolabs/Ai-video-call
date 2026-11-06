@@ -1,0 +1,196 @@
+<!doctype html>
+<html lang="en" style="background:transparent">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title data-i18n="demos_embed_forge.meta_title">Forge · three.ws</title>
+  <meta name="robots" content="noindex">
+  <script type="module" src="/dist-lib/agent-3d.js"></script>
+  <style>
+    html, body {
+      background: transparent !important;
+      margin: 0; padding: 0;
+      font-family: 'Helvetica Neue', 'Helvetica Neue', Arial, sans-serif;
+      color: #161616;
+    }
+    .forge-wrap {
+      background: transparent;
+      padding: 32px 24px;
+    }
+    .forge-header {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      margin-bottom: 28px;
+      flex-wrap: wrap;
+      gap: 16px;
+    }
+    .forge-eyebrow {
+      font-size: 11px;
+      font-weight: 600;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: #0f62fe;
+      margin-bottom: 6px;
+    }
+    .forge-title {
+      font-size: clamp(22px, 3vw, 30px);
+      font-weight: 300;
+      color: #161616;
+      margin: 0 0 8px;
+    }
+    .forge-title strong { font-weight: 600; }
+    .forge-sub { font-size: 14px; color: #525252; line-height: 1.5; max-width: 480px; }
+    .forge-cta {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      background: #0f62fe;
+      color: #fff;
+      border: none;
+      padding: 12px 20px;
+      font-size: 13px;
+      font-weight: 500;
+      font-family: inherit;
+      cursor: pointer;
+      text-decoration: none;
+      white-space: nowrap;
+      transition: background 0.12s;
+    }
+    .forge-cta:hover { background: #0353e9; color: #fff; text-decoration: none; }
+    /* 3D model grid */
+    .model-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+      gap: 1px;
+      background: #e0e0e0;
+      margin-bottom: 28px;
+    }
+    .model-cell {
+      background: transparent;
+      position: relative;
+      aspect-ratio: 1;
+      overflow: hidden;
+    }
+    agent-3d {
+      width: 100%;
+      height: 100%;
+      display: block;
+      background: transparent;
+      --agent-bg: transparent;
+    }
+    .model-label {
+      position: absolute;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      padding: 6px 10px;
+      font-size: 11px;
+      color: #525252;
+      background: rgba(255,255,255,0.85);
+      border-top: 1px solid #e0e0e0;
+    }
+    /* Prompt demo */
+    .prompt-demo {
+      border: 1px solid #e0e0e0;
+      padding: 20px 24px;
+      background: transparent;
+    }
+    .prompt-label { font-size: 11px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: #525252; margin-bottom: 10px; }
+    .prompt-row { display: flex; gap: 0; }
+    .prompt-input {
+      flex: 1;
+      padding: 10px 14px;
+      border: 1px solid #e0e0e0;
+      border-right: none;
+      font-size: 14px;
+      font-family: inherit;
+      color: #161616;
+      background: transparent;
+    }
+    .prompt-input:focus { outline: none; border-color: #0f62fe; }
+    .prompt-input::placeholder { color: #a8a8a8; }
+    .prompt-btn {
+      padding: 10px 20px;
+      background: #0f62fe;
+      border: none;
+      color: #fff;
+      font-size: 13px;
+      font-weight: 600;
+      font-family: inherit;
+      cursor: pointer;
+      white-space: nowrap;
+      transition: background 0.12s;
+    }
+    .prompt-btn:hover { background: #0353e9; }
+    .prompt-note { font-size: 12px; color: #6f6f6f; margin-top: 8px; }
+    .prompt-note a { color: #0f62fe; }
+  </style>
+</head>
+<body style="background:transparent">
+  <div class="forge-wrap">
+    <div class="forge-header">
+      <div>
+        <div class="forge-eyebrow">three.ws · Forge</div>
+        <h1 class="forge-title" data-i18n-html="demos_embed_forge.text_3d_model">Text → <strong>3D model</strong></h1>
+        <p class="forge-sub" data-i18n="demos_embed_forge.type_a_description_get_a_textured_interactiv">Type a description. Get a textured, interactive 3D model. Download the GLB or embed it anywhere.</p>
+      </div>
+      <a href="https://three.ws/forge" target="_blank" class="forge-cta" rel="noopener" data-i18n="demos_embed_forge.open_forge">Open Forge →</a>
+    </div>
+
+    <!-- Live 3D models generated on three.ws -->
+    <div class="model-grid">
+      <div class="model-cell">
+        <agent-3d src="/avatars/cesium-man.glb"></agent-3d>
+        <div class="model-label">3D AI Agent</div>
+      </div>
+      <div class="model-cell">
+        <agent-3d src="/avatars/michelle.glb"></agent-3d>
+        <div class="model-label">Humanoid Agent</div>
+      </div>
+      <div class="model-cell">
+        <agent-3d src="/avatars/fox.glb"></agent-3d>
+        <div class="model-label">Character Agent</div>
+      </div>
+      <div class="model-cell">
+        <agent-3d src="/avatars/default.glb"></agent-3d>
+        <div class="model-label">Default Avatar</div>
+      </div>
+    </div>
+
+    <!-- Prompt demo pointing to real forge -->
+    <div class="prompt-demo">
+      <div class="prompt-label">Try a prompt — opens Forge on three.ws</div>
+      <div class="prompt-row">
+        <input
+          type="text"
+          class="prompt-input"
+          id="prompt-input"
+          placeholder="e.g. e.g. a futuristic robot with glowing blue eyes…"
+          value=""
+        >
+        <button class="prompt-btn" id="forge-generate" type="button" data-i18n="demos_embed_forge.generate">Generate →</button>
+      </div>
+      <p class="prompt-note" data-i18n-html="demos_embed_forge.generation_happens_on_three_ws_forge_real">
+        Generation happens on <a href="https://three.ws/forge" target="_blank" rel="noopener">three.ws/forge</a> — real Meshy API, real GLB output.
+      </p>
+    </div>
+  </div>
+
+  <script>
+    function openForge() {
+      const prompt = document.getElementById('prompt-input').value.trim();
+      const url = prompt
+        ? 'https://three.ws/forge?prompt=' + encodeURIComponent(prompt)
+        : 'https://three.ws/forge';
+      window.open(url, '_blank');
+    }
+    document.getElementById('prompt-input').addEventListener('keydown', function(e) {
+      if (e.key === 'Enter') openForge();
+    });
+    document.getElementById('forge-generate').addEventListener('click', openForge);
+  </script>
+	<!-- Runtime i18n: detects locale, swaps annotated copy, mounts <lang-switcher>. -->
+	<script type="module" src="/i18n.js"></script>
+</body>
+</html>

@@ -1,0 +1,968 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+	<script>/* three.ws theme boot: no-flash */(function(){try{var m=localStorage.getItem('twx_theme');var l=m==='auto'?(window.matchMedia&&window.matchMedia('(prefers-color-scheme: light)').matches):m==='light';document.documentElement.setAttribute('data-theme',l?'light':'dark');}catch(e){document.documentElement.setAttribute('data-theme','dark');}})();</script>
+	<meta charset="utf-8" />
+	<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+	<title data-i18n="mcp_tools.meta_title">MCP Tool Catalog · three.ws</title>
+	<meta name="description" content="Every MCP tool three.ws publishes, in one searchable catalog: what it does, which server hosts it, what it costs in USDC, and whether it is safe for an AI client to run unattended. Generated from source, so it is never out of date."  data-i18n-attr="content:mcp_tools.meta_description"/>
+	<link rel="canonical" href="https://three.ws/mcp-tools" />
+	<link rel="icon" href="/favicon.ico" sizes="any" />
+	<link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+	<link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+	<link rel="manifest" href="/manifest.webmanifest" />
+	<link rel="stylesheet" href="/style.css" />
+	<link rel="stylesheet" href="/nav.css" />
+	<link rel="stylesheet" href="/mobile.css" />
+	<meta property="og:type" content="website" />
+	<meta property="og:title" content="MCP Tool Catalog · three.ws"  data-i18n-attr="content:mcp_tools.meta_og_title"/>
+	<meta property="og:description" content="Every MCP tool three.ws publishes: what it does, what it costs, and whether an AI client can run it unattended. Generated from source."  data-i18n-attr="content:mcp_tools.meta_og_description"/>
+	<meta property="og:url" content="https://three.ws/mcp-tools" />
+	<meta property="og:image" content="https://three.ws/api/page-og?s=learn&amp;t=MCP+Tool+Catalog&amp;d=Every+MCP+tool+three.ws+publishes%2C+searchable+and+filterable+by+category%3A+what+it+does%2C+which+server+hosts+it%2C+what+it+costs+in+USDC%2C+and+whether+an+AI+client&amp;p=%2Fmcp-tools" />
+	<meta name="twitter:card" content="summary_large_image" />
+	<meta name="twitter:title" content="MCP Tool Catalog · three.ws"  data-i18n-attr="content:mcp_tools.meta_twitter_title"/>
+	<meta name="twitter:description" content="Every MCP tool three.ws publishes, searchable by safety, price, and server."  data-i18n-attr="content:mcp_tools.meta_twitter_description"/>
+	<meta name="twitter:image" content="https://three.ws/api/page-og?s=learn&amp;t=MCP+Tool+Catalog&amp;d=Every+MCP+tool+three.ws+publishes%2C+searchable+and+filterable+by+category%3A+what+it+does%2C+which+server+hosts+it%2C+what+it+costs+in+USDC%2C+and+whether+an+AI+client&amp;p=%2Fmcp-tools" />
+	<meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1" />
+	<meta property="og:locale" content="en_US" />
+	<meta property="og:image:alt" content="MCP Tool Catalog / three.ws" />
+	<meta name="twitter:site" content="@trythreews" />
+	<style>
+		:root {
+			/* Safety classes ride the canonical status tokens: read is a healthy
+			   state, write is a caution, irreversible is a danger. */
+			--mc-read: var(--success);
+			--mc-write: var(--warn);
+			--mc-irreversible: var(--danger);
+			--mc-paid: var(--wallet-accent);
+			--mc-maxw: 1240px;
+		}
+		:root[data-theme="light"] {
+			--mc-read: #15803d;
+			--mc-write: #a16207;
+			--mc-irreversible: #b91c1c;
+			--mc-paid: #6d28d9;
+		}
+		* { box-sizing: border-box; }
+		html, body { margin: 0; background: var(--bg-0); color: var(--ink); }
+		body { font-family: var(--font-body, 'Inter', system-ui, sans-serif); min-height: 100vh; }
+		.site-header { position: sticky; top: 0; z-index: 50; background: color-mix(in srgb, var(--bg-0) 82%, transparent); backdrop-filter: blur(10px); }
+
+		.mc-wrap { max-width: var(--mc-maxw); margin: 0 auto; padding: 0 18px 96px; }
+
+		/* ── hero ───────────────────────────────────────────────────────── */
+		.mc-hero { padding: 34px 0 8px; }
+		.mc-hero h1 { font-size: clamp(1.7rem, 4vw, 2.5rem); line-height: 1.15; margin: 0 0 10px; letter-spacing: -0.02em; color: var(--ink-bright, var(--ink)); }
+		.mc-hero p { margin: 0; max-width: 68ch; color: var(--ink-dim); line-height: 1.6; }
+		.mc-hero a { color: inherit; text-decoration: underline; text-underline-offset: 3px; }
+		.mc-hero a:hover { color: var(--ink-bright, var(--ink)); }
+
+		/* ── stat strip ─────────────────────────────────────────────────── */
+		.mc-stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 10px; margin: 22px 0 6px; }
+		.mc-stat { border: 1px solid var(--stroke); background: var(--surface-1, rgba(255,255,255,0.03)); border-radius: var(--radius-md, 10px); padding: 12px 14px; }
+		.mc-stat dt { font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.06em; color: var(--ink-dim); margin: 0 0 4px; }
+		.mc-stat dd { margin: 0; font-size: 1.4rem; font-weight: 650; font-variant-numeric: tabular-nums; color: var(--ink-bright, var(--ink)); }
+
+		/* ── controls ───────────────────────────────────────────────────── */
+		.mc-controls { position: sticky; top: 58px; z-index: 20; padding: 14px 0 12px; background: color-mix(in srgb, var(--bg-0) 92%, transparent); backdrop-filter: blur(8px); border-bottom: 1px solid var(--hairline); margin-bottom: 18px; }
+		.mc-search { position: relative; display: flex; align-items: center; }
+		.mc-search svg { position: absolute; left: 12px; width: 16px; height: 16px; color: var(--ink-dim); pointer-events: none; }
+		.mc-search input {
+			width: 100%; padding: 11px 84px 11px 36px; font: inherit; font-size: 0.95rem;
+			color: var(--ink); background: var(--surface-2, rgba(255,255,255,0.05));
+			border: 1px solid var(--stroke); border-radius: var(--radius-md, 10px);
+			transition: border-color var(--duration-fast) var(--ease-standard), background var(--duration-fast) var(--ease-standard);
+		}
+		.mc-search input::placeholder { color: var(--ink-dim); }
+		.mc-search input:hover { border-color: var(--stroke-strong); }
+		.mc-search input:focus-visible { outline: none; border-color: var(--accent); background: var(--surface-3, rgba(255,255,255,0.07)); }
+		.mc-kbd {
+			position: absolute; right: 10px; display: inline-flex; gap: 4px; pointer-events: none;
+		}
+		.mc-kbd kbd {
+			font: 600 0.7rem/1 var(--font-mono, ui-monospace, monospace); padding: 4px 6px;
+			border: 1px solid var(--stroke); border-radius: 5px; color: var(--ink-dim);
+			background: var(--surface-1, rgba(255,255,255,0.04));
+		}
+		.mc-filters { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; align-items: center; }
+		.mc-group { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+		.mc-group-label { font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.06em; color: var(--ink-dim); margin-right: 2px; }
+		.mc-chip {
+			font: inherit; font-size: 0.82rem; padding: 6px 11px; cursor: pointer;
+			color: var(--ink-dim); background: transparent;
+			border: 1px solid var(--stroke); border-radius: 999px;
+			transition: color var(--duration-fast) var(--ease-standard), border-color var(--duration-fast) var(--ease-standard), background var(--duration-fast) var(--ease-standard), transform var(--duration-instant) var(--ease-standard);
+		}
+		.mc-chip:hover { color: var(--ink); border-color: var(--stroke-strong); background: var(--surface-1, rgba(255,255,255,0.04)); }
+		.mc-chip:active { transform: translateY(1px); }
+		.mc-chip:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+		.mc-chip[aria-pressed="true"] { color: var(--ink-bright, var(--ink)); border-color: currentColor; background: var(--surface-3, rgba(255,255,255,0.08)); }
+		.mc-chip[data-safety="read"][aria-pressed="true"] { color: var(--mc-read); }
+		.mc-chip[data-safety="write"][aria-pressed="true"] { color: var(--mc-write); }
+		.mc-chip[data-safety="irreversible"][aria-pressed="true"] { color: var(--mc-irreversible); }
+		.mc-select {
+			font: inherit; font-size: 0.82rem; padding: 6px 10px; color: var(--ink);
+			background: var(--surface-1, rgba(255,255,255,0.04)); border: 1px solid var(--stroke);
+			border-radius: 999px; cursor: pointer; max-width: 240px;
+		}
+		.mc-select:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+		.mc-reset { margin-left: auto; }
+
+		/* ── trust policy ───────────────────────────────────────────────── */
+		.mc-policy {
+			border: 1px solid var(--stroke); border-radius: var(--radius-lg, 14px);
+			background: linear-gradient(180deg, var(--surface-2, rgba(255,255,255,0.05)), transparent 65%);
+			padding: 20px 20px 22px; margin: 0 0 26px;
+		}
+		.mc-policy-head h2 { margin: 0 0 8px; font-size: 1.15rem; letter-spacing: -0.01em; color: var(--ink-bright, var(--ink)); }
+		.mc-policy-head p { margin: 0; max-width: 74ch; font-size: 0.89rem; line-height: 1.6; color: var(--ink-dim); }
+		.mc-policy-head a { color: inherit; text-decoration: underline; text-underline-offset: 3px; }
+		.mc-policy-head a:hover { color: var(--ink-bright, var(--ink)); }
+
+		.mc-policy-profiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 10px; margin: 16px 0 18px; }
+		.mc-prof {
+			display: flex; flex-direction: column; gap: 5px; text-align: left; font: inherit; cursor: pointer;
+			padding: 13px 14px; color: var(--ink); background: var(--surface-1, rgba(255,255,255,0.03));
+			border: 1px solid var(--stroke); border-radius: var(--radius-md, 10px);
+			transition: border-color var(--duration-fast) var(--ease-standard), background var(--duration-fast) var(--ease-standard);
+		}
+		.mc-prof:hover { border-color: var(--stroke-strong); background: var(--surface-2, rgba(255,255,255,0.06)); }
+		.mc-prof:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+		.mc-prof[aria-checked="true"] { border-color: var(--accent); background: var(--accent-soft, var(--surface-3)); }
+		.mc-prof-name { font-weight: 650; font-size: 0.92rem; color: var(--ink-bright, var(--ink)); }
+		.mc-prof-name em { font-style: normal; font-size: 0.68rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; color: var(--accent); margin-left: 6px; }
+		.mc-prof-desc { font-size: 0.8rem; line-height: 1.45; color: var(--ink-dim); }
+		.mc-prof-counts { font-size: 0.74rem; font-variant-numeric: tabular-nums; color: var(--ink-faint, var(--ink-dim)); margin-top: 2px; }
+
+		.mc-policy-tabs { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 10px; }
+		.mc-tab {
+			font: inherit; font-size: 0.8rem; padding: 5px 12px; cursor: pointer; color: var(--ink-dim);
+			background: transparent; border: 1px solid var(--stroke); border-radius: 999px;
+			transition: color var(--duration-fast) var(--ease-standard), border-color var(--duration-fast) var(--ease-standard), background var(--duration-fast) var(--ease-standard);
+		}
+		.mc-tab:hover { color: var(--ink); border-color: var(--stroke-strong); }
+		.mc-tab:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+		.mc-tab[aria-selected="true"] { color: var(--ink-bright, var(--ink)); border-color: currentColor; background: var(--surface-3, rgba(255,255,255,0.08)); }
+		.mc-policy-where { margin: 0 0 10px; font-size: 0.8rem; color: var(--ink-dim); }
+		.mc-policy-where code { font-family: var(--font-mono, ui-monospace, monospace); color: var(--ink); }
+		.mc-policy-out .mc-snippet pre { max-height: 260px; overflow: auto; }
+		.mc-policy-live { margin: 10px 0 0; font-size: 0.78rem; line-height: 1.5; color: var(--ink-faint, var(--ink-dim)); }
+		.mc-policy-live a { color: var(--ink-dim); font-family: var(--font-mono, ui-monospace, monospace); }
+		.mc-policy-live a:hover { color: var(--ink); }
+
+		.mc-count { font-size: 0.85rem; color: var(--ink-dim); margin: 0 0 14px; font-variant-numeric: tabular-nums; }
+
+		/* ── tool grid ──────────────────────────────────────────────────── */
+		.mc-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 12px; }
+		.mc-card {
+			display: flex; flex-direction: column; gap: 8px; text-align: left; color: inherit; text-decoration: none;
+			padding: 15px 16px; font: inherit; cursor: pointer;
+			background: var(--surface-1, rgba(255,255,255,0.03));
+			border: 1px solid var(--stroke); border-radius: var(--radius-lg, 14px);
+			transition: border-color var(--duration-fast) var(--ease-standard), background var(--duration-fast) var(--ease-standard), transform var(--duration-fast) var(--ease-standard);
+		}
+		.mc-card:hover { border-color: var(--stroke-strong); background: var(--surface-2, rgba(255,255,255,0.055)); transform: translateY(-1px); }
+		.mc-card:active { transform: translateY(0); }
+		.mc-card:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+		.mc-card-top { display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; }
+		/* Both are spans inside one cell, so they must be blocks or the mono name
+		   and the human title run together on a single line. */
+		.mc-cat { font-size: 0.7rem; color: var(--ink-dim); }
+		.mc-name { display: block; font: 600 0.92rem/1.3 var(--font-mono, ui-monospace, monospace); color: var(--ink-bright, var(--ink)); word-break: break-word; }
+		.mc-title { display: block; font-size: 0.78rem; color: var(--ink-dim); margin-top: 3px; line-height: 1.35; }
+		.mc-desc {
+			font-size: 0.84rem; line-height: 1.5; color: var(--ink-dim); margin: 0;
+			display: -webkit-box; -webkit-line-clamp: 3; line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden;
+		}
+		.mc-badges { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin-top: auto; padding-top: 4px; }
+		.mc-badge {
+			font-size: 0.7rem; font-weight: 600; padding: 3px 8px; border-radius: 999px;
+			border: 1px solid currentColor; white-space: nowrap;
+		}
+		.mc-badge[data-safety="read"] { color: var(--mc-read); }
+		.mc-badge[data-safety="write"] { color: var(--mc-write); }
+		.mc-badge[data-safety="irreversible"] { color: var(--mc-irreversible); }
+		.mc-badge-price { color: var(--mc-paid); }
+		.mc-badge-free { color: var(--ink-dim); border-color: var(--stroke); }
+		.mc-server { font-size: 0.72rem; color: var(--ink-faint, var(--ink-dim)); font-family: var(--font-mono, ui-monospace, monospace); }
+
+		/* ── states ─────────────────────────────────────────────────────── */
+		.mc-skeleton { border: 1px solid var(--stroke); border-radius: var(--radius-lg, 14px); padding: 15px 16px; }
+		.mc-shimmer { height: 12px; border-radius: 6px; background: linear-gradient(90deg, var(--surface-1, rgba(255,255,255,0.04)) 25%, var(--surface-3, rgba(255,255,255,0.09)) 50%, var(--surface-1, rgba(255,255,255,0.04)) 75%); background-size: 200% 100%; animation: mc-shimmer 1.4s ease-in-out infinite; }
+		.mc-shimmer + .mc-shimmer { margin-top: 9px; }
+		.mc-shimmer.w60 { width: 60%; } .mc-shimmer.w40 { width: 40%; } .mc-shimmer.w85 { width: 85%; }
+		@keyframes mc-shimmer { 0% { background-position: 200% 0; } 100% { background-position: -200% 0; } }
+		@media (prefers-reduced-motion: reduce) {
+			.mc-shimmer { animation: none; }
+			.mc-card, .mc-chip { transition: none; }
+		}
+		.mc-empty, .mc-error {
+			border: 1px dashed var(--stroke-strong); border-radius: var(--radius-lg, 14px);
+			padding: 40px 24px; text-align: center; color: var(--ink-dim);
+		}
+		.mc-error { border-style: solid; border-color: var(--danger); }
+		.mc-empty h2, .mc-error h2 { margin: 0 0 8px; font-size: 1.05rem; color: var(--ink-bright, var(--ink)); }
+		.mc-empty p, .mc-error p { margin: 0 auto 16px; max-width: 46ch; line-height: 1.55; font-size: 0.9rem; }
+		.mc-btn {
+			font: inherit; font-size: 0.85rem; font-weight: 600; padding: 8px 16px; cursor: pointer;
+			color: var(--btn-secondary-fg, var(--ink)); background: var(--btn-secondary-bg, var(--surface-3));
+			border: 1px solid var(--btn-secondary-border, var(--stroke-strong)); border-radius: var(--radius-md, 10px);
+			transition: background var(--duration-fast) var(--ease-standard);
+		}
+		.mc-btn:hover { background: var(--btn-secondary-bg-hover, rgba(255,255,255,0.12)); }
+		.mc-btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+		.mc-snippet { position: relative; }
+		.mc-snippet pre {
+			margin: 0; padding: 13px 14px; overflow-x: auto; font-size: 0.78rem; line-height: 1.5;
+			font-family: var(--font-mono, ui-monospace, monospace); color: var(--ink);
+			background: var(--bg-0); border: 1px solid var(--stroke); border-radius: var(--radius-md, 10px);
+		}
+		.mc-copy { position: absolute; top: 8px; right: 8px; font-size: 0.72rem; padding: 5px 10px; }
+
+		/* ── census ─────────────────────────────────────────────────────── */
+		.mc-stat dd small { display: block; margin-top: 2px; font-size: 0.72rem; font-weight: 500; color: var(--ink-dim); }
+		.mc-live { margin: 8px 0 0; font-size: 0.8rem; color: var(--ink-dim); display: flex; align-items: center; gap: 8px; min-height: 1.4em; }
+		.mc-live::before { content: ""; width: 8px; height: 8px; border-radius: 50%; background: var(--stroke-strong); flex: none; }
+		.mc-live[data-state="match"]::before { background: var(--mc-read); }
+		.mc-live[data-state="drift"]::before { background: var(--mc-write); }
+		.mc-live a { color: inherit; text-underline-offset: 3px; }
+		.mc-method { margin: 10px 0 4px; font-size: 0.84rem; color: var(--ink-dim); }
+		.mc-method summary { cursor: pointer; width: fit-content; padding: 4px 0; color: var(--ink); text-underline-offset: 3px; }
+		.mc-method summary:hover { text-decoration: underline; }
+		.mc-method summary:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 4px; }
+		.mc-method p { max-width: 80ch; line-height: 1.6; margin: 8px 0 12px; }
+		.mc-table-wrap { overflow-x: auto; border: 1px solid var(--stroke); border-radius: var(--radius-md, 10px); }
+		.mc-servers { width: 100%; border-collapse: collapse; font-size: 0.8rem; font-variant-numeric: tabular-nums; }
+		.mc-servers th, .mc-servers td { padding: 7px 10px; text-align: right; border-bottom: 1px solid var(--hairline); white-space: nowrap; }
+		.mc-servers th:first-child, .mc-servers td:first-child { text-align: left; }
+		.mc-servers thead th { font-weight: 600; color: var(--ink-dim); font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.05em; }
+		.mc-grade { display: inline-flex; align-items: center; justify-content: center; min-width: 2.6em; padding: 2px 8px; border-radius: 999px; font-weight: 700; font-size: 0.74rem; border: 1px solid currentColor; cursor: help; }
+		.mc-grade:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+		.mc-grade[data-grade="A"] { color: var(--mc-read); }
+		.mc-grade[data-grade="B"] { color: var(--accent); }
+		.mc-grade[data-grade="C"], .mc-grade[data-grade="D"] { color: var(--mc-write); }
+		.mc-grade[data-grade="F"] { color: var(--ink-dim); }
+		.mc-servers th button.mc-sort { text-transform: inherit; letter-spacing: inherit; font-weight: inherit; color: inherit; text-decoration: none; }
+		.mc-servers th button.mc-sort:hover { color: var(--ink); text-decoration: underline; }
+		.mc-servers td code { font-family: var(--font-mono, ui-monospace, monospace); color: var(--ink); }
+		.mc-servers tbody tr:hover { background: var(--surface-1, rgba(255,255,255,0.03)); }
+		.mc-servers button { font: inherit; color: var(--ink); background: none; border: 0; padding: 0; cursor: pointer; text-decoration: underline; text-underline-offset: 3px; }
+		.mc-servers button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+		/* ── releases ───────────────────────────────────────────────────── */
+		.mc-releases { margin-top: 44px; }
+		.mc-releases h2 { margin: 0 0 6px; font-size: 1.15rem; color: var(--ink-bright, var(--ink)); }
+		.mc-releases-intro { margin: 0 0 16px; max-width: 74ch; font-size: 0.86rem; line-height: 1.6; color: var(--ink-dim); }
+		.mc-releases-intro a { color: inherit; }
+		.mc-release-list { list-style: none; margin: 0 0 14px; padding: 0; display: grid; gap: 10px; }
+		.mc-release { border: 1px solid var(--stroke); border-radius: var(--radius-md, 10px); background: var(--surface-1, rgba(255,255,255,0.03)); }
+		.mc-release summary { display: flex; flex-wrap: wrap; gap: 10px; align-items: baseline; padding: 11px 14px; cursor: pointer; list-style: none; }
+		.mc-release summary::-webkit-details-marker { display: none; }
+		.mc-release summary:hover { background: var(--surface-2, rgba(255,255,255,0.05)); }
+		.mc-release summary:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+		.mc-release time { font: 600 0.88rem/1.3 var(--font-mono, ui-monospace, monospace); color: var(--ink-bright, var(--ink)); }
+		.mc-delta { font-size: 0.78rem; font-variant-numeric: tabular-nums; }
+		.mc-delta.add { color: var(--mc-read); }
+		.mc-delta.rm { color: var(--mc-irreversible); }
+		.mc-release-total { font-size: 0.76rem; color: var(--ink-dim); margin-left: auto; }
+		.mc-release-body { padding: 4px 14px 14px; font-size: 0.82rem; }
+		.mc-release-note { margin: 0 0 10px; color: var(--ink-dim); line-height: 1.5; }
+		.mc-release-body h3 { margin: 10px 0 4px; font-size: 0.74rem; text-transform: uppercase; letter-spacing: 0.06em; color: var(--ink-dim); font-weight: 600; }
+		.mc-release-body ul { margin: 0; padding: 0; list-style: none; display: flex; flex-wrap: wrap; gap: 6px; }
+		.mc-release-body li a, .mc-release-body li span { display: inline-block; padding: 2px 8px; border: 1px solid var(--stroke); border-radius: 999px; font: 0.76rem/1.5 var(--font-mono, ui-monospace, monospace); color: var(--ink); text-decoration: none; }
+		.mc-release-body li a:hover { border-color: var(--stroke-strong); background: var(--surface-2, rgba(255,255,255,0.05)); }
+		.mc-release-body li a:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+		.mc-release-body li span { color: var(--ink-dim); text-decoration: line-through; }
+		.mc-release-server { margin-top: 8px; font-size: 0.74rem; color: var(--ink-dim); }
+
+		@media (max-width: 640px) {
+			.mc-controls { top: 0; }
+			.mc-grid { grid-template-columns: 1fr; }
+			.mc-reset { margin-left: 0; }
+		}
+	</style>
+	<script type="application/ld+json">{"@context":"https://schema.org","@type":"WebPage","name":"MCP Tool Catalog","description":"Every MCP tool three.ws publishes: what it does, which server hosts it, what it costs in USDC, and whether an AI client can run it unattended.","url":"https://three.ws/mcp-tools","isPartOf":{"@type":"WebSite","name":"three.ws","url":"https://three.ws"}}</script>
+
+	<meta property="og:site_name" content="three.ws">
+</head>
+<body>
+	<header class="site-header"><div id="nav-container"></div></header>
+	<script src="/nav.js"></script>
+
+	<main class="mc-wrap">
+		<div class="mc-hero">
+			<h1 data-i18n="mcp_tools.mcp_tool_catalog">MCP Tool Catalog</h1>
+			<p data-i18n-html="mcp_tools.every_tool_three_ws_publishes_live">
+				Every tool three.ws publishes over the <a href="/docs/mcp">Model Context Protocol</a>, in one place:
+				what it does, which server hosts it, what it costs, and whether an AI client can run it without asking you first.
+				The build asks every server for its live <code>tools/list</code>, so this page cannot drift from what the servers actually serve.
+				Each tool has its own page with its schema, an example call and, for free read-only tools, a button that runs it.
+				The same data is machine-readable at <a href="/mcp-catalog.json"><code>/mcp-catalog.json</code></a> and <a href="/tools.json"><code>/tools.json</code></a>.
+			</p>
+			<p style="margin-top:10px" data-i18n-html="mcp_tools.connect_three_ws_to_claude_chatgpt_cursor"><a href="/connect">Connect three.ws to Claude, ChatGPT, Cursor or VS Code</a> in two clicks to use them.</p>
+		</div>
+
+		<section class="mc-census" aria-labelledby="mc-census-h">
+			<h2 id="mc-census-h" class="sr-only">How many tools, resources and prompts three.ws serves</h2>
+			<dl class="mc-stats" id="mc-stats" aria-live="polite"></dl>
+			<p class="mc-live" id="mc-live" role="status" aria-live="polite"></p>
+			<details class="mc-method" id="mc-method">
+				<summary>Per-server trust grades and how these numbers are calculated</summary>
+				<p id="mc-method-text"></p>
+				<div class="mc-table-wrap"><table class="mc-servers" id="mc-servers"></table></div>
+			</details>
+		</section>
+
+		<div class="mc-controls">
+			<label class="mc-search">
+				<span class="sr-only" data-i18n="mcp_tools.search_tools">Search tools</span>
+				<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+				<input id="mc-q" type="search" autocomplete="off" spellcheck="false"
+					placeholder="Search tools by name, description, or server…" />
+				<span class="mc-kbd" aria-hidden="true"><kbd>/</kbd></span>
+			</label>
+
+			<div class="mc-filters">
+				<div class="mc-group" role="group" aria-label="Filter by safety">
+					<span class="mc-group-label" data-i18n="mcp_tools.safety">Safety</span>
+					<button type="button" class="mc-chip" data-filter="safety" data-safety="read" data-value="read" aria-pressed="false" data-i18n="mcp_tools.read_only">Read-only</button>
+					<button type="button" class="mc-chip" data-filter="safety" data-safety="write" data-value="write" aria-pressed="false" data-i18n="mcp_tools.writes">Writes</button>
+					<button type="button" class="mc-chip" data-filter="safety" data-safety="irreversible" data-value="irreversible" aria-pressed="false" data-i18n="mcp_tools.irreversible">Irreversible</button>
+				</div>
+				<div class="mc-group" role="group" aria-label="Filter by price">
+					<span class="mc-group-label" data-i18n="mcp_tools.price">Price</span>
+					<button type="button" class="mc-chip" data-filter="price" data-value="free" aria-pressed="false" data-i18n="mcp_tools.free">Free</button>
+					<button type="button" class="mc-chip" data-filter="price" data-value="paid" aria-pressed="false" data-i18n="mcp_tools.paid">Paid</button>
+				</div>
+				<div class="mc-group">
+					<span class="mc-group-label"><label for="mc-category">Category</label></span>
+					<select id="mc-category" class="mc-select"><option value="">All categories</option></select>
+				</div>
+				<div class="mc-group">
+					<span class="mc-group-label"><label for="mc-server" data-i18n="mcp_tools.server">Server</label></span>
+					<select id="mc-server" class="mc-select"><option value="" data-i18n="mcp_tools.all_servers">All servers</option></select>
+				</div>
+				<button type="button" class="mc-btn mc-reset" id="mc-reset" hidden data-i18n="mcp_tools.clear_filters">Clear filters</button>
+			</div>
+		</div>
+
+		<section class="mc-policy" id="mc-policy" aria-labelledby="mc-policy-h">
+			<div class="mc-policy-head">
+				<div>
+					<h2 id="mc-policy-h" data-i18n="mcp_tools.let_your_assistant_run_the_safe_ones">Let your assistant run the safe ones by itself</h2>
+					<p data-i18n-html="mcp_tools.your_ai_client_decides_whether_to_run">
+						Your AI client decides whether to run a tool without asking you by trusting its
+						read-only label. Everywhere else that label is the tool author's own word for it.
+						Here it is <a href="/docs/mcp-safety">checked against the code on every build</a>,
+						so it is worth automating on. Pick how much you want automated and paste the result
+						into your client.
+					</p>
+				</div>
+			</div>
+
+			<div class="mc-policy-profiles" role="radiogroup" aria-label="How much to automate">
+				<button type="button" class="mc-prof" data-profile="strict" role="radio" aria-checked="false" data-i18n-html="mcp_tools.strict_only_free_verified_reads_run_by">
+					<span class="mc-prof-name">Strict</span>
+					<span class="mc-prof-desc">Only free, verified reads run by themselves. Nothing irreversible may run at all.</span>
+					<span class="mc-prof-counts" data-counts></span>
+				</button>
+				<button type="button" class="mc-prof" data-profile="balanced" role="radio" aria-checked="true" data-i18n-html="mcp_tools.balanced_recommended_every_verified_read_run">
+					<span class="mc-prof-name">Balanced <em>recommended</em></span>
+					<span class="mc-prof-desc">Every verified read runs. Anything that changes state asks first.</span>
+					<span class="mc-prof-counts" data-counts></span>
+				</button>
+				<button type="button" class="mc-prof" data-profile="open" role="radio" aria-checked="false" data-i18n-html="mcp_tools.open_reads_and_reversible_writes_run_only">
+					<span class="mc-prof-name">Open</span>
+					<span class="mc-prof-desc">Reads and reversible writes run. Only the un-undoable stops for you.</span>
+					<span class="mc-prof-counts" data-counts></span>
+				</button>
+			</div>
+
+			<div class="mc-policy-out">
+				<div class="mc-policy-tabs" role="tablist" aria-label="Client format">
+					<button type="button" class="mc-tab" data-format="claude" role="tab" aria-selected="true" data-i18n="mcp_tools.claude">Claude</button>
+					<button type="button" class="mc-tab" data-format="vscode" role="tab" aria-selected="false" data-i18n="mcp_tools.vs_code">VS Code</button>
+					<button type="button" class="mc-tab" data-format="json" role="tab" aria-selected="false" data-i18n="mcp_tools.portable_json">Portable JSON</button>
+				</div>
+				<p class="mc-policy-where" id="mc-policy-where"></p>
+				<div class="mc-snippet">
+					<pre><code id="mc-policy-code">Loading the policy…</code></pre>
+					<button type="button" class="mc-btn mc-copy" id="mc-policy-copy" data-i18n="mcp_tools.copy">Copy</button>
+				</div>
+				<p class="mc-policy-live">
+					<span data-i18n="mcp_tools.always_current_api_mcp_policy_returns_this_label">Always current:</span> <a id="mc-policy-url" href="/api/mcp-policy">/api/mcp-policy</a> <span data-i18n="mcp_tools.always_current_api_mcp_policy_returns_this_label2">returns
+					this same document, so a client can refetch it instead of pinning a copy that goes stale
+					as tools are added.</span>
+				</p>
+			</div>
+		</section>
+
+		<p class="mc-count" id="mc-count" role="status" aria-live="polite"></p>
+		<div class="mc-grid" id="mc-grid"></div>
+
+		<section class="mc-releases" id="releases" aria-labelledby="mc-releases-h">
+			<h2 id="mc-releases-h">Releases</h2>
+			<p class="mc-releases-intro">
+				Which tools each release added or removed, from <a href="/mcp-tool-history.json"><code>/mcp-tool-history.json</code></a>.
+				Replaying every release from the first reproduces today's catalog exactly, and the build fails when it does not.
+			</p>
+			<ol class="mc-release-list" id="mc-release-list"></ol>
+			<button type="button" class="mc-btn" id="mc-release-more" hidden>Show older releases</button>
+		</section>
+	</main>
+
+	<script src="/brand.js" defer></script>
+	<script type="module">
+		const grid = document.getElementById('mc-grid');
+		const countEl = document.getElementById('mc-count');
+		const statsEl = document.getElementById('mc-stats');
+		const qEl = document.getElementById('mc-q');
+		const serverEl = document.getElementById('mc-server');
+		const resetEl = document.getElementById('mc-reset');
+		const categoryEl = document.getElementById('mc-category');
+		const liveEl = document.getElementById('mc-live');
+
+		const state = { q: '', safety: new Set(), price: new Set(), server: '', category: '' };
+		let catalog = null;
+		let categoryLabel = new Map();
+
+		const esc = (s) =>
+			String(s ?? '').replace(/[&<>"']/g, (c) =>
+				({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c],
+			);
+
+		const SAFETY_LABEL = {
+			read: 'Read-only',
+			write: 'Writes',
+			irreversible: 'Irreversible',
+		};
+		const SAFETY_BLURB = {
+			read: 'Does not change anything. An MCP client can run this without asking you.',
+			write: 'Changes something, and the change can be corrected by a follow-up call.',
+			irreversible: 'Cannot be undone once it runs. Approve each call deliberately.',
+		};
+
+		const priceLabel = (price) =>
+			price.free ? 'Free' : `$${price.usd >= 0.01 ? price.usd.toFixed(2) : String(+price.usd.toPrecision(2))}`;
+
+		// ── skeleton while the catalog loads ──────────────────────────────
+		function renderSkeleton() {
+			grid.innerHTML = Array.from({ length: 9 })
+				.map(
+					() =>
+						'<div class="mc-skeleton" aria-hidden="true"><div class="mc-shimmer w60"></div>' +
+						'<div class="mc-shimmer w85"></div><div class="mc-shimmer"></div>' +
+						'<div class="mc-shimmer w40"></div></div>',
+				)
+				.join('');
+			countEl.textContent = 'Loading the catalog…';
+		}
+
+		function renderError(message) {
+			statsEl.hidden = true;
+			countEl.textContent = '';
+			grid.innerHTML =
+				'<div class="mc-error" style="grid-column:1/-1"><h2>The catalog could not be loaded</h2>' +
+				`<p>${esc(message)}</p>` +
+				'<button type="button" class="mc-btn" id="mc-retry">Try again</button></div>';
+			document.getElementById('mc-retry').addEventListener('click', load);
+		}
+
+		// ── census ────────────────────────────────────────────────────────
+		// Every number here is computed: the build asks each server for its
+		// tools/list, resources/list and prompts/list, and /api/mcp-census asks
+		// the running hosted endpoints again so the two can be compared.
+		const fmt = (n) => Number(n ?? 0).toLocaleString('en-US');
+
+		function renderStats() {
+			const t = catalog.census.totals.all;
+			const c = catalog.counts;
+			const cells = [
+				['Tools', fmt(t.tools), `${fmt(t.uniqueTools)} unique names`, 'Every tool every server serves. Some servers share a tool, so the unique count is the honest headline.'],
+				['Servers', fmt(t.servers), `${catalog.census.totals.hosted.servers} hosted, ${catalog.census.totals.stdio.servers} npm`, 'Hosted endpoints plus installable npm servers'],
+				['Resources', fmt(t.resources + t.templates), `${fmt(t.templates)} templates`, 'Readable resources (fixed URIs) plus resource templates (URIs with a placeholder)'],
+				['Prompts', fmt(t.prompts), `${fmt(t.uniquePrompts)} unique`, 'Guided workflows a client can list and run'],
+				['Read-only', fmt(c.read), null, SAFETY_BLURB.read],
+				['Irreversible', fmt(c.irreversible), null, SAFETY_BLURB.irreversible],
+				['Try in browser', fmt(c.tryIt), 'free, keyless reads', 'Free read-only tools on keyless endpoints: their pages can run them for you'],
+			];
+			statsEl.innerHTML = cells
+				.map(
+					([label, value, sub, hint]) =>
+						`<div class="mc-stat" title="${esc(hint)}"><dt>${esc(label)}</dt><dd>${value}${sub ? `<small>${esc(sub)}</small>` : ''}</dd></div>`,
+				)
+				.join('');
+			document.getElementById('mc-method-text').textContent = catalog.census.method;
+			renderServerTable();
+		}
+
+		// Trust grade: a 0-100 score from facts the build checks (see docs/mcp.md).
+		// Sorting is a view over the table only; the order resets on reload.
+		let trustSort = null;
+
+		function trustFor(id) {
+			return catalog.servers.find((s) => s.id === id)?.trust ?? null;
+		}
+
+		function trustSummary(trust) {
+			const lines = trust.facts.map((f) => `${f.earned ? '+' : '-'} ${f.label} (${f.earned}/${f.weight}): ${f.detail}`);
+			return `Trust score ${trust.score}/100\n${lines.join('\n')}`;
+		}
+
+		function renderServerTable() {
+			let rows = catalog.census.servers.slice();
+			if (trustSort) {
+				const dir = trustSort === 'desc' ? -1 : 1;
+				rows.sort((a, b) => dir * ((trustFor(a.id)?.score ?? 0) - (trustFor(b.id)?.score ?? 0)) || a.id.localeCompare(b.id));
+			}
+			const ariaSort = trustSort === 'desc' ? 'descending' : trustSort === 'asc' ? 'ascending' : 'none';
+			const arrow = trustSort === 'desc' ? ' \u2193' : trustSort === 'asc' ? ' \u2191' : '';
+			document.getElementById('mc-servers').innerHTML =
+				`<thead><tr><th scope="col">Server</th><th scope="col" aria-sort="${ariaSort}"><button type="button" class="mc-sort" id="mc-sort-trust" title="Sort servers by trust grade">Trust${arrow}</button></th><th scope="col">Transport</th><th scope="col">Tools</th><th scope="col">On by default</th><th scope="col">Read-only</th><th scope="col">Resources</th><th scope="col">Templates</th><th scope="col">Prompts</th></tr></thead><tbody>` +
+				rows
+					.map((r) => {
+						const trust = trustFor(r.id);
+						const summary = trust ? esc(trustSummary(trust)) : '';
+						const badge = trust
+							? `<span class="mc-grade" data-grade="${esc(trust.grade)}" tabindex="0" role="img" title="${summary}" aria-label="${summary}">${esc(trust.grade)} ${trust.score}</span>`
+							: '';
+						return (
+							`<tr><td><button type="button" data-server="${esc(r.id)}" title="Show only ${esc(r.title)} tools"><code>${esc(r.endpoint || r.id)}</code></button></td>` +
+							`<td>${badge}</td><td>${r.transport === 'remote' ? 'hosted' : 'npm'}</td><td>${r.tools}</td><td>${r.defaultOn}</td><td>${r.readOnly}</td>` +
+							`<td>${r.resources}</td><td>${r.templates}</td><td>${r.prompts}</td></tr>`
+						);
+					})
+					.join('') +
+				'</tbody>';
+		}
+
+		document.getElementById('mc-servers').addEventListener('click', (event) => {
+			if (!event.target.closest('#mc-sort-trust')) return;
+			trustSort = trustSort === 'desc' ? 'asc' : 'desc';
+			renderServerTable();
+			document.getElementById('mc-sort-trust').focus();
+		});
+
+		document.getElementById('mc-servers').addEventListener('click', (event) => {
+			const btn = event.target.closest('button[data-server]');
+			if (!btn) return;
+			state.server = btn.dataset.server;
+			syncChips();
+			syncUrl();
+			render();
+			document.querySelector('.mc-controls').scrollIntoView({ behavior: 'smooth', block: 'start' });
+		});
+
+		/** Compare the build's hosted figures with what the running servers serve now. */
+		async function renderLive() {
+			liveEl.textContent = 'Checking the live servers…';
+			liveEl.removeAttribute('data-state');
+			try {
+				const res = await fetch('/api/mcp-census', { headers: { accept: 'application/json' } });
+				if (!res.ok) throw new Error(`the census endpoint returned ${res.status}`);
+				const live = await res.json();
+				const h = live.totals.hosted;
+				const when = new Date(live.computedAt).toLocaleString();
+				if (live.matchesBuild) {
+					liveEl.dataset.state = 'match';
+					liveEl.innerHTML = `The ${h.servers} hosted servers report ${fmt(h.tools)} tools right now, the same as this page. <a href="/api/mcp-census">Live census</a>, computed ${esc(when)}.`;
+				} else {
+					liveEl.dataset.state = 'drift';
+					const changed = [...new Set(live.drift.map((d) => d.id))].join(', ');
+					liveEl.innerHTML = `The live hosted servers differ from this build on ${esc(changed)} (a deploy is rolling out). <a href="/api/mcp-census">See the live census</a>.`;
+				}
+			} catch (error) {
+				liveEl.textContent = `The live census could not be reached (${error.message}). The figures above are from the build.`;
+			}
+		}
+
+		function matches(tool) {
+			if (state.safety.size && !state.safety.has(tool.safety)) return false;
+			if (state.price.size) {
+				const bucket = tool.price.free ? 'free' : 'paid';
+				if (!state.price.has(bucket)) return false;
+			}
+			if (state.server && tool.server.id !== state.server) return false;
+			if (state.category && tool.category !== state.category) return false;
+			if (state.q) {
+				const hay = `${tool.name} ${tool.title ?? ''} ${tool.description ?? ''} ${tool.server.id} ${tool.server.title} ${categoryLabel.get(tool.category) ?? ''}`.toLowerCase();
+				// Every term must appear somewhere, so "solana read" narrows sensibly.
+				return state.q.split(/\s+/).every((term) => hay.includes(term));
+			}
+			return true;
+		}
+
+		function cardHtml(tool) {
+			const desc = esc(tool.whenToUse || tool.description || '');
+			const price = tool.price.free
+				? '<span class="mc-badge mc-badge-free" title="No payment, no wallet, no key">Free</span>'
+				: `<span class="mc-badge mc-badge-price" title="Costs ${esc(priceLabel(tool.price))} USDC per call, settled over x402">${esc(priceLabel(tool.price))} USDC</span>`;
+			return (
+				`<a class="mc-card" href="${esc(tool.page)}">` +
+				'<span class="mc-card-top"><span>' +
+				`<span class="mc-name">${esc(tool.name)}</span>` +
+				(tool.title ? `<span class="mc-title">${esc(tool.title)}</span>` : '') +
+				'</span></span>' +
+				`<p class="mc-desc">${desc}</p>` +
+				'<span class="mc-badges">' +
+				`<span class="mc-badge" data-safety="${tool.safety}" title="${esc(SAFETY_BLURB[tool.safety])}">${SAFETY_LABEL[tool.safety]}</span>` +
+				price +
+				(tool.tryIt ? '<span class="mc-badge mc-badge-free" title="Its page can run it in your browser">Try it</span>' : '') +
+				`<span class="mc-cat">${esc(categoryLabel.get(tool.category) ?? tool.category)}</span>` +
+				`<span class="mc-server">${esc(tool.server.title)}</span>` +
+				'</span></a>'
+			);
+		}
+
+		let visible = [];
+
+		function render() {
+			visible = catalog.tools.filter(matches);
+			const anyFilter = Boolean(state.q || state.safety.size || state.price.size || state.server || state.category);
+			resetEl.hidden = !anyFilter;
+
+			if (!visible.length) {
+				countEl.textContent = 'No matches';
+				grid.innerHTML =
+					'<div class="mc-empty" style="grid-column:1/-1"><h2>No tools match those filters</h2>' +
+					'<p>Try a different search term, or widen the filters. Every three.ws MCP tool is listed here, so an empty result means the filters are too narrow, not that the catalog is missing something.</p>' +
+					'<button type="button" class="mc-btn" id="mc-clear">Clear filters</button></div>';
+				document.getElementById('mc-clear').addEventListener('click', clearFilters);
+				return;
+			}
+
+			countEl.textContent =
+				visible.length === catalog.tools.length
+					? `${visible.length} tools`
+					: `${visible.length} of ${catalog.tools.length} tools`;
+			grid.innerHTML = visible.map(cardHtml).join('');
+		}
+
+		// ── filter wiring + shareable URL ─────────────────────────────────
+		function syncUrl() {
+			const params = new URLSearchParams();
+			if (state.q) params.set('q', state.q);
+			if (state.safety.size) params.set('safety', [...state.safety].join(','));
+			if (state.price.size) params.set('price', [...state.price].join(','));
+			if (state.server) params.set('server', state.server);
+			if (state.category) params.set('category', state.category);
+			const qs = params.toString();
+			history.replaceState(null, '', qs ? `?${qs}` : location.pathname);
+		}
+
+		function readUrl() {
+			const params = new URLSearchParams(location.search);
+			state.q = (params.get('q') ?? '').trim().toLowerCase();
+			state.server = params.get('server') ?? '';
+			state.category = params.get('category') ?? '';
+			for (const key of ['safety', 'price']) {
+				const raw = params.get(key);
+				if (raw) for (const v of raw.split(',').filter(Boolean)) state[key].add(v);
+			}
+			qEl.value = params.get('q') ?? '';
+		}
+
+		function syncChips() {
+			for (const chip of document.querySelectorAll('.mc-chip')) {
+				const on = state[chip.dataset.filter].has(chip.dataset.value);
+				chip.setAttribute('aria-pressed', String(on));
+			}
+			serverEl.value = state.server;
+			categoryEl.value = state.category;
+		}
+
+		function clearFilters() {
+			state.q = '';
+			state.safety.clear();
+			state.price.clear();
+			state.server = '';
+			state.category = '';
+			qEl.value = '';
+			syncChips();
+			syncUrl();
+			render();
+			qEl.focus();
+		}
+
+		for (const chip of document.querySelectorAll('.mc-chip')) {
+			chip.addEventListener('click', () => {
+				const bucket = state[chip.dataset.filter];
+				const value = chip.dataset.value;
+				if (bucket.has(value)) bucket.delete(value);
+				else bucket.add(value);
+				syncChips();
+				syncUrl();
+				render();
+			});
+		}
+
+		let debounce;
+		qEl.addEventListener('input', () => {
+			clearTimeout(debounce);
+			debounce = setTimeout(() => {
+				state.q = qEl.value.trim().toLowerCase();
+				syncUrl();
+				render();
+			}, 120);
+		});
+
+		serverEl.addEventListener('change', () => {
+			state.server = serverEl.value;
+			syncUrl();
+			render();
+		});
+
+		categoryEl.addEventListener('change', () => {
+			state.category = categoryEl.value;
+			syncUrl();
+			render();
+		});
+
+		resetEl.addEventListener('click', clearFilters);
+
+		document.addEventListener('keydown', (event) => {
+			if (event.key === '/' && document.activeElement !== qEl) {
+				event.preventDefault();
+				qEl.focus();
+				qEl.select();
+			} else if (event.key === 'Escape' && document.activeElement === qEl && qEl.value) {
+				qEl.value = '';
+				state.q = '';
+				syncUrl();
+				render();
+			}
+		});
+
+		// ── trust policy ──────────────────────────────────────────────────
+		// The decision (which tools may run unattended) belongs to /api/mcp-policy
+		// and is fetched, never re-implemented here: a second copy of those rules
+		// in the page would drift from the endpoint a client actually consumes.
+		// Only the per-client formatting below is presentational, derived from the
+		// buckets the endpoint returns.
+		const WHERE = {
+			claude: 'Paste into <code>.claude/settings.json</code> in your project, or your user settings.',
+			vscode: 'Paste into VS Code <code>settings.json</code>.',
+			json: 'The portable document, for any client that can read an allowlist.',
+		};
+
+		const policyState = { profile: 'balanced', format: 'claude' };
+		const policyCache = new Map();
+		const codeEl = () => document.getElementById('mc-policy-code');
+
+		async function loadPolicy(profile) {
+			if (policyCache.has(profile)) return policyCache.get(profile);
+			const res = await fetch(`/api/mcp-policy?profile=${encodeURIComponent(profile)}`, {
+				headers: { accept: 'application/json' },
+			});
+			if (!res.ok) throw new Error(`the policy endpoint returned ${res.status}`);
+			const doc = await res.json();
+			policyCache.set(profile, doc);
+			return doc;
+		}
+
+		/** Shape one policy document for a specific client's settings file. */
+		function formatPolicy(doc, format) {
+			const ids = (bucket) => doc.rules[bucket].map((t) => t.permission);
+			if (format === 'claude') {
+				return { permissions: { allow: ids('allow'), ask: ids('confirm'), deny: ids('deny') } };
+			}
+			if (format === 'vscode') {
+				const tools = {};
+				for (const id of ids('allow')) tools[id] = true;
+				for (const id of [...ids('confirm'), ...ids('deny')]) tools[id] = false;
+				return { 'chat.tools.autoApprove': tools };
+			}
+			return doc;
+		}
+
+		let policyText = '';
+
+		async function renderPolicy() {
+			for (const btn of document.querySelectorAll('.mc-prof')) {
+				btn.setAttribute('aria-checked', String(btn.dataset.profile === policyState.profile));
+			}
+			for (const tab of document.querySelectorAll('.mc-tab')) {
+				tab.setAttribute('aria-selected', String(tab.dataset.format === policyState.format));
+			}
+			document.getElementById('mc-policy-where').innerHTML = WHERE[policyState.format];
+
+			const link = document.getElementById('mc-policy-url');
+			const href = `/api/mcp-policy?profile=${policyState.profile}&format=${policyState.format}`;
+			link.href = href;
+			link.textContent = href;
+
+			let doc;
+			try {
+				doc = await loadPolicy(policyState.profile);
+			} catch (error) {
+				policyText = '';
+				codeEl().textContent =
+					`Could not load the policy: ${error.message}.\nFetch it directly at ${href}`;
+				return;
+			}
+
+			policyText = JSON.stringify(formatPolicy(doc, policyState.format), null, 2);
+			codeEl().textContent = policyText;
+
+			// Each profile advertises its own split, so the trade-off is visible
+			// before you pick. Fetched lazily; the active one is always accurate.
+			for (const btn of document.querySelectorAll('.mc-prof')) {
+				const cached = policyCache.get(btn.dataset.profile);
+				if (!cached) continue;
+				const c = cached.counts;
+				btn.querySelector('[data-counts]').textContent =
+					`${c.allow} run on their own · ${c.confirm} ask` + (c.deny ? ` · ${c.deny} blocked` : '');
+			}
+		}
+
+		/** Warm the other profiles so their counts appear without a click. */
+		async function warmPolicyCounts() {
+			await Promise.all(
+				['strict', 'balanced', 'open'].map((p) => loadPolicy(p).catch(() => null)),
+			);
+			renderPolicy();
+		}
+
+		for (const btn of document.querySelectorAll('.mc-prof')) {
+			btn.addEventListener('click', () => {
+				policyState.profile = btn.dataset.profile;
+				renderPolicy();
+			});
+		}
+		for (const tab of document.querySelectorAll('.mc-tab')) {
+			tab.addEventListener('click', () => {
+				policyState.format = tab.dataset.format;
+				renderPolicy();
+			});
+		}
+
+		document.getElementById('mc-policy-copy').addEventListener('click', async (event) => {
+			const btn = event.currentTarget;
+			if (!policyText) return;
+			try {
+				await navigator.clipboard.writeText(policyText);
+				btn.textContent = 'Copied';
+			} catch {
+				btn.textContent = 'Select and copy';
+			}
+			setTimeout(() => {
+				btn.textContent = 'Copy';
+			}, 1600);
+		});
+
+		// ── load ──────────────────────────────────────────────────────────
+		async function load() {
+			renderSkeleton();
+			statsEl.hidden = false;
+			try {
+				const res = await fetch('/mcp-catalog.json', { headers: { accept: 'application/json' } });
+				if (!res.ok) throw new Error(`the server returned ${res.status}`);
+				catalog = await res.json();
+			} catch (error) {
+				renderError(
+					`${error.message}. The catalog is a static file at /mcp-catalog.json, so this is usually a network problem.`,
+				);
+				return;
+			}
+
+			// The old dialog deep link (?tool=name) now has a page of its own.
+			const linked = new URLSearchParams(location.search).get('tool');
+			const linkedTool = linked && catalog.tools.find((t) => t.name === linked);
+			if (linkedTool) {
+				location.replace(linkedTool.page);
+				return;
+			}
+
+			categoryLabel = new Map(catalog.categories.map((g) => [g.id, g.label]));
+			renderStats();
+			renderLive();
+			qEl.placeholder = `Search ${catalog.counts.tools} tools by name, description, category or server…`;
+			serverEl.innerHTML =
+				'<option value="">All servers</option>' +
+				catalog.servers
+					.map((s) => `<option value="${esc(s.id)}">${esc(s.title)} (${s.tools})</option>`)
+					.join('');
+			categoryEl.innerHTML =
+				'<option value="">All categories</option>' +
+				catalog.categories
+					.map((g) => `<option value="${esc(g.id)}" title="${esc(g.summary)}">${esc(g.label)} (${g.tools})</option>`)
+					.join('');
+			readUrl();
+			syncChips();
+			render();
+			warmPolicyCounts();
+			if (linked) countEl.textContent += ` (no tool named "${linked}")`;
+			loadReleases();
+		}
+
+		// ── releases ──────────────────────────────────────────────────────
+		const RELEASES_SHOWN = 6;
+		let releases = [];
+
+		function releaseHtml(r, open) {
+			const pageOf = (server, name) => catalog.tools.find((t) => t.server.id === server && t.name === name)?.page;
+			const block = (groups, removed) =>
+				Object.entries(groups)
+					.map(
+						([server, names]) =>
+							`<div class="mc-release-server">${esc(server)}</div><ul>` +
+							names
+								.map((name) => {
+									const href = !removed && pageOf(server, name);
+									return href ? `<li><a href="${esc(href)}">${esc(name)}</a></li>` : `<li><span>${esc(name)}</span></li>`;
+								})
+								.join('') +
+							'</ul>',
+					)
+					.join('');
+			const c = r.counts;
+			return (
+				`<li><details class="mc-release" id="release-${esc(r.date)}"${open ? ' open' : ''}><summary>` +
+				`<time datetime="${esc(r.date)}">${esc(r.date)}</time>` +
+				(c.added ? `<span class="mc-delta add">+${c.added} added</span>` : '') +
+				(c.removed ? `<span class="mc-delta rm">${c.removed} removed</span>` : '') +
+				`<span class="mc-release-total">${fmt(c.total)} tools after</span></summary>` +
+				'<div class="mc-release-body">' +
+				(r.note ? `<p class="mc-release-note">${esc(r.note)}</p>` : '') +
+				(c.added ? `<h3>Added</h3>${block(r.added, false)}` : '') +
+				(c.removed ? `<h3>Removed</h3>${block(r.removed, true)}` : '') +
+				'</div></details></li>'
+			);
+		}
+
+		function renderReleases(all) {
+			const list = document.getElementById('mc-release-list');
+			const more = document.getElementById('mc-release-more');
+			const shown = all ? releases : releases.slice(0, RELEASES_SHOWN);
+			list.innerHTML = shown.map((r, i) => releaseHtml(r, i === 0)).join('');
+			more.hidden = all || releases.length <= RELEASES_SHOWN;
+		}
+
+		async function loadReleases() {
+			const list = document.getElementById('mc-release-list');
+			list.innerHTML = '<li class="mc-skeleton" aria-hidden="true"><div class="mc-shimmer w40"></div><div class="mc-shimmer w85"></div></li>';
+			try {
+				const res = await fetch('/mcp-tool-history.json', { headers: { accept: 'application/json' } });
+				if (!res.ok) throw new Error(`the server returned ${res.status}`);
+				releases = (await res.json()).releases.slice().reverse();
+			} catch (error) {
+				list.innerHTML = `<li class="mc-error"><p>The release history could not be loaded (${esc(error.message)}).</p><button type="button" class="mc-btn" id="mc-release-retry">Try again</button></li>`;
+				document.getElementById('mc-release-retry').addEventListener('click', loadReleases);
+				return;
+			}
+			if (!releases.length) {
+				list.innerHTML = '<li class="mc-empty"><p>No releases are recorded yet. The next catalog build records the first one.</p></li>';
+				return;
+			}
+			renderReleases(false);
+			if (location.hash.startsWith('#release-')) document.querySelector(location.hash)?.scrollIntoView();
+		}
+
+		document.getElementById('mc-release-more').addEventListener('click', () => renderReleases(true));
+
+		load();
+	</script>
+	<script type="module" src="/i18n.js"></script>
+</body>
+</html>

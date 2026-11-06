@@ -1,0 +1,605 @@
+<!doctype html>
+<html lang="en">
+	<head>
+		<style>/* three.ws hidden-guard — make the `hidden` attribute authoritative; see scripts/lib/hidden-guard.mjs */[hidden]{display:none!important}</style>
+		<meta charset="utf-8" />
+		<link rel="icon" href="/favicon.ico" sizes="any" />
+		<link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+		<link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png" />
+		<link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png" />
+		<link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+		<link rel="manifest" href="/manifest.webmanifest" />
+		<title data-i18n="agent_embed.meta_title">Agent</title>
+		<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+		<meta name="description" content="Embedded three.ws avatar."  data-i18n-attr="content:agent_embed.meta_description"/>
+		<meta name="robots" content="noindex" />
+		<style>
+			html,
+			body {
+				margin: 0;
+				padding: 0;
+				height: 100%;
+				width: 100%;
+				background: transparent;
+				overflow: hidden;
+				font-family: system-ui, sans-serif;
+			}
+			#stage {
+				position: absolute;
+				inset: 0;
+			}
+			#stage canvas {
+				display: block;
+				width: 100% !important;
+				height: 100% !important;
+			}
+			#stage .gui-wrap,
+			#stage .gui-toggle,
+			#stage .annotation-canvas,
+			#stage .model-info {
+				display: none !important;
+			}
+			#name-plate {
+				position: absolute;
+				left: 12px;
+				bottom: 10px;
+				z-index: 2;
+				pointer-events: none;
+				font-size: 11px;
+				color: rgba(255, 255, 255, 0.55);
+				letter-spacing: 0.04em;
+				text-shadow: 0 1px 2px rgba(0, 0, 0, 0.6);
+			}
+			#error {
+				position: absolute;
+				inset: 0;
+				display: none;
+				align-items: center;
+				justify-content: center;
+				color: rgba(255, 255, 255, 0.4);
+				font-size: 12px;
+				padding: 1rem;
+				text-align: center;
+			}
+			body.bg-dark {
+				background: #0d0d0d;
+			}
+			body.bg-light {
+				background: #f5f5f5;
+			}
+			body.bg-light #name-plate {
+				color: rgba(0, 0, 0, 0.55);
+				text-shadow: none;
+			}
+		</style>
+	</head>
+	<body>
+		<div id="stage"></div>
+		<div id="name-plate"></div>
+		<div id="error"></div>
+
+		<script type="module">
+			/*
+			 * ─── Host ↔ agent postMessage bridge — v1 (FROZEN) ───────────────────
+			 *
+			 * Wire format. All payloads are JSON-serializable. All messages MUST
+			 * include `agentId` so a single host page with multiple iframes can
+			 * route deterministically. Unknown `type` values are ignored.
+			 *
+			 * Host  → iframe:
+			 *   { type: 'agent:hello',  agentId, host? }     Handshake. Iframe replies
+			 *                                                with agent:ready (now or
+			 *                                                when init completes).
+			 *   { type: 'agent:action', agentId, action }    Forward action onto the
+			 *                                                iframe's protocol bus.
+			 *                                                See src/agent-protocol.js
+			 *                                                for action.type vocabulary.
+			 *   { type: 'agent:ping',   agentId, id }        Liveness probe; iframe
+			 *                                                replies with agent:pong{id}.
+			 *
+			 * Iframe → host:
+			 *   { type: 'agent:ready',  agentId, version, capabilities: [string], name }
+			 *                                                Sent once init succeeds and
+			 *                                                in response to agent:hello.
+			 *   { type: 'agent:action', agentId, action }    Echo of every protocol
+			 *                                                action the iframe emits.
+			 *   { type: 'agent:resize', agentId, height }    Preferred CSS pixel height
+			 *                                                of the iframe content box.
+			 *   { type: 'agent:pong',   agentId, id }        Reply to agent:ping.
+			 *   { type: 'agent:blocked', agentId }           Embed policy denied this host.
+			 *
+			 * Legacy envelope `{ __agent, type: 'action'|'ready'|'blocked' }` is still
+			 * accepted on input and emitted on output for backwards compatibility with
+			 * pre-v1 hosts. New consumers SHOULD prefer the v1 envelope above.
+			 *
+			 * Future bumps go to v2 — DO NOT change v1 wire shapes in place.
+			 */
+
+			import { Viewer } from '/src/viewer.js';
+			import { AgentIdentity } from '/src/agent-identity.js';
+			import { AgentAvatar } from '/src/agent-avatar.js';
+			import { protocol } from '/src/agent-protocol.js';
+			import { EmbedActionBridge } from '/src/embed-action-bridge.js';
+			import { createTTS, agentVoiceConfig } from '/src/runtime/speech.js';
+
+			const BRIDGE_VERSION = '1';
+			const CAPABILITIES = ['speak', 'gesture', 'look-at', 'emote', 'present-model'];
+
+			const params = new URL(location.href).searchParams;
+			const bg = params.get('bg') || 'transparent';
+			if (bg === 'dark') document.body.classList.add('bg-dark');
+			if (bg === 'light') document.body.classList.add('bg-light');
+
+			const plateOn = params.get('name') !== '0';
+			const preview = params.get('preview') === '1';
+
+			// Resolve agentId from either:
+			//   1. /agent/{id}/embed         (Vercel rewrite + vite middleware)
+			//   2. /agent-embed.html?id={id} (direct file access — share snippet legacy form)
+			//   3. ?id={id}                  (any path — explicit override)
+			const agentId = (() => {
+				const parts = location.pathname.split('/').filter(Boolean);
+				const idx = parts.findIndex((p) => p === 'agents' || p === 'agent');
+				if (idx !== -1 && parts[idx + 1] && parts[idx + 1] !== 'embed') {
+					return parts[idx + 1];
+				}
+				return params.get('id') || null;
+			})();
+
+			function hostMatches(host, pattern) {
+				if (!host || !pattern) return false;
+				host = host.toLowerCase();
+				pattern = pattern.toLowerCase();
+				if (pattern.startsWith('*.')) {
+					const suffix = pattern.slice(2);
+					return host === suffix || host.endsWith('.' + suffix);
+				}
+				return host === pattern;
+			}
+
+			function embeddingHost() {
+				// Prefer ancestorOrigins (Chromium/Safari) for the true top-level
+				// origin; fall back to document.referrer which is the cross-browser
+				// signal for a first-party iframe's parent. Firefox has no
+				// ancestorOrigins today.
+				try {
+					const anc = window.location.ancestorOrigins;
+					if (anc && anc.length) return new URL(anc[0]).hostname;
+				} catch {}
+				try {
+					if (document.referrer) return new URL(document.referrer).hostname;
+				} catch {}
+				return null;
+			}
+
+			// Normalize legacy { mode, hosts } policy shape to the extended shape.
+			// Returns null when the agent has no policy at all.
+			function normalisePolicy(raw) {
+				if (!raw) return null;
+				if (!('version' in raw) && ('mode' in raw || 'hosts' in raw)) {
+					return {
+						version: 1,
+						origins: {
+							mode: raw.mode || 'allowlist',
+							hosts: Array.isArray(raw.hosts) ? raw.hosts : [],
+						},
+						surfaces: { script: true, iframe: true, widget: true, mcp: true },
+					};
+				}
+				return raw;
+			}
+
+			async function checkPolicy() {
+				if (preview) return { ok: true };
+				const sameOrigin =
+					!window.parent ||
+					window.parent === window ||
+					(() => {
+						try {
+							return window.parent.location.origin === location.origin;
+						} catch {
+							return false;
+						}
+					})();
+
+				let rawPolicy = null;
+				try {
+					const r = await fetch(`/api/agents/${agentId}/embed-policy`, {
+						credentials: 'omit',
+					});
+					if (r.ok) rawPolicy = (await r.json()).policy;
+				} catch {}
+
+				const policy = normalisePolicy(rawPolicy);
+				if (policy === null) return { ok: true };
+
+				if (sameOrigin) {
+					if (policy.surfaces && policy.surfaces.iframe === false) {
+						return { ok: false, reason: 'iframe-disabled' };
+					}
+					return { ok: true };
+				}
+
+				const host = embeddingHost();
+				const hosts = policy.origins?.hosts ?? [];
+				const mode = policy.origins?.mode ?? 'allowlist';
+				const matched = host ? hosts.some((p) => hostMatches(host, p)) : false;
+				const originOk = mode === 'allowlist' ? matched : !matched;
+				if (!originOk) return { ok: false, reason: 'origin-not-allowed' };
+
+				if (policy.surfaces && policy.surfaces.iframe === false) {
+					return { ok: false, reason: 'iframe-disabled' };
+				}
+				return { ok: true };
+			}
+
+			function showError(msg) {
+				const el = document.getElementById('error');
+				el.textContent = msg;
+				el.style.display = 'flex';
+			}
+
+			// ── Bridge state. The handshake handler is installed *before* main()
+			// runs so a host that sends agent:hello early gets a reply once we're
+			// ready, even if init takes a few seconds (network + GLB parse).
+			let bridgeReady = false;
+			let identityName = null;
+			const pendingHellos = [];
+
+			// Real TTS context — populated in main() once the avatar + voice resolve.
+			// speak/speak:stop actions drive ElevenLabs audio (via the server proxy)
+			// and the avatar's lip-sync, and report a result back to the host.
+			const ttsCtx = { tts: null, avatar: null, viewer: null };
+
+			// Parent origin is locked to the first valid host message we receive
+			// (ev.origin), or seeded from document.referrer as a best-effort
+			// fallback so an unsolicited postReady() doesn't have to use '*'.
+			let parentOrigin = (() => {
+				try {
+					if (window.parent === window) return location.origin;
+					if (document.referrer) return new URL(document.referrer).origin;
+				} catch {}
+				return null;
+			})();
+			let parentOriginLocked = false;
+
+			function postToParent(msg) {
+				if (!parent || parent === window) return;
+				if (!parentOrigin) {
+					console.warn('[agent-embed] parent origin unknown; dropping', msg.type);
+					return;
+				}
+				parent.postMessage(msg, parentOrigin);
+			}
+
+			function postReady() {
+				postToParent({
+					type: 'agent:ready',
+					agentId,
+					version: BRIDGE_VERSION,
+					capabilities: CAPABILITIES,
+					name: identityName,
+				});
+				// Legacy envelope for pre-v1 hosts.
+				postToParent({ __agent: agentId, type: 'ready', name: identityName });
+			}
+
+			function postResize(height) {
+				postToParent({ type: 'agent:resize', agentId, height });
+			}
+
+			function postActionResult(type, ok, errorMsg) {
+				postToParent({ type: 'agent:action:result', agentId, action: { type }, ok, error: errorMsg || undefined });
+			}
+
+			function handleAction(action) {
+				if (!action || typeof action !== 'object') return;
+				if (action.type === 'speak') { handleSpeak(action); return; }
+				if (action.type === 'speak:stop') { handleSpeakStop(); return; }
+				protocol.emit(action);
+			}
+
+			async function handleSpeak(action) {
+				const text = (action.text || action.payload?.text || '').toString().trim();
+				if (!text) { postActionResult('speak', false, 'no text to speak'); return; }
+				if (!ttsCtx.tts) { postActionResult('speak', false, 'agent has no voice configured'); return; }
+				// Drive the talk/mouth animation hint via the protocol bus.
+				protocol.emit({ type: 'speak', payload: { text } });
+				try {
+					await ttsCtx.tts.speak(text, {
+						scene: ttsCtx.viewer?.content,
+						onStart: () => {
+							if (ttsCtx.tts.analyserNode) ttsCtx.avatar?.connectLipSync(ttsCtx.tts.analyserNode);
+						},
+					});
+					ttsCtx.avatar?.disconnectLipSync();
+					postToParent({ type: 'agent:action', agentId, action: { type: 'speak:end' } });
+					postActionResult('speak', true);
+				} catch (err) {
+					ttsCtx.avatar?.disconnectLipSync();
+					postActionResult('speak', false, err?.message || 'speech failed');
+				}
+			}
+
+			function handleSpeakStop() {
+				try { ttsCtx.tts?.cancel(protocol); } catch {}
+				ttsCtx.avatar?.disconnectLipSync();
+				postToParent({ type: 'agent:action', agentId, action: { type: 'speak:end' } });
+				postActionResult('speak:stop', true);
+			}
+
+			window.addEventListener('message', (ev) => {
+				if (ev.source !== window.parent) return;
+				const msg = ev.data;
+				if (!msg || typeof msg !== 'object') return;
+
+				const isV1 =
+					msg.agentId === agentId &&
+					typeof msg.type === 'string' &&
+					msg.type.startsWith('agent:');
+				const isLegacy = msg.__agent === agentId;
+				if (!isV1 && !isLegacy) return;
+
+				// Lock the parent origin to the first authenticated message we see
+				// and reject anything from a different origin thereafter.
+				if (!parentOriginLocked) {
+					parentOrigin = ev.origin;
+					parentOriginLocked = true;
+				} else if (ev.origin !== parentOrigin) {
+					return;
+				}
+
+				if (isV1) {
+					switch (msg.type) {
+						case 'agent:hello':
+							if (bridgeReady) postReady();
+							else pendingHellos.push(true);
+							return;
+						case 'agent:action':
+							if (bridgeReady) handleAction(msg.action);
+							return;
+						case 'agent:ping':
+							if (bridgeReady)
+								postToParent({ type: 'agent:pong', agentId, id: msg.id });
+							return;
+					}
+				}
+
+				// Legacy envelope. Kept until all known hosts migrate.
+				if (isLegacy && msg.type === 'action' && msg.action) handleAction(msg.action);
+			});
+
+			async function main() {
+				if (!agentId) {
+					showError('Missing agent id.');
+					return;
+				}
+
+				const policyCheck = await checkPolicy();
+				if (!policyCheck.ok) {
+					const msg =
+						policyCheck.reason === 'iframe-disabled'
+							? "This agent's iframe embed is disabled."
+							: 'This agent can only be embedded on approved sites.';
+					showError(msg);
+					postToParent({ type: 'agent:blocked', agentId });
+					postToParent({ __agent: agentId, type: 'blocked' });
+					return;
+				}
+
+				const identity = new AgentIdentity({ agentId, autoLoad: false });
+				await identity.load();
+				identityName = identity.name;
+
+				if (plateOn && identity.name) {
+					document.getElementById('name-plate').textContent = identity.name;
+				}
+
+				if (!identity.avatarId) throw new Error('agent has no avatar body');
+
+				const resp = await fetch(`/api/avatars/${identity.avatarId}`, {
+					credentials: 'include',
+				});
+				if (!resp.ok) throw new Error(`avatar ${resp.status}`);
+				const { avatar } = await resp.json();
+				const glbUrl = avatar?.url;
+				if (!glbUrl) throw new Error('no avatar url');
+
+				const stage = document.getElementById('stage');
+				const viewer = new Viewer(stage, { kiosk: true });
+				if (bg === 'transparent') {
+					viewer.renderer?.setClearAlpha(0);
+					if (viewer.scene) viewer.scene.background = null;
+				}
+				if (params.get('gaze') === 'off') viewer.state.followMode = 'off';
+				await viewer.load(glbUrl, '', new Map());
+
+				// Load animation manifest so gestures and state transitions work
+				try {
+					const manifest = await fetch('/animations/manifest.json').then(r => r.json());
+					if (Array.isArray(manifest) && manifest.length > 0) {
+						viewer.setAnimationDefs(manifest);
+					}
+				} catch (err) {
+					console.warn('[agent-embed] failed to load animation manifest:', err.message);
+				}
+
+				if (bg === 'dark') {
+					// Midnight-blue atmosphere with volumetric clouds.
+					const { Clouds, Cloud } = await import('/src/cloud.js');
+					if (viewer.scene.background?.set) viewer.scene.background.set('#0b0b0b');
+
+					const clouds = new Clouds({ limit: 350 });
+					clouds.add(
+						_makeCloud({
+							seed: 1,
+							segments: 40,
+							bounds: [14, 5, 4],
+							volume: 4,
+							color: '#7a9ad8',
+							fade: 32,
+							opacity: 0.9,
+							speed: 0.012,
+							pos: [0, 1.5, -9],
+							Cloud,
+						}),
+					);
+					clouds.add(
+						_makeCloud({
+							seed: 7,
+							segments: 25,
+							bounds: [6, 2.5, 2],
+							volume: 3,
+							color: '#b8ccff',
+							fade: 20,
+							opacity: 0.65,
+							speed: 0.038,
+							pos: [-3.5, 0.8, -5],
+							Cloud,
+						}),
+					);
+					clouds.add(
+						_makeCloud({
+							seed: 13,
+							segments: 25,
+							bounds: [6, 2, 2],
+							volume: 3,
+							color: '#ccd8ff',
+							fade: 22,
+							opacity: 0.6,
+							speed: 0.05,
+							pos: [3.2, 1.2, -6],
+							Cloud,
+						}),
+					);
+					clouds.add(
+						_makeCloud({
+							seed: 42,
+							segments: 15,
+							bounds: [4, 1.5, 1],
+							volume: 2,
+							color: 'white',
+							fade: 7,
+							opacity: 0.28,
+							speed: 0.07,
+							pos: [0, -0.8, -2],
+							Cloud,
+						}),
+					);
+					clouds.add(
+						_makeCloud({
+							seed: 99,
+							segments: 18,
+							bounds: [8, 2, 2],
+							volume: 3.5,
+							color: '#a0b8f0',
+							fade: 25,
+							opacity: 0.5,
+							speed: 0.025,
+							pos: [-1, 4, -7],
+							Cloud,
+						}),
+					);
+					viewer.scene.add(clouds);
+					if (!viewer._afterAnimateHooks) viewer._afterAnimateHooks = [];
+					viewer._afterAnimateHooks.push((dt) => clouds.update(viewer.activeCamera, dt));
+				}
+
+				const avatarCtl = new AgentAvatar(viewer, protocol, identity);
+				avatarCtl.attach();
+
+				// Bind real TTS so `speak` actions produce ElevenLabs audio + lip-sync.
+				// The whole config (voice id, model, saved settings, and the agent id
+				// that authorizes an owner-BYOK clone for anonymous listeners) comes
+				// from the agent record via agentVoiceConfig: no silent fallback to a
+				// default voice; speak reports "agent has no voice configured" when
+				// nothing is bound.
+				ttsCtx.viewer = viewer;
+				ttsCtx.avatar = avatarCtl;
+				try {
+					const ar = await fetch(`/api/agents/${agentId}`, { credentials: 'include' });
+					if (ar.ok) {
+						const { agent } = await ar.json();
+						const voiceCfg = agentVoiceConfig(agent, { agentId });
+						if (voiceCfg) {
+							ttsCtx.tts = createTTS(voiceCfg);
+							avatarCtl.setTTS(ttsCtx.tts);
+						}
+					}
+				} catch (err) {
+					console.warn('[agent-embed] voice resolve failed:', err.message);
+				}
+
+				// Echo every protocol action onto the legacy bridge so hosts can mirror
+				// state (chat UIs, telemetry, host-side animation triggers).
+				protocol.on('*', (action) => {
+					postToParent({ type: 'agent:action', agentId, action });
+				});
+
+				// Modern bridge — accepts the v1 EmbedHostBridge envelope used by
+				// `<threews-avatar driveable>` and by the embed-host-bridge npm
+				// surface. Listens on the same window in parallel with the legacy
+				// `agent:action` handler above. Both fan into the same protocol bus,
+				// so AgentAvatar handles speak/gesture/look/emote identically no
+				// matter which envelope the host chose.
+				const modernBridge = new EmbedActionBridge({
+					protocol,
+					avatar: { id: identity.avatarId, name: identity.name },
+					manifest: { id: { agentId }, agentId, policy: null },
+					window,
+					getClips: () => {
+						const defs = viewer?.animationManager?.getAnimationDefs?.() || [];
+						return defs.map((d) => ({
+							name: d.name,
+							label: d.label || d.name,
+							icon: d.icon || null,
+							loop: !!d.loop,
+							source: d.source || null,
+						}));
+					},
+				});
+				modernBridge.start();
+
+				// Report content height to host so embed-sdk can auto-fit the iframe.
+				// Coalesce into rAF so a runaway resize observer can't flood the host.
+				let pendingPost = false;
+				const reportSize = () => {
+					if (pendingPost) return;
+					pendingPost = true;
+					requestAnimationFrame(() => {
+						pendingPost = false;
+						const h = Math.ceil(
+							document.documentElement.scrollHeight || stage.clientHeight || 0,
+						);
+						if (h > 0) postResize(h);
+					});
+				};
+				if (typeof ResizeObserver !== 'undefined') {
+					new ResizeObserver(reportSize).observe(document.documentElement);
+				}
+				reportSize();
+
+				bridgeReady = true;
+				postReady();
+				while (pendingHellos.length) {
+					pendingHellos.pop();
+					postReady();
+				}
+			}
+
+			function _makeCloud({ pos, Cloud, ...opts }) {
+				const c = new Cloud(opts);
+				c.position.set(pos[0], pos[1], pos[2]);
+				return c;
+			}
+
+			main().catch((err) => {
+				const el = document.getElementById('error');
+				el.textContent = err.message || 'Could not load agent';
+				el.style.display = 'flex';
+			});
+		</script>
+		<!-- Runtime i18n: detects locale, swaps annotated copy, mounts <lang-switcher>. -->
+	<script type="module" src="/i18n.js"></script>
+</body>
+</html>

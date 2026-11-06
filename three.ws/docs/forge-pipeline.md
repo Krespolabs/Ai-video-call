@@ -1,0 +1,351 @@
+# The Forge pipeline: architecture deep dive
+
+This is the engineering guide to the Forge, the text/image/sketch to 3D generation system behind [/forge](https://three.ws/forge), the free MCP tools, and every agent-facing 3D endpoint. It maps the whole path a generation takes: entry points, the engine grid, free-first routing, the job lifecycle, failover, persistence, GPU workers, post-processing, and payments.
+
+If you want the product-level overview, read [Forge](./forge.md). If you want the plain-language version, read [How the Forge works](./how-forge-works.md). This document is for people changing the pipeline.
+
+## Bird's-eye view
+
+```
+  /forge page          MCP tools            x402 buyers        SDK / agents
+  home mini-forge      (paid stdio +        /api/x402/forge    /api/3d/generate
+  /forge-studio         free hosted)                           /api/v1/ai/text-to-3d
+        │                    │                    │                  │
+        └────────────────────┴──────────┬─────────┴──────────────────┘
+                                        ▼
+                          POST /api/forge  (api/forge.js, the orchestrator)
+                                        │
+                    resolve (path, tier, backend) via api/_lib/forge-tiers.js
+                    health-aware free-first routing + circuit breakers
+                                        │
+              ┌─────────────┬───────────┼───────────────┬──────────────┐
+              ▼             ▼           ▼               ▼              ▼
+        NVIDIA NIM     HF Spaces   self-host GPU    BYOK vendors   Replicate
+        (TRELLIS,      (Hunyuan3D  workers on       (Meshy, Tripo, (paid last
+        text only)     chain)      Cloud Run        Rodin, ...)    resort)
+              │             │           │               │              │
+              └─────────────┴───────────┼───────────────┴──────────────┘
+                                        ▼
+              job handle (HMAC token) ── poll GET /api/forge?job=<id>
+              poll-time failover (forge-failover.js) if a lane dies mid-job
+                                        │
+                                        ▼
+              forge_creations row (Neon Postgres) + GLB mirrored to R2 CDN
+                                        │
+                                        ▼
+              viewer / AR / rig / refine / restyle / remesh / gallery / remix
+```
+
+Three properties define the design:
+
+1. **One orchestrator, many front doors.** Every entry point is a thin client over `POST /api/forge` and `GET /api/forge?job=<id>`. No generation logic is duplicated.
+2. **Free-first routing over a declared engine grid.** Engines are data, not code paths: each is a registry entry declaring what it can do, what it costs, and what env it needs. Routing walks that registry.
+3. **Failure is a routing event, not an error.** A rejected submit walks to the next lane at submit time; a lane that accepts and then dies is silently re-dispatched at poll time. The client sees the same job id throughout.
+
+## 1. Entry points
+
+| Surface | Route / tool | Notes |
+| --- | --- | --- |
+| Forge page | [/forge](https://three.ws/forge), `src/forge.js` | Text, photos (up to 6 views), sketch. One shared polling loop. `/forge-max` deep-links straight into the maximum-quality lane. |
+| Homepage mini-forge | `src/home-forge.js` | Health-aware default lane, never pins a backend. |
+| Forge Studio | [/forge-studio](https://three.ws/forge-studio), `src/forge-studio/` | Create, refine, stylize, Game-Ready export, remix. |
+| Core API | `POST /api/forge` (`api/forge.js`) | The orchestrator. Auth-free. Text, image, and sketch bodies. |
+| Job poll | `GET /api/forge?job=<id>` | Free to poll regardless of how the job was paid for. |
+| Cost preview | `GET /api/forge-quote` (`api/forge-quote.js`) | Public, spend-free price for a `(path, tier, backend, options)` combination, or `?table=1` for all three tiers. Reads the same tables the generation endpoint enforces, so a quote cannot drift from the charge. |
+| Pay-to-keep | `GET/POST /api/forge-keep` (`api/forge-keep.js`) | Off unless `FORGE_PAY_TO_KEEP=on` (flip with `npm run forge:pay-to-keep -- on\|off\|status`). When on, generating and previewing on a free lane stays free and the original file is released once per creation to a $THREE holder or against one settled $THREE payment; with it off every generation is keepable. |
+| Image to splat | `POST/GET /api/forge-splat` (`api/forge-splat.js`) | TripoSplat: one public https image to a 3D Gaussian splat (`num_gaussians` 8192 to 262144), opened in the Splat Viewer. 503 `unconfigured` until `MODEL_TRIPOSPLAT_URL` is set. |
+| Photo to scene | `POST/GET /api/forge-scene-objects` (`api/forge-scene-objects.js`) | SAM 3D Objects: one photo to a scene GLB with one named node per object, laid out like the photo. 503 `backend_unconfigured` until `MODEL_SAM3D_URL` points at a deployed worker (32 GB+ GPU, gated weights). |
+| Tripo webhook | `POST /api/forge/webhook/tripo` (`api/forge/webhook/tripo.js`) | Optional fast-completion path for Tripo jobs: HMAC-signed (`TRIPO_WEBHOOK_SECRET`, 5 minute replay window) and idempotent per delivery (`forge_webhook_deliveries`). Polling stays the fallback. |
+| Catalog | `GET /api/forge?catalog=1` | The tier/backend/cost matrix the UI renders. |
+| Health | `GET /api/forge?health=1` | Live per-lane upstream status. |
+| Rig | `POST /api/forge?action=rig` | Auto-rig a finished GLB (see post-processing). |
+| Paid x402 twin | `POST /api/x402/forge` (`api/x402/forge.js`) | Pay-per-call USDC on Solana, no account. Prices come from the tier table. |
+| Agent REST | `POST /api/3d/generate` (`api/3d/generate.js`) | Keyless agent shape wrapping the free draft lane. |
+| Flagship free API | `POST /api/v1/ai/text-to-3d` (`api/v1/ai/text-to-3d.js`) | NVIDIA NIM TRELLIS draft lane, 10 generations per IP per day, 429 + x402 upsell above quota. |
+| Refinement | `POST /api/forge-iterate` (`api/forge-iterate.js`) | Conversational refinement with version lineage for the signed-in Studio. |
+| MCP (paid stdio) | `mesh_forge`, `forge_avatar`, `forge_free`, `text_to_avatar`, `rig_mesh`, `refine_model`, `restyle_material` (`mcp-server/src/tools/`) | Shared cores in `mcp-server/src/tools/_studio-core.js`; thin clients over `/api/forge`. |
+| ChatGPT clone | `POST /api/gpt-forge` (`api/gpt-forge.js`) | Clone of the orchestrator dedicated to the ChatGPT surfaces (the Apps SDK MCP connector `api/mcp-studio` and the custom-GPT Actions endpoint `api/3d/studio`, via `api/_mcp-studio/gpt-forge-client.js`), so the ChatGPT pipeline can evolve without touching `/api/forge`. Same lanes, tiers, job tokens, and `forge_creations` rows. First divergence: its poll responses also carry `prompt`, `preview_image_url` (the painted concept view), and `text_to_image_model`, so the ChatGPT surfaces can show the concept image while the mesh generates. It also remembers a finished job's poll frame (`api/_lib/forge-done-cache.js`), so later polls of a done job answer in milliseconds without re-reading the provider. |
+| MCP (hosted HTTP) | `text_to_3d`, `image_to_3d`, `auto_rig_model`, plus the wider studio toolset (`generation_status`, `preview_3d`, `remove_background`, `remesh_model`, `stylize_model`, `segment_model`, `retexture_model`, `pose_model`, `save_avatar`, persona tools; `api/mcp-3d.js`, tools in `api/_mcp3d/tools/studio.js`) | Streamable HTTP server registered as `io.github.nirholas/three-ws-3d-studio`. |
+| DCC plugins | `integrations/blender/`, `integrations/comfyui/`, `integrations/_pyclient/` | First-party clients driving the same API. |
+
+The rule when adding a surface: never talk to a provider directly. Submit through `/api/forge` (or the shared MCP cores) so routing, failover, persistence, and payments stay in one place.
+
+## 2. The request axes: path and tier
+
+Every request resolves to a `(path, tier, backend)` triple. `api/_lib/forge-tiers.js` is the single source of truth for all three; the endpoint, the catalog, the x402 pricing, and every provider param builder read from it.
+
+**`path`** is how geometry is produced:
+
+- `image`: image-intermediate, the default. Text is painted into a reference view (FLUX/Imagen) and reconstructed to a mesh, or the user's own photos are reconstructed directly.
+- `geometry`: geometry-first. A native 3D model (Meshy, Tripo, Rodin) emits mesh directly from the prompt, so detail is not capped by what one synthesized image implies.
+- `sketch`: sketch-conditioned. A drawing plus a prompt naming what it depicts drives TripoSG-scribble straight to geometry.
+
+**`tier`** is how much budget to spend (`TIERS` in forge-tiers.js):
+
+| Tier | Poly target | Textures | ETA multiplier | Price (USDC atomics) |
+| --- | --- | --- | --- | --- |
+| `draft` | 12,000 | none | 0.6 | 50,000 ($0.05) |
+| `standard` | 30,000 | 2K | 1.0 | 150,000 ($0.15) |
+| `high` | 200,000 | PBR + HD | 2.2 | 500,000 ($0.50) |
+
+Prices live only here, as `priceUsdcAtomics`. `priceAtomicsForTier()` feeds the x402 402 challenge; `priceUsdcForTier()` feeds the catalog and docs. Never hardcode a second copy.
+
+Self-hosted TRELLIS additionally maps tiers to sampler and texture budgets via `SELFHOST_TRELLIS_QUALITY` (draft: 12/12 steps, 1024px textures; standard: 35/35, 2048px; high: 50/50, 4096px). Texture sizes must be powers of two: nvdiffrast hard-fails on mip generation otherwise (live incident, 2026-07-16).
+
+## 3. The engine grid
+
+`BACKENDS` in `api/_lib/forge-tiers.js` declares every lane. Each entry names the `provider` client (`api/_providers/*.js`), which `paths` it serves, whether it is `free`, whether it needs a BYOK key, the env vars that must be present (`requiresEnv`), and its latency estimate (`baseEta`, plus `coldStart` for scale-to-zero workers).
+
+| id | Engine | Hosting | Paths | Cost model | Env |
+| --- | --- | --- | --- | --- | --- |
+| `nvidia` | Microsoft TRELLIS | NVIDIA NIM (hosted) | image (text only, rejects user photos) | free | `NVIDIA_API_KEY` |
+| `huggingface` | Hunyuan3D 2.1 → Hunyuan3D 2 → TRELLIS → TripoSR (internal chain) | HF Spaces | image | free, blocking submit | `HF_TOKEN` |
+| `trellis2` | Microsoft TRELLIS.2 (MIT, PBR with alpha) | Our Cloud Run L4 worker (`workers/model-trellis2/`) | image (native single-hop image to 3D) | free (our GPU) | `MODEL_TRELLIS2_URL` + `GCP_RECONSTRUCTION_KEY` |
+| `trellis_selfhost` | Microsoft TRELLIS | Our Cloud Run L4 worker (`workers/model-trellis/`) | image (native single-hop image to 3D) | free (our GPU) | `MODEL_TRELLIS_URL` + `GCP_RECONSTRUCTION_KEY` |
+| `hunyuan3d` | Tencent Hunyuan3D-2.1 | Our Cloud Run L4 worker (`workers/model-hunyuan3d/`) | image | free (our GPU) | `GCP_HUNYUAN3D_URL` + key |
+| `modly` | VAST AI TripoSG via Modly (MIT, untextured geometry) | Our Cloud Run L4 worker (`workers/modly/`) | image (single photo) | free (our GPU) | `MODEL_MODLY_URL` + `GCP_RECONSTRUCTION_KEY` |
+| `modly_hunyuan` | Tencent Hunyuan3D 2 Mini Turbo via Modly (untextured geometry) | Same worker as `modly` | image (single photo) | free (our GPU) | `MODEL_MODLY_URL` + `GCP_RECONSTRUCTION_KEY` |
+| `pixal3d` | TencentARC Pixal3D ("Match my photo", MIT) | Our Cloud Run worker (`workers/model-pixal3d/`) | image (1 to 4 labeled photos fused pixel-aligned; opt-in only) | free (our GPU) | `MODEL_PIXAL3D_URL` + `GCP_RECONSTRUCTION_KEY` |
+| `anigen` | VAST AI AniGen (MIT) | Our Cloud Run worker (`workers/model-anigen/`) | image (mesh, skeleton and skin weights in one pass, already rigged) | free (our GPU) | `MODEL_ANIGEN_URL` + `GCP_RECONSTRUCTION_KEY` |
+| `partcrafter` | PartCrafter (MIT) | Our Cloud Run worker (`workers/model-partcrafter/`) | image (2 to 16 named part meshes) | free (our GPU) | `MODEL_PARTCRAFTER_URL` + `GCP_RECONSTRUCTION_KEY` |
+| `triposg` | VAST AI TripoSG-scribble | Our Cloud Run L4 worker (`workers/model-triposg/`) | sketch only | free (our GPU) | `GCP_TRIPOSG_URL` + key |
+| `trellis` | Microsoft TRELLIS | Replicate | image | paid platform, last resort | `REPLICATE_API_TOKEN` |
+| `meshy` | Meshy 6 | vendor API | geometry, image | BYOK, credits | user key |
+| `tripo` | Tripo v3.1 | vendor API | geometry, image | BYOK, or house lane when `TRIPO_API_KEY` is set | user key, or `TRIPO_API_KEY` |
+| `rodin` | Rodin (Hyper3D) | vendor API | geometry, image | BYOK | user key |
+| `stability` | Stable Fast 3D | vendor API | image, synchronous | BYOK | user key |
+| `replicate_byok` | Replicate models | caller's Replicate account | image | BYOK | user key |
+
+The two Modly lanes run [Modly](https://github.com/lightningpixel/modly)'s backend headless on one worker (`workers/modly/README.md`): TripoSG and Hunyuan3D 2 Mini Turbo through Modly's own extensions, then a mesh repair pass and a decimate to the tier's face budget (`target_polycount`). They return geometry without textures, so they rank below every textured free lane and are meant as an explicit pick, or for retexture and stylize afterwards.
+
+`pixal3d`, `anigen` and `partcrafter` are opt-in lanes: none is a named default or a failover target, so a plain request never lands on one by chance. TripoSplat (`/api/forge-splat`) and SAM 3D Objects (`/api/forge-scene-objects`) are not `BACKENDS` entries at all: they are standalone endpoints over the same `gcp` provider (modes `triposplat` and `sam3d`), because their outputs (a splat, a multi-object scene) are not a single mesh.
+
+Two lanes deserve a warning. `hunyuan3d` must point at the general Hunyuan3D worker URL, never at the avatar-pipeline controller: the controller fronts a face pipeline and rejects general object images. And `nvidia` is text-only; every routing list that might carry a user photo filters it out.
+
+## 4. Routing: free-first, subject-aware, health-tempered
+
+Routing answers one question: given `(path, tier, userImages, prompt)`, which configured lane runs first, and who is next when it fails.
+
+**Static preference order.** `freeLaneCandidates()` builds the ordered list both resolvers walk:
+
+1. The tier's named free default (`FREE_DEFAULT_FOR_TIERS`): every image tier (draft, standard, high) names `trellis2`, the only default lane that serves every region. Hunyuan3D is no longer a named default; it is an explicit lane and a fallback outside the restricted territories (see Territory enforcement below). The unconfigured case matters: until `MODEL_TRELLIS2_URL` is set the lane is skipped and the chain behind it serves the request. The workers are our own GPUs; NVIDIA NIM is no longer a named default (its text-only, no-reference-image conditioning is the realism hole this table closes) but stays explicitly selectable and remains the final fallthrough in the per-path chain.
+2. The per-path free fallback chain (`FREE_FALLBACK_FOR_PATH`). For `image` that is `trellis2`, `trellis_selfhost`, `hunyuan3d`, `huggingface`, `modly`, `modly_hunyuan`, `nvidia`: our own textured GPU workers first (zero vendor cost), then external free lanes, then the untextured Modly lanes, with the text-only NIM lane trailing as a safety net.
+3. A configured house-key lane (`houseDefaultForPath()`): on the High tier only, when `TRIPO_API_KEY` is set, Tripo becomes the default geometry engine and bills through the same $THREE hold-or-pay gate as every platform lane. A caller's own inline or saved Tripo key still takes precedence and runs exempt. Draft and standard are untouched, and with the env var unset behavior is unchanged. The catalog reports `house_key_available` so the picker can offer it without a key prompt.
+4. The paid platform default (`DEFAULT_BACKEND_FOR_PATH`: image → `trellis` on Replicate, geometry → `meshy`, sketch → `triposg`) only when nothing free is configured and healthy.
+
+**Generation controls** (`api/_lib/forge-options.js`). `target_polycount` (alias `target_faces`) is honored by every lane that has polygon control, including the BYOK providers (Meshy, Tripo, Rodin), which used to hardcode the tier default. `bbox` (`[x, y, z]` meters) is lane-agnostic: after generation `api/_lib/glb-bbox-fit.js` uniformly scales the delivered mesh to fit the box, centered on X/Z and floored at Y=0, on every sync and async lane. `pose` (`t` or `a`) asks for a rest pose where the lane can honor it (`poseControlFor()`: text-conditioned requests only, since a caller photo fixes the pose, and never `anigen`, whose rigging pass re-normalizes the pose), and the response reports `pose_applied`.
+
+**Subject-aware reorder (high tier).** `classifyForgeSubject()` regex-classifies the prompt as hard-surface or organic. Hard-surface prompts (vehicles, machines, architecture) hoist `trellis_selfhost` above `hunyuan3d`; organic subjects (people, creatures) keep Hunyuan3D first. This exists because the two engines genuinely differ on those subject classes at high fidelity.
+
+**Operator levers.** `FORGE_PREFER_FREE` (default on) prefers free reconstruction before paid Replicate. `FORGE_SELFHOST_PRIMARY` (default off) hoists self-host GPU lanes above hosted free lanes across the board.
+
+**Health tempering.** `resolveBackendIdWithHealth()` walks the candidate list against the snapshot from `api/_lib/forge-lane-health.js`: lanes reporting `ok` or `unknown` are preferred, lanes confirmed `down` are skipped, and paid lanes are considered only when every free lane is down. The UI consumes the same data via `GET /api/forge?health=1` and disables down lanes with the real upstream reason before the user clicks Generate.
+
+**Circuit breakers.** A failing lane is sidelined, not retried in a loop: per-lane cooldowns (`forge-lane:<id>`, 90s) plus dedicated NIM cooldowns (120s model, 30s gateway) short-circuit routing away from a degraded upstream. Cooldowns are shared cross-instance via `api/_lib/provider-health.js` and expire on their own, so a recovered lane is retried promptly. Every entry is env-gated, so partial deployments degrade to a shorter list instead of erroring.
+
+**The HuggingFace Spaces pause.** The free HF lane fails as a whole (every Space in its chain GPU-quota-exhausted or errored), and each attempt still costs the caller 3-15 s of Space round trips. So one chain-wide failure records `forge-lane:huggingface` for `HF_LANE_COOLDOWN_SECONDS` (300 s, `api/_lib/forge-lane-health.js`). While it holds, `runHfImageLane` reports "not served" at once, the health-aware router reads the lane as down, and `GET /api/forge?health=1` reports `huggingface` as `down` (whoami alone only proves the token), so the engine picker disables it. A caller who explicitly picked the HF engine gets `503 provider_busy` with `Retry-After: 30` and `retry_backends` naming the configured image-capable engines; the pick is never swapped silently, and `/forge` hops to the first suggestion visibly through the same lane-failed path a mid-job failure uses. The first request after the window re-tests the Spaces for real.
+
+## 5. Job lifecycle
+
+### Submit
+
+`POST /api/forge` validates input, resolves the triple, runs the payment gate if the tier requires one (section 9), inserts a `forge_creations` row (`status: generating`), and submits to the resolved lane. Synchronous lanes (NVIDIA NIM, HF Spaces, BYOK-sync like Stability) complete inside the request and return `status: done` with the GLB URL directly. Async lanes return `status: queued` plus a `job_id`.
+
+**Submit-time failover.** If a lane rejects the submit outright (down, quota, cooldown), `startJob` walks the free-first chain to the next candidate in the same request. The client never sees the rejected lane.
+
+**Backdrop pre-matting.** A synthesized reference view is on a *plain* background, which is not the same as a transparent one, and the reconstructor fuses that backdrop in as geometry: six text personas through the live router returned four figures standing on a full-footprint slab and two that were a bare plane with no figure at all. Non-draft text jobs therefore get the same rembg cutout that image jobs already got (`matte: tier.id !== 'draft'`), while draft stays single-view and fast. It is best-effort worker-side: a rembg miss falls back to the original image rather than failing the generation.
+
+**Floor-slab strip.** Pre-matting is not enough on its own: TRELLIS and Hunyuan3D read "an object resting on the ground" into even a clean alpha cutout and still fuse a thin, wide plate under the subject (measured on 2026-09-30: a teapot on a black marble square, a telescope on a grey sheet 65 times its footprint, both from spotless cutouts). `materializeCreation` therefore runs `api/_lib/glb-floor-slab.js` right after geometry cleanup and before scoring, on geometry alone, so it never depends on a vision provider answering. A bottom band counts as a fused slab only when it is a solid sheet seen from above (it fills at least 90% of its bounding rectangle; feet, legs and soles fill 3-42%, a round lamp foot about 79%) and is wider than the subject standing on it. A flat subject, a thick plinth, a round foot and a tripod are all left alone. The cut keeps the plate only directly under where the subject touches down, so the subject keeps its own underside. The creation's cleanup stats record `floor_slab_removed_tris` when it fires.
+
+**Reference-image budget.** On the text path the reference-image step (the Vertex lane in `api/_lib/forge-reference-image.js`, its QA score and corrective retry, and the `textToImage` fallthrough ladder, Livepeer included) runs under one shared budget, `TEXT_TO_IMAGE_BUDGET_MS` (default 60 s). A stalled paint provider can no longer hold a submit open for minutes before a job exists; once the budget is spent the caller gets a fast, retryable failure instead.
+
+### The job handle
+
+Async jobs get an opaque HMAC-signed token (`f1.<payload>.<sig>`, `api/_lib/forge-job-token.js`) that records provider, kind, and upstream task id, signed with `JWT_SECRET`. The legacy Replicate path keeps the bare prediction id. Tokens make the poll endpoint stateless: any instance can decode the handle and ask the right upstream.
+
+### Poll
+
+`GET /api/forge?job=<id>` returns `status`: `queued`, `running`, `done` (with `glb_url`, `viewer_url`, and the `path`/`tier`/`backend` that actually produced it), or `failed`. Polling is free and unauthenticated.
+
+Every non-terminal poll also carries honest timing: `elapsed_seconds` (the age of the *job*, from `created_at`, not of the tab watching it), `eta_seconds` (the lane's typical total) and `eta_remaining_seconds`. The remaining figure is floored at 5, because the estimate is a typical duration rather than a deadline and a countdown that goes negative reads as "stuck" on a job that is merely slower than average. A `queued` poll on a scale-to-zero self-host lane additionally carries `cold_start` and `cold_start_seconds` (that lane's spin-up budget). `laneColdStart()` is module-scope for exactly this reason: it used to be a closure inside the submit handler, so only the submit response could say a worker was booting, and a client that never saw it (a coalesced job, a page resumed after a reload, a failover successor) was told "queued" with no explanation for a wait that is a container boot rather than a stall. `forgeStageNarration()` and `coldStartState()` in [src/shared/forge-frames.js](../src/shared/forge-frames.js) turn those fields into the same copy on every surface, off the payload and never off a local clock, and the flag clears on the first real `running` poll rather than on a timer. The in-flight job id is also written to `localStorage`, so an interrupted browser session resumes polling for up to 30 minutes; background completion persists the result to the user's gallery either way (see [Background generation](./forge-background-generation.md)).
+
+**Territory enforcement** (`api/_lib/forge-territory.js`). The Hunyuan3D license excludes the European Union, the United Kingdom and South Korea for the model and its output. The Forge resolves the requester's country on the server from the edge geo header (`clientCountry`), never from the request body, and never routes a restricted request to a Tencent-model lane. Those lanes are `hunyuan3d`, `huggingface` (the Spaces chain runs Hunyuan3D-2 and 2.1) and `modly_hunyuan` (Hunyuan3D 2 Mini Turbo, under the Hunyuan3D 2.0 licence with the same exclusion). An unknown or malformed country is treated as restricted, so a request with no geo signal fails closed to the MIT and non-Tencent lanes. The filter sits in every place a lane is chosen: auto routing and its health-aware variant, the HuggingFace failure hop, poll-time redispatch, the `retry_backends` suggestions, and the prompt-to-avatar plan. An explicit `backend=hunyuan3d`, `backend=huggingface` or `backend=modly_hunyuan` from a restricted country answers `403 region_restricted` and lists the open lanes in `retry_backends`. The public catalog is CDN-cached and country-agnostic, so it advertises the fail-closed defaults.
+
+**Resolution option.** `resolution` (512, 1024 or 1536) is a request option honoured by the `trellis2` lane and part of the dedup and cache key, so two resolutions of one prompt never share a result. It is rejected with a clear error when invalid, and a worker that cannot hold the requested size steps down and reports `resolution_served`.
+
+**Poll-time failover** (`api/_lib/forge-failover.js`) closes the nastier gap: a self-host worker can accept a task and fail it minutes later, in a poll handled by a different instance that no longer holds the request. On a failed poll the module recovers the original inputs (prompt plus reference image) from the creation row, resubmits to the next configured lane, and binds old handle to new handle in Redis (2 hour TTL). The client keeps polling the same job id and simply sees `status: running` with a new `backend`. Hops are capped by `MAX_FAILOVER_HOPS = 3` (one primary plus up to three backups). The redispatch order is `trellis2`, `trellis_selfhost`, `hunyuan3d`, `trellis`, `modly`, `modly_hunyuan`, then `triposg` as the final rung (Tencent lanes are skipped for a restricted or unknown territory). TripoSG runs its photo pipeline (gcp provider mode `triposg`) and returns untextured geometry, so it only serves a job once every textured lane has failed or is marked down; the client's lane note says the result will have no textures. It was added after the 2026-09-18 to 09-28 outage, when Hunyuan3D and TRELLIS self-host failed together, Replicate was unconfigured, and roughly 400 photo jobs a day ended in a hard failure while the TripoSG worker was healthy. TripoSG stays out of the `retry_backends` suggestions because its public lane is sketch-only; the two Modly lanes are image lanes and close that list. A Modly lane that rejects the submit itself (cold, restarting, throttled) is cooled and the same request retries on `trellis2`, then `trellis_selfhost`, inside the submit. HuggingFace is excluded because its provider blocks through the whole generation (cannot be ridden from a poll), and NVIDIA is excluded because poll-time redispatch always reconstructs from a stored reference image, which NIM rejects. Both failover paths (this attended one and the unattended finalizer sweep) link the failed attempt to its successor row (`forge_creations.superseded_by`, migration `20260814200000_forge_failover_supersede.sql`), so the outcome ledger, the forge health sensor and `npm run forge:errors` count a recovered attempt as a recovery, not a loss.
+
+**Stalled NVIDIA jobs.** The unattended finalizer (`api/cron/forge-finalize.js`) is the only consumer of a poll-time failure on the free NIM text lane once the browser stops polling. A stalled text-to-3D job there gets one resubmit (`decideNvidiaStall`), and both give-up points (`nvcf_expired` and the bare TTL timeout) now mark the `forge-nim-trellis` cooldown, so new submissions skip to the next lane within the 120 s window instead of feeding a broken lane for up to 45 minutes.
+
+**Designed terminal failure.** When no successor is possible, the failed response carries `retryable: true` plus `retry_backends: [...]`, the ordered configured lanes a client can one-click resubmit to. A failure is never a bare string. The whole module is fail-open: no Redis disables automatic redispatch but keeps suggestions; no DB disables recovery but never turns a clean failure into a hang.
+
+### Quality, caching, and scale
+
+- **Quality gate + best-of retry.** `scoreQualityGate` flags degenerate results (near-empty geometry, texture failures); synchronous lanes retry once inline before returning.
+- **Result cache** (`api/_lib/forge-cache.js`). Identical text prompts on platform-keyed non-high lanes are served from cache with `cached: true`. The key covers path, tier, backend, the normalized prompt, and the output-affecting options (seed included), with a 7-day TTL that a read never refreshes. `force_regenerate: true` in the request body skips the cache READ while still writing the fresh result back. Any caller that must prove the pipeline is alive rather than that a mesh exists has to send it: the daily smoke cron (`api/cron/forge-smoke.js`) submits a constant prompt with no seed, so without the flag its key never changes and it verifies a replay. Automation that seeds the gallery takes the other route and varies the seed per submit (`api/cron/forge-seed-cron.js`), so a repeated prompt yields a genuinely new asset instead of a second catalog entry pointing at one GLB.
+- **Scale controls** (`api/_lib/forge-scale.js`). In-flight coalescing, blocking-lane slots, and daily paid caps keep a traffic spike from stampeding the GPU fleet or the paid last resort. Its circuit breaker (`circuitRecordFailure`) widens the open window linearly per consecutive failure but caps it at one hour (`CIRCUIT_MAX_OPEN_MS`), so a provider outage parks the seed cron for at most an hour before it re-probes the lane.
+
+## 6. Persistence and storage
+
+**`forge_creations`** (Neon Postgres, migration `api/_lib/migrations/20260604000000_forge_creations.sql`) is the ground truth for every generation. Key columns:
+
+- Identity and attribution: `id` (uuid), `client_key` (sha256 of the anonymous browser id), `ip_hash`, `user_id`.
+- Inputs: `prompt`, `aspect`, `preview_image_url` (the reference view), `text_to_image_model`, `views_requested`/`views_used`/`multiview`.
+- Routing outcome: `backend`, `tier`, `path`, `replicate_job_id` (poll correlation for any provider, despite the name), `model_category` (avatar, accessory, item, scene, creature, vehicle, other).
+- Result: `glb_key`, `glb_url`, `size_bytes`, `status` (`generating`, `done`, `failed`), `error`.
+- Feedback flywheel: `outcome` (`generated`, `accepted`, `rejected`), `rating`, `note`, `downloaded`, `feedback_at`. The outcome partial index feeds training-signal export.
+- Funnel instrumentation (migration `20260921120000_forge_destination.sql`): `destination` (what the maker is building for: `game`, `web`, `avatar`, `simulation`, `print`, `ar`, `play`; sent on the request or answered afterwards in the composer, null when never answered), `completed_at` (when the row reached `done` or `failed`; `updated_at` cannot stand in because later votes and feedback move it), and `internal` (true for rows the catalog seeder or the quality benchmark generated, so they stay out of conversion numbers). The handler states `destination` and `internal` once per request in a creation context that `createCreation` reads, so no insert branch can omit them, and both failover paths copy them to the successor row. Read by the [Forge funnel board](./ops/forge-funnel.md).
+- Lineage and remix (migration `20260625000000_forge_refine_lineage.sql`): `parent_creation_id`, `refine_instruction`, `lineage_index`, `remixable`, `remix_royalty_bps` (0 to 2000, default 1000), `creator_wallet_solana`, `remix_settlement_ref`.
+- Forge-Off (migration `20260625120000_forge_board.sql`): `vote_count`, plus the `forge_votes` and `forge_board_winners` tables.
+- Failover and cleanup: `superseded_by` (migration `20260814200000_forge_failover_supersede.sql`, the successor row's id when this attempt was re-dispatched; a plain uuid, not a foreign key, so retention pruning stays free) and `source_image_keys` (migration `20260813160000_forge_source_image_keys.sql`, the storage key of every uploaded reference photo, so a delete can erase them).
+
+`api/_lib/forge-store.js` owns all writes: `createCreation` on submit (also records the funnel `start` event), `materializeCreation` on completion, `markFailed`, `markSupersededBy` when a failed attempt is re-dispatched, verdict capture, and `deleteCreation` (behind `DELETE /api/forge-creation?id=`), which removes the mesh, preview and source uploads from storage before the row and is scoped to the owning client key. It is fail-soft: without a DB or storage config it no-ops rather than blocking generation.
+
+**Storage is two-layer.** GPU workers write raw output to GCS (`gs://$GCS_BUCKET/raw-meshes/...`), and provider URLs generally expire within about an hour. `materializeCreation` therefore mirrors the mesh and reference image into Cloudflare R2 (`api/_lib/r2.js`) and stores the durable same-origin `/cdn/` URL (`cdnUrl()`) in `glb_url`. Stored and returned URLs go through the `/cdn/` proxy (`api/cdn-object.js`), never the raw `*.r2.dev` domain, which browsers block on cross-origin reads (ORB/CORS); `normalizeStoredUrl()` rewrites legacy raw URLs on read. Anything user-facing must reference the R2 URL, never the raw provider URL.
+
+### When object storage is the thing that is down
+
+A rejected S3 secret takes 3D generation and every avatar, thumbnail and GLB read down at once, and on 2026-09-07 it did so with no health signature at all, because the forge sensor only sees generations that got far enough to write a row. Four rules now bound that blast radius:
+
+1. **It has its own sensor.** [api/_lib/ops/object-storage-health.js](../api/_lib/ops/object-storage-health.js) probes the bucket with a signed one-key list (retried once after a 300 ms backoff, so a one-off blip stays `ok` while two consecutive failures still classify `down`) and reports `ok` / `degraded` / `down` with the R2-specific hint (the secret is the token *digest*, not the token).
+2. **The reference-view write is no longer a single point of failure.** `persistImageBytes` runs before the reconstructor is ever called, so a refusing bucket returned 502 on 100% of text-to-3D while image-to-3D, which supplies its own view URLs, kept working. A storage-*infrastructure* fault now falls back to an inline `data:` URI under 4 MB ([api/_lib/image-persist.js](../api/_lib/image-persist.js)). `backendAcceptsInlineViews()` names the lanes that can read one, and it is true for our own GPU workers and only them, because every `workers/model-*` declares `images: [data-uri|url]` while a third-party reconstructor takes a URL it fetches itself. A programming error or an oversized payload still throws.
+3. **A refusal is reported as a refusal.** `/api/forge-upload` used to check only that the S3 env vars were *present*, so a rotated token still minted a well-formed presigned URL, the bucket answered the browser's PUT with a `403 SignatureDoesNotMatch` carrying no `Access-Control-Allow-Origin`, and the page fell into its catch-all "network error" branch for a fault that had nothing to do with the user's connection. `objectStorageUsable()` in `r2.js` runs the same probe, cached and single-flighted so a six-slot burst costs one, and both forge entry points answer `503 storage_unavailable` rather than forwarding a raw signing complaint.
+4. **Reads fail over to the public domain.** When the signed read fails on infrastructure rather than on the object, [api/cdn-object.js](../api/cdn-object.js) **streams** the same key from the public bucket domain. It must stream and never redirect: `r2.dev` sends no `access-control-allow-origin`, a browser re-runs the CORS check on a redirect's target, and the wildcard grant this handler sets is discarded the moment the hop is followed (measured on 2026-09-09, every cross-origin `/cdn` read threw "Failed to fetch" while the same URL curled 200). Streaming keeps the response on three.ws so the CORS, CORP and content-type headers survive the degraded path, and a short 60 s edge cache absorbs a thumbnail burst instead of pointing every browser at the rate-limited public domain the route exists to dodge. When both lanes fail on a storage-infrastructure fault, an image key gets a bundled 64x64 placeholder PNG with a 30 s cache instead of a raw 502, so real content resumes within 30 s of recovery; non-image keys (a `.glb`) still fail, because a static image cannot stand in for a model.
+
+Anonymous presigned uploads cannot sign a content length, so `api/cron/anon-upload-sweep.js` (hourly) deletes objects that exceed their prefix ceiling in `api/_lib/anon-upload-limits.js` (for example 8 MB under `forge/uploads/`).
+
+Note the asymmetry with rule 3: `objectStorageUsable()` fails closed only on a *rejected credential*, which never recovers on retry, and stays open through a timeout, so a flaky probe cannot take uploads down on its own.
+
+### The delivery variant: what a phone downloads is not what a download gives you
+
+A raw generation is 1.25 to 3.5 MB of unquantized vertex data and embedded PNG skins. On a mid-tier phone over slow 4G (1.6 Mbps) that is ten to twenty seconds before the first frame, which is most of what made the model pages and the marketplace grid unusable on a handset.
+
+So every finished mesh gets a second object, the **web-delivery variant**: meshopt geometry plus WebP textures capped at 2048 px on the long edge, produced by `deliveryCompressionOptions()` in [api/_lib/glb-compress.js](../api/_lib/glb-compress.js). Six real production forge outputs sampled on 2026-09-04 compressed like this:
+
+| source | original | variant | saved |
+|---|---|---|---|
+| geometry-only mesh | 3.00 MB | 0.52 MB | 83% |
+| geometry-only mesh | 1.25 MB | 0.38 MB | 70% |
+| textured mesh | 2.94 MB | 0.51 MB | 83% |
+| textured mesh | 1.70 MB | 0.11 MB | 94% |
+| textured mesh | 2.64 MB | 0.22 MB | 92% |
+| textured mesh | 3.34 MB | 0.67 MB | 80% |
+
+Three rules govern it, and none of them are optional:
+
+1. **It is a second object, never a replacement.** `glb_url` stays exactly the bytes the caller's `output_format` asked for. `web_glb_url` (migration `20260904120000_forge_web_glb.sql`, with `web_glb_key` and `web_size_bytes`) is the variant. Viewers take `web_glb_url`; **every download link and every third-party API consumer takes `glb_url`**, so nobody with a bare `GLTFLoader` is handed an `EXT_meshopt_compression` file they cannot decode, and nobody downloading an asset they will edit gets a texture-capped copy.
+2. **Null means "serve the original".** A creation forged before this existed, one whose compression pass has not run, and one already small enough that a second object would not pay for itself all carry `web_glb_url = null`. Every reader treats that as `glb_url`, so there is no separate "not ready" state to handle.
+3. **It is built after the row is already `done`.** `buildWebVariant()` is fire-and-forget, exactly like the physics grade beside it. The pass costs 0.6 to 5.6 s of CPU and the person waiting on their generation must never wait on it, nor lose a finished model to a compression bug or an instance recycle.
+
+Meshes that predate the variant are drained by [api/cron/forge-web-variants.js](../api/cron/forge-web-variants.js) (every 10 minutes, `FORGE_WEB_VARIANT_BATCH` rows per tick, newest first, because the newest models are the ones being opened on a phone). It reads the stored original, writes the variant to a second key, and never rewrites the original object; a row that yields no gain has `web_glb_key` pointed at the original key so it leaves the pending index while `web_glb_url` stays null.
+
+**The decoder ships from our own origin.** `EXT_meshopt_compression` needs a decoder that `<model-viewer>` loads as a classic script, and that URL used to be a public CDN. It is now `/vendor/meshopt_decoder.js`, vendored from the `meshoptimizer` package by `npm run vendor:meshopt` and pinned byte-for-byte by `tests/meshopt-vendor.test.js`. A hard dependency of the format we serve by default cannot have worse availability than the site itself, and the extra DNS plus TLS handshake sat on the critical path of the first 3D frame. The viewer also listens for a decode failure and retries once against `glb_url`, so a browser that genuinely cannot decode the variant gets a slower load rather than a dead page.
+
+**Texture dimensions come from the encoder, not from a header parse.** `@gltf-transform`'s own `textureCompress({ resize })` derives its target from a minimal PNG header reader, and three of the six meshes above carry a PNG it reads as 65536x4292542531, which made the whole pass throw `Expected positive integer for width but received 0` and lost the geometry win with it. `recompressTextures()` reads dimensions from sharp, which is the thing about to decode the bytes, and isolates every texture in its own try/catch so one unreadable skin costs that skin and nothing else.
+
+### The LOD variant: opt-in, because decimation is real work
+
+Send `"lods": true` on the generation request (`api/_lib/forge-options.js`) and `materializeCreation` builds a third object alongside `glb_url` and `web_glb_url`: a single combined GLB tagged with the archived `MSFT_lod` extension, carrying LOD0 (the delivered mesh, untouched), LOD1 and LOD2 (decimated with `meshoptimizer`'s simplifier through `packages/glb-tools`' `buildLodChain`). A real-time engine that understands `MSFT_lod` switches levels from this one file at runtime; one that does not simply renders LOD0, because the lower-detail levels are merged in as orphan nodes outside the scene's child graph.
+
+It is off by default for the same reason the delivery variant is not: building three decimated meshes costs real CPU (meshoptimizer's simplifier, run three times), and most callers never render in an engine that benefits from a LOD chain. The same real pipeline backs the Engine QA panel's own "Build & grade LOD chain" / "Check LOD & collider fitness" upgrade action (`public/engine-qa-panel.js`, `GET/POST /api/3d/engine-qa?lods=1`, see [engine-qa.md](engine-qa.md)), so a caller who only wants to grade fitness, not keep the chain, can do that on demand without ever setting `lods` on the generation itself.
+
+Two rules, mirroring the delivery variant:
+
+1. **It is a second object, never a replacement.** `lod_glb_url` (migration `20261015020000_forge_lod_variant.sql`, with `lod_glb_key` and `lod_levels`) is the combined `MSFT_lod` GLB. `glb_url` stays exactly the caller's requested `output_format`, untouched.
+2. **Null means "no chain was requested, or the build failed."** `buildLodVariant()` in `api/_lib/forge-store.js` is fire-and-forget, built after the row is already `done`, exactly like `buildWebVariant`: the person waiting on their generation never waits on it, and a build failure (logged, never thrown) simply leaves `lod_glb_url` null. `lod_levels` is a JSON array of `{ name, ratio, triangleCount, vertexCount }` per level, so a reader can show the chain's shape without fetching and parsing the GLB.
+
+## 7. GPU workers
+
+Workers are Python FastAPI services on Cloud Run (scale-to-zero L4 GPUs unless noted), documented worker-by-worker in `workers/README.md`. All share one contract: `POST /infer` returns `{task_id}`, `GET /tasks/:id` returns progress and finally a `result_gcs_url`, authenticated by the shared bearer `GCP_RECONSTRUCTION_KEY`. `api/_providers/gcp.js` maps modes to worker URLs.
+
+| Worker | Role |
+| --- | --- |
+| `workers/model-trellis2/` | Self-hosted TRELLIS.2, the default `trellis2` lane. `resolution` 512, 1024 or 1536, PBR GLB with alpha, meshopt packed. |
+| `workers/modly/` | Modly's backend headless, the `modly` (TripoSG) and `modly_hunyuan` (Hunyuan3D 2 Mini Turbo) lanes. Untextured GLB, repaired and decimated to the tier's face budget. |
+| `workers/model-trellis/` | Self-hosted TRELLIS, the `trellis_selfhost` lane. Quality-tiered up to 4096px textures. |
+| `workers/model-hunyuan3d/` | Hunyuan3D-2.1 single image to textured mesh, the `hunyuan3d` lane. |
+| `workers/model-pixal3d/` | Pixal3D, the `pixal3d` "Match my photo" lane: 1 to 4 photos fused into one PBR GLB. |
+| `workers/model-anigen/` | AniGen, the `anigen` lane: mesh, skeleton and skin weights predicted together. |
+| `workers/model-partcrafter/` | PartCrafter, the `partcrafter` lane: named part meshes. `workers/model-holopart/` is the companion that completes occluded geometry on meshes segmented after the fact. |
+| `workers/model-triposplat/` | TripoSplat behind `/api/forge-splat`: image to Gaussian splat. |
+| `workers/model-sam3d-objects/` | SAM 3D Objects behind `/api/forge-scene-objects`: photo to laid-out scene. 32 GB+ GPU, off until the gated weights are staged (`npm run stage:sam3d-objects`). |
+| `workers/model-triposg/` | TripoSG 1.5B. `mode: image` for the avatar pool, `mode: scribble` for the sketch path. |
+| `workers/model-triposr/` | TripoSR fast path and fallback (5 to 15s). |
+| `workers/rig/` | Make-It-Animatable rigging: 52-bone Mixamo skeleton, skin weights, ARKit-52 blendshapes, sub-second GPU predict, grafted into the original GLB bytes. Replaced the retired `workers/unirig/` (2026-07-17); cutover was the `GCP_UNIRIG_URL` env change. |
+| `workers/avatar-pipeline-controller/` | CPU orchestrator for the avatar flow: `POST /reconstruct` picks a mesh backend by weighted random, then auto-rigs. |
+| `workers/remesh/`, `workers/texture/`, `workers/segment/`, `workers/stylize/`, `workers/rembg/` | Post-processing: retopology and Game-Ready, SDXL retexture, part splitting, geometric stylize, background removal. `rembg` also offers `birefnet` (birefnet-general-lite) for cutouts where hair and thin edges decide the mesh: roughly 6 s against the default's 1 s, so it is worth it on a hero image and not on a batch, and the default is deliberately unchanged. |
+
+Model weights are staged from `gs://three-ws-model-weights` via `workers/deploy/stage-weights.sh`. Each worker has its own `cloudbuild.yaml`; every config pins the `three-ws-build@` service account.
+
+## 8. Post-processing
+
+- **Rigging.** `POST /api/forge?action=rig` prefers the self-host rig worker and falls back to Replicate; unconfigured deployments return a clean 501. Auto-rig-on-create (`api/_lib/auto-rig.js`) mints a sibling creation row rather than mutating the original (provenance and attestation depend on the original bytes staying put), gated by the humanoid prompt classifier (`mcp-server/src/tools/_humanoid.js`) and `rigInfoIsRigged()` (already-skinned GLBs are skipped).
+- **Skeleton canonicalization.** `src/glb-canonicalize.js` maps any humanoid rig's bone names (Mixamo, Avaturn, Unreal, VRM/VRoid, Daz, MakeHuman, MMD/MikuMikuDance with its Japanese bone names, Blender `.L`, and more) onto the canonical bone set, repacking the GLB in place. There is no rig allowlist; a new convention means a new bone-name mapping plus a test case in `tests/glb-canonicalize.test.js`.
+- **Animation retargeting.** `src/animation-retarget.js` applies the pre-baked canonical clip library (`public/animations/clips/*.json`) to arbitrary rigs: rewrites track names, drops missing bones, rescales hip translation, and requires 50% bone coverage. Pure JS, shared between the browser and the Node MCP tool.
+- **Refinement lineage.** `api/forge-iterate.js` and the MCP `refine_model` tool share one core (`mcp-server/src/tools/_lineage.js`) for composing refinements and maintaining the revertable, branchable version tree over `parent_creation_id` and `lineage_index`.
+- **Restyle.** `api/material-studio.js` re-skins a GLB without regenerating the mesh: an LLM proposes PBR factors from an instruction, applied server-side. The paid MCP `restyle_material` is a thin client over it.
+- **Mesh operations.** `forge-remesh`, `forge-gameready` (QuadriFlow retopology to a poly budget, GLB plus FBX, $0.10), `forge-stylize`, `forge-segment`, `forge-rembg`. Each is also sold as a standalone x402 stage; see [3D pipeline](./3d-pipeline.md).
+
+## 9. Payments and gating
+
+The pipeline separates what a generation costs us from what it costs the user. Draft and standard route to free lanes; we charge for quality, not to recover vendor bills.
+
+- **Direct x402** (`api/x402/forge.js`): per-tier USDC prices from the tier table, exact-settle on Solana mainnet. The order is verify, submit, settle: a failed submit never charges. The returned job token polls free on the standard endpoint.
+- **High-tier gate** (`api/_lib/forge-high-payment.js`): the high tier is $THREE hold-or-pay gated regardless of which free engine serves it. Non-holders pay per generation through the token rail in three phases: `assertForgePayment` validates at the gate, `redeemForgePayment` atomically claims single-use (primary-key race-safe), `releaseForgePayment` undoes the claim if dispatch fails. Settled consumption lands in `token_payments` with `ref_type: 'forge'`.
+- **MCP pricing**: the `paid()` wrapper (`mcp-server/src/payments.js`) charges the `priceUsd` each tool module declares at its own call site (`mesh_forge` $0.25, `rig_mesh` $0.20, `forge_avatar` $0.45, `refine_model` $0.25, `text_to_avatar` $0.15, `restyle_material` $0.05, all under `mcp-server/src/tools/`); `forge_free` needs no payment. The hosted MCP server sums per-tool prices for batched x402 challenges.
+- **Quota upsell**: the free flagship API allows 10 generations per IP per day, then returns 429 with the x402 endpoint as the paid path.
+- **BYOK lanes** bill the caller's own vendor key and are never charged to a platform account.
+
+## 10. Operator reference
+
+The env vars that shape a deployment (production values live on the Cloud Run service, not in any Vercel export):
+
+| Var | Effect |
+| --- | --- |
+| `NVIDIA_API_KEY` | Enables the free NIM TRELLIS text lane. |
+| `HF_TOKEN` | Enables the HF Spaces lane. |
+| `MODEL_TRELLIS2_URL`, `MODEL_TRELLIS_URL`, `MODEL_MODLY_URL`, `MODEL_PIXAL3D_URL`, `MODEL_ANIGEN_URL`, `MODEL_PARTCRAFTER_URL`, `MODEL_TRIPOSPLAT_URL`, `MODEL_SAM3D_URL`, `GCP_HUNYUAN3D_URL`, `GCP_TRIPOSG_URL`, `GCP_UNIRIG_URL`, `GCP_RECONSTRUCTION_URL` | Self-host worker URLs (TRELLIS, Modly, Pixal3D, AniGen, PartCrafter, TripoSplat, SAM 3D Objects, Hunyuan3D, sketch, rig, avatar controller). |
+| `TRIPO_API_KEY`, `TRIPO_WEBHOOK_SECRET` | Optional. The key makes Tripo the High-tier default geometry engine (house lane); the secret enables the signed Tripo webhook receiver. |
+| `FORGE_PAY_TO_KEEP` | Default off; gates releasing the original file behind a $THREE hold or payment (`api/forge-keep.js`). |
+| `GCP_RECONSTRUCTION_KEY` | Shared bearer for all self-host workers. |
+| `REPLICATE_API_TOKEN` | Enables the paid Replicate last resort. |
+| `FORGE_PREFER_FREE` | Default on; prefer free reconstruction before paid Replicate. |
+| `FORGE_SELFHOST_PRIMARY` | Default off; hoist self-host lanes above hosted free lanes. |
+| `JWT_SECRET` | Signs job handle tokens. |
+| `DATABASE_URL`, R2 `S3_*` config | Persistence and durable storage; both fail soft. |
+| `LIVEPEER_FEDERATION_ENABLED` | Default off; inserts the federated Livepeer text-to-image lane (`api/_providers/livepeer.js`) into the reference-image chain after the free lanes and before the paid Replicate backstop. See [ops/livepeer-federation.md](./ops/livepeer-federation.md) for the measured state before flipping it. |
+| `LIVEPEER_API_KEY`, `LIVEPEER_GATEWAY_URL`, `LIVEPEER_T2I_MODEL` | Studio gateway key (absent today), gateway base-URL override, and pipeline model override (`ByteDance/SDXL-Lightning` default) for the federated lane. |
+
+Fast diagnostics: `forge_creations` carries per-generation backend, status, error, and prompt, so it is the quickest ground truth for generation issues. `GET /api/forge?health=1` shows the live lane picture.
+
+Whether the output is any good to the people asking for it is a separate question with its own report: `npm run forge:funnel` (or the owner board at `/forge-funnel`) gives useful-output rate, repeat use, per-destination acceptance and attempts per kept model by engine. See [ops/forge-funnel.md](./ops/forge-funnel.md).
+
+## 11. Extending the pipeline
+
+**Adding a generation lane:**
+
+1. Add a provider client in `api/_providers/<name>.js` (submit and poll, normalized errors).
+2. Register the backend in `BACKENDS` (`api/_lib/forge-tiers.js`): paths, `free` or `byok`, `requiresEnv`, ETA, credits.
+3. Place it in the routing lists it belongs in: `FREE_FALLBACK_FOR_PATH` and, if it should be a default, `FREE_DEFAULT_FOR_TIERS` or `DEFAULT_BACKEND_FOR_PATH`.
+4. If it is async and can be re-dispatched from a poll, add it to `ASYNC_REDISPATCH_ORDER` and the suggestion orders in `api/_lib/forge-failover.js`.
+5. Nothing else: the catalog, the UI engine picker, health checks, and x402 pricing all derive from the registry.
+
+**Adding a rig convention:** add the bone-name mapping to `src/glb-canonicalize.js` and a case to `tests/glb-canonicalize.test.js`. Never introduce a curated rig allowlist.
+
+**The invariants to preserve:**
+
+- Free-first: a paid lane must never run while a healthy free lane can serve the request.
+- One source of truth: prices, poly targets, and lane capabilities live only in `forge-tiers.js`.
+- Fail-open persistence: the DB and storage layers may degrade, generation must not.
+- Same job id across failover: the client never re-submits because a lane died.
+- Durable URLs: user-facing results reference R2, never expiring provider URLs.
+
+## Related
+
+- [Forge](./forge.md), the product-level doc for the /forge surface.
+- [How the Forge works](./how-forge-works.md), the plain-language explainer.
+- [3D pipeline](./3d-pipeline.md), the pay-per-stage x402 pipeline (rig, remesh, gameready, stylize, rembg).
+- [3D asset pipeline](./3d-asset-pipeline.md), formats and the animation/conversion flow.
+- [Avatar pipeline](./avatar-pipeline.md), the selfie-to-avatar reconstruction flow.
+- [Background generation](./forge-background-generation.md), job resume and gallery persistence.
+- `workers/README.md`, the worker-by-worker operational reference.

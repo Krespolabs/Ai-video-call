@@ -1,0 +1,233 @@
+{
+	"id": "model-inspect",
+	"scenarioHash": "1331ea25392d841087dba673d5ae9f4cfe65ece4c8858601da6069d07104f011",
+	"ranAt": "2026-09-30T08:07:31.771Z",
+	"target": {
+		"commit": "955623897",
+		"revision": "three-ws-api-00464-mbw"
+	},
+	"passed": true,
+	"steps": [
+		{
+			"index": 1,
+			"kind": "goto",
+			"target": "https://three.ws/3d#quickstart",
+			"detail": "loaded https://three.ws/3d#quickstart",
+			"ok": true,
+			"ms": 8119,
+			"frames": 0
+		},
+		{
+			"index": 2,
+			"kind": "scroll",
+			"target": "-64",
+			"detail": "scrolled -64 px",
+			"ok": true,
+			"ms": 3274,
+			"frames": 9
+		},
+		{
+			"index": 3,
+			"kind": "hold",
+			"target": "1500",
+			"detail": "1500 ms",
+			"ok": true,
+			"ms": 13092,
+			"frames": 45
+		},
+		{
+			"index": 4,
+			"kind": "click",
+			"target": "Run it live ▶",
+			"detail": "clicked; GET /api/3d/inspect answered 200 in 0 s",
+			"ok": true,
+			"ms": 5840,
+			"frames": 21
+		},
+		{
+			"index": 5,
+			"kind": "expect",
+			"target": "\"valid\": true",
+			"detail": "appeared after 0.0 s",
+			"ok": true,
+			"ms": 42,
+			"frames": 0
+		},
+		{
+			"index": 6,
+			"kind": "read",
+			"target": "vertices",
+			"detail": "vertices = \"3273\"",
+			"ok": true,
+			"ms": 2,
+			"frames": 0
+		},
+		{
+			"index": 7,
+			"kind": "read",
+			"target": "triangles",
+			"detail": "triangles = \"4672\"",
+			"ok": true,
+			"ms": 3,
+			"frames": 0
+		},
+		{
+			"index": 8,
+			"kind": "read",
+			"target": "joints",
+			"detail": "joints = \"19\"",
+			"ok": true,
+			"ms": 2,
+			"frames": 0
+		},
+		{
+			"index": 9,
+			"kind": "read",
+			"target": "animations",
+			"detail": "animations = \"1\"",
+			"ok": true,
+			"ms": 3,
+			"frames": 0
+		},
+		{
+			"index": 10,
+			"kind": "read",
+			"target": "errors",
+			"detail": "errors = \"0\"",
+			"ok": true,
+			"ms": 2,
+			"frames": 0
+		},
+		{
+			"index": 11,
+			"kind": "read",
+			"target": "warnings",
+			"detail": "warnings = \"1\"",
+			"ok": true,
+			"ms": 1,
+			"frames": 0
+		},
+		{
+			"index": 12,
+			"kind": "hold",
+			"target": "2200",
+			"detail": "2200 ms",
+			"ok": true,
+			"ms": 17646,
+			"frames": 66
+		},
+		{
+			"index": 13,
+			"kind": "hover",
+			"target": ".out pre",
+			"detail": "hovered",
+			"ok": true,
+			"ms": 4635,
+			"frames": 18
+		},
+		{
+			"index": 14,
+			"kind": "scroll",
+			"target": "330",
+			"detail": "scrolled 330 px",
+			"ok": true,
+			"ms": 13114,
+			"frames": 54
+		},
+		{
+			"index": 15,
+			"kind": "hold",
+			"target": "1800",
+			"detail": "1800 ms",
+			"ok": true,
+			"ms": 13905,
+			"frames": 54
+		},
+		{
+			"index": 16,
+			"kind": "scroll",
+			"target": "156",
+			"detail": "scrolled 156 px",
+			"ok": true,
+			"ms": 9362,
+			"frames": 36
+		},
+		{
+			"index": 17,
+			"kind": "hold",
+			"target": "1600",
+			"detail": "1600 ms",
+			"ok": true,
+			"ms": 11534,
+			"frames": 48
+		},
+		{
+			"index": 18,
+			"kind": "hover",
+			"target": "Run it live ▶",
+			"detail": "hovered",
+			"ok": true,
+			"ms": 4679,
+			"frames": 18
+		},
+		{
+			"index": 19,
+			"kind": "scroll",
+			"target": "Drag to orbit",
+			"detail": "scrolled 841 px",
+			"ok": true,
+			"ms": 21069,
+			"frames": 60
+		},
+		{
+			"index": 20,
+			"kind": "scroll",
+			"target": "70",
+			"detail": "scrolled 70 px",
+			"ok": true,
+			"ms": 8039,
+			"frames": 15
+		},
+		{
+			"index": 21,
+			"kind": "hold",
+			"target": "3000",
+			"detail": "3000 ms",
+			"ok": true,
+			"ms": 43481,
+			"frames": 90
+		}
+	],
+	"facts": {
+		"vertices": "3273",
+		"triangles": "4672",
+		"joints": "19",
+		"animations": "1",
+		"errors": "0",
+		"warnings": "1"
+	},
+	"saw": [
+		"\"valid\": true"
+	],
+	"responses": [
+		{
+			"method": "GET",
+			"path": "/api/3d/inspect",
+			"status": 200,
+			"seconds": 0
+		}
+	],
+	"cuts": [],
+	"video": {
+		"path": "public/x-media/model-inspect/reel.mp4",
+		"sha256": "020dbd9950c273d03bd6ac7fbb3becf2181908da30f15616545db89990996f6a",
+		"frames": 534,
+		"motion": 0.58,
+		"durationSec": 17.8,
+		"width": 1080,
+		"height": 1080,
+		"fps": 30,
+		"videoCodec": "h264",
+		"pixFmt": "yuv420p"
+	}
+}

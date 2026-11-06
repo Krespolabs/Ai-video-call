@@ -1,0 +1,335 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>AI Voice Call</title>
+  <!-- LiveKit JS SDK via CDN -->
+  <script src="https://cdn.jsdelivr.net/npm/livekit-client/dist/livekit-client.umd.min.js"></script>
+  <style>
+    :root { color-scheme: dark; }
+    body {
+      font-family: Arial, sans-serif;
+      margin: 2rem;
+      background: #0b0f14;
+      color: #e6edf3;
+    }
+    h1 { font-size: 1.4rem; font-weight: 600; }
+    #controls { margin-bottom: 1rem; }
+    #controls input { margin-right: 0.5rem; padding: 0.4rem; }
+    #controls button { padding: 0.4rem 1rem; }
+    #controls button:disabled { opacity: 0.5; cursor: default; }
+    #call {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: flex-start;
+      gap: 1rem;
+    }
+
+    /* ── Agent panel (audio only) ─────────────────────────────────── */
+    #stage {
+      flex: 1 1 320px;
+      min-width: 280px;
+      padding: 2rem 1.5rem;
+      border-radius: 12px;
+      text-align: center;
+      background: radial-gradient(circle at 50% 30%, #1b2634 0%, #0b0f14 70%);
+    }
+    #agent-icon {
+      font-size: 56px;
+      line-height: 1;
+      margin-bottom: 1rem;
+    }
+    #agent-icon.speaking { animation: pulse 1s ease-in-out infinite; }
+    @keyframes pulse {
+      0%, 100% { transform: scale(1); }
+      50% { transform: scale(1.12); }
+    }
+    #agent-name { font-size: 1.1rem; font-weight: 600; }
+    #agent-state { margin-top: 0.5rem; color: #8b9cb0; font-size: 14px; }
+
+    /* ── Participants (audio tiles) ───────────────────────────────── */
+    #participants {
+      flex: 1 1 260px;
+      min-width: 240px;
+    }
+    #participants h2 { font-size: 0.9rem; font-weight: 600; color: #9fb3c8; }
+    #participant-list { list-style: none; margin: 0; padding: 0; }
+    #participant-list li {
+      padding: 0.5rem 0.7rem;
+      margin-bottom: 0.4rem;
+      border-radius: 8px;
+      background: #131b24;
+      font-size: 14px;
+    }
+    #participant-list li .role {
+      margin-left: 0.4rem;
+      font-size: 11px;
+      color: #7d8ea3;
+    }
+    #status { margin-top: 1rem; color: #8b9cb0; }
+  </style>
+</head>
+<body>
+  <h1>AI Voice Call</h1>
+
+  <div id="controls">
+    <input id="identity" type="text" placeholder="Your name" value="guest" />
+    <input id="room" type="text" placeholder="Room name" value="default-room" />
+    <button id="joinBtn">Join Room</button>
+    <button id="muteBtn" disabled>Mute</button>
+  </div>
+
+  <div id="status">Not connected</div>
+
+  <div id="call">
+    <!--
+      Audio-only call: the agent has no face. This panel just reports whether
+      the agent is listening or speaking; its voice is played by the LiveKit
+      audio track the script below attaches to the page.
+    -->
+    <div id="stage">
+      <div id="agent-icon" aria-hidden="true">🎙️</div>
+      <div id="agent-name">AI Voice Assistant</div>
+      <div id="agent-state">Join a room to start talking</div>
+    </div>
+
+    <div id="participants">
+      <h2>In the room</h2>
+      <ul id="participant-list"></ul>
+    </div>
+  </div>
+
+  <script>
+    // Token server endpoint (from token_server.py)
+    const TOKEN_SERVER_URL = "http://localhost:5000/getToken";
+
+    const joinBtn = document.getElementById("joinBtn");
+    const muteBtn = document.getElementById("muteBtn");
+    const statusEl = document.getElementById("status");
+    const agentIcon = document.getElementById("agent-icon");
+    const agentState = document.getElementById("agent-state");
+    const participantList = document.getElementById("participant-list");
+
+    // The connected LiveKit room, once the user joins.
+    let room;
+
+    // ── Audio-only UI ──────────────────────────────────────────────────────
+    /**
+     * Report what the agent is doing in the call.
+     *
+     * @param {string} text Line under the agent's name.
+     * @param {{speaking?: boolean}} [options] Pulses the icon while the agent
+     *   is talking, so the panel doubles as a "who has the floor" indicator.
+     */
+    function setAgentState(text, { speaking = false } = {}) {
+      agentState.textContent = text;
+      agentIcon.classList.toggle("speaking", speaking);
+    }
+
+    /**
+     * Best-effort "is this participant the Pipecat bot?" test.
+     *
+     * livekit-client exposes `isAgent` on Participant in current builds and
+     * `kind` (ParticipantKind.AGENT) in others; older builds expose neither,
+     * so the identity prefix Pipecat's LiveKit runner assigns is the fallback.
+     */
+    function isAgentParticipant(participant) {
+      if (typeof participant?.isAgent === "boolean") return participant.isAgent;
+      const agentKind = LivekitClient.ParticipantKind?.AGENT;
+      if (agentKind !== undefined && participant?.kind === agentKind) return true;
+      return /^agent/i.test(participant?.identity || "");
+    }
+
+    function addParticipant(identity, { agent = false, self = false } = {}) {
+      if (!identity || document.getElementById(`participant-${identity}`)) return;
+      const item = document.createElement("li");
+      item.id = `participant-${identity}`;
+      item.textContent = identity;
+      const roleName = agent ? "agent" : self ? "you" : "";
+      if (roleName) {
+        const role = document.createElement("span");
+        role.className = "role";
+        role.textContent = roleName;
+        item.appendChild(role);
+      }
+      participantList.appendChild(item);
+    }
+
+    function removeParticipant(identity) {
+      document.getElementById(`participant-${identity}`)?.remove();
+    }
+
+    // The local microphone publication, if any: the mute button mirrors it.
+    function microphonePublication() {
+      return room?.localParticipant?.getTrackPublication(
+        LivekitClient.Track.Source.Microphone
+      );
+    }
+
+    function updateMuteButton() {
+      const publication = microphonePublication();
+      if (!publication?.track) {
+        muteBtn.disabled = true;
+        muteBtn.textContent = "Mute";
+        return;
+      }
+      muteBtn.disabled = false;
+      muteBtn.textContent = publication.isMuted ? "Unmute" : "Mute";
+    }
+
+    muteBtn.addEventListener("click", async () => {
+      if (!room) return;
+      const publication = microphonePublication();
+      const live = Boolean(publication?.track) && !publication.isMuted;
+      try {
+        await room.localParticipant.setMicrophoneEnabled(!live);
+      } catch (err) {
+        console.error("Could not toggle the microphone", err);
+      } finally {
+        updateMuteButton();
+      }
+    });
+
+    /**
+     * Publish the local microphone -- the only track this call ever sends.
+     *
+     * This is deliberately *not* `localParticipant.enableCameraAndMicrophone()`.
+     * That helper builds both tracks in a single
+     * `createTracks({audio: true, video: true})` call, so it would prompt for
+     * the camera -- which an audio-only agent has no use for -- and would
+     * reject as a unit if that permission were refused, costing us the
+     * microphone too: no track is published at all. The agent then greets you
+     * and hears nothing, and Deepgram logs no transcript, because there is no
+     * audio in the room to transcribe. The microphone is the only track this
+     * agent listens to, so it gets its own call, placed before anything else.
+     *
+     * @returns {Promise<string>} A short device description for the status line.
+     * @throws {Error} If the browser refuses the mic or publishes it muted.
+     */
+    async function publishMicrophone() {
+      await room.localParticipant.setMicrophoneEnabled(true);
+
+      // setMicrophoneEnabled() resolves once the track is published, but a
+      // muted publication (device held by another app, OS privacy switch)
+      // leaves the agent with pure silence, so the publication itself is
+      // checked rather than trusted.
+      const publication = room.localParticipant.getTrackPublication(
+        LivekitClient.Track.Source.Microphone
+      );
+      const mediaTrack = publication?.track?.mediaStreamTrack;
+
+      if (!publication?.track || publication.isMuted || mediaTrack?.readyState !== "live") {
+        throw new Error(
+          "the microphone track is not live (browser mic permission or default input device)"
+        );
+      }
+
+      // Which device the browser actually picked: when the agent hears silence
+      // this line is what points at a virtual cable or an idle phone mic.
+      console.info("Microphone published", {
+        sid: publication.trackSid,
+        device: mediaTrack.label,
+        deviceId: mediaTrack.getSettings?.().deviceId,
+      });
+
+      return mediaTrack.label || "live";
+    }
+
+    joinBtn.addEventListener("click", async () => {
+      const identity = document.getElementById("identity").value || "guest";
+      const roomName = document.getElementById("room").value || "default-room";
+
+      statusEl.innerText = "Fetching token...";
+
+      try {
+        // 1. Get a token (and server URL) from our local token_server.py
+        const res = await fetch(
+          `${TOKEN_SERVER_URL}?identity=${encodeURIComponent(identity)}&room=${encodeURIComponent(roomName)}`
+        );
+        const data = await res.json();
+        const { token, url } = data;
+
+        // 2. Create and connect to the LiveKit room
+        room = new LivekitClient.Room();
+
+        room.on(LivekitClient.RoomEvent.TrackSubscribed, (track, publication, participant) => {
+          addParticipant(participant.identity, {
+            agent: isAgentParticipant(participant),
+          });
+          // Audio only: attaching the track is what actually plays the agent's
+          // voice. No camera is requested, and any video track someone else
+          // publishes is deliberately left unattached.
+          if (track.kind === "audio") track.attach();
+        });
+
+        room.on(LivekitClient.RoomEvent.TrackUnsubscribed, (track) => {
+          track.detach().forEach((el) => el.remove());
+        });
+
+        // 3. Keep the "In the room" list in sync with the call.
+        room.on(LivekitClient.RoomEvent.ParticipantConnected, (participant) => {
+          const agent = isAgentParticipant(participant);
+          addParticipant(participant.identity, { agent });
+          if (agent) setAgentState("Listening…");
+        });
+
+        room.on(LivekitClient.RoomEvent.ParticipantDisconnected, (participant) => {
+          removeParticipant(participant.identity);
+        });
+
+        // 4. Who has the floor: an audio-only UI has no faces, so the agent
+        //    panel's "Listening…" / "Speaking…" line is the whole call status.
+        room.on(LivekitClient.RoomEvent.ActiveSpeakersChanged, (speakers) => {
+          const agentSpeaking = speakers.some(
+            (participant) => !participant.isLocal && isAgentParticipant(participant)
+          );
+          setAgentState(agentSpeaking ? "Speaking…" : "Listening…", {
+            speaking: agentSpeaking,
+          });
+        });
+
+        room.on(LivekitClient.RoomEvent.Disconnected, () => {
+          room = undefined;
+          participantList.replaceChildren();
+          updateMuteButton();
+          setAgentState("Disconnected");
+          statusEl.innerText = "Disconnected";
+        });
+
+        statusEl.innerText = "Connecting to room...";
+        await room.connect(url, token);
+        addParticipant(identity, { self: true });
+        statusEl.innerText = `Connected to room: ${roomName} as ${identity}`;
+
+        // Browsers only allow audible playback after a real user gesture.
+        // This still runs inside the click handler, so the agent's voice can
+        // start the moment its first audio track arrives.
+        try {
+          await room.startAudio();
+        } catch (err) {
+          console.warn("room.startAudio() failed — audio may need a click", err);
+        }
+
+        // 5. Publish the microphone. It is the only track this call uses: the
+        //    camera is never requested, so no video permission prompt appears.
+        let mic = null;
+        try {
+          mic = await publishMicrophone();
+        } catch (err) {
+          console.error("Microphone could not be published", err);
+        }
+        updateMuteButton();
+        setAgentState("Connected — waiting for the agent…");
+
+        statusEl.innerText = mic
+          ? `Connected to room: ${roomName} as ${identity} — mic: ${mic}`
+          : `Connected to ${roomName}, but NO microphone is published — the agent cannot hear you. ` +
+            `Allow the microphone for this page and check the system's default input device.`;
+      } catch (err) {
+        console.error(err);
+        statusEl.innerText = "Error: " + err.message;
+      }
+    });
+  </script>
+</body>
+</html>

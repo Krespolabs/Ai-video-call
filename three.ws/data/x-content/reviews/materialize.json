@@ -1,0 +1,73 @@
+{
+	"id": "materialize",
+	"contentHash": "24c8167087536ce0a572c1cd7c22ee9ac3e0cdcbdf2ddae65bf0e85e4af5e340",
+	"reviewedAt": "2026-09-18T00:28:58.508Z",
+	"passed": true,
+	"blockers": [],
+	"texts": [
+		"Materialize prices a 3D print from the repaired mesh: it measures the true solid volume and charges that volume in your material, paid in USDC on Solana: three.ws/materialize"
+	],
+	"lint": [],
+	"verification": {
+		"ok": true,
+		"checks": [
+			{
+				"claim": "measures the true solid volume and charges that volume in your material",
+				"kind": "evidence:page",
+				"target": "https://three.ws/materialize",
+				"ok": true,
+				"detail": "live page shows \"Every quote comes from the mesh itself: the analyzer computes the true solid volume of the repaired model, and the price is that volume in the material you picked. Nothing is estimated from a bounding box.\""
+			},
+			{
+				"claim": "paid in USDC on Solana",
+				"kind": "evidence:page",
+				"target": "https://three.ws/materialize",
+				"ok": true,
+				"detail": "live page shows \"There is no card processor. You pay the exact quoted amount in USDC on Solana, the order is opened against a signed quote, and the price can never move between the quote and the charge.\""
+			},
+			{
+				"kind": "link",
+				"target": "https://three.ws/materialize",
+				"ok": true,
+				"detail": "HTTP 200"
+			}
+		]
+	},
+	"editor": {
+		"verdict": "publish",
+		"scores": {
+			"accuracy": 5,
+			"clarity": 5,
+			"specificity": 5,
+			"voice": 4,
+			"professionalism": 5,
+			"visual": 5
+		},
+		"issues": [
+			{
+				"severity": "minor",
+				"area": "voice",
+				"quote": "Solana: three.ws/materialize",
+				"problem": "The post uses a colon twice, and the second colon before the link reads slightly mechanical. A period is more natural here.",
+				"fix": "End with '...paid in USDC on Solana. three.ws/materialize' or leave as is; both are within the house style."
+			}
+		],
+		"rewrite": {
+			"posts": [
+				"Materialize prices a 3D print from the repaired mesh: it measures the true solid volume and charges that volume in your material, paid in USDC on Solana: three.ws/materialize"
+			],
+			"altText": [
+				"The three.ws Materialize page: a drop area for any .glb beside models fresh from the Forge, over three columns explaining that the price is measured from the repaired mesh, that checkout is USDC on Solana, and that agents can order over x402."
+			]
+		},
+		"summary": "Both claims are verified word-for-word against the live /materialize page and the screenshot matches the live product exactly, with no numbers in conflict. The voice is a textbook mechanism lead within the target length band; only a minor punctuation preference keeps voice from a 5. Ship it.",
+		"model": "nvidia:moonshotai/kimi-k3",
+		"fallbacks": [
+			"No GCP credentials found. Set GCP_SERVICE_ACCOUNT_JSON, run `gcloud auth application-default login`, or run on GCE/Cloud Run.",
+			"openrouter 402: {\"error\":{\"message\":\"Insufficient credits. Add more using https://openrouter.ai/settings/credits\",\"code\":402,\"metadata\":{\"limit_source\":\"openrouter_credits\",\"remedy_hint\":\"Add credits at https://openr",
+			"openai 429: {\n    \"error\": {\n        \"message\": \"Your account is not active, please check your billing details on our website.\",\n        \"type\": \"billing_not_active\",\n        \"param\": null,\n        \"code\": \"billi"
+		],
+		"rewriteFindings": []
+	},
+	"editorError": null
+}

@@ -1,0 +1,336 @@
+<!doctype html>
+<html lang="en">
+<head>
+	<style>/* three.ws hidden-guard — make the `hidden` attribute authoritative; see scripts/lib/hidden-guard.mjs */[hidden]{display:none!important}</style>
+	<script>/* three.ws theme boot — no-flash; runtime in /theme-switcher.js */(function(){try{var m=localStorage.getItem('twx_theme');var l=m==='auto'?(window.matchMedia&&window.matchMedia('(prefers-color-scheme: light)').matches):m==='light';document.documentElement.setAttribute('data-theme',l?'light':'dark');}catch(e){document.documentElement.setAttribute('data-theme','dark');}})();</script>
+	<meta charset="utf-8" />
+	<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+	<title data-i18n="mint_success.meta_title">Agent deployed · three.ws</title>
+	<meta name="robots" content="noindex" />
+	<link rel="icon" href="/favicon.ico" sizes="any" />
+	<link rel="stylesheet" href="/fonts/fonts.css" />
+	<script type="module" src="https://cdn.jsdelivr.net/npm/@google/model-viewer@4.4.0/dist/model-viewer.min.js"></script>
+	<style>
+		*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+		html, body {
+			height: 100%;
+			background: #050508;
+			color: #e5e7eb;
+			font-family: Inter, system-ui, sans-serif;
+			overflow: hidden;
+		}
+
+		/* ── starfield ── */
+		#starfield {
+			position: fixed; inset: 0; z-index: 0;
+			opacity: 0; transition: opacity 1.4s ease-out;
+		}
+		#starfield.show { opacity: 1; }
+
+		/* ── layout ── */
+		.shell {
+			position: relative; z-index: 1;
+			display: flex; flex-direction: column;
+			align-items: center; justify-content: center;
+			min-height: 100vh; padding: 24px;
+			gap: 0;
+		}
+
+		/* ── avatar zone ── */
+		.avatar-wrap {
+			position: relative;
+			width: min(320px, 65vw);
+			height: min(320px, 65vw);
+			flex-shrink: 0;
+			opacity: 0; transform: translateY(18px) scale(.96);
+			transition: opacity .9s ease-out, transform .9s ease-out;
+		}
+		.avatar-wrap.show { opacity: 1; transform: none; }
+
+		.avatar-glow {
+			position: absolute; inset: -30px;
+			border-radius: 50%;
+			background: radial-gradient(circle at center, rgba(99,102,241,.28) 0%, transparent 70%);
+			opacity: 0; animation: none;
+		}
+		.avatar-glow.show {
+			opacity: 1;
+			animation: glow-pulse 2.8s ease-in-out infinite;
+		}
+		@keyframes glow-pulse {
+			0%,100% { opacity: .5; transform: scale(1); }
+			50%      { opacity: 1; transform: scale(1.07); }
+		}
+
+		model-viewer, .avatar-placeholder {
+			width: 100%; height: 100%;
+			border-radius: 50%;
+			background: transparent;
+			--progress-bar-color: transparent;
+		}
+		.avatar-placeholder {
+			display: flex; align-items: center; justify-content: center;
+			background: linear-gradient(135deg, #312e81, #4f46e5);
+			font-size: 3.5rem; font-weight: 800; color: rgba(255,255,255,.9);
+			border-radius: 50%;
+		}
+
+		/* ── text content ── */
+		.content { margin-top: 32px; text-align: center; display: flex; flex-direction: column; align-items: center; gap: 0; }
+
+		.tag {
+			display: inline-flex; align-items: center; gap: 6px;
+			font-size: 11px; font-weight: 600; letter-spacing: .1em; text-transform: uppercase;
+			color: #a5b4fc; padding: 4px 12px; border-radius: 20px;
+			border: 1px solid rgba(99,102,241,.4); background: rgba(99,102,241,.08);
+			opacity: 0; transform: translateY(10px);
+			transition: opacity .6s ease-out, transform .6s ease-out;
+		}
+		.tag.show { opacity: 1; transform: none; }
+		.tag::before { content: '✦'; }
+
+		.agent-name {
+			margin-top: 12px;
+			font-size: clamp(1.6rem, 5vw, 2.4rem);
+			font-weight: 800; line-height: 1.1; color: #f9fafb;
+			opacity: 0; transform: translateY(10px);
+			transition: opacity .6s ease-out, transform .6s ease-out;
+		}
+		.agent-name.show { opacity: 1; transform: none; }
+
+		.tx-row {
+			margin-top: 20px;
+			display: flex; flex-direction: column; align-items: center; gap: 4px;
+			opacity: 0; transform: translateY(10px);
+			transition: opacity .6s ease-out, transform .6s ease-out;
+		}
+		.tx-row.show { opacity: 1; transform: none; }
+
+		.chain-badge {
+			font-size: 10px; font-weight: 700; letter-spacing: .1em;
+			color: #6b7280; background: rgba(255,255,255,.05);
+			border: 1px solid rgba(255,255,255,.08);
+			padding: 2px 8px; border-radius: 20px;
+		}
+		.tx-hash {
+			font-family: ui-monospace, monospace;
+			font-size: 13px; color: #9ca3af;
+		}
+		.tx-link {
+			font-size: 12px; color: #6366f1;
+			text-decoration: none;
+			transition: color .15s;
+		}
+		.tx-link:hover { color: #a5b4fc; }
+
+		/* ── CTAs ── */
+		.ctas {
+			margin-top: 28px;
+			display: flex; gap: 10px; flex-wrap: wrap; justify-content: center;
+			opacity: 0; transform: translateY(12px);
+			transition: opacity .6s ease-out, transform .6s ease-out;
+		}
+		.ctas.show { opacity: 1; transform: none; }
+
+		.btn {
+			display: inline-flex; align-items: center; gap: 6px;
+			padding: 11px 22px; border-radius: 10px;
+			font-size: 14px; font-weight: 600;
+			text-decoration: none; cursor: pointer;
+			border: none; transition: opacity .15s, transform .15s;
+		}
+		.btn:hover { opacity: .88; transform: translateY(-1px); }
+		.btn.primary { background: #4f46e5; color: #fff; }
+		.btn.ghost   { background: rgba(255,255,255,.06); border: 1px solid rgba(255,255,255,.12); color: #d1d5db; }
+
+		@media (max-width: 480px) {
+			.avatar-wrap { width: min(240px, 72vw); height: min(240px, 72vw); }
+			.ctas { flex-direction: column; align-items: stretch; }
+		}
+	</style>
+	<script src="/model-viewer-meshopt.js"></script>
+</head>
+<body>
+	<canvas id="starfield" aria-hidden="true"></canvas>
+
+	<div class="shell">
+		<div class="avatar-wrap" id="avatarWrap">
+			<div class="avatar-glow" id="avatarGlow"></div>
+			<div class="avatar-placeholder" id="avatarPlaceholder" aria-hidden="true">?</div>
+		</div>
+
+		<div class="content">
+			<div class="tag" id="tag">Agent deployed on-chain</div>
+			<div class="agent-name" id="agentName">Loading…</div>
+
+			<div class="tx-row" id="txRow">
+				<span class="chain-badge" id="chainBadge" data-i18n="mint_success.solana">SOLANA</span>
+				<span class="tx-hash" id="txHash">—</span>
+				<a class="tx-link" id="txLink" target="_blank" rel="noopener" data-i18n="mint_success.view_on_explorer">View on explorer ↗</a>
+			</div>
+
+			<div class="ctas" id="ctas">
+				<a class="btn primary" id="btnView" data-i18n="mint_success.view_your_agent">View your agent →</a>
+				<button class="btn ghost" id="btnShare" type="button" data-i18n="mint_success.share">Share</button>
+			</div>
+		</div>
+	</div>
+
+	<script type="module">
+		import { agentAvatarGlb } from '/src/shared/agent-3d.js';
+		import { CHAIN_META, txExplorerUrl } from '/src/erc8004/chain-meta.js';
+
+		const p = new URLSearchParams(location.search);
+		const agentId = p.get('id')  || '';
+		const txSig   = p.get('tx')  || '';
+		const chain   = p.get('chain') || 'solana-mainnet';
+
+		// `chain` is either a Solana cluster string ('solana-mainnet' /
+		// 'solana-devnet') or a numeric EVM chainId (e.g. 8453). Resolve once.
+		const evmChainId = /^\d+$/.test(chain) ? Number(chain) : null;
+		const evmMeta    = evmChainId != null ? CHAIN_META[evmChainId] : null;
+
+		// Starfield
+		const canvas = document.getElementById('starfield');
+		const ctx    = canvas.getContext('2d');
+		let stars = [];
+		function resizeCanvas() {
+			canvas.width  = window.innerWidth;
+			canvas.height = window.innerHeight;
+		}
+		function initStars() {
+			resizeCanvas();
+			stars = Array.from({ length: 38 }, () => ({
+				x: Math.random() * canvas.width,
+				y: Math.random() * canvas.height,
+				r: Math.random() * 1.2 + .4,
+				vy: Math.random() * .18 + .05,
+				a: Math.random() * .6 + .2,
+			}));
+		}
+		function drawStars() {
+			ctx.clearRect(0, 0, canvas.width, canvas.height);
+			for (const s of stars) {
+				ctx.beginPath();
+				ctx.arc(s.x, s.y, s.r, 0, Math.PI * 2);
+				ctx.fillStyle = `rgba(255,255,255,${s.a})`;
+				ctx.fill();
+				s.y -= s.vy;
+				if (s.y < -2) { s.y = canvas.height + 2; s.x = Math.random() * canvas.width; }
+			}
+			requestAnimationFrame(drawStars);
+		}
+		initStars();
+		window.addEventListener('resize', initStars);
+		drawStars();
+
+		// Staggered reveals
+		function after(ms, fn) { setTimeout(fn, ms); }
+
+		after(0,    () => canvas.classList.add('show'));
+		after(300,  () => document.getElementById('avatarWrap').classList.add('show'));
+		after(800,  () => document.getElementById('avatarGlow').classList.add('show'));
+		after(1200, () => document.getElementById('tag').classList.add('show'));
+		after(1600, () => document.getElementById('agentName').classList.add('show'));
+		after(2000, () => document.getElementById('txRow').classList.add('show'));
+		after(2400, () => document.getElementById('ctas').classList.add('show'));
+
+		// Chain label + explorer URL — Solana clusters and EVM chains both supported.
+		function chainLabel(c) {
+			if (c === 'solana-mainnet') return 'SOLANA';
+			if (c === 'solana-devnet')  return 'SOLANA · DEVNET';
+			if (evmMeta) return evmMeta.testnet ? `${evmMeta.name} · TESTNET`.toUpperCase() : evmMeta.name.toUpperCase();
+			return c.toUpperCase().replace(/-/g, ' ');
+		}
+		// Short, human chain name for share copy ("live on Base").
+		function chainDisplayName(c) {
+			if (c === 'solana-mainnet') return 'Solana';
+			if (c === 'solana-devnet')  return 'Solana devnet';
+			if (evmMeta) return evmMeta.name;
+			return 'chain';
+		}
+		function explorerUrl(c, sig) {
+			if (!sig) return '';
+			if (c === 'solana-mainnet') return `https://solscan.io/tx/${sig}`;
+			if (c === 'solana-devnet')  return `https://explorer.solana.com/tx/${sig}?cluster=devnet`;
+			if (evmMeta) return txExplorerUrl(evmChainId, sig);
+			return '';
+		}
+		function shortSig(s) {
+			if (!s || s.length < 16) return s || '—';
+			return `${s.slice(0, 8)}…${s.slice(-8)}`;
+		}
+
+		document.getElementById('chainBadge').textContent = chainLabel(chain);
+		document.getElementById('txHash').textContent     = shortSig(txSig);
+		const expUrl = explorerUrl(chain, txSig);
+		const txLinkEl = document.getElementById('txLink');
+		if (expUrl) {
+			txLinkEl.href = expUrl;
+		} else {
+			// No verifiable tx (or unknown chain) — don't show a dead link.
+			txLinkEl.style.display = 'none';
+		}
+
+		// Agent fetch + avatar
+		async function loadAgent() {
+			if (!agentId) return;
+
+			let agent;
+			try {
+				const r = await fetch(`/api/agents/${encodeURIComponent(agentId)}`, { credentials: 'include' });
+				if (r.ok) agent = await r.json();
+			} catch { /* non-fatal */ }
+
+			const name = agent?.name || 'Agent';
+			document.getElementById('agentName').textContent = name;
+			document.getElementById('avatarPlaceholder').textContent = (name[0] || 'A').toUpperCase();
+			document.title = `${name} deployed · three.ws`;
+
+			// CTA links
+			document.getElementById('btnView').href = `/agents/${encodeURIComponent(agentId)}`;
+			document.getElementById('btnShare').addEventListener('click', () => {
+				const url  = `https://three.ws/agents/${encodeURIComponent(agentId)}`;
+				const text = `Just deployed my 3D AI Agent on-chain.\n\n${name} is live on ${chainDisplayName(chain)}.\n\n${url}`;
+				if (navigator.share) {
+					navigator.share({ title: `${name} — deployed on three.ws`, text, url }).catch(() => {});
+					return;
+				}
+				const tweet = `https://twitter.com/intent/tweet?text=${encodeURIComponent(text)}`;
+				window.open(tweet, '_blank', 'noopener');
+			});
+
+			// 3D avatar via model-viewer
+			const glbUrl = agentAvatarGlb(agent);
+			const wrap   = document.getElementById('avatarWrap');
+			const ph     = document.getElementById('avatarPlaceholder');
+
+			const mv = document.createElement('model-viewer');
+			mv.setAttribute('src', glbUrl);
+			mv.setAttribute('auto-rotate', '');
+			mv.setAttribute('auto-rotate-delay', '0');
+			mv.setAttribute('rotation-per-second', '24deg');
+			mv.setAttribute('camera-controls', '');
+			mv.setAttribute('interaction-prompt', 'none');
+			mv.setAttribute('environment-image', 'neutral');
+			mv.setAttribute('exposure', '0.9');
+			mv.setAttribute('shadow-intensity', '0.4');
+			mv.setAttribute('ar', '');
+			mv.setAttribute('loading', 'eager');
+			mv.setAttribute('reveal', 'auto');
+			mv.setAttribute('style', 'width:100%;height:100%;background:transparent;border-radius:50%');
+			mv.setAttribute('alt', `${name} 3D avatar spinning`);
+
+			mv.addEventListener('load', () => { ph.style.display = 'none'; });
+			mv.addEventListener('error', () => { /* placeholder stays visible */ });
+
+			wrap.appendChild(mv);
+		}
+
+		loadAgent();
+	</script>
+	<!-- Runtime i18n: detects locale, swaps annotated copy, mounts <lang-switcher>. -->
+	<script type="module" src="/i18n.js"></script>
+</body>
+</html>

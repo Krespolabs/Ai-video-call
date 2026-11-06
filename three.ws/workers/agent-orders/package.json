@@ -1,0 +1,16 @@
+{
+  "name": "@three-ws/agent-orders",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Programmable order execution worker — limit/stop/trailing/DCA/TWAP/conditional orders fired from agent wallets through the firewall + spend guards.",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js",
+    "simulate": "ORDERS_MODE=simulate node index.js",
+    "live": "ORDERS_MODE=live node index.js"
+  },
+  "engines": {
+    "node": ">=22"
+  }
+}

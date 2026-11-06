@@ -1,0 +1,70 @@
+{
+	"id": "free-characters",
+	"contentHash": "1aaf0e5bf1e1a097a810c607c0c55021220bb95fa7ebc359d2618f9efe3149b7",
+	"reviewedAt": "2026-09-18T09:09:32.764Z",
+	"passed": true,
+	"blockers": [],
+	"texts": [
+		"107 rigged 3D characters. Free.\n\nThey arrive rigged and ready to animate. Pick one, press Animate, and it moves.\n\nPut one on your website, drop it in a scene, or make it your agent's body.\n\nthree.ws/character-library"
+	],
+	"lint": [],
+	"verification": {
+		"ok": true,
+		"checks": [
+			{
+				"claim": "107 rigged 3D characters",
+				"kind": "evidence:page",
+				"target": "https://three.ws/api/catalog?limit=1",
+				"ok": true,
+				"detail": "live page shows \"\"character\":107\""
+			},
+			{
+				"kind": "probe:api",
+				"target": "the catalog serves characters",
+				"ok": true,
+				"detail": "HTTP 200, expectations met"
+			},
+			{
+				"kind": "probe:api",
+				"target": "the library page is live",
+				"ok": true,
+				"detail": "HTTP 200, expectations met"
+			},
+			{
+				"kind": "link",
+				"target": "https://three.ws/character-library",
+				"ok": true,
+				"detail": "HTTP 200"
+			}
+		]
+	},
+	"editor": {
+		"verdict": "publish",
+		"scores": {
+			"accuracy": 5,
+			"clarity": 5,
+			"specificity": 5,
+			"voice": 5,
+			"professionalism": 5,
+			"visual": 5
+		},
+		"issues": [],
+		"rewrite": {
+			"posts": [
+				"107 rigged 3D characters. Free.\n\nThey arrive rigged and ready to animate. Pick one, press Animate, and it moves.\n\nPut one on your website, drop it in a scene, or make it your agent's body.\n\nthree.ws/character-library"
+			],
+			"altText": [
+				"A three.ws card reading '107 rigged characters. Free.' beside a browser window showing the character library: a grid of rigged 3D characters, each with Use, Animate and Preview buttons"
+			]
+		},
+		"summary": "The core number (107) is confirmed by the live API and matches both the card and the library page header in the image; 'Free' and the Animate action are visible on the captured live page. The post opens on the verified number, stays in the 100-179 target voice band, ships a real product capture with accurate alt text, and contains no banned constructions. Ship it unchanged.",
+		"model": "nvidia:moonshotai/kimi-k3",
+		"fallbacks": [
+			"No GCP credentials found. Set GCP_SERVICE_ACCOUNT_JSON, run `gcloud auth application-default login`, or run on GCE/Cloud Run.",
+			"openrouter 402: {\"error\":{\"message\":\"Insufficient credits. Add more using https://openrouter.ai/settings/credits\",\"code\":402,\"metadata\":{\"limit_source\":\"openrouter_credits\",\"remedy_hint\":\"Add credits at https://openr",
+			"openai 429: {\n    \"error\": {\n        \"message\": \"Your account is not active, please check your billing details on our website.\",\n        \"type\": \"billing_not_active\",\n        \"param\": null,\n        \"code\": \"billi"
+		],
+		"rewriteFindings": []
+	},
+	"editorError": null
+}

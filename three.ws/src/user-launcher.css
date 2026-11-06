@@ -1,0 +1,105 @@
+/* /launcher, the personal Memetic Launcher. Additive to launcher-base.css (shared
+   monochrome .ml-* atoms). Only the user-only pieces live here: the mode badge,
+   the explainer note, the synthesized-coin sample card, and the go-live /
+   agent-wallet funding surface. */
+@import './ui-juice.css';
+
+/* mode badge in the hero — Preview (dim) vs Live (inverted) */
+.ul-badge {
+	font-size: var(--text-2xs, 0.66rem);
+	font-weight: 700;
+	text-transform: uppercase;
+	letter-spacing: 0.1em;
+	color: var(--ink-dim, #999);
+	border: 1px solid var(--stroke-strong, rgba(255, 255, 255, 0.18));
+	border-radius: var(--radius-pill, 999px);
+	padding: 5px 12px;
+	white-space: nowrap;
+	transition: background var(--duration-fast) var(--ease-standard), color var(--duration-fast) var(--ease-standard), border-color var(--duration-fast) var(--ease-standard);
+}
+.ul-badge.is-live {
+	background: var(--ink-bright, #fff);
+	border-color: var(--ink-bright, #fff);
+	color: #000;
+}
+
+/* honest explainer */
+.ul-note {
+	display: flex;
+	align-items: flex-start;
+	gap: 12px;
+	background: var(--surface-1, rgba(255, 255, 255, 0.03));
+	border: 1px solid var(--stroke, rgba(255, 255, 255, 0.08));
+	border-radius: var(--radius-md, 12px);
+	padding: 14px 16px;
+	margin-bottom: var(--space-lg, 24px);
+}
+.ul-note-ico { font-size: 1rem; color: var(--ink, #ccc); line-height: 1.5; }
+.ul-note p { margin: 0; font-size: var(--text-sm, 0.82rem); line-height: 1.55; color: var(--ink-dim, #aaa); }
+.ul-note strong { color: var(--ink-bright, #fff); font-weight: 700; }
+
+/* 4-up stats (vs admin's 6) */
+.ul-stats { grid-template-columns: repeat(4, 1fr); }
+.ul-s-mode { text-transform: capitalize; }
+
+.ul-net-row { margin-top: var(--space-md, 16px); }
+
+/* preview-a-coin card */
+.ul-preview-card .ml-console-h { margin-bottom: 6px; }
+.ul-preview-btn { padding: 6px 14px; }
+.ul-sample {
+	margin-top: var(--space-md, 14px);
+	background: var(--surface-2, rgba(255, 255, 255, 0.05));
+	border: 1px solid var(--stroke-strong, rgba(255, 255, 255, 0.14));
+	border-radius: var(--radius-md, 12px);
+	padding: 16px;
+	animation: ml-in 0.24s ease;
+}
+.ul-sample-head { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; }
+.ul-sample-name { font-family: var(--font-display, sans-serif); font-size: 1.15rem; font-weight: 700; color: var(--ink-bright, #fff); }
+.ul-sample-sym { font-family: var(--font-mono, monospace); font-size: var(--text-sm, 0.82rem); color: var(--ink-dim, #999); }
+.ul-sample-desc { margin: 8px 0 0; font-size: var(--text-sm, 0.82rem); line-height: 1.5; color: var(--ink-dim, #aaa); }
+.ul-sample-meta { margin-top: 12px; font-size: var(--text-2xs, 0.7rem); color: var(--ink-dim, #888); display: flex; align-items: center; gap: 7px; flex-wrap: wrap; }
+.ul-sample-meta strong { color: var(--ink, #e8e8e8); font-weight: 700; }
+.ul-sample-empty { margin-top: var(--space-md, 14px); color: var(--ink-dim, #888); font-size: var(--text-xs, 0.78rem); line-height: 1.5; }
+.ul-sample-empty p { margin: 0; }
+.ul-sample-empty strong { color: var(--ink, #e8e8e8); }
+
+/* go-live card */
+.ul-liveseg { margin-bottom: var(--space-md, 16px); }
+.ul-live-fields { margin-top: 2px; }
+
+/* agent-wallet funding */
+.ul-funding { margin-top: var(--space-lg, 20px); border-top: 1px solid var(--stroke, rgba(255, 255, 255, 0.08)); padding-top: var(--space-md, 16px); }
+.ul-funding-h { margin: 0; font-size: var(--text-sm, 0.85rem); font-weight: 700; color: var(--ink, #e8e8e8); }
+.ul-fund-refresh { padding: 4px 12px; font-size: var(--text-xs, 0.74rem); }
+.ul-fund-list { list-style: none; margin: 10px 0 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+.ul-fund-row {
+	display: flex;
+	align-items: center;
+	gap: 10px;
+	background: var(--surface-1, rgba(255, 255, 255, 0.03));
+	border: 1px solid var(--stroke, rgba(255, 255, 255, 0.08));
+	border-radius: var(--radius-sm, 8px);
+	padding: 8px 10px;
+	transition: border-color var(--duration-fast) var(--ease-standard), background var(--duration-fast) var(--ease-standard);
+}
+.ul-fund-row:hover { border-color: var(--stroke-strong, rgba(255, 255, 255, 0.16)); }
+.ul-fund-row.is-funded { background: var(--surface-2, rgba(255, 255, 255, 0.05)); }
+.ul-fund-name { font-size: var(--text-sm, 0.8rem); font-weight: 600; color: var(--ink, #e8e8e8); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; flex: 1; }
+.ul-fund-addr { font-family: var(--font-mono, monospace); font-size: var(--text-2xs, 0.7rem); color: var(--ink-dim, #999); flex: none; }
+.ul-fund-copy { padding: 3px 10px; font-size: var(--text-2xs, 0.68rem); flex: none; }
+.ul-fund-bal { font-family: var(--font-mono, monospace); font-size: var(--text-xs, 0.74rem); color: var(--ink, #ddd); flex: none; min-width: 74px; text-align: right; font-variant-numeric: tabular-nums; }
+.ul-fund-note { margin: 10px 0 0; font-size: var(--text-2xs, 0.7rem); color: var(--ink-dim, #888); }
+.ul-fund-empty { margin-top: 10px; font-size: var(--text-xs, 0.78rem); color: var(--ink-dim, #888); line-height: 1.5; }
+.ul-fund-empty p { margin: 0; }
+.ul-fund-empty a { color: var(--ink-bright, #fff); text-decoration: underline; text-underline-offset: 2px; }
+.ul-fund-empty a:hover { text-decoration-thickness: 2px; }
+
+@media (max-width: 940px) { .ul-stats { grid-template-columns: repeat(2, 1fr); } }
+@media (max-width: 560px) {
+	.ul-fund-row { flex-wrap: wrap; }
+	.ul-fund-name { flex-basis: 100%; }
+	.ul-fund-bal { min-width: 0; }
+}
+@media (prefers-reduced-motion: reduce) { .ul-sample { animation: none; } .ul-badge { transition: none; } }

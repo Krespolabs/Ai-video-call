@@ -1,0 +1,20 @@
+{
+  "verified": {
+    "status": "verified",
+    "reason": "the model matches its signed credential"
+  },
+  "tampered_bytes": {
+    "status": "tampered",
+    "reason": "the model bytes do not match the signed content hash — the asset was modified"
+  },
+  "tampered_credential": {
+    "status": "tampered",
+    "reason": "the credential signature does not verify — the record was altered"
+  },
+  "unknown": {
+    "status": "unknown",
+    "reason": "no provenance credential is on record for this asset"
+  },
+  "signatureVerifies": true,
+  "r2Key": "provenance/d0a6887e6d62e21c7b0f4a33cde33b73ff219a8ddc9feae734cd7627fa06e9d8.json"
+}

@@ -1,0 +1,37 @@
+{
+  "content": [
+    {
+      "type": "text",
+      "text": "Refined the model (v1: \"make it chrome and add racing stripes\"). View it: https://three.ws/viewer?src=https%3A%2F%2Fpub-2534e921bf9c4314addcd4d8a6e98b7b.r2.dev%2Fforge%2Fanon%2F8e1e0a46-069f-4e90-ab00-4745b74959f5.glb\nDownload: https://pub-2534e921bf9c4314addcd4d8a6e98b7b.r2.dev/forge/anon/8e1e0a46-069f-4e90-ab00-4745b74959f5.glb"
+    }
+  ],
+  "structuredContent": {
+    "kind": "refined model",
+    "glbUrl": "https://pub-2534e921bf9c4314addcd4d8a6e98b7b.r2.dev/forge/anon/8e1e0a46-069f-4e90-ab00-4745b74959f5.glb",
+    "viewerUrl": "https://three.ws/viewer?src=https%3A%2F%2Fpub-2534e921bf9c4314addcd4d8a6e98b7b.r2.dev%2Fforge%2Fanon%2F8e1e0a46-069f-4e90-ab00-4745b74959f5.glb",
+    "format": "glb",
+    "prompt": "a friendly round robot mascot, glossy white plastic, chrome and add racing stripes",
+    "instruction": "make it chrome and add racing stripes",
+    "lineage": [
+      {
+        "index": 0,
+        "parentIndex": null,
+        "glbUrl": "https://pub-2534e921bf9c4314addcd4d8a6e98b7b.r2.dev/forge/anon/d6892889-ca6b-4d77-8ffc-638a60002b15.glb",
+        "viewerUrl": "https://three.ws/viewer?src=https%3A%2F%2Fpub-2534e921bf9c4314addcd4d8a6e98b7b.r2.dev%2Fforge%2Fanon%2Fd6892889-ca6b-4d77-8ffc-638a60002b15.glb",
+        "label": "Original",
+        "instruction": null,
+        "active": false
+      },
+      {
+        "index": 1,
+        "parentIndex": 0,
+        "glbUrl": "https://pub-2534e921bf9c4314addcd4d8a6e98b7b.r2.dev/forge/anon/8e1e0a46-069f-4e90-ab00-4745b74959f5.glb",
+        "viewerUrl": "https://three.ws/viewer?src=https%3A%2F%2Fpub-2534e921bf9c4314addcd4d8a6e98b7b.r2.dev%2Fforge%2Fanon%2F8e1e0a46-069f-4e90-ab00-4745b74959f5.glb",
+        "label": "make it chrome and add racing stripes",
+        "instruction": "make it chrome and add racing stripes",
+        "active": true
+      }
+    ],
+    "activeIndex": 1
+  }
+}

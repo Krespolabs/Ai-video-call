@@ -1,0 +1,275 @@
+/**
+ * Agent Wallet hub: page entry.
+ *
+ * Routes: /agents/:id/wallet and /agents/:id/wallet (agent named in the path),
+ * plus /agent-wallet with an optional ?id=<uuid>.
+ *
+ * When no agent is named, the page resolves the signed-in user's own agents
+ * from GET /api/agents: exactly one agent mounts its hub straight away, several
+ * render a picker, and none (or a signed-out visitor) gets a designed next step
+ * instead of a dead end.
+ *
+ * Every page state is designed: loading skeleton, picker, signed out, no agents
+ * yet, agent not found, fetch error (with retry), and the live hub. Owner vs
+ * visitor is decided server-side by the agent record's `is_owner`.
+ */
+
+import { mountAgentWalletHub } from './agent-wallet-hub/index.js';
+import { addressHtml } from './shared/address.js';
+
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+function resolveAgentId() {
+	const fromQuery = new URLSearchParams(location.search).get('id');
+	if (fromQuery) return fromQuery;
+	// /agents/:id/wallet  or  /agents/:id/wallet
+	const m = location.pathname.match(/\/agents?\/([^/]+)\/wallet/);
+	return m ? decodeURIComponent(m[1]) : null;
+}
+
+const root = document.getElementById('awh-root');
+
+/**
+ * Write a dynamic page title (an agent's name, the picker heading) and hold it.
+ *
+ * The document's <title> carries a data-i18n key, so the i18n runtime's catalog
+ * pass reverts it to the declared "Agent Wallet · three.ws" whenever /api/locale
+ * resolves after this page has already rendered, a race the title lost roughly
+ * one load in three. `data-i18n-owned="1"` is that runtime's documented opt-out
+ * for an element whose content is live data rather than translatable copy.
+ *
+ * States that show the page's declared default never call this: leaving the
+ * title unclaimed is what lets a non-English visitor keep a localized one.
+ */
+const titleEl = document.querySelector('title');
+function setPageTitle(text) {
+	document.title = text;
+	titleEl?.setAttribute('data-i18n-owned', '1');
+}
+
+function escapeHtml(s) {
+	return String(s ?? '').replace(
+		/[&<>"']/g,
+		(c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c],
+	);
+}
+
+function renderLoading(label = 'Loading agent wallet') {
+	root.innerHTML = `
+		<div class="awh-page-skel" aria-busy="true" aria-label="${escapeHtml(label)}">
+			<div class="awh-page-skel-row"></div>
+			<div class="awh-page-skel-tabs"></div>
+			<div class="awh-page-skel-card"></div>
+		</div>`;
+}
+
+/**
+ * A designed terminal state: heading, one line of guidance, and up to two real
+ * actions. `retry` adds a button that re-runs the page load.
+ *
+ * `tone` decides how assistive tech announces the state. Only a genuine failure
+ * gets role="alert", which interrupts a screen-reader user mid-sentence. The
+ * states that are simply this page's answer for a visitor who is signed out or
+ * has no agents yet are a labelled region, read in turn like any other content.
+ */
+function renderMessage({ title, body, actions = [], retry, tone = 'error' }) {
+	root.innerHTML = `
+		<div class="awh-page-msg" ${
+			tone === 'error' ? 'role="alert"' : 'role="region" aria-labelledby="awh-page-msg-h"'
+		}>
+			<h1 id="awh-page-msg-h">${escapeHtml(title)}</h1>
+			<p>${escapeHtml(body)}</p>
+			<div class="awh-page-msg-actions">
+				${actions
+					.map(
+						(a) =>
+							`<a class="awh-page-btn${a.primary ? ' awh-page-btn--primary' : ''}" href="${escapeHtml(a.href)}">${escapeHtml(a.label)}</a>`,
+					)
+					.join('')}
+				${retry ? '<button class="awh-page-btn" type="button" data-act="retry">Try again</button>' : ''}
+			</div>
+		</div>`;
+	if (retry) root.querySelector('[data-act="retry"]')?.addEventListener('click', () => load());
+}
+
+/** Picker shown when the signed-in user owns more than one agent. */
+function renderPicker(agents) {
+	root.innerHTML = `
+		<section class="awh-pick" aria-labelledby="awh-pick-h">
+			<h1 id="awh-pick-h" class="awh-pick-h">Your agent wallets</h1>
+			<p class="awh-pick-lede">Each agent holds its own self-custodied Solana wallet. Pick one to see its balance, fund it, and review its activity.</p>
+			<ul class="awh-pick-list">
+				${agents
+					.map((a) => {
+						const ready = !!(a.wallet_ready ?? a.walletReady);
+						const addr = a.solana_address || '';
+						const sub = addr
+							? addressHtml(addr, { label: 'Wallet address' })
+							: escapeHtml('Wallet is being prepared');
+						return `<li>
+							<a class="awh-pick-row" href="/agents/${encodeURIComponent(a.id)}/wallet">
+								${
+									a.avatar_thumbnail_url
+										? `<img class="awh-pick-av" src="${escapeHtml(a.avatar_thumbnail_url)}" alt="" loading="lazy" />`
+										: '<span class="awh-pick-av" aria-hidden="true"></span>'
+								}
+								<span class="awh-pick-id">
+									<span class="awh-pick-name">${escapeHtml(a.name || 'Untitled agent')}</span>
+									<span class="awh-pick-sub">${sub}</span>
+								</span>
+								<span class="awh-pick-state" data-state="${ready ? 'ready' : 'preparing'}">${ready ? 'Ready' : 'Preparing'}</span>
+								<span class="awh-pick-go" aria-hidden="true">→</span>
+							</a>
+						</li>`;
+					})
+					.join('')}
+			</ul>
+			<div class="awh-page-msg-actions awh-pick-foot">
+				<a class="awh-page-btn" href="/my-agents">Manage agents</a>
+				<a class="awh-page-btn" href="/create-agent">Create an agent</a>
+			</div>
+		</section>`;
+	setPageTitle('Your agent wallets · three.ws');
+}
+
+/** Fetch one agent by id. Returns { agent } or { state } for a designed stop. */
+async function fetchAgent(agentId) {
+	const res = await fetch(`/api/agents/${encodeURIComponent(agentId)}`, {
+		credentials: 'include',
+		headers: { accept: 'application/json' },
+	});
+	if (res.status === 404) return { state: 'not_found' };
+	if (!res.ok) throw new Error(`HTTP ${res.status}`);
+	const data = await res.json();
+	if (!data?.agent) throw new Error('empty agent payload');
+	return { agent: data.agent };
+}
+
+/**
+ * Fetch the caller's own agents. Returns { agents } or { state: 'signed_out' }.
+ *
+ * The session is resolved first through /api/auth/me, which answers 200 with a
+ * null user for anonymous visitors. GET /api/agents answers 401 for them, and
+ * the browser logs every 401 response as a console error, so the signed-out
+ * path stops before it fires one.
+ */
+async function fetchOwnAgents() {
+	const me = await fetch('/api/auth/me', {
+		credentials: 'include',
+		headers: { accept: 'application/json' },
+	});
+	if (!me.ok) throw new Error(`HTTP ${me.status}`);
+	const session = await me.json();
+	if (!session?.user?.id) return { state: 'signed_out' };
+
+	const res = await fetch('/api/agents', {
+		credentials: 'include',
+		headers: { accept: 'application/json' },
+	});
+	if (res.status === 401 || res.status === 403) return { state: 'signed_out' };
+	if (!res.ok) throw new Error(`HTTP ${res.status}`);
+	const data = await res.json();
+	return { agents: Array.isArray(data?.agents) ? data.agents : [] };
+}
+
+function mountHub(agent) {
+	setPageTitle(`${agent.name || 'Agent'} wallet · three.ws`);
+	mountAgentWalletHub({ mount: root, agent, initialTab: new URLSearchParams(location.search).get('tab') || undefined });
+}
+
+/** No agent in the URL: resolve the signed-in user's own agents. */
+async function loadOwnWallets() {
+	renderLoading('Loading your agent wallets');
+
+	let result;
+	try {
+		result = await fetchOwnAgents();
+	} catch {
+		renderMessage({
+			title: "Couldn't load your wallets",
+			body: 'We could not reach the agent service. This is usually temporary, so check your connection and try again.',
+			retry: true,
+		});
+		return;
+	}
+
+	if (result.state === 'signed_out') {
+		renderMessage({
+			title: 'Sign in to open an agent wallet',
+			body: 'Agent wallets are private to their owner. Sign in to see your agents and their balances, or create an account to get an agent with its own Solana wallet.',
+			actions: [
+				{ href: '/login?next=/agent-wallet', label: 'Sign in', primary: true },
+				{ href: '/register', label: 'Create account' },
+			],
+			tone: 'info',
+		});
+		return;
+	}
+
+	const agents = result.agents;
+	if (!agents.length) {
+		renderMessage({
+			title: 'No agents yet',
+			body: 'Every agent you create gets a self-custodied Solana wallet it can fund, trade, and pay from. Create your first agent to open its wallet.',
+			actions: [{ href: '/create-agent', label: 'Create an agent', primary: true }],
+			tone: 'info',
+		});
+		return;
+	}
+
+	if (agents.length === 1) {
+		mountHub(agents[0]);
+		return;
+	}
+
+	renderPicker(agents);
+}
+
+/** An agent is named in the URL: load and mount its hub. */
+async function loadNamedWallet(agentId) {
+	if (!UUID_RE.test(agentId)) {
+		renderMessage({
+			title: 'That agent link is not valid',
+			body: 'An agent wallet link carries the agent id. Open the wallet from the agent profile, or pick one of your own agents.',
+			actions: [
+				{ href: '/agent-wallet', label: 'Your agent wallets', primary: true },
+				{ href: '/agents', label: 'Browse agents' },
+			],
+		});
+		return;
+	}
+
+	renderLoading();
+
+	let result;
+	try {
+		result = await fetchAgent(agentId);
+	} catch {
+		renderMessage({
+			title: "Couldn't load this wallet",
+			body: 'We could not reach the agent service. This is usually temporary, so check your connection and try again.',
+			retry: true,
+		});
+		return;
+	}
+
+	if (result.state === 'not_found') {
+		renderMessage({
+			title: 'Agent not found',
+			body: 'This agent does not exist or has been removed. It may have been deleted by its owner.',
+			actions: [{ href: '/agents', label: 'Browse agents', primary: true }],
+		});
+		setPageTitle('Agent not found · three.ws');
+		return;
+	}
+
+	mountHub(result.agent);
+}
+
+async function load() {
+	const agentId = resolveAgentId();
+	if (agentId) return loadNamedWallet(agentId);
+	return loadOwnWallets();
+}
+
+load();

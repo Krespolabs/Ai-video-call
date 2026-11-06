@@ -1,0 +1,31 @@
+{
+  "registered": [
+    {
+      "name": "mint_3d_asset",
+      "present": true,
+      "title": "Mint a 3D asset as a Solana NFT",
+      "annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": false,
+        "idempotentHint": true,
+        "openWorldHint": true
+      },
+      "price": {
+        "amount_usdc": 0.25,
+        "description": "Per mint — on-chain Solana 3D NFT (media + rent)"
+      }
+    },
+    {
+      "name": "get_3d_asset_onchain",
+      "present": true,
+      "title": "Resolve a 3D NFT to its live asset + provenance",
+      "annotations": {
+        "readOnlyHint": true,
+        "destructiveHint": false,
+        "idempotentHint": false,
+        "openWorldHint": true
+      },
+      "price": null
+    }
+  ]
+}

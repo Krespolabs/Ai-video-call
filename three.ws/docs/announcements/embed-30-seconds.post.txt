@@ -1,0 +1,9 @@
+Put a living 3D agent on your website in 30 seconds.
+
+Two lines of HTML. No build step, no npm install.
+
+Paste, refresh, and a 3D character is standing in the corner of your page, greeting visitors and answering questions.
+
+As easy as embedding a video.
+
+three.ws/tutorials/embed-in-30-seconds

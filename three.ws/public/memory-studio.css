@@ -1,0 +1,348 @@
+/* ════════════════════════════════════════════════════════════════════════════
+ * Memory Studio (P2) — styles
+ * Mounts inside the Agent Studio shell's Memory tab. Uses the platform design
+ * tokens throughout; all interactive elements have hover / active / focus states.
+ * ════════════════════════════════════════════════════════════════════════════ */
+
+.mem {
+	--mem-working: #8b5cf6;
+	--mem-recall: #22d3ee;
+	--mem-archival: #64748b;
+	display: flex;
+	flex-direction: column;
+	gap: var(--space-md, 1rem);
+	min-height: 0;
+	position: relative;
+	color: var(--ink, #e8e8e8);
+}
+
+/* ── Top bar ─────────────────────────────────────────────────────────────── */
+.mem-top { display: flex; flex-direction: column; gap: var(--space-sm, 0.618rem); }
+
+.mem-recall {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	padding: 4px 4px 4px 12px;
+	border-radius: var(--radius-pill, 999px);
+	background: var(--surface-2, rgba(255, 255, 255, 0.05));
+	border: 1px solid var(--stroke, rgba(255, 255, 255, 0.08));
+	transition: border-color var(--duration-fast) var(--ease-standard);
+}
+.mem-recall:focus-within { border-color: var(--mem-working); }
+.mem-recall-icon { width: 16px; height: 16px; color: var(--ink-dim, #888); flex: none; }
+.mem-recall-input {
+	flex: 1; min-width: 0; background: transparent; border: none; outline: none;
+	color: var(--ink-bright, #fff); font-size: var(--text-ui, 0.875rem); font-family: var(--font-body);
+}
+.mem-recall-input::placeholder { color: var(--ink-faint, #666); }
+
+.mem-quick { display: flex; flex-wrap: wrap; gap: 6px; }
+.mem-chip {
+	appearance: none; cursor: pointer;
+	padding: 4px 10px; border-radius: var(--radius-pill, 999px);
+	background: var(--surface-1, rgba(255, 255, 255, 0.03));
+	border: 1px solid var(--stroke); color: var(--ink-dim, #888);
+	font-size: var(--text-2xs, 0.6875rem); font-weight: var(--weight-semibold, 600);
+	transition: color var(--duration-fast) var(--ease-standard), border-color var(--duration-fast) var(--ease-standard), background var(--duration-fast) var(--ease-standard);
+}
+.mem-chip:hover { color: var(--ink-bright, #fff); border-color: var(--stroke-strong); background: var(--surface-2); }
+
+.mem-toolbar { display: flex; align-items: center; justify-content: space-between; gap: var(--space-sm); flex-wrap: wrap; }
+.mem-views { display: inline-flex; gap: 2px; background: var(--surface-1); padding: 3px; border-radius: var(--radius-md, 10px); border: 1px solid var(--stroke); }
+.mem-view {
+	appearance: none; cursor: pointer; border: none; background: transparent;
+	padding: 6px 14px; border-radius: var(--radius-sm, 6px); color: var(--ink-dim, #888);
+	font-size: var(--text-md, 0.8125rem); font-weight: var(--weight-semibold, 600); font-family: var(--font-body);
+	transition: color var(--duration-fast) var(--ease-standard), background var(--duration-fast) var(--ease-standard);
+}
+.mem-view:hover { color: var(--ink, #e8e8e8); }
+.mem-view.active { color: var(--ink-bright, #fff); background: var(--surface-3, rgba(255, 255, 255, 0.08)); }
+.mem-view:focus-visible { outline: 2px solid var(--focus-ring-color, #fff); outline-offset: 2px; }
+
+.mem-actions { display: inline-flex; gap: 8px; }
+
+/* ── Buttons ─────────────────────────────────────────────────────────────── */
+.mem-btn {
+	appearance: none; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+	padding: 7px 14px; border-radius: var(--radius-pill, 999px); border: 1px solid transparent;
+	background: var(--ink-bright, #fff); color: var(--bg-0, #0a0a0a);
+	font-size: var(--text-ui, 0.875rem); font-weight: var(--weight-semibold, 600); font-family: var(--font-body);
+	transition: transform var(--duration-fast) var(--ease-standard), background var(--duration-fast) var(--ease-standard), border-color var(--duration-fast) var(--ease-standard), opacity var(--duration-fast) var(--ease-standard);
+}
+.mem-btn:hover { background: #e9e9e9; }
+.mem-btn:active { transform: scale(0.97); }
+.mem-btn:disabled { opacity: 0.5; cursor: default; }
+.mem-btn:focus-visible { outline: 2px solid var(--focus-ring-color, #fff); outline-offset: 2px; }
+.mem-btn-sm { padding: 5px 11px; font-size: var(--text-2xs, 0.6875rem); }
+.mem-btn-full { width: 100%; }
+.mem-btn-ghost { background: var(--surface-2, rgba(255, 255, 255, 0.05)); color: var(--ink, #e8e8e8); border-color: var(--stroke); }
+.mem-btn-ghost:hover { background: var(--surface-3); }
+.mem-btn-accent { background: linear-gradient(135deg, var(--mem-working), #6d28d9); color: #fff; }
+.mem-btn-accent:hover { filter: brightness(1.08); background: linear-gradient(135deg, var(--mem-working), #6d28d9); }
+
+/* ── Subbar / filters ────────────────────────────────────────────────────── */
+.mem-subbar { display: flex; align-items: center; gap: var(--space-md); flex-wrap: wrap; }
+.mem-filters { display: inline-flex; gap: 4px; flex-wrap: wrap; }
+.mem-pill {
+	appearance: none; cursor: pointer; padding: 4px 11px; border-radius: var(--radius-pill, 999px);
+	background: transparent; border: 1px solid var(--stroke); color: var(--ink-dim, #888);
+	font-size: var(--text-2xs, 0.6875rem); font-weight: var(--weight-semibold, 600);
+	transition: color var(--duration-fast) var(--ease-standard), border-color var(--duration-fast) var(--ease-standard), background var(--duration-fast) var(--ease-standard);
+}
+.mem-pill:hover { color: var(--ink, #e8e8e8); border-color: var(--stroke-strong); }
+.mem-pill.active { color: var(--ink-bright, #fff); background: var(--accent-soft, rgba(139, 92, 246, 0.18)); border-color: var(--mem-working); }
+.mem-pill-ghost { margin-left: auto; }
+.mem-subbar-note { margin: 0; font-size: var(--text-md, 0.8125rem); color: var(--ink-dim, #888); line-height: var(--leading-normal, 1.618); }
+
+/* ── Body ────────────────────────────────────────────────────────────────── */
+.mem-body { flex: 1; min-height: 0; overflow-y: auto; overflow-x: hidden; scrollbar-width: thin; }
+.mem-body:focus-visible { outline: none; }
+
+/* ── Stream / cards ──────────────────────────────────────────────────────── */
+.mem-stream { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 10px; }
+.mem-stream-compact { gap: 8px; }
+
+.mem-card {
+	position: relative; display: flex; gap: 0;
+	background: var(--surface-1, rgba(255, 255, 255, 0.03));
+	border: 1px solid var(--stroke, rgba(255, 255, 255, 0.08));
+	border-radius: var(--radius-md, 10px); overflow: hidden;
+	transition: border-color var(--duration-fast) var(--ease-standard), transform var(--duration-base) var(--ease-out), opacity var(--duration-base) var(--ease-out), box-shadow var(--duration-fast) var(--ease-standard);
+}
+.mem-card:hover { border-color: var(--stroke-strong, rgba(255, 255, 255, 0.16)); }
+.mem-card--sel { border-color: var(--mem-working); box-shadow: 0 0 0 1px var(--mem-working); }
+.mem-card--new { animation: mem-card-in var(--duration-slow, 320ms) var(--ease-out); }
+@keyframes mem-card-in { from { opacity: 0; transform: translateY(-8px) scale(0.99); } to { opacity: 1; transform: none; } }
+.mem-card--leaving { opacity: 0; transform: translateX(12px); }
+
+.mem-card-check { margin: 12px 0 0 12px; accent-color: var(--mem-working); }
+.mem-card-rail { width: 3px; flex: none; background: var(--mem-recall); }
+.mem-card-rail[data-tier='working'] { background: var(--mem-working); }
+.mem-card-rail[data-tier='recall'] { background: var(--mem-recall); }
+.mem-card-rail[data-tier='archival'] { background: var(--mem-archival); }
+.mem-card-main { flex: 1; min-width: 0; padding: 11px 13px; display: flex; flex-direction: column; gap: 8px; }
+
+.mem-card-head { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.mem-badge {
+	font-size: 10px; font-weight: var(--weight-bold, 700); text-transform: uppercase; letter-spacing: 0.04em;
+	padding: 2px 7px; border-radius: var(--radius-sm, 6px);
+	background: var(--surface-3, rgba(255, 255, 255, 0.08)); color: var(--ink-dim, #888);
+}
+.mem-badge[data-type='user'] { color: #93c5fd; background: rgba(59, 130, 246, 0.14); }
+.mem-badge[data-type='feedback'] { color: #fca5a5; background: rgba(239, 68, 68, 0.14); }
+.mem-badge[data-type='project'] { color: #86efac; background: rgba(34, 197, 94, 0.14); }
+.mem-badge[data-type='reference'] { color: var(--accent-violet); background: rgba(139, 92, 246, 0.14); }
+.mem-tier-tag {
+	font-size: 10px; font-weight: var(--weight-semibold, 600); padding: 1px 7px; border-radius: var(--radius-pill, 999px);
+	border: 1px solid var(--stroke);
+}
+.mem-tier-tag[data-tier='working'] { color: var(--mem-working); border-color: rgba(139, 92, 246, 0.4); }
+.mem-tier-tag[data-tier='recall'] { color: var(--mem-recall); border-color: rgba(34, 211, 238, 0.4); }
+.mem-tier-tag[data-tier='archival'] { color: #94a3b8; border-color: rgba(100, 116, 139, 0.4); }
+.mem-pin-on { color: var(--warn); font-size: 12px; }
+.mem-embed-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--success, #4ade80); box-shadow: 0 0 6px rgba(74, 222, 128, 0.6); }
+.mem-embed-dot.pending { background: var(--ink-faint, #555); box-shadow: none; animation: mem-pulse 1.6s ease-in-out infinite; }
+@keyframes mem-pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.35; } }
+.mem-card-time { margin-left: auto; font-size: var(--text-2xs, 0.6875rem); color: var(--ink-faint, #666); white-space: nowrap; }
+.mem-recalls { font-size: var(--text-2xs); color: var(--ink-faint); }
+.mem-step { display: inline-grid; place-items: center; width: 18px; height: 18px; border-radius: 50%; background: var(--mem-working); color: #fff; font-size: 10px; font-weight: 700; }
+
+.mem-card-content {
+	font-size: var(--text-md, 0.8125rem); line-height: var(--leading-normal, 1.55); color: var(--ink, #e8e8e8);
+	white-space: pre-wrap; word-break: break-word;
+	display: -webkit-box; -webkit-line-clamp: 4; -webkit-box-orient: vertical; overflow: hidden; cursor: pointer;
+}
+.mem-card-content.expanded { -webkit-line-clamp: unset; }
+
+.mem-card-foot { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.mem-tags { display: flex; gap: 5px; flex-wrap: wrap; flex: 1; min-width: 0; }
+.mem-tag {
+	cursor: pointer; font-size: 10px; color: var(--ink-dim, #888); padding: 1px 7px;
+	border-radius: var(--radius-pill, 999px); background: var(--surface-2, rgba(255, 255, 255, 0.05));
+	transition: color var(--duration-fast) var(--ease-standard), background var(--duration-fast) var(--ease-standard);
+}
+.mem-tag:hover { color: var(--ink-bright, #fff); background: var(--surface-3); }
+.mem-sal { display: inline-flex; align-items: center; gap: 7px; }
+.mem-sal-range { width: 88px; accent-color: var(--mem-working); cursor: pointer; }
+.mem-sal-val { font-size: var(--text-2xs, 0.6875rem); color: var(--ink-dim, #888); font-variant-numeric: tabular-nums; min-width: 28px; }
+
+.mem-card-tools { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.mem-tool, .mem-tool-select {
+	appearance: none; cursor: pointer; font-size: var(--text-2xs, 0.6875rem); font-weight: var(--weight-semibold, 600);
+	padding: 4px 9px; border-radius: var(--radius-sm, 6px); border: 1px solid var(--stroke);
+	background: var(--surface-1, rgba(255, 255, 255, 0.03)); color: var(--ink-dim, #888); font-family: var(--font-body);
+	transition: color var(--duration-fast) var(--ease-standard), border-color var(--duration-fast) var(--ease-standard), background var(--duration-fast) var(--ease-standard);
+}
+.mem-tool:hover { color: var(--ink-bright, #fff); border-color: var(--stroke-strong); background: var(--surface-2); }
+.mem-tool-danger:hover { color: var(--danger, #f87171); border-color: rgba(248, 113, 113, 0.4); }
+.mem-tool-select { padding: 4px 6px; }
+
+/* ── Inline edit / composer ──────────────────────────────────────────────── */
+.mem-edit, .mem-composer { display: flex; flex-direction: column; gap: 8px; }
+.mem-composer {
+	background: var(--surface-2, rgba(255, 255, 255, 0.05)); border: 1px solid var(--mem-working);
+	border-radius: var(--radius-md, 10px); padding: 12px; margin-bottom: 12px;
+	animation: mem-card-in var(--duration-base) var(--ease-out);
+}
+.mem-composer-row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.mem-composer-pin { display: inline-flex; align-items: center; gap: 5px; font-size: var(--text-2xs); color: var(--ink-dim); }
+.mem-edit-content, .mem-edit-tags, .mem-composer-content, .mem-composer-tags,
+.mem-composer-type, .mem-composer-tier {
+	background: var(--surface-1, rgba(0, 0, 0, 0.3)); border: 1px solid var(--stroke); border-radius: var(--radius-sm, 6px);
+	color: var(--ink-bright, #fff); font-family: var(--font-body); font-size: var(--text-md, 0.8125rem); padding: 7px 9px; outline: none;
+}
+.mem-edit-content, .mem-composer-content { resize: vertical; width: 100%; box-sizing: border-box; }
+.mem-edit-content:focus, .mem-edit-tags:focus, .mem-composer-content:focus, .mem-composer-tags:focus { border-color: var(--mem-working); }
+.mem-edit-tools, .mem-composer-tools { display: flex; gap: 8px; }
+
+/* ── Empty / first-run ───────────────────────────────────────────────────── */
+.mem-empty, .mem-first { text-align: center; max-width: 460px; margin: clamp(20px, 6vh, 60px) auto; color: var(--ink-dim, #888); }
+.mem-empty-glyph, .mem-first-glyph {
+	font-size: 40px; margin-bottom: var(--space-sm); opacity: 0.7; color: var(--mem-working);
+}
+.mem-empty h3, .mem-first h3 { margin: 0 0 6px; font-family: var(--font-display); font-size: var(--text-lg, 1.236rem); color: var(--ink-bright, #fff); }
+.mem-empty p, .mem-first p { margin: 0 0 var(--space-md); font-size: var(--text-md, 0.8125rem); line-height: var(--leading-normal, 1.618); }
+.mem-tier-legend { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin: var(--space-md) 0; text-align: left; }
+.mem-tier-card { padding: 10px; border-radius: var(--radius-md); border: 1px solid var(--stroke); background: var(--surface-1); display: flex; flex-direction: column; gap: 3px; }
+.mem-tier-card[data-tier='working'] { border-color: rgba(139, 92, 246, 0.35); }
+.mem-tier-card[data-tier='recall'] { border-color: rgba(34, 211, 238, 0.3); }
+.mem-tier-card strong { color: var(--ink-bright, #fff); font-size: var(--text-md); }
+.mem-tier-card span { font-size: var(--text-2xs, 0.6875rem); color: var(--ink-dim); }
+.mem-first-cta { display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; }
+.mem-more { text-align: center; padding: 14px; font-size: var(--text-2xs, 0.6875rem); color: var(--ink-faint, #666); }
+
+/* ── Skeleton ────────────────────────────────────────────────────────────── */
+.mem-skel { display: flex; flex-direction: column; gap: 10px; }
+.mem-skel-row {
+	height: 80px; border-radius: var(--radius-md, 10px);
+	background: linear-gradient(110deg, rgba(255, 255, 255, 0.03) 30%, rgba(255, 255, 255, 0.07) 50%, rgba(255, 255, 255, 0.03) 70%);
+	background-size: 220% 100%; animation: mem-shimmer 1.4s ease-in-out infinite;
+}
+@keyframes mem-shimmer { to { background-position: -220% 0; } }
+
+/* ── Graph ───────────────────────────────────────────────────────────────── */
+.mem-graph-wrap { position: relative; height: clamp(380px, 60vh, 680px); border-radius: var(--radius-md, 10px); border: 1px solid var(--stroke); overflow: hidden; background: radial-gradient(120% 90% at 50% 0%, rgba(139, 92, 246, 0.06), transparent 60%), var(--surface-1); }
+.mem-graph-canvas { width: 100%; height: 100%; display: block; }
+.mem-graph-legend { position: absolute; left: 12px; top: 12px; display: flex; flex-wrap: wrap; gap: 10px; padding: 8px 11px; border-radius: var(--radius-md); background: rgba(0, 0, 0, 0.45); backdrop-filter: blur(var(--blur-sm, 8px)); border: 1px solid var(--stroke); }
+.mem-legend-item { display: inline-flex; align-items: center; gap: 5px; font-size: var(--text-2xs, 0.6875rem); color: var(--ink-dim, #888); }
+.mem-legend-item i { width: 9px; height: 9px; border-radius: 50%; display: inline-block; }
+.mem-graph-empty { position: absolute; inset: 0; display: grid; place-items: center; text-align: center; padding: 24px; color: var(--ink-dim, #888); }
+.mem-graph-empty p { max-width: 340px; font-size: var(--text-md); line-height: var(--leading-normal); }
+
+/* ── Entity drilldown ────────────────────────────────────────────────────── */
+.mem-entity-head { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: var(--space-md); }
+.mem-back { appearance: none; cursor: pointer; background: none; border: none; color: var(--ink-dim, #888); font-size: var(--text-md); font-family: var(--font-body); padding: 2px 0; transition: color var(--duration-fast) var(--ease-standard); }
+.mem-back:hover { color: var(--ink-bright, #fff); }
+.mem-entity-kind { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em; padding: 2px 8px; border-radius: var(--radius-pill); color: var(--c); border: 1px solid color-mix(in srgb, var(--c) 40%, transparent); }
+.mem-entity-head h3 { margin: 0; font-family: var(--font-display); font-size: var(--text-lg, 1.236rem); color: var(--ink-bright, #fff); word-break: break-all; }
+.mem-entity-stat { font-size: var(--text-2xs); color: var(--ink-dim); }
+.mem-entity-replay-note { font-size: var(--text-md); color: var(--ink-dim); margin: 0 0 var(--space-md); }
+
+/* ── In context ──────────────────────────────────────────────────────────── */
+.mem-ctx { display: flex; flex-direction: column; gap: var(--space-md); }
+.mem-ctx-budget { padding: 14px; border-radius: var(--radius-md); border: 1px solid var(--stroke); background: var(--surface-1); }
+.mem-ctx-budget.over { border-color: rgba(251, 191, 36, 0.5); }
+.mem-ctx-budget-top { display: flex; justify-content: space-between; font-size: var(--text-md, 0.8125rem); color: var(--ink, #e8e8e8); margin-bottom: 8px; }
+.mem-ctx-tokens { color: var(--ink-dim, #888); font-variant-numeric: tabular-nums; }
+.mem-ctx-bar { height: 8px; border-radius: var(--radius-pill); background: var(--surface-3, rgba(255, 255, 255, 0.08)); overflow: hidden; }
+.mem-ctx-fill { height: 100%; border-radius: var(--radius-pill); background: linear-gradient(90deg, var(--mem-working), var(--mem-recall)); transition: width var(--duration-slow) var(--ease-out); }
+.mem-ctx-budget.over .mem-ctx-fill { background: linear-gradient(90deg, #f59e0b, var(--danger)); }
+.mem-ctx-warn { margin: 8px 0 0; font-size: var(--text-2xs, 0.6875rem); color: var(--warn, #fbbf24); }
+.mem-ctx-counts { display: grid; grid-template-columns: repeat(5, 1fr); gap: 8px; }
+.mem-count { padding: 10px; border-radius: var(--radius-md); border: 1px solid var(--stroke); background: var(--surface-1); text-align: center; display: flex; flex-direction: column; gap: 2px; }
+.mem-count b { font-size: var(--text-lg, 1.236rem); color: var(--ink-bright, #fff); font-variant-numeric: tabular-nums; }
+.mem-count span { font-size: 10px; color: var(--ink-dim, #888); text-transform: uppercase; letter-spacing: 0.04em; }
+.mem-count[data-tier='working'] b { color: var(--mem-working); }
+.mem-count[data-tier='recall'] b { color: var(--mem-recall); }
+.mem-ctx-title { margin: 4px 0 0; font-size: var(--text-md, 0.8125rem); color: var(--ink-dim, #888); text-transform: uppercase; letter-spacing: 0.05em; }
+
+/* ── Search results ──────────────────────────────────────────────────────── */
+.mem-search-head { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: var(--space-md); }
+.mem-search-head h3 { margin: 0; font-family: var(--font-display); font-size: var(--text-lg, 1.236rem); color: var(--ink-bright, #fff); }
+.mem-search-note { font-size: var(--text-2xs, 0.6875rem); color: var(--ink-faint, #666); }
+.mem-score { font-size: 10px; font-weight: 700; padding: 2px 7px; border-radius: var(--radius-pill); background: rgba(139, 92, 246, 0.18); color: var(--accent-violet); font-variant-numeric: tabular-nums; }
+.mem-score-lex { background: var(--surface-3); color: var(--ink-dim); }
+
+/* ── Merge bar ───────────────────────────────────────────────────────────── */
+.mem-merge-bar {
+	position: sticky; bottom: 0; display: flex; align-items: center; gap: 10px; justify-content: center;
+	padding: 10px; border-radius: var(--radius-md); border: 1px solid var(--mem-working);
+	background: rgba(20, 16, 32, 0.9); backdrop-filter: blur(var(--blur-sm, 8px));
+	font-size: var(--text-md); color: var(--ink-bright, #fff);
+	animation: mem-card-in var(--duration-base) var(--ease-out);
+}
+
+/* ── Seed modal ──────────────────────────────────────────────────────────── */
+.mem-seed-modal { position: fixed; inset: 0; z-index: 60; display: grid; place-items: center; padding: var(--space-md); background: rgba(0, 0, 0, 0.6); backdrop-filter: blur(var(--blur-sm, 8px)); animation: mem-fade var(--duration-base) var(--ease-out); }
+@keyframes mem-fade { from { opacity: 0; } to { opacity: 1; } }
+.mem-seed-card { width: min(520px, 100%); max-height: 86vh; overflow-y: auto; background: var(--surface-1, #14151c); border: 1px solid var(--stroke-strong, rgba(255, 255, 255, 0.16)); border-radius: var(--radius-lg, 14px); padding: var(--space-lg, 1.618rem); box-shadow: var(--shadow-2); }
+.mem-seed-head { display: flex; align-items: center; justify-content: space-between; }
+.mem-seed-head h3 { margin: 0; font-family: var(--font-display); font-size: var(--text-lg, 1.236rem); color: var(--ink-bright, #fff); }
+.mem-seed-x { appearance: none; cursor: pointer; background: none; border: none; color: var(--ink-dim); font-size: 24px; line-height: 1; padding: 0 4px; }
+.mem-seed-x:hover { color: var(--ink-bright, #fff); }
+.mem-seed-sub { font-size: var(--text-md, 0.8125rem); color: var(--ink-dim, #888); line-height: var(--leading-normal); margin: 6px 0 var(--space-md); }
+.mem-seed-conns { display: flex; flex-direction: column; gap: 10px; margin-bottom: var(--space-md); }
+.mem-seed-conn { display: grid; grid-template-columns: 90px 1fr 14px; align-items: center; gap: 10px; }
+.mem-seed-conn label { font-size: var(--text-md); color: var(--ink, #e8e8e8); }
+.mem-seed-conn input { background: var(--surface-2, rgba(0, 0, 0, 0.3)); border: 1px solid var(--stroke); border-radius: var(--radius-sm); color: var(--ink-bright, #fff); padding: 7px 9px; font-family: var(--font-body); outline: none; }
+.mem-seed-conn input:focus { border-color: var(--mem-working); }
+.mem-seed-dot { width: 9px; height: 9px; border-radius: 50%; background: var(--surface-3); }
+.mem-seed-dot.loading { background: var(--warn, #fbbf24); animation: mem-pulse 1s ease-in-out infinite; }
+.mem-seed-dot.ok { background: var(--success, #4ade80); }
+.mem-seed-dot.err { background: var(--danger, #f87171); }
+.mem-seed-out { margin-top: var(--space-md); padding: 12px; border-radius: var(--radius-md); background: var(--surface-2, rgba(0, 0, 0, 0.3)); border: 1px solid var(--stroke); font-size: var(--text-md, 0.8125rem); color: var(--ink, #e8e8e8); white-space: pre-wrap; max-height: 240px; overflow-y: auto; line-height: var(--leading-normal); }
+.mem-seed-fail { color: var(--danger, #f87171); }
+.mem-seed-tools { display: flex; align-items: center; gap: 10px; margin-top: var(--space-md); }
+.mem-seed-notice { font-size: var(--text-2xs, 0.6875rem); color: var(--ink-dim); }
+
+/* ── Toast ───────────────────────────────────────────────────────────────── */
+.mem-toast {
+	position: absolute; left: 50%; bottom: 16px; transform: translateX(-50%) translateY(12px);
+	padding: 9px 16px; border-radius: var(--radius-pill, 999px); background: rgba(20, 16, 32, 0.95);
+	border: 1px solid var(--mem-working); color: var(--ink-bright, #fff); font-size: var(--text-md, 0.8125rem);
+	box-shadow: var(--shadow-2); opacity: 0; pointer-events: none; z-index: 40;
+	transition: opacity var(--duration-base) var(--ease-out), transform var(--duration-base) var(--ease-out);
+}
+.mem-toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+.mem-toast-err { border-color: var(--danger, #f87171); }
+
+/* ── Responsive ──────────────────────────────────────────────────────────── */
+@media (max-width: 640px) {
+	.mem-tier-legend { grid-template-columns: 1fr; }
+	.mem-ctx-counts { grid-template-columns: repeat(3, 1fr); }
+	.mem-toolbar { flex-direction: column; align-items: stretch; }
+	.mem-views { justify-content: center; }
+	.mem-actions { justify-content: flex-end; }
+}
+@media (prefers-reduced-motion: reduce) {
+	.mem-card--new, .mem-composer, .mem-merge-bar, .mem-seed-modal { animation: none; }
+	.mem-skel-row, .mem-embed-dot.pending, .mem-seed-dot.loading { animation: none; }
+	.mem-ctx-fill, .mem-toast { transition: none; }
+}
+
+/* ── Interactive states (QB-07) ────────────────────────────────────────────
+   The card body is click-to-expand and the salience slider is draggable, and
+   neither said so. .mem-tool-select already had the transition and the tool
+   sibling's hover; it just never got its own. */
+.mem-card-content {
+	transition: color var(--duration-fast) var(--ease-standard);
+}
+
+.mem-card-content:hover {
+	color: var(--ink-bright);
+}
+
+.mem-sal-range {
+	transition: transform var(--duration-fast) var(--ease-standard);
+}
+
+.mem-sal-range:hover {
+	transform: scaleY(1.4);
+}
+
+.mem-tool-select:hover {
+	color: var(--ink);
+	border-color: var(--stroke-strong);
+	background: var(--surface-2);
+}

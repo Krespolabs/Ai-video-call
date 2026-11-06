@@ -1,0 +1,98 @@
+{
+	"$schema": "http://json-schema.org/draft-07/schema#",
+	"title": "three.ws i18n config",
+	"type": "object",
+	"required": ["entry", "entryLocale", "output", "outputLocales"],
+	"additionalProperties": true,
+	"properties": {
+		"entry": {
+			"type": "string",
+			"description": "Source-of-truth locale JSON (the entryLocale catalog)."
+		},
+		"entryLocale": {
+			"type": "string",
+			"description": "Reference language code, e.g. 'en'."
+		},
+		"output": {
+			"type": "string",
+			"description": "Directory holding all locale JSON files."
+		},
+		"outputLocales": {
+			"type": "array",
+			"items": {
+				"type": "string"
+			},
+			"description": "Target language codes to generate."
+		},
+		"localeNames": {
+			"type": "object",
+			"description": "code → human-readable display name for the locale switcher."
+		},
+		"rtlLocales": {
+			"type": "array",
+			"items": {
+				"type": "string"
+			},
+			"description": "Locale codes that render right-to-left."
+		},
+		"provider": {
+			"enum": ["gemini", "vertex", "groq", "openrouter", "nvidia", "mistral", "openai", "anthropic", "threews"],
+			"description": "LLM backend. Free lanes: groq, gemini (free tier), openrouter (:free models), nvidia, mistral. vertex bills to the platform's GCP credit pool (GOOGLE_CLOUD_PROJECT + GCP creds) with no free-tier quota to exhaust. threews rides the platform's own we-pay LLM proxy with a QA session (npm run audit:web:login) and THREEWS_I18N_AGENT; the zero-local-credential lane."
+		},
+		"modelName": {
+			"type": "string"
+		},
+		"temperature": {
+			"type": "number",
+			"minimum": 0,
+			"maximum": 2
+		},
+		"topP": {
+			"type": "number",
+			"minimum": 0,
+			"maximum": 1
+		},
+		"concurrency": {
+			"type": "integer",
+			"minimum": 1,
+			"description": "Parallel translation requests."
+		},
+		"splitToken": {
+			"type": "integer",
+			"minimum": 200,
+			"description": "Approx token budget per chunk before splitting a namespace."
+		},
+		"saveImmediately": {
+			"type": "boolean",
+			"description": "Persist each locale as soon as it finishes."
+		},
+		"reference": {
+			"type": "string",
+			"description": "Domain context handed to the model for accurate, on-brand translations."
+		},
+		"htmlExtract": {
+			"type": "object",
+			"properties": {
+				"entry": {
+					"type": "array",
+					"items": {
+						"type": "string"
+					}
+				},
+				"exclude": {
+					"type": "array",
+					"items": {
+						"type": "string"
+					}
+				}
+			}
+		},
+		"doNotTranslate": {
+			"type": "array",
+			"items": {
+				"type": "string"
+			},
+			"description": "Brand/protocol terms masked verbatim so the model can never alter them."
+		}
+	}
+}

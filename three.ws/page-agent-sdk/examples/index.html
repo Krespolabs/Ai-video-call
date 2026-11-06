@@ -1,0 +1,127 @@
+<!doctype html>
+<html lang="en">
+<head>
+	<meta charset="utf-8" />
+	<meta name="viewport" content="width=device-width, initial-scale=1" />
+	<title>@three-ws/page-agent — rigged 3D guide demo</title>
+	<style>
+		:root { color-scheme: dark; }
+		* { box-sizing: border-box; }
+		body {
+			margin: 0; font: 16px/1.6 -apple-system, system-ui, sans-serif;
+			background: #0b0c10; color: #e9eaf0;
+		}
+		main { max-width: 720px; margin: 0 auto; padding: 80px 24px 200px; }
+		h1 { font-size: 40px; line-height: 1.1; margin: 0 0 12px; }
+		h2 { font-size: 26px; margin: 48px 0 8px; }
+		.lede { font-size: 19px; color: #aab; }
+		p { color: #c7c9d6; }
+		.row { display: flex; gap: 10px; flex-wrap: wrap; margin: 24px 0; }
+		button {
+			cursor: pointer; border: 1px solid #2a2c38; background: #15161e; color: #e9eaf0;
+			padding: 10px 16px; border-radius: 12px; font: inherit; font-weight: 600;
+		}
+		button:hover { background: #1d1f29; }
+		code { background: #15161e; padding: 2px 6px; border-radius: 6px; font-size: 14px; }
+	</style>
+</head>
+<body>
+	<main>
+		<h1 data-narrate="Welcome to three.ws page agent — I'm your rigged 3D guide, and I'll walk you through this demo.">
+			The rigged 3D guide for any page
+		</h1>
+		<p class="lede" data-narrate="Drop one script tag, and a skeleton-rigged avatar appears in the corner and talks visitors through your site. Visitors pick which agent they want.">
+			Drop in one tag. A rigged, lipsync-capable avatar greets your visitors,
+			narrates the page, and lets them choose their own guide.
+		</p>
+
+		<div class="row">
+			<button id="tour">▶ Take the tour</button>
+			<button id="say">💬 Say something</button>
+			<button id="pick">🔀 Choose a guide</button>
+			<button id="stop">⏹ Stop</button>
+		</div>
+
+		<h2 data-narrate="Presets turn the agent into a persona with one attribute: a greeting, a role, suggested-prompt chips, and a tool allowlist for a paired chat backend.">Persona presets</h2>
+		<p>Pick a preset below to reload the agent as that persona — greeting,
+		suggested-prompt chips, and <code>systemPrompt</code>/<code>tools</code>
+		(logged to the console) all switch with it.</p>
+		<div class="row" id="presets"></div>
+
+		<h2 data-narrate="Every avatar in the catalog is skeleton-rigged. That's a hard rule — unrigged meshes are excluded, because the runtime drives skeletal idle motion and viseme lipsync.">Only rigged agents</h2>
+		<p>Each agent ships a verified skinned mesh and armature. The runtime picks a
+		viseme, jaw, or full-body lipsync driver based on what the rig exposes.</p>
+
+		<h2 data-narrate="Visitors choose. Click change agent any time to swap between a diverse roster — realistic, stylized, and robot guides — and your choice is remembered.">Visitors choose their guide</h2>
+		<p>The picker is built in. The selection persists across pages via
+		<code>localStorage</code>.</p>
+
+		<h2 data-narrate="Speech is synthesized in the browser with the Web Speech API. No backend, no API key, no audio files — and the mouth shapes track the words.">Talks out loud, in-browser</h2>
+		<p>Web Speech API drives the voice; the text-to-viseme driver drives the mouth.</p>
+	</main>
+
+	<!-- Local dev: map the bare `three` specifier so the unbundled ESM source runs
+	     straight from disk. In production you'd use the bundled global build or a
+	     bundler that resolves `three` for you. -->
+	<script type="importmap">
+	{
+		"imports": {
+			"three": "https://unpkg.com/three@0.184.0/build/three.module.js",
+			"three/addons/": "https://unpkg.com/three@0.184.0/examples/jsm/"
+		}
+	}
+	</script>
+	<script type="module">
+		import { PageAgent, PRESETS, PRESET_IDS } from '../src/index.js';
+
+		let guide = mountGuide();
+
+		function mountGuide(preset) {
+			const g = new PageAgent({
+				agent: 'sol',
+				position: 'bottom-right',
+				// Local assets so the demo works offline against this repo's public/ dir.
+				assetBase: 'https://three.ws/avatars/',
+				preset,
+				// Sample host-page context — see how it's folded into `guide.systemPrompt`.
+				context: { page: 'page-agent-demo', tier: 'visitor' },
+			});
+			window.guide = g;
+			g.on('agentchange', (a) => console.log('now guided by', a.name));
+			g.on('error', (e) => console.warn('page-agent error', e));
+			g.on('ready', () => {
+				console.log('preset:', g.currentPreset?.name ?? '(none — default behavior)');
+				console.log('tools allowlist:', g.tools);
+				console.log('systemPrompt:\n' + g.systemPrompt);
+			});
+			return g;
+		}
+
+		document.getElementById('tour').onclick = () => guide.narratePage({ greet: true });
+		document.getElementById('say').onclick = () =>
+			guide.narrate("Hi! I'm a rigged 3D agent. Try the tour, or pick a different guide.", { interrupt: true });
+		document.getElementById('pick').onclick = () => guide.openPicker();
+		document.getElementById('stop').onclick = () => guide.stop();
+
+		// ── Persona preset switcher ──────────────────────────────────────────────
+		const presetsRow = document.getElementById('presets');
+		const defaultBtn = document.createElement('button');
+		defaultBtn.textContent = '— default (no preset) —';
+		defaultBtn.onclick = () => switchPreset(undefined);
+		presetsRow.appendChild(defaultBtn);
+
+		for (const id of PRESET_IDS) {
+			const btn = document.createElement('button');
+			btn.textContent = PRESETS[id].name;
+			btn.title = PRESETS[id].description;
+			btn.onclick = () => switchPreset(id);
+			presetsRow.appendChild(btn);
+		}
+
+		function switchPreset(id) {
+			guide.dispose();
+			guide = mountGuide(id);
+		}
+	</script>
+</body>
+</html>

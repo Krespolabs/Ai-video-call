@@ -1,0 +1,121 @@
+// Memory entity extraction (P2 — Memory Studio knowledge graph).
+//
+// Deterministic, dependency-free extraction of the entities an agent's memories
+// mention — the nodes of the temporal knowledge graph (Zep/Graphiti-style).
+// No LLM call: extraction is pattern-based so it's free, instant, and stable
+// across re-runs (re-extracting the same memory yields the same entities, which
+// the store relies on for idempotent upserts).
+//
+// Kinds:
+//   mint     — Solana token mint address (runtime data only; $THREE is the only
+//              coin the platform promotes — see CLAUDE.md)
+//   ticker   — a $SYMBOL cashtag
+//   wallet   — a base58 / EVM account address
+//   person   — an @handle
+//   strategy — a trading rule/strategy the agent follows
+//   topic    — a free-form tag
+
+// $SYMBOL cashtag: 2–10 alnum after the $, must start with a letter.
+const TICKER_RE = /\$([A-Za-z][A-Za-z0-9]{1,9})\b/g;
+// @handle: 2–30 chars of the usual handle alphabet.
+const HANDLE_RE = /(?:^|[^\w@/])@([A-Za-z0-9_]{2,30})\b/g;
+// EVM address.
+const EVM_RE = /\b(0x[a-fA-F0-9]{40})\b/g;
+// Solana base58 address (excludes 0,O,I,l). 32–44 chars is the mint/pubkey range.
+const BASE58_RE = /\b([1-9A-HJ-NP-Za-km-z]{32,44})\b/g;
+
+// Tags / words that mean a base58 address in this memory is most likely a token
+// mint rather than a personal wallet.
+const TOKEN_CONTEXT = new Set([
+	'trade', 'snipe', 'buy', 'sell', 'launch', 'token', 'mint', 'coin',
+	'position', 'watchlist', 'pump', 'graduation', 'pumpfun',
+]);
+
+// Tags / words that mark a memory as encoding a trading rule or strategy.
+const STRATEGY_HINTS = [
+	'strategy', 'rule', 'stop-loss', 'stop loss', 'take-profit', 'take profit',
+	'risk', 'entry', 'exit', 'sizing', 'dca', 'never', 'always', 'only buy',
+	'cut losses', 'lesson',
+];
+
+function dedupeKey(kind, normalized) {
+	return `${kind}\u0000${normalized}`;
+}
+
+/**
+ * Extract entities from a single memory.
+ * @param {string} content
+ * @param {string[]} [tags]
+ * @param {Record<string, any>} [context]
+ * @returns {Array<{kind:string,label:string,normalized:string,meta?:object}>}
+ */
+export function extractEntities(content, tags = [], context = {}) {
+	const text = String(content || '');
+	const lowerTags = (Array.isArray(tags) ? tags : []).map((t) => String(t).toLowerCase());
+	const found = new Map(); // dedupeKey → entity
+
+	const push = (kind, label, normalized, meta) => {
+		const norm = String(normalized || label).trim();
+		if (!norm) return;
+		const key = dedupeKey(kind, norm.toLowerCase());
+		if (!found.has(key)) {
+			found.set(key, { kind, label: String(label).trim(), normalized: norm.toLowerCase(), meta: meta || {} });
+		}
+	};
+
+	// 1. Explicit, structured context fields (most reliable — e.g. trade memories
+	//    from P4 carry { mint, symbol, wallet }).
+	if (context && typeof context === 'object') {
+		if (context.mint) push('mint', context.mint, context.mint, { source: 'context' });
+		if (context.symbol) push('ticker', String(context.symbol).replace(/^\$/, '').toUpperCase(), String(context.symbol).replace(/^\$/, '').toUpperCase(), { source: 'context' });
+		if (context.ticker) push('ticker', String(context.ticker).replace(/^\$/, '').toUpperCase(), String(context.ticker).replace(/^\$/, '').toUpperCase(), { source: 'context' });
+		if (context.wallet) push('wallet', context.wallet, context.wallet, { source: 'context' });
+		if (context.address && context.address !== context.wallet) push('wallet', context.address, context.address, { source: 'context' });
+	}
+
+	// 2. Cashtags.
+	for (const m of text.matchAll(TICKER_RE)) {
+		push('ticker', m[1].toUpperCase(), m[1].toUpperCase());
+	}
+
+	// 3. @handles → people.
+	for (const m of text.matchAll(HANDLE_RE)) {
+		push('person', `@${m[1]}`, m[1]);
+	}
+
+	// 4. EVM addresses → wallets.
+	for (const m of text.matchAll(EVM_RE)) {
+		push('wallet', m[1], m[1].toLowerCase());
+	}
+
+	// 5. Base58 addresses → mint or wallet depending on context. A base58 hit
+	//    that already matched as part of an EVM string can't happen (different
+	//    alphabets), so this is independent.
+	const tokenish =
+		lowerTags.some((t) => TOKEN_CONTEXT.has(t)) ||
+		[...TOKEN_CONTEXT].some((w) => text.toLowerCase().includes(w));
+	for (const m of text.matchAll(BASE58_RE)) {
+		const addr = m[1];
+		// Skip pure-decimal or obviously non-address tokens already captured.
+		if (/^\d+$/.test(addr)) continue;
+		push(tokenish ? 'mint' : 'wallet', addr, addr);
+	}
+
+	// 6. Tags become topics; strategy-flavored memories also yield a strategy node.
+	for (const raw of lowerTags) {
+		if (!raw || raw === 'studio' || raw === 'chat' || raw === 'seed') continue;
+		push('topic', raw, raw);
+	}
+	const looksStrategic =
+		lowerTags.some((t) => STRATEGY_HINTS.some((h) => t.includes(h))) ||
+		STRATEGY_HINTS.some((h) => text.toLowerCase().includes(h));
+	if (looksStrategic) {
+		// Use a short, stable label derived from the memory's first line.
+		const firstLine = text.split('\n')[0].slice(0, 80).trim();
+		if (firstLine) push('strategy', firstLine, firstLine.toLowerCase());
+	}
+
+	return [...found.values()];
+}
+
+export const ENTITY_KINDS = ['mint', 'ticker', 'wallet', 'person', 'strategy', 'topic'];

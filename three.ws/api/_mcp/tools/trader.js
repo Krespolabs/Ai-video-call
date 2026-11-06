@@ -1,0 +1,665 @@
+// Trader MCP tools: leaderboard discovery + copy-trading for autonomous agents.
+//
+// Four tools that close the autonomous copy-trading loop:
+//
+//   trader_leaderboard  unscoped. Top agents ranked by composite TraderScore.
+//                       Each row carries win rate, realized P&L, ROI, and
+//                       a recommendation on whether to copy them.
+//
+//   trader_profile      unscoped. Full track record for one agent: score,
+//                       all headline metrics, and the 10 most recent trades.
+//
+//   trade_receipt       unscoped. Why an agent took one trade: the evidence
+//                       every gate recorded before the entry (Oracle score and
+//                       reasons, trade firewall, LLM judge, Risk Officer, paid
+//                       x402 reads) plus each journal leg and its tx.
+//
+//   sentiment_scout     unscoped. Sourced pump.fun momentum candidates: every
+//                       claim carries its source link, the time it was true,
+//                       and (for social claims) the on-chain facts it was
+//                       checked against. Never trades.
+//
+//   copy_subscribe      auth-gated (agents:write). Set up copy-trading: mirror
+//                       a leader's future entries to your own wallet with your
+//                       own sizing and risk caps. Non-custodial: we never
+//                       touch keys.
+//
+//   copy_status         auth-gated (agents:read). Check the caller's active
+//                       copy subscriptions and their execution counts.
+//
+// "unscoped" means no OAuth scope is required, not free: /api/mcp still gates
+// every tool here behind an OAuth token or an x402 payment (only
+// getting_started is exempt), so an anonymous caller gets a 402, never data.
+
+import { sql, isDbUnavailableError } from '../../_lib/db.js';
+import { limits } from '../../_lib/rate-limit.js';
+import { getLeaderboard, getTraderStats, WINDOWS, LEADERBOARD_SORTS } from '../../_lib/trader-stats.js';
+import { normalizeSubscriptionInput } from '../../_lib/copy-engine.js';
+import { loadTradeReceipt } from '../../_lib/trade-receipt.js';
+import { runSentimentScout, scoutTrackRecord } from '../../_lib/sentiment-scout.js';
+import { isUuid } from '../../_lib/validate.js';
+
+const NETWORKS  = new Set(['mainnet', 'devnet']);
+const SORTS     = new Set([...LEADERBOARD_SORTS]);
+const BASE58_RE = /^[1-9A-HJ-NP-Za-km-z]{32,44}$/;
+
+function mcpOk(payload) {
+	return {
+		content: [{ type: 'text', text: JSON.stringify(payload, null, 2) }],
+		structuredContent: payload,
+	};
+}
+
+function mcpErr(msg) {
+	return { content: [{ type: 'text', text: msg }], isError: true };
+}
+
+// A DB outage and a genuine "no such row" used to look identical here: every
+// query was wrapped in `.catch(() => [])`, so a dropped Neon connection told the
+// caller their leader did not exist or that they had no subscriptions. That is a
+// wrong answer, not a degraded one, and an agent acts on it. Now only transport
+// and configuration failures are folded into an explicit "temporarily
+// unavailable" reply; a real SQL fault propagates to the MCP dispatcher, which
+// sanitizes it, logs it with an id, and returns isError.
+function unavailable(err, what) {
+	if (!isDbUnavailableError(err)) throw err;
+	return mcpErr(`${what} is temporarily unavailable. Retry in a moment.`);
+}
+
+const LIVE = { readOnlyHint: true, destructiveHint: false, idempotentHint: false, openWorldHint: true };
+const WRITE = { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false };
+
+// computeTraderMetrics reports win_rate as a 0-to-1 ratio (wins / closed), and
+// both payloads publish it under `win_rate_pct`. Without this scaling a flawless
+// 2-for-2 leader was handed to the calling agent as a "1% win rate", and the
+// `watch` tier below could never fire because a ratio never reaches 60.
+function winRatePct(ratio) {
+	return ratio == null ? null : Math.round(ratio * 1000) / 10;
+}
+
+function recommendationFor({ score, verified, winPct, closed }) {
+	if (score >= 75 && verified) return 'copy';
+	if (score >= 60 || (winPct >= 60 && closed >= 5)) return 'watch';
+	return 'skip';
+}
+
+// shapeClosed() carries opened_at/closed_at, never a duration, so the hold time
+// the profile advertises has to be derived from the two timestamps.
+function holdSeconds(trade) {
+	const opened = Date.parse(trade.opened_at ?? '');
+	const closed = Date.parse(trade.closed_at ?? '');
+	return Number.isFinite(opened) && Number.isFinite(closed)
+		? Math.round((closed - opened) / 1000)
+		: null;
+}
+
+// Only x402 principals carry a rateKey; OAuth and API-key callers carry a userId
+// instead. Falling straight through to 'anon' put every signed-in caller into one
+// shared bucket with every anonymous one, so a single busy account throttled the
+// whole tool for everybody.
+function rateKeyFor(auth) {
+	return auth?.rateKey || (auth?.userId ? `user:${auth.userId}` : 'anon');
+}
+
+function shapeLeaderboardRow(r) {
+	const winPct = winRatePct(r.win_rate);
+	return {
+		rank:             r.rank,
+		agent_id:         r.agent_id,
+		name:             r.agent_name,
+		image:            r.image || null,
+		score:            r.score,
+		verified:         r.verified,
+		closed_trades:    r.closed,
+		open_positions:   r.open_positions,
+		wins:             r.wins,
+		losses:           r.losses,
+		win_rate_pct:     winPct,
+		realized_pnl_sol: r.realized_pnl_sol,
+		realized_pnl_usd: r.realized_pnl_usd ?? null,
+		roi_pct:          r.roi_pct,
+		profit_factor:    r.profit_factor,
+		max_drawdown_pct: r.max_drawdown_pct,
+		copiers:          r.copiers,
+		last_active_at:   r.last_active_at,
+		recommendation:   recommendationFor({ score: r.score, verified: r.verified, winPct, closed: r.closed }),
+		profile_url:      `https://three.ws/trader/${r.agent_id}`,
+	};
+}
+
+export const toolDefs = [
+	// ── trader_leaderboard ──────────────────────────────────────────────────
+	{
+		name: 'trader_leaderboard',
+		title: 'Top pump.fun traders',
+		annotations: LIVE,
+		description:
+			"Get the top pump.fun traders on three.ws ranked by composite TraderScore (win rate + P&L + ROI + drawdown). Each row includes score (0-100), verified badge, closed trade count, win rate, realized P&L in SOL and USD, ROI %, max drawdown, and a 'recommendation' field: 'copy' = strong candidate, 'watch' = emerging, 'skip' = unproven. Use this to find leaders worth copying, then call trader_profile for full details before you copy one. Sort by 'score' (default), 'pnl', 'winrate', or 'roi'. Window: '24h', '7d', '30d' (default), or 'all'.",
+		inputSchema: {
+			type: 'object',
+			properties: {
+				limit:         { type: 'integer', minimum: 1, maximum: 50, default: 10, description: 'Max rows to return (default 10, max 50).' },
+				sort:          { type: 'string', enum: ['score', 'pnl', 'winrate', 'roi'], default: 'score', description: 'Ranking metric.' },
+				window:        { type: 'string', enum: ['24h', '7d', '30d', 'all'], default: '30d', description: 'Time window for trade history.' },
+				verified_only: { type: 'boolean', default: false, description: 'Only return verified traders (12+ closed trades, 5+ unique coins, <40% churn).' },
+				network:       { type: 'string', enum: ['mainnet', 'devnet'], default: 'mainnet' },
+			},
+			additionalProperties: false,
+		},
+		async handler(args, auth) {
+			const network      = NETWORKS.has(args?.network) ? args.network : 'mainnet';
+			const window       = WINDOWS.has(args?.window) ? args.window : '30d';
+			const sort         = SORTS.has(args?.sort) ? args.sort : 'score';
+			const asked        = Number(args?.limit ?? 10);
+			// A non-finite limit reached getLeaderboard's `.slice(0, NaN)` and
+			// silently returned an empty board that read as "no traders".
+			const limit        = Number.isFinite(asked) ? Math.min(50, Math.max(1, Math.floor(asked))) : 10;
+			const verifiedOnly = !!args?.verified_only;
+
+			const rl = await limits.mcpIp(rateKeyFor(auth));
+			if (!rl.success) return mcpErr('Rate limit exceeded, try again in a moment.');
+
+			let result;
+			try {
+				result = await getLeaderboard({ network, window, sort, limit, verifiedOnly });
+			} catch (err) {
+				return unavailable(err, 'The trader leaderboard');
+			}
+
+			const traders = (result.leaderboard || []).map(shapeLeaderboardRow);
+			const copyCount = traders.filter((t) => t.recommendation === 'copy').length;
+
+			const payload = {
+				network,
+				window,
+				sort,
+				sol_usd: result.sol_usd ?? null,
+				count: traders.length,
+				copy_candidates: copyCount,
+				traders,
+				hint: traders.length === 0
+					? 'No traders found in this window. Try a wider window or remove verified_only.'
+					: `Top trader: ${traders[0].name} · score ${traders[0].score} · ${traders[0].win_rate_pct ?? '?'}% win rate. ${copyCount} copy candidate${copyCount !== 1 ? 's' : ''} in results.`,
+				generated_at: new Date().toISOString(),
+			};
+			return mcpOk(payload);
+		},
+	},
+
+	// ── trader_profile ──────────────────────────────────────────────────────
+	{
+		name: 'trader_profile',
+		title: 'Full track record for one agent',
+		annotations: LIVE,
+		description:
+			"Get the full, verifiable track record for a specific pump.fun agent trader. Returns the composite TraderScore, all headline metrics (win rate, realized P&L, ROI, profit factor, max drawdown, average hold time), up to 10 recent closed trades with their on-chain Solscan links, and any open positions. Every number is traceable to its on-chain buy/sell transaction. Use this to vet an agent before calling copy_subscribe.",
+		inputSchema: {
+			type: 'object',
+			properties: {
+				agent_id: { type: 'string', description: 'Agent UUID (from trader_leaderboard rows or /api/agents).' },
+				window:   { type: 'string', enum: ['24h', '7d', '30d', 'all'], default: 'all', description: 'Time window for metrics (default all-time).' },
+				network:  { type: 'string', enum: ['mainnet', 'devnet'], default: 'mainnet' },
+			},
+			required: ['agent_id'],
+			additionalProperties: false,
+		},
+		async handler(args, auth) {
+			const agentId = (args?.agent_id || '').trim();
+			if (!isUuid(agentId)) return mcpErr('Invalid agent_id: must be a UUID (get it from trader_leaderboard).');
+
+			const network = NETWORKS.has(args?.network) ? args.network : 'mainnet';
+			const window  = WINDOWS.has(args?.window) ? args.window : 'all';
+
+			const rl = await limits.mcpIp(rateKeyFor(auth));
+			if (!rl.success) return mcpErr('Rate limit exceeded, try again in a moment.');
+
+			let stats;
+			try {
+				stats = await getTraderStats({ agentId, network, window });
+			} catch (err) {
+				return unavailable(err, 'This trader profile');
+			}
+			if (!stats) return mcpErr(`Agent ${agentId} not found or has no public trading history.`);
+			if (!stats.agent.is_public) return mcpErr('This agent\'s track record is not public.');
+
+			const m = stats.metrics;
+			// Field names here must track shapeClosed() in trader-stats.js. They did
+			// not: realized_pnl_sol / realized_pnl_pct / sell_solscan never existed on
+			// a closed trade, so every trade in this tool's headline "verifiable track
+			// record" came back with a null P&L, no Solscan proof, and an outcome of
+			// 'flat' regardless of how big the win was. moonbag_held and self_dealing
+			// ride along because a partial exit and a self-launched coin are exactly
+			// what an agent vetting a leader must not be shown a clean number for.
+			const topTrades = (stats.closed || []).slice(0, 10).map((t) => ({
+				trade_id:        t.id,
+				symbol:          t.symbol,
+				mint:            t.mint,
+				outcome:         t.pnl_pct > 5 ? 'win' : t.pnl_pct < -5 ? 'loss' : 'flat',
+				pnl_sol:         t.pnl_sol ?? null,
+				pnl_pct:         t.pnl_pct ?? null,
+				hold_seconds:    holdSeconds(t),
+				exit_reason:     t.exit_reason,
+				closed_at:       t.closed_at,
+				moonbag_held:    t.moonbag_held === true,
+				self_dealing:    t.self_dealing === true,
+				proof_url:       t.sell_url || t.buy_url || null,
+			}));
+
+			// The tool description promises open positions; only the count was ever
+			// returned, so an agent vetting a leader could not see what they are
+			// currently holding. Same shape the /trader page renders.
+			const openPositions = (stats.open || []).map((p) => ({
+				symbol:         p.symbol,
+				mint:           p.mint,
+				entry_sol:      p.entry_sol,
+				current_sol:    p.current_sol,
+				unrealized_pct: p.unrealized_pct,
+				opened_at:      p.opened_at,
+				proof_url:      p.buy_url || null,
+			}));
+
+			const winPct = winRatePct(m.win_rate);
+			const rec = recommendationFor({ score: m.score, verified: m.verified, winPct, closed: m.closed_count });
+
+			const payload = {
+				agent_id:        agentId,
+				name:            stats.agent.name,
+				image:           stats.agent.image || null,
+				network,
+				window,
+				sol_usd:         stats.sol_usd ?? null,
+				score:           m.score,
+				verified:        m.verified,
+				recommendation:  rec,
+				metrics: {
+					closed_trades:      m.closed_count,
+					open_positions:     m.open_count,
+					wins:               m.wins,
+					losses:             m.losses,
+					win_rate_pct:       winPct,
+					realized_pnl_sol:   m.realized_pnl_sol,
+					realized_pnl_usd:   m.realized_pnl_usd ?? null,
+					roi_pct:            m.roi_pct,
+					profit_factor:      m.profit_factor,
+					avg_pnl_pct:        m.avg_pnl_pct,
+					best_pnl_pct:       m.best_pnl_pct,
+					max_drawdown_pct:   m.max_drawdown_pct,
+					avg_hold_seconds:   m.avg_hold_seconds,
+					unique_coins:       m.unique_coins,
+				},
+				copiers:         stats.agent.copiers,
+				oracle:          stats.oracle ?? null,
+				recent_trades:   topTrades,
+				open_positions:  openPositions,
+				profile_url:     `https://three.ws/trader/${agentId}`,
+				generated_at:    new Date().toISOString(),
+			};
+			return mcpOk(payload);
+		},
+	},
+
+	{
+		name: 'trade_receipt',
+		title: 'Why an agent took one trade',
+		annotations: LIVE,
+		description:
+			"Get the decision receipt for one pump.fun trade by an agent: the entry trigger, the Oracle conviction score and pillars at entry with the base-rate reasons behind it, the trade firewall verdict and its checks (including the simulated buy/sell round-trip), the LLM judge's thesis when one ran, the Risk Officer review, paid x402 sentiment and rug-pull reads with their payment transaction, launch intel, and every journal leg with its on-chain signature. Evidence recorded after the exit is excluded because it could not have caused the trade; evidence seen while holding is tagged during_trade. Use this to understand what a leader actually trades on before copying it, passing a trade_id from trader_profile's recent_trades.",
+		inputSchema: {
+			type: 'object',
+			properties: {
+				trade_id: { type: 'string', description: 'Trade (position) UUID, from trader_profile recent_trades[].trade_id.' },
+			},
+			required: ['trade_id'],
+			additionalProperties: false,
+		},
+		async handler(args, auth) {
+			const tradeId = (args?.trade_id || '').trim();
+			if (!isUuid(tradeId)) return mcpErr('Invalid trade_id: must be a UUID (get it from trader_profile recent_trades).');
+
+			const rl = await limits.mcpIp(rateKeyFor(auth));
+			if (!rl.success) return mcpErr('Rate limit exceeded, try again in a moment.');
+
+			let receipt;
+			try {
+				receipt = await loadTradeReceipt(tradeId);
+			} catch (err) {
+				return unavailable(err, 'This trade receipt');
+			}
+			if (!receipt) return mcpErr(`Trade ${tradeId} not found, never filled, or its agent is not public.`);
+			return mcpOk({
+				...receipt,
+				receipt_url: `https://three.ws/trader/${receipt.position.agent_id}?trade=${tradeId}`,
+				generated_at: new Date().toISOString(),
+			});
+		},
+	},
+
+	// ── sentiment_scout ─────────────────────────────────────────────────────
+	{
+		name: 'sentiment_scout',
+		title: 'Sourced momentum candidates (Sentiment Scout)',
+		annotations: LIVE,
+		description:
+			"Surface pump.fun momentum candidates with evidence you can cite. Each candidate returns a 0-100 momentum_score (with the parts that add up to it), evidence lines of type volume_spike, fresh_buyers, smart_money, graduation_approach, social_mention (X posts quoting the coin's exact contract address, or pump.fun callouts), paid_signal (x402 market reads with their payment transaction) and news_match, and one caution line naming the main risk. Every evidence line carries source (a URL that returns the fact), at (when it was true) and, for social or paid claims, checked_against (the on-chain facts read in the same run). Sources that could not be read are listed in unavailable, never estimated. Pass mint to read one coin even if it would not make the board. Pass track_record=true to include how the coins the Scout flagged over the last 14 days actually did against the base rate. This tool never trades and is not advice; cite the evidence, not the score. Use this to find which pump.fun coins are gaining momentum right now and why; for a full conviction verdict on one coin call oracle_coin.",
+		inputSchema: {
+			type: 'object',
+			properties: {
+				mint:           { type: 'string', description: 'Optional pump.fun mint (base58). Omit for the board.' },
+				network:        { type: 'string', enum: ['mainnet', 'devnet'], default: 'mainnet' },
+				window_minutes: { type: 'integer', minimum: 15, maximum: 240, default: 60, description: 'Minutes of launches to rank against.' },
+				limit:          { type: 'integer', minimum: 1, maximum: 10, default: 5 },
+				track_record:   { type: 'boolean', default: false, description: 'Include the Scout\'s graded track record.' },
+			},
+			additionalProperties: false,
+		},
+		async handler(args, auth) {
+			const network = NETWORKS.has(args?.network) ? args.network : 'mainnet';
+			const mint = typeof args?.mint === 'string' && args.mint.trim() ? args.mint.trim() : null;
+			if (mint && !BASE58_RE.test(mint)) return mcpErr('Invalid mint: must be a base58 Solana address.');
+
+			const rl = await limits.mcpIp(rateKeyFor(auth));
+			if (!rl.success) return mcpErr('Rate limit exceeded, try again in a moment.');
+
+			let scout;
+			let track = null;
+			try {
+				[scout, track] = await Promise.all([
+					runSentimentScout({ network, mint, windowMinutes: args?.window_minutes, limit: args?.limit }),
+					args?.track_record === true ? scoutTrackRecord(network).catch(() => null) : null,
+				]);
+			} catch (err) {
+				return unavailable(err, 'The Sentiment Scout');
+			}
+			const payload = {
+				...scout,
+				board_url: 'https://three.ws/coin-intel?tab=scout',
+				disclaimer: 'Evidence, not advice. Most early pump.fun momentum fades; the caution line names the main risk for each coin.',
+			};
+			if (args?.track_record === true) payload.track_record = track;
+			return mcpOk(payload);
+		},
+	},
+
+	// ── copy_subscribe ──────────────────────────────────────────────────────
+	{
+		name: 'copy_subscribe',
+		title: 'Subscribe to copy a trader',
+		scope: 'agents:write',
+		annotations: WRITE,
+		description:
+			"Set up non-custodial copy-trading: mirror a leader agent's future pump.fun entries into your own wallet with your own sizing and risk caps. You supply your wallet address and the sizing rules; we never hold keys. The fan-out cron checks for new leader entries and generates sized intents you act on from /dashboard/copy. Provide leader_agent_id (from trader_leaderboard) and your Solana wallet address. Sizing rules: 'fixed' = exact SOL per trade, 'multiplier' = N× leader size, 'pct_balance' = % of your balance. Always set a per_trade_cap_sol and daily_budget_sol to limit exposure. Calling this again for the same leader and network updates that subscription in place: sizing, caps and perf_fee_bps are replaced by what you send, so anything you omit falls back to its default, while the Oracle-score floor, market-cap band and Telegram route are kept as they were. Clear those three from /dashboard/copy. Use this after vetting a leader with trader_profile, when the user wants to mirror that leader's trades.",
+		inputSchema: {
+			type: 'object',
+			properties: {
+				leader_agent_id:    { type: 'string', format: 'uuid', description: 'The agent UUID to copy (from trader_leaderboard).' },
+				copier_wallet:      { type: 'string', description: 'Your Solana wallet address (base58) that will receive the copy intents.' },
+				sizing_rule:        { type: 'string', enum: ['fixed', 'multiplier', 'pct_balance'], default: 'fixed', description: 'How to size your copies relative to the leader.' },
+				fixed_sol:          { type: 'number', minimum: 0.001, description: 'SOL per trade (sizing_rule=fixed).' },
+				multiplier:         { type: 'number', minimum: 0.01, maximum: 10, description: 'Multiplier of leader size (sizing_rule=multiplier).' },
+				pct_balance:        { type: 'number', minimum: 0.1, maximum: 100, description: 'Percent of your balance per trade (sizing_rule=pct_balance).' },
+				per_trade_cap_sol:  { type: 'number', minimum: 0.001, default: 0.05, description: 'Hard cap: no single copy trade may exceed this SOL amount.' },
+				daily_budget_sol:   { type: 'number', minimum: 0.001, default: 0.5, description: 'Hard daily spend ceiling across all copy trades.' },
+				min_order_sol:      { type: 'number', minimum: 0, default: 0, description: 'Skip copies that would be smaller than this SOL amount.' },
+				max_open_copies:    { type: 'integer', minimum: 1, maximum: 50, default: 5, description: 'Max simultaneous open copy positions.' },
+				min_oracle_score:   { type: 'integer', minimum: 0, maximum: 100, description: 'Only copy leader entries where Oracle conviction is at least this score.' },
+				mcap_floor_usd:     { type: 'number', minimum: 0, description: 'Skip coins below this USD market cap at entry.' },
+				mcap_ceiling_usd:   { type: 'number', minimum: 0, description: 'Skip coins above this USD market cap at entry (avoid already-pumped).' },
+				telegram_chat_id:   { type: 'string', description: 'Telegram chat ID for copy-execution alerts (optional).' },
+				perf_fee_bps:       { type: 'integer', minimum: 0, maximum: 3000, default: 1000, description: 'Performance fee in bps paid to the leader on wins (default 10%).' },
+				network:            { type: 'string', enum: ['mainnet', 'devnet'], default: 'mainnet' },
+			},
+			required: ['leader_agent_id', 'copier_wallet'],
+			additionalProperties: false,
+		},
+		async handler(args, auth) {
+			if (!auth.userId) return mcpErr('Sign in to a three.ws account to set up copy-trading.');
+
+			const leaderId = (args?.leader_agent_id || '').trim();
+			if (!isUuid(leaderId)) return mcpErr('Invalid leader_agent_id: must be a UUID from trader_leaderboard.');
+
+			const wallet = (args?.copier_wallet || '').trim();
+			if (!BASE58_RE.test(wallet)) return mcpErr('Invalid copier_wallet: must be a base58 Solana address.');
+
+			const network = NETWORKS.has(args?.network) ? args.network : 'mainnet';
+
+			const rl = await limits.mcpIp(rateKeyFor(auth));
+			if (!rl.success) return mcpErr('Rate limit exceeded, try again in a moment.');
+
+			// Validate leader exists and is public
+			let leader;
+			try {
+				[leader] = await sql`
+					select id, name, is_public from agent_identities
+					where id = ${leaderId} and deleted_at is null limit 1
+				`;
+			} catch (err) {
+				return unavailable(err, 'Copy-trading setup');
+			}
+			if (!leader) return mcpErr(`Leader agent ${leaderId} not found.`);
+			if (leader.is_public === false) return mcpErr('That agent\'s trades are not public, so they cannot be copied.');
+
+			const raw = {
+				sizing_rule:      args?.sizing_rule ?? 'fixed',
+				fixed_sol:        args?.fixed_sol,
+				multiplier:       args?.multiplier,
+				pct_balance:      args?.pct_balance,
+				per_trade_cap_sol: args?.per_trade_cap_sol ?? 0.05,
+				min_order_sol:    args?.min_order_sol ?? 0,
+				daily_budget_sol: args?.daily_budget_sol ?? 0.5,
+				max_open_copies:  args?.max_open_copies ?? 5,
+				min_oracle_score: args?.min_oracle_score ?? null,
+				mcap_floor_usd:   args?.mcap_floor_usd ?? null,
+				mcap_ceiling_usd: args?.mcap_ceiling_usd ?? null,
+				telegram_chat_id: args?.telegram_chat_id ?? null,
+				perf_fee_bps:     args?.perf_fee_bps ?? 1000,
+			};
+
+			const norm = normalizeSubscriptionInput(raw);
+			if (!norm.ok) return mcpErr(`Invalid subscription parameters: ${norm.error}`);
+			const cfg = norm.value;
+
+			// Denormalize the leader's trading wallet from their most recent position,
+			// exactly as POST /api/copy/subscriptions does. Without it the row carries a
+			// null leader_wallet and /api/copy/settle-fee refuses the leader's
+			// performance fee with leader_wallet_unknown, so an MCP-created
+			// subscription could never pay its leader. coalesce on update keeps a
+			// previously recorded wallet when the leader has no position on this
+			// network yet.
+			let leaderWallet;
+			try {
+				const [pos] = await sql`
+					select wallet from agent_sniper_positions
+					where agent_id = ${leaderId} and network = ${network}
+					order by opened_at desc limit 1
+				`;
+				leaderWallet = pos?.wallet || null;
+			} catch (err) {
+				return unavailable(err, 'Copy-trading setup');
+			}
+
+			// One atomic upsert against the (copier_user_id, leader_agent_id, network)
+			// unique key. The previous select-then-insert lost the race between two
+			// concurrent calls and failed the second with a raw unique violation.
+			// `xmax = 0` is true only for the row this statement inserted, which is how
+			// we still report created vs updated. copy_sells and require_safety_pass are
+			// deliberately absent: this tool does not expose them, so an insert takes
+			// the table defaults and an update leaves whatever the dashboard set.
+			//
+			// The four filter/alert columns coalesce instead of overwriting. They are
+			// the only inputs with no schema default, so omitting one means "leave it
+			// alone", not "clear it". Overwriting silently wiped a copier's Telegram
+			// alert route and, worse, dropped the Oracle-score floor and market-cap
+			// band guarding their money the moment they called this tool again to
+			// change sizing. Clearing a filter stays a dashboard action.
+			let sub;
+			try {
+				[sub] = await sql`
+					insert into copy_subscriptions (
+						copier_user_id, leader_agent_id, leader_wallet, network, copier_wallet,
+						sizing_rule, fixed_sol, multiplier, pct_balance,
+						per_trade_cap_sol, min_order_sol, daily_budget_sol, max_open_copies,
+						min_oracle_score, mcap_floor_usd, mcap_ceiling_usd, telegram_chat_id,
+						perf_fee_bps, status
+					) values (
+						${auth.userId}, ${leaderId}, ${leaderWallet}, ${network}, ${wallet},
+						${cfg.sizing_rule}, ${cfg.fixed_sol}, ${cfg.multiplier}, ${cfg.pct_balance},
+						${cfg.per_trade_cap_sol}, ${cfg.min_order_sol}, ${cfg.daily_budget_sol}, ${cfg.max_open_copies},
+						${cfg.min_oracle_score}, ${cfg.mcap_floor_usd}, ${cfg.mcap_ceiling_usd}, ${cfg.telegram_chat_id},
+						${cfg.perf_fee_bps}, 'active'
+					)
+					on conflict (copier_user_id, leader_agent_id, network) do update set
+						copier_wallet     = excluded.copier_wallet,
+						leader_wallet     = coalesce(excluded.leader_wallet, copy_subscriptions.leader_wallet),
+						sizing_rule       = excluded.sizing_rule,
+						fixed_sol         = excluded.fixed_sol,
+						multiplier        = excluded.multiplier,
+						pct_balance       = excluded.pct_balance,
+						per_trade_cap_sol = excluded.per_trade_cap_sol,
+						min_order_sol     = excluded.min_order_sol,
+						daily_budget_sol  = excluded.daily_budget_sol,
+						max_open_copies   = excluded.max_open_copies,
+						min_oracle_score  = coalesce(excluded.min_oracle_score, copy_subscriptions.min_oracle_score),
+						mcap_floor_usd    = coalesce(excluded.mcap_floor_usd, copy_subscriptions.mcap_floor_usd),
+						mcap_ceiling_usd  = coalesce(excluded.mcap_ceiling_usd, copy_subscriptions.mcap_ceiling_usd),
+						telegram_chat_id  = coalesce(excluded.telegram_chat_id, copy_subscriptions.telegram_chat_id),
+						perf_fee_bps      = excluded.perf_fee_bps,
+						status            = 'active',
+						updated_at        = now()
+					returning id, status, created_at, updated_at, (xmax = 0) as inserted
+				`;
+			} catch (err) {
+				return unavailable(err, 'Copy-trading setup');
+			}
+
+			if (!sub) return mcpErr('Failed to save the copy subscription. Try again.');
+
+			const isNew = sub.inserted !== false;
+			const sizeLabel = cfg.sizing_rule === 'fixed'
+				? `${cfg.fixed_sol} SOL fixed`
+				: cfg.sizing_rule === 'multiplier'
+				? `${cfg.multiplier}× leader size`
+				: `${cfg.pct_balance}% of balance`;
+
+			const payload = {
+				success: true,
+				action:        isNew ? 'created' : 'updated',
+				subscription_id: sub.id,
+				leader_agent_id: leaderId,
+				leader_name:     leader.name,
+				copier_wallet:   wallet,
+				network,
+				config: {
+					sizing:         sizeLabel,
+					per_trade_cap:  `${cfg.per_trade_cap_sol} SOL`,
+					daily_budget:   `${cfg.daily_budget_sol} SOL`,
+					max_open:       cfg.max_open_copies,
+					min_oracle_score: cfg.min_oracle_score ?? null,
+					perf_fee_bps:   cfg.perf_fee_bps,
+				},
+				message: `Copy subscription ${isNew ? 'created' : 'updated'}. The fan-out cron will detect ${leader.name}'s next entry and generate a sized intent for your wallet. Review intents at https://three.ws/dashboard/copy`,
+				links: {
+					dashboard:    'https://three.ws/dashboard/copy',
+					leader_profile: `https://three.ws/trader/${leaderId}`,
+					leaderboard:  'https://three.ws/leaderboard',
+				},
+			};
+			return mcpOk(payload);
+		},
+	},
+
+	// ── copy_status ─────────────────────────────────────────────────────────
+	{
+		name: 'copy_status',
+		title: 'My copy subscriptions',
+		scope: 'agents:read',
+		annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+		description:
+			"List all your active copy-trading subscriptions, with sizing config, execution counts (pending/acted), and the leader's name and profile. Use this to check that copy-trading is set up correctly and to see which subscriptions are generating intents.",
+		inputSchema: {
+			type: 'object',
+			properties: {
+				network: { type: 'string', enum: ['mainnet', 'devnet'], default: 'mainnet' },
+			},
+			additionalProperties: false,
+		},
+		async handler(args, auth) {
+			if (!auth.userId) return mcpErr('Sign in to view your copy subscriptions.');
+
+			const rl = await limits.mcpIp(rateKeyFor(auth));
+			if (!rl.success) return mcpErr('Rate limit exceeded, try again in a moment.');
+
+			const network = NETWORKS.has(args?.network) ? args.network : 'mainnet';
+
+			let rows;
+			try {
+				rows = await sql`
+					select s.id, s.leader_agent_id, s.status, s.network,
+					       s.copier_wallet, s.sizing_rule, s.fixed_sol, s.multiplier, s.pct_balance,
+					       s.per_trade_cap_sol, s.daily_budget_sol, s.max_open_copies,
+					       s.min_oracle_score, s.perf_fee_bps, s.created_at, s.updated_at,
+					       a.name as leader_name, a.profile_image_url as leader_image,
+					       (select count(*) from copy_executions e
+					         where e.subscription_id = s.id and e.status = 'pending') as pending_count,
+					       (select count(*) from copy_executions e
+					         where e.subscription_id = s.id and e.status = 'acted') as acted_count
+					from copy_subscriptions s
+					join agent_identities a on a.id = s.leader_agent_id
+					where s.copier_user_id = ${auth.userId} and s.network = ${network}
+					  and s.status not in ('stopped')
+					order by s.created_at desc
+				`;
+			} catch (err) {
+				return unavailable(err, 'Your copy subscriptions list');
+			}
+
+			const subs = rows.map((s) => ({
+				id:              s.id,
+				leader_agent_id: s.leader_agent_id,
+				leader_name:     s.leader_name,
+				leader_image:    s.leader_image || null,
+				status:          s.status,
+				network:         s.network,
+				copier_wallet:   s.copier_wallet,
+				sizing_rule:     s.sizing_rule,
+				fixed_sol:       s.fixed_sol ? Number(s.fixed_sol) : null,
+				multiplier:      s.multiplier ? Number(s.multiplier) : null,
+				pct_balance:     s.pct_balance ? Number(s.pct_balance) : null,
+				per_trade_cap_sol: Number(s.per_trade_cap_sol),
+				daily_budget_sol:  Number(s.daily_budget_sol),
+				max_open_copies:   Number(s.max_open_copies),
+				min_oracle_score:  s.min_oracle_score ? Number(s.min_oracle_score) : null,
+				perf_fee_bps:      Number(s.perf_fee_bps),
+				pending_intents:   Number(s.pending_count),
+				acted_intents:     Number(s.acted_count),
+				created_at:        s.created_at,
+				profile_url:       `https://three.ws/trader/${s.leader_agent_id}`,
+			}));
+
+			// The query keeps paused rows (only 'stopped' is filtered out), so counting
+			// them all as active misreported a paused subscription as live.
+			const activeCount  = subs.filter((s) => s.status === 'active').length;
+			const pausedCount  = subs.length - activeCount;
+			const pendingTotal = subs.reduce((n, s) => n + s.pending_intents, 0);
+
+			const payload = {
+				user_id:     auth.userId,
+				network,
+				count:       subs.length,
+				active_count: activeCount,
+				paused_count: pausedCount,
+				subscriptions: subs,
+				pending_total: pendingTotal,
+				acted_total:   subs.reduce((n, s) => n + s.acted_intents, 0),
+				hint: subs.length === 0
+					? 'No copy subscriptions yet. Use trader_leaderboard to find top performers, then copy_subscribe to mirror them.'
+					: `${activeCount} active subscription${activeCount !== 1 ? 's' : ''}${pausedCount ? ` (plus ${pausedCount} paused)` : ''}. ${pendingTotal} intent${pendingTotal !== 1 ? 's' : ''} waiting to be acted on.`,
+				links: {
+					dashboard:   'https://three.ws/dashboard/copy',
+					leaderboard: 'https://three.ws/leaderboard',
+				},
+				generated_at: new Date().toISOString(),
+			};
+			return mcpOk(payload);
+		},
+	},
+];

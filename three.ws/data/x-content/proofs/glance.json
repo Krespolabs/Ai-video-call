@@ -1,0 +1,225 @@
+{
+	"id": "glance",
+	"scenarioHash": "555ee3554050a902e8248c7a5d62b3e7136a6606a9d5dec6f76c16abd974a1c2",
+	"ranAt": "2026-09-30T08:09:23.814Z",
+	"target": {
+		"commit": "07a1ab3b5",
+		"revision": "three-ws-api-00465-jlh"
+	},
+	"passed": true,
+	"steps": [
+		{
+			"index": 1,
+			"kind": "goto",
+			"target": "https://three.ws/glance",
+			"detail": "loaded https://three.ws/glance",
+			"ok": true,
+			"ms": 14779,
+			"frames": 0
+		},
+		{
+			"index": 2,
+			"kind": "hold",
+			"target": "1500",
+			"detail": "1500 ms",
+			"ok": true,
+			"ms": 18420,
+			"frames": 45
+		},
+		{
+			"index": 3,
+			"kind": "scroll",
+			"target": "150",
+			"detail": "scrolled 150 px",
+			"ok": true,
+			"ms": 9176,
+			"frames": 21
+		},
+		{
+			"index": 4,
+			"kind": "type",
+			"target": "62e1863d-3c32-4f9b-a11c-7d89ce2bcd57",
+			"detail": "typed 36 characters; GET /api/glance/card answered 200 in 36.7 s",
+			"ok": true,
+			"ms": 44554,
+			"frames": 88
+		},
+		{
+			"index": 5,
+			"kind": "expect",
+			"target": "Showing the agent you pasted",
+			"detail": "appeared after 0.1 s",
+			"ok": true,
+			"ms": 56,
+			"frames": 0
+		},
+		{
+			"index": 6,
+			"kind": "scroll",
+			"target": "300",
+			"detail": "scrolled 300 px",
+			"ok": true,
+			"ms": 13030,
+			"frames": 27
+		},
+		{
+			"index": 7,
+			"kind": "read",
+			"target": "name",
+			"detail": "name = \"Whatchget\"",
+			"ok": true,
+			"ms": 9,
+			"frames": 0
+		},
+		{
+			"index": 8,
+			"kind": "read",
+			"target": "metric",
+			"detail": "metric = \"moves today\"",
+			"ok": true,
+			"ms": 6,
+			"frames": 0
+		},
+		{
+			"index": 9,
+			"kind": "hold",
+			"target": "2200",
+			"detail": "2200 ms",
+			"ok": true,
+			"ms": 37202,
+			"frames": 66
+		},
+		{
+			"index": 10,
+			"kind": "hover",
+			"target": "#theme-select",
+			"detail": "hovered",
+			"ok": true,
+			"ms": 9629,
+			"frames": 18
+		},
+		{
+			"index": 11,
+			"kind": "press",
+			"target": "Tab",
+			"detail": "pressed Tab",
+			"ok": true,
+			"ms": 2900,
+			"frames": 6
+		},
+		{
+			"index": 12,
+			"kind": "press",
+			"target": "Tab",
+			"detail": "pressed Tab",
+			"ok": true,
+			"ms": 2401,
+			"frames": 6
+		},
+		{
+			"index": 13,
+			"kind": "press",
+			"target": "ArrowDown",
+			"detail": "pressed ArrowDown; GET /api/glance/card answered 200 in 0 s",
+			"ok": true,
+			"ms": 2432,
+			"frames": 6
+		},
+		{
+			"index": 14,
+			"kind": "press",
+			"target": "ArrowDown",
+			"detail": "pressed ArrowDown; GET /api/glance/card answered 200 in 0.1 s",
+			"ok": true,
+			"ms": 2357,
+			"frames": 6
+		},
+		{
+			"index": 15,
+			"kind": "read",
+			"target": "theme",
+			"detail": "theme = \"dark\"",
+			"ok": true,
+			"ms": 10,
+			"frames": 0
+		},
+		{
+			"index": 16,
+			"kind": "hold",
+			"target": "2200",
+			"detail": "2200 ms",
+			"ok": true,
+			"ms": 25986,
+			"frames": 66
+		},
+		{
+			"index": 17,
+			"kind": "scroll",
+			"target": "Take it with you",
+			"detail": "scrolled 458 px",
+			"ok": true,
+			"ms": 12267,
+			"frames": 30
+		},
+		{
+			"index": 18,
+			"kind": "read",
+			"target": "cli",
+			"detail": "cli = \"npx @three-ws/agent-glance\"",
+			"ok": true,
+			"ms": 9,
+			"frames": 0
+		},
+		{
+			"index": 19,
+			"kind": "hold",
+			"target": "3200",
+			"detail": "3200 ms",
+			"ok": true,
+			"ms": 34117,
+			"frames": 96
+		}
+	],
+	"facts": {
+		"name": "Whatchget",
+		"metric": "moves today",
+		"theme": "dark",
+		"cli": "npx @three-ws/agent-glance"
+	},
+	"saw": [
+		"Showing the agent you pasted"
+	],
+	"responses": [
+		{
+			"method": "GET",
+			"path": "/api/glance/card",
+			"status": 200,
+			"seconds": 36.7
+		},
+		{
+			"method": "GET",
+			"path": "/api/glance/card",
+			"status": 200,
+			"seconds": 0
+		},
+		{
+			"method": "GET",
+			"path": "/api/glance/card",
+			"status": 200,
+			"seconds": 0.1
+		}
+	],
+	"cuts": [],
+	"video": {
+		"path": "public/x-media/glance/reel.mp4",
+		"sha256": "311875747e696b01fbbeea20330777bc4a4c313cd7858272940c443d90652f05",
+		"frames": 481,
+		"motion": 1,
+		"durationSec": 16.03,
+		"width": 1280,
+		"height": 720,
+		"fps": 30,
+		"videoCodec": "h264",
+		"pixFmt": "yuv420p"
+	}
+}

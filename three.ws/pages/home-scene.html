@@ -1,0 +1,85 @@
+<!doctype html>
+<html lang="en">
+<head>
+	<script>/* three.ws theme boot */(function(){document.documentElement.classList.add('js');try{var m=localStorage.getItem('twx_theme');var l=m==='auto'?(window.matchMedia&&window.matchMedia('(prefers-color-scheme: light)').matches):m==='light';document.documentElement.setAttribute('data-theme',l?'light':'dark');}catch(e){document.documentElement.setAttribute('data-theme','dark');}})();</script>
+	<meta charset="utf-8" />
+	<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+	<title data-i18n="home_scene.meta_title">Your home, live · three.ws</title>
+	<meta name="description" content="A live 3D model of your house driven by Home Assistant: every room lit the way the real room is lit, every door and lock shown as it really is, and your agent standing in it." data-i18n-attr="content:home_scene.meta_description" />
+	<meta name="robots" content="noindex, follow" />
+	<link rel="icon" href="/favicon.ico" sizes="any" />
+	<!-- The platform PWA manifest, scope "/". A connected home is the one surface
+	     here meant to live on a screen that stays put (a kitchen tablet on a
+	     shelf), and an installed window is what makes that a display rather than
+	     a browser tab. No lane-specific manifest is invented for it. -->
+	<link rel="manifest" href="/manifest.webmanifest" />
+	<link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+	<link rel="stylesheet" href="/style.css" />
+	<link rel="stylesheet" href="/nav.css" />
+	<link rel="stylesheet" href="/fonts/fonts.css" />
+	<link rel="stylesheet" href="/home-scene.css" />
+	<!--
+		The floorplan editor's own stylesheet. It renders inside this page's Plan
+		view (src/home/floorplan.js, every class prefixed hm-plan-), and its rules
+		live in the smart-home surface's sheet, which only the /smart-home pages
+		were loading. So the editor shipped here with no styling at all: browser
+		default buttons, a 21px toolbar, and none of the touch sizing the rest of
+		the lane has. Caught by measuring its controls on an emulated phone in
+		tests/e2e/home-a11y.spec.js. The sheet is safe to add: outside a :root
+		block of --hm-* custom properties, every selector in it is scoped to an
+		hm- class, and this page uses hs- ones.
+	-->
+	<link rel="stylesheet" href="/src/home/home.css" />
+</head>
+<body>
+	<div id="nav-container"></div>
+
+	<div class="hs-shell" id="hs-shell">
+		<div class="hs-bar">
+			<a class="hs-back" href="/home">
+				<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M19 12H5M12 19l-7-7 7-7" /></svg>
+				<span data-i18n="home_scene.back">Homes</span>
+			</a>
+			<h1 class="hs-title" id="hs-title" data-i18n="home_scene.loading_title">Loading your home</h1>
+			<span class="hs-pill" id="hs-status" data-status="connecting" role="status" data-i18n="home_scene.status_connecting">Connecting</span>
+			<span class="hs-spacer"></span>
+			<button type="button" class="hs-btn" id="hs-view-3d" aria-pressed="true" data-i18n-attr="aria-label:home_scene.view_3d_aria" aria-label="Show the 3D house">3D</button>
+			<button type="button" class="hs-btn" id="hs-view-2d" aria-pressed="false" data-i18n-attr="aria-label:home_scene.view_2d_aria" aria-label="Show the house as a room and device list">2D</button>
+			<button type="button" class="hs-btn" id="hs-view-plan" aria-pressed="false" data-i18n-attr="aria-label:home_scene.view_plan_aria" aria-label="Draw where the rooms are">Plan</button>
+			<button type="button" class="hs-btn" id="hs-reconnect" hidden data-i18n="home_scene.reconnect">Reconnect</button>
+		</div>
+
+		<div class="hs-body">
+			<nav class="hs-rail" id="hs-rail" aria-label="Rooms" data-i18n-attr="aria-label:home_scene.rail_aria">
+				<p class="hs-rail-head" data-i18n="home_scene.rail_head">Rooms</p>
+				<div id="hs-rooms" class="hs-skeleton" aria-busy="true">
+					<span></span><span></span><span></span><span></span>
+				</div>
+			</nav>
+
+			<main class="hs-stage" id="hs-stage" tabindex="-1"></main>
+			<main class="hs-stage hs-stage-plan" id="hs-plan" tabindex="-1" hidden></main>
+
+			<aside class="hs-panel" id="hs-panel" aria-label="Selected device" data-i18n-attr="aria-label:home_scene.panel_aria">
+				<p class="hs-panel-empty" id="hs-panel-empty" data-i18n="home_scene.panel_empty">Pick a room from the list, or click anything in the house to see what it is and act on it.</p>
+				<div id="hs-inspector" hidden></div>
+			</aside>
+		</div>
+	</div>
+
+	<!--
+		Two live regions, on purpose. Ordinary state changes (a light going on, the
+		house going stale, a view switching) are polite: they wait for the reader to
+		finish its sentence. The guarded confirmation is assertive, because it is the
+		safety control and a person must not be able to miss the question that stands
+		between them and an unlocked front door.
+	-->
+	<p class="sr-only" id="hs-live" role="status" aria-live="polite"></p>
+	<p class="sr-only" id="hs-alert" role="alert" aria-live="assertive"></p>
+
+	<script src="/nav.js"></script>
+	<script type="module" src="/src/home/scene.js"></script>
+	<!-- Runtime i18n: detects locale, swaps annotated copy, mounts <lang-switcher>. -->
+	<script type="module" src="/i18n.js"></script>
+</body>
+</html>

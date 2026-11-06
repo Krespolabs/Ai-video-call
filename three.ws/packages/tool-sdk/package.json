@@ -1,0 +1,46 @@
+{
+	"name": "@three-ws/tool-sdk",
+	"version": "0.1.0",
+	"description": "Typed tool authoring for three.ws MCP servers: defineTool + defineExecutor + per-tool permission manifests (network allowlist, rate limits, wallet access), plus a one-call adapter into the repo's MCP tool-registration shape.",
+	"keywords": [
+		"three.ws",
+		"mcp",
+		"model-context-protocol",
+		"tool-sdk",
+		"zod",
+		"agent-tools",
+		"json-schema"
+	],
+	"author": "three.ws <support@three.ws> (https://three.ws)",
+	"license": "Apache-2.0",
+	"homepage": "https://three.ws",
+	"repository": {
+		"type": "git",
+		"url": "git+https://github.com/nirholas/three.ws.git",
+		"directory": "packages/tool-sdk"
+	},
+	"bugs": {
+		"url": "https://github.com/nirholas/three.ws/issues"
+	},
+	"private": true,
+	"type": "module",
+	"main": "./src/index.js",
+	"module": "./src/index.js",
+	"exports": {
+		".": "./src/index.js"
+	},
+	"files": [
+		"src",
+		"README.md",
+		"LICENSE"
+	],
+	"engines": {
+		"node": ">=18"
+	},
+	"scripts": {
+		"test": "vitest run tests"
+	},
+	"dependencies": {
+		"zod": "^4.6.7"
+	}
+}

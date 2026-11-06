@@ -1,0 +1,168 @@
+<!doctype html>
+<html lang="en">
+	<head>
+		<script>/* three.ws theme boot, no-flash; runtime in /theme-switcher.js */(function(){try{var m=localStorage.getItem('twx_theme');var l=m==='auto'?(window.matchMedia&&window.matchMedia('(prefers-color-scheme: light)').matches):m==='light';document.documentElement.setAttribute('data-theme',l?'light':'dark');}catch(e){document.documentElement.setAttribute('data-theme','dark');}})();</script>
+		<meta charset="utf-8" />
+		<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+		<title data-i18n="fee_bridge.meta_title">Fee Bridge · three.ws</title>
+		<meta name="description" content="Route a coin's creator fees to any X account. Recipients sign in with X and withdraw USDC on Solana, no wallet needed up front. 80% to the recipient, 20% buys $THREE for the treasury."  data-i18n-attr="content:fee_bridge.meta_description"/>
+		<meta property="og:type" content="website" />
+		<meta property="og:site_name" content="three.ws" />
+		<meta property="og:url" content="https://three.ws/fee-bridge" />
+		<meta property="og:title" content="Fee Bridge · three.ws"  data-i18n-attr="content:fee_bridge.meta_og_title"/>
+		<meta property="og:description" content="Route a coin's creator fees to any X account. Recipients sign in with X and withdraw USDC on Solana."  data-i18n-attr="content:fee_bridge.meta_og_description"/>
+		<meta property="og:image" content="https://three.ws/api/page-og?s=crypto&amp;t=Fee+Bridge&amp;d=Creator+fees%2C+paid+to+an+X+account+in+USDC.&amp;p=%2Ffee-bridge" />
+		<meta property="og:image:width" content="1200" />
+		<meta property="og:image:height" content="630" />
+		<meta property="og:image:alt" content="Fee Bridge on three.ws" />
+		<meta property="og:locale" content="en_US" />
+		<meta name="twitter:card" content="summary_large_image" />
+		<meta name="twitter:site" content="@trythreews" />
+		<meta name="twitter:title" content="Fee Bridge · three.ws"  data-i18n-attr="content:fee_bridge.meta_twitter_title"/>
+		<meta name="twitter:description" content="Route a coin's creator fees to any X account. Recipients sign in with X and withdraw USDC on Solana."  data-i18n-attr="content:fee_bridge.meta_twitter_description"/>
+		<meta name="twitter:image" content="https://three.ws/api/page-og?s=crypto&amp;t=Fee+Bridge&amp;d=Creator+fees%2C+paid+to+an+X+account+in+USDC.&amp;p=%2Ffee-bridge" />
+		<meta name="theme-color" content="#0a0a0a" />
+		<meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1" />
+		<link rel="canonical" href="https://three.ws/fee-bridge" />
+		<link rel="icon" href="/favicon.ico" sizes="any" />
+		<link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+		<link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png" />
+		<link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png" />
+		<link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+		<link rel="manifest" href="/manifest.webmanifest" />
+		<link rel="stylesheet" href="/fonts/fonts.css" />
+		<link rel="stylesheet" href="/nav.css" />
+		<link rel="stylesheet" href="/src/fee-bridge.css" />
+		<link rel="stylesheet" href="/footer.css" />
+		<script defer src="/footer-newsletter.js"></script>
+		<script type="application/ld+json">{"@context":"https://schema.org","@type":"WebPage","name":"Fee Bridge","description":"Route a coin's creator fees to any X account. Recipients sign in with X and withdraw USDC on Solana.","url":"https://three.ws/fee-bridge","isPartOf":{"@type":"WebSite","name":"three.ws","url":"https://three.ws"}}</script>
+	</head>
+	<body>
+		<header><div id="nav-container"></div></header>
+		<script src="/nav.js"></script>
+
+		<main class="fb-shell" aria-labelledby="fb-title">
+			<section class="fb-hero">
+				<p class="fb-kicker" data-i18n="fee_bridge.fee_bridge_solana">Fee Bridge · Solana</p>
+				<h1 id="fb-title" class="fb-title" data-i18n="fee_bridge.creator_fees_paid_to_an_x_account">Creator fees, paid to an&nbsp;X&nbsp;account in&nbsp;USDC.</h1>
+				<p class="fb-sub" data-i18n="fee_bridge.point_a_coin_s_creator_fees_at">
+					Point a coin's creator fees at the bridge and name an X handle. The owner of that handle signs in
+					with X and withdraws dollars on Solana. They never need a wallet before the money shows up.
+				</p>
+				<div class="fb-ctas">
+					<a class="fb-btn fb-btn-primary" href="#claim" data-i18n="fee_bridge.claim_your_payouts">Claim your payouts</a>
+					<a class="fb-btn" href="#route" data-i18n="fee_bridge.route_a_coin_s_fees">Route a coin's fees</a>
+					<a class="fb-btn fb-btn-quiet" href="/docs/fee-bridge" data-i18n="fee_bridge.how_it_works">How it works</a>
+				</div>
+				<div id="fb-banner" class="fb-banner" hidden role="status"></div>
+			</section>
+
+			<section class="fb-stats" aria-label="Fee Bridge totals">
+				<div class="fb-stat"><span class="fb-stat-n" id="fb-stat-paid" data-skel>&nbsp;</span><span class="fb-stat-l" data-i18n="fee_bridge.paid_out_in_usdc">Paid out in USDC</span></div>
+				<div class="fb-stat"><span class="fb-stat-n" id="fb-stat-unpaid" data-skel>&nbsp;</span><span class="fb-stat-l" data-i18n="fee_bridge.waiting_to_be_claimed">Waiting to be claimed</span></div>
+				<div class="fb-stat"><span class="fb-stat-n" id="fb-stat-coins" data-skel>&nbsp;</span><span class="fb-stat-l" data-i18n="fee_bridge.coins_routing_fees">Coins routing fees</span></div>
+				<div class="fb-stat"><span class="fb-stat-n" id="fb-stat-buyback" data-skel>&nbsp;</span><span class="fb-stat-l" data-i18n="fee_bridge.spent_buying_three">Spent buying $THREE</span></div>
+			</section>
+
+			<section class="fb-grid">
+				<article id="claim" class="fb-card fb-claim" aria-labelledby="fb-claim-title">
+					<header class="fb-card-head">
+						<h2 id="fb-claim-title" data-i18n="fee_bridge.your_payouts">Your payouts</h2>
+						<span class="fb-chip" id="fb-claim-chip" hidden></span>
+					</header>
+					<div id="fb-claim-body" class="fb-claim-body" aria-live="polite">
+						<div class="fb-skel fb-skel-lg"></div>
+						<div class="fb-skel"></div>
+						<div class="fb-skel fb-skel-sm"></div>
+					</div>
+				</article>
+
+				<article class="fb-card fb-lookup" aria-labelledby="fb-lookup-title">
+					<header class="fb-card-head"><h2 id="fb-lookup-title" data-i18n="fee_bridge.check_any_handle">Check any handle</h2></header>
+					<form id="fb-lookup-form" class="fb-inline-form" novalidate>
+						<label class="fb-sr" for="fb-lookup-input" data-i18n="fee_bridge.x_handle">X handle</label>
+						<span class="fb-at" aria-hidden="true">@</span>
+						<input id="fb-lookup-input" name="handle" autocomplete="off" spellcheck="false" placeholder="handle" maxlength="60" />
+						<button class="fb-btn" type="submit" data-i18n="fee_bridge.look_up">Look up</button>
+					</form>
+					<div id="fb-lookup-out" class="fb-lookup-out" aria-live="polite">
+						<p class="fb-muted" data-i18n="fee_bridge.see_what_any_x_account_has_earned">See what any X account has earned through the bridge, and which coins pay it.</p>
+					</div>
+				</article>
+			</section>
+
+			<section class="fb-how" aria-labelledby="fb-how-title">
+				<h2 id="fb-how-title" class="fb-h2" data-i18n="fee_bridge.how_the_money_moves">How the money moves</h2>
+				<ol class="fb-steps">
+					<li>
+						<span class="fb-step-n">1</span>
+						<h3 data-i18n="fee_bridge.fees_route_to_the_bridge">Fees route to the bridge</h3>
+						<p data-i18n="fee_bridge.the_coin_s_pump_fun_fee_sharing">The coin's pump.fun fee-sharing config sends 100% of creator fees to the bridge wallet, and the coin is registered to an X handle.</p>
+					</li>
+					<li>
+						<span class="fb-step-n">2</span>
+						<h3 data-i18n="fee_bridge.converted_to_dollars">Converted to dollars</h3>
+						<p data-i18n="fee_bridge.every_ten_minutes_the_bridge_distributes_acc">Every ten minutes the bridge distributes accrued fees, swaps the SOL to USDC on Jupiter, and credits the handle.</p>
+					</li>
+					<li>
+						<span class="fb-step-n">3</span>
+						<h3 data-i18n="fee_bridge.claimed_with_x">Claimed with X</h3>
+						<p data-i18n="fee_bridge.the_handle_s_owner_signs_in_with">The handle's owner signs in with X and withdraws to a Solana wallet. Once a wallet is linked, balances over the auto-payout floor are sent automatically.</p>
+					</li>
+				</ol>
+				<div class="fb-split" id="fb-split" aria-label="How each dollar is split">
+					<div class="fb-split-bar"><span class="fb-split-a" id="fb-split-a" style="--w: 80%"></span><span class="fb-split-b" id="fb-split-b" style="--w: 20%"></span></div>
+					<div class="fb-split-legend">
+						<span><i class="fb-dot fb-dot-a"></i><b id="fb-split-a-l">80%</b> <span data-i18n="fee_bridge.80_to_the_recipient_in_usdc_label2">to the recipient, in USDC</span></span>
+						<span><i class="fb-dot fb-dot-b"></i><b id="fb-split-b-l">20%</b> <span data-i18n="fee_bridge.20_buys_three_for_the_treasury_label2">buys $THREE for the treasury</span></span>
+					</div>
+				</div>
+			</section>
+
+			<section id="route" class="fb-card fb-route" aria-labelledby="fb-route-title">
+				<header class="fb-card-head"><h2 id="fb-route-title" data-i18n="fee_bridge.route_a_coin_s_fees_2">Route a coin's fees</h2></header>
+				<div class="fb-route-grid">
+					<div>
+						<h3 class="fb-h3" data-i18n="fee_bridge.launched_on_three_ws">Launched on three.ws?</h3>
+						<p class="fb-muted" data-i18n-html="fee_bridge.open_the_coin_s_fees_rewards_panel">Open the coin's <b>Fees &amp; rewards</b> panel from your <a href="/dashboard/tokens">tokens dashboard</a> or the agent page and choose <b>Pay an X account in USDC</b>. It writes the split and registers the handle in one step.</p>
+						<h3 class="fb-h3" data-i18n="fee_bridge.any_other_pump_fun_coin">Any other pump.fun coin</h3>
+						<ol class="fb-list">
+							<li data-i18n="fee_bridge.with_the_coin_s_creator_wallet_set">With the coin's creator wallet, set its fee-sharing config to one shareholder: the bridge wallet below, at 100%.</li>
+							<li data-i18n="fee_bridge.link_that_creator_wallet_to_your_three">Link that creator wallet to your three.ws account, then register the coin here.</li>
+						</ol>
+						<div class="fb-wallet-copy">
+							<code id="fb-bridge-addr" class="fb-addr">loading bridge wallet</code>
+							<button class="fb-btn fb-btn-sm" id="fb-copy-addr" type="button" disabled data-i18n="fee_bridge.copy">Copy</button>
+						</div>
+						<p class="fb-warn" data-i18n="fee_bridge.a_pump_fun_fee_sharing_update_is">A pump.fun fee-sharing update is usually final. Check the handle before you sign: a registered coin cannot be pointed at a different handle later.</p>
+					</div>
+					<form id="fb-register" class="fb-form" novalidate>
+						<label for="fb-reg-mint" data-i18n="fee_bridge.coin_mint">Coin mint</label>
+						<input id="fb-reg-mint" name="mint" autocomplete="off" spellcheck="false" placeholder="Mint address" maxlength="44" required />
+						<label for="fb-reg-handle" data-i18n="fee_bridge.pay_this_x_handle">Pay this X handle</label>
+						<div class="fb-inline-input"><span class="fb-at" aria-hidden="true">@</span><input id="fb-reg-handle" name="handle" autocomplete="off" spellcheck="false" placeholder="handle" maxlength="60" required /></div>
+						<button class="fb-btn fb-btn-primary" type="submit" id="fb-reg-submit" data-i18n="fee_bridge.register_coin">Register coin</button>
+						<div id="fb-reg-out" class="fb-form-out" aria-live="polite"></div>
+					</form>
+				</div>
+			</section>
+
+			<section class="fb-ledger" aria-labelledby="fb-ledger-title">
+				<div class="fb-ledger-col">
+					<h2 id="fb-ledger-title" class="fb-h2" data-i18n="fee_bridge.latest_payouts">Latest payouts</h2>
+					<ul id="fb-payouts" class="fb-rows"><li class="fb-skel"></li><li class="fb-skel"></li><li class="fb-skel"></li></ul>
+				</div>
+				<div class="fb-ledger-col">
+					<h2 class="fb-h2" data-i18n="fee_bridge.coins_routing_fees_2">Coins routing fees</h2>
+					<ul id="fb-coins" class="fb-rows"><li class="fb-skel"></li><li class="fb-skel"></li><li class="fb-skel"></li></ul>
+				</div>
+			</section>
+		</main>
+
+		<script type="module" src="/src/fee-bridge.js"></script>
+		<script src="/brand.js" defer></script>
+		<div id="footer-container"></div>
+		<script src="/footer.js"></script>
+		<script type="module" src="/i18n.js"></script>
+	</body>
+</html>

@@ -1,0 +1,1 @@
+An MCP server that lets an AI burn $THREE on @solana. three_burn is flagged irreversible and by default won't sign without confirm: true. three.ws/mcp-tools?server=three-token-mcp

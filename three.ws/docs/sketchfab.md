@@ -1,0 +1,111 @@
+# Sketchfab showcase
+
+The best community-made forge models are published to the official three.ws
+account on [Sketchfab](https://sketchfab.com), the largest public 3D model
+site. Each model page there links back to the creation on three.ws, so the
+showcase doubles as a discovery channel: someone browsing Sketchfab finds a
+model, follows the link, and can remix it or forge their own.
+
+This is a curated feed, not a mirror. Only models the community has already
+validated get pushed, a few per week.
+
+## What gets picked
+
+Selection runs three times a week (Mon/Wed/Fri) and takes up to
+`SKETCHFAB_UPLOADS_PER_RUN` models per run (default 2), in this order:
+
+1. **Weekly Forge-Off winners.** The creation crowned by community vote each
+   week on the [forge board](/forge) is the strongest curation signal on the
+   platform and always goes first.
+2. **Top-voted board models.** Anything with at least one community upvote,
+   highest votes first.
+3. **Creator-validated models.** Creations whose maker explicitly accepted
+   the result or downloaded the GLB, newest first. This tier keeps the
+   showcase alive while board voting ramps up. Raw unreviewed output is
+   never pushed.
+
+A model is skipped when its GLB exceeds the Sketchfab upload cap (45 MB
+guard), when it was already uploaded, or when it failed three times.
+
+**Brand safety.** The official account never publishes firearms or explicit
+content, regardless of what the forge itself allows. A conservative
+word-boundary denylist filters the selection query and re-checks before
+upload, and the NemoGuard content classifier in `api/_lib/publish-safety.js`
+runs as a second, fail-open layer. Both are limits on what this account
+publishes, not on what users may forge. Blocked creations are parked in the ledger (`blocked`) and never
+re-picked. Refinement children are also excluded from the creator-validated
+tier, since their prompts are instructions, not titles.
+
+## What an upload looks like
+
+Every published model carries:
+
+- **The generation prompt** at the top of the description, in quotes. The
+  model's name is the prompt with a leading article stripped and clamped to
+  Sketchfab's display limit; a creation whose stored prompt is a placeholder
+  rather than a description (the image-to-3D path stores its route name,
+  `image-to-3d`, as the prompt) is named from its forge category instead
+  ("Forged Sci-Fi"), falling back to "3D Model" for the catch-all buckets, so
+  a winning image-derived model never reaches the account titled after a
+  route.
+- **AI disclosure**: Sketchfab's "Created With AI" tag (slug `createdwithai`),
+  which its [AI-generated content policy](https://help.sketchfab.com/en/articles/16152133)
+  requires on AI-generated models, plus a plain statement that the model was
+  AI-generated on the three.ws Forge. Without the tag Sketchfab can file the
+  model as "Human Created" in its search filters.
+- **Backlinks with UTM parameters** (`utm_source=sketchfab`,
+  `utm_medium=referral`, `utm_campaign=showcase`): one to the creation's
+  [share page](/docs/share-and-embed) (`/forge/share/<id>`), one to
+  [/forge](/forge). The UTM tags make Sketchfab referrals measurable in
+  analytics, which decides whether the cadence goes up or down.
+- **Tags**: `createdwithai`, `ai-generated`, `generative-ai`, `text-to-3d`, `threews`, plus the
+  model's category.
+
+Models are published viewable and inspectable but not downloadable: creations
+belong to their creators, and the showcase does not relicense them.
+
+## How it runs
+
+`GET /api/cron/sketchfab-showcase` (Cloud Scheduler, `Bearer $CRON_SECRET`):
+
+1. Refreshes the async processing status of recent uploads
+   (`uploaded` becomes `live` when Sketchfab finishes processing).
+2. Selects candidates and claims each in the `sketchfab_uploads` ledger
+   before any network call, so a retried or concurrent run can never
+   double-upload.
+3. Downloads the stored GLB and posts it to the
+   [Sketchfab Data API v3](https://docs.sketchfab.com/data-api/v3/index.html)
+   (`POST /v3/models`, multipart).
+
+`?dry_run=1` returns the current selection without uploading anything.
+
+## Configuration
+
+| Env var | Meaning |
+|---|---|
+| `SKETCHFAB_API_TOKEN` | Data API token of the official account (Sketchfab settings, Password & API). Unset: the cron is dormant and skips cleanly. |
+| `SKETCHFAB_UPLOADS_PER_RUN` | Models per run, default 2, clamped 1-5. At the Mon/Wed/Fri schedule the default publishes up to 6 models a week. |
+
+State lives in the `sketchfab_uploads` table (one row per creation:
+`pending`, `uploaded`, `live`, `failed` with the error recorded, or `blocked`
+when the brand-safety gate parked it). Code:
+[`api/cron/sketchfab-showcase.js`](https://github.com/nirholas/three.ws/blob/main/api/cron/sketchfab-showcase.js)
+and [`api/_lib/sketchfab.js`](https://github.com/nirholas/three.ws/blob/main/api/_lib/sketchfab.js).
+
+## Backfilling the AI tag on older uploads
+
+New uploads carry `createdwithai` from 2026-10-09 (commit `919e54e82`). Models the account
+published before that date do not, and Sketchfab can file them as "Human Created". The backfill
+script adds the tag to every model that lacks it and changes nothing else:
+
+```bash
+eval "$(node scripts/read-service-env.mjs '^SKETCHFAB_API_TOKEN$')"
+node scripts/sketchfab-retag.mjs            # dry run: prints exactly what would change
+node scripts/sketchfab-retag.mjs --apply    # PATCH /v3/models/{uid} for each model missing the tag
+node scripts/sketchfab-retag.mjs            # second dry run: must report 0 to change
+```
+
+Without a token, `--user <username>` runs a read-only dry run against the public listing. Sketchfab
+replaces the whole tag list on PATCH, so each request carries the model's existing tags in order
+plus `createdwithai`, and nothing else. A `429` is retried after Sketchfab's `Retry-After`.
+Tests: `tests/sketchfab-retag.test.js`.

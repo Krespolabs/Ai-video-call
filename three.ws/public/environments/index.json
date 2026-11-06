@@ -1,0 +1,1032 @@
+{
+	"version": 1,
+	"default": "park",
+	"environments": [
+		{
+			"name": "park",
+			"label": "Park",
+			"kind": "outdoor",
+			"blurb": "Rolling green with shade trees, benches, and lamp posts.",
+			"scene": "park/scene.glb",
+			"hdr": "park/env.hdr",
+			"preview": "park/preview.jpg",
+			"terrain": {
+				"amplitude": 0.85,
+				"color": "#2f6b2c",
+				"seed": 4011
+			},
+			"sky": {
+				"top": "#3f87c8",
+				"bottom": "#bfe3f5"
+			},
+			"light": {
+				"ambient": {
+					"color": "#fff7e6",
+					"intensity": 0.5
+				},
+				"hemi": {
+					"sky": "#a8d8ea",
+					"ground": "#3a5a28",
+					"intensity": 0.75
+				},
+				"sun": {
+					"color": "#fff2d2",
+					"intensity": 1.7,
+					"direction": [
+						5,
+						9,
+						6
+					]
+				}
+			},
+			"envIntensity": 0.85,
+			"grid": null,
+			"dynamicProps": {
+				"balls": 3,
+				"crates": 2
+			},
+			"colliders": [
+				{
+					"type": "cylinder",
+					"x": 9.186,
+					"z": 1.892,
+					"radius": 0.375,
+					"halfHeight": 1.125
+				},
+				{
+					"type": "cylinder",
+					"x": 7.268,
+					"z": 5.227,
+					"radius": 0.33,
+					"halfHeight": 0.99
+				},
+				{
+					"type": "cylinder",
+					"x": 6.288,
+					"z": 6.906,
+					"radius": 0.384,
+					"halfHeight": 1.151
+				},
+				{
+					"type": "cylinder",
+					"x": 1.397,
+					"z": 5.827,
+					"radius": 0.265,
+					"halfHeight": 0.794
+				},
+				{
+					"type": "cylinder",
+					"x": -0.271,
+					"z": 9.848,
+					"radius": 0.359,
+					"halfHeight": 1.076
+				},
+				{
+					"type": "cylinder",
+					"x": -4.15,
+					"z": 4.167,
+					"radius": 0.29,
+					"halfHeight": 0.87
+				},
+				{
+					"type": "cylinder",
+					"x": -7.798,
+					"z": 6.079,
+					"radius": 0.272,
+					"halfHeight": 0.815
+				},
+				{
+					"type": "cylinder",
+					"x": -8.909,
+					"z": 3.038,
+					"radius": 0.293,
+					"halfHeight": 0.879
+				},
+				{
+					"type": "cylinder",
+					"x": -7.304,
+					"z": -1.952,
+					"radius": 0.338,
+					"halfHeight": 1.013
+				},
+				{
+					"type": "cylinder",
+					"x": -6.647,
+					"z": -2.967,
+					"radius": 0.373,
+					"halfHeight": 1.12
+				},
+				{
+					"type": "cylinder",
+					"x": -4.194,
+					"z": -7.642,
+					"radius": 0.385,
+					"halfHeight": 1.154
+				},
+				{
+					"type": "cylinder",
+					"x": -1.709,
+					"z": -7.742,
+					"radius": 0.313,
+					"halfHeight": 0.938
+				},
+				{
+					"type": "cylinder",
+					"x": 0.347,
+					"z": -8.791,
+					"radius": 0.398,
+					"halfHeight": 1.195
+				},
+				{
+					"type": "cylinder",
+					"x": 3.426,
+					"z": -6.328,
+					"radius": 0.368,
+					"halfHeight": 1.103
+				},
+				{
+					"type": "cylinder",
+					"x": 4.601,
+					"z": -4.587,
+					"radius": 0.285,
+					"halfHeight": 0.855
+				},
+				{
+					"type": "cylinder",
+					"x": 7.676,
+					"z": -0.836,
+					"radius": 0.381,
+					"halfHeight": 1.143
+				},
+				{
+					"type": "box",
+					"x": -2.6,
+					"z": 1.4,
+					"hx": 0.75,
+					"hy": 0.42,
+					"hz": 0.21,
+					"rotationY": 0.5
+				},
+				{
+					"type": "box",
+					"x": 2.6,
+					"z": -1.6,
+					"hx": 0.75,
+					"hy": 0.42,
+					"hz": 0.21,
+					"rotationY": -0.6
+				},
+				{
+					"type": "cylinder",
+					"x": 2.404,
+					"z": 2.404,
+					"radius": 0.12,
+					"halfHeight": 1.2
+				},
+				{
+					"type": "cylinder",
+					"x": -2.404,
+					"z": 2.404,
+					"radius": 0.12,
+					"halfHeight": 1.2
+				},
+				{
+					"type": "cylinder",
+					"x": -2.404,
+					"z": -2.404,
+					"radius": 0.12,
+					"halfHeight": 1.2
+				},
+				{
+					"type": "cylinder",
+					"x": 2.404,
+					"z": -2.404,
+					"radius": 0.12,
+					"halfHeight": 1.2
+				}
+			]
+		},
+		{
+			"name": "cyberpunk",
+			"label": "Cyberpunk",
+			"kind": "night",
+			"blurb": "Neon-trimmed towers and holo signs over a rain-dark street.",
+			"scene": "cyberpunk/scene.glb",
+			"hdr": "cyberpunk/env.hdr",
+			"preview": "cyberpunk/preview.jpg",
+			"terrain": {
+				"amplitude": 0.06,
+				"color": "#0e0d14",
+				"seed": 5120
+			},
+			"sky": {
+				"top": "#0a0612",
+				"bottom": "#2a1140"
+			},
+			"light": {
+				"ambient": {
+					"color": "#6a4fd0",
+					"intensity": 0.35
+				},
+				"hemi": {
+					"sky": "#3a2a6a",
+					"ground": "#1a0f2a",
+					"intensity": 0.5
+				},
+				"sun": {
+					"color": "#ff5ad0",
+					"intensity": 0.7,
+					"direction": [
+						-4,
+						6,
+						-3
+					]
+				}
+			},
+			"envIntensity": 1.1,
+			"grid": null,
+			"dynamicProps": {
+				"balls": 3,
+				"crates": 3
+			},
+			"colliders": [
+				{
+					"type": "box",
+					"x": 10.523,
+					"z": 0.744,
+					"hx": 0.643,
+					"hy": 1.805,
+					"hz": 0.705,
+					"rotationY": 0.914
+				},
+				{
+					"type": "box",
+					"x": 8.847,
+					"z": 3.409,
+					"hx": 1.104,
+					"hy": 1.892,
+					"hz": 1.022,
+					"rotationY": 0.728
+				},
+				{
+					"type": "box",
+					"x": 5.975,
+					"z": 5.769,
+					"hx": 0.861,
+					"hy": 3.794,
+					"hz": 0.627,
+					"rotationY": 0.405
+				},
+				{
+					"type": "box",
+					"x": 4.378,
+					"z": 9.598,
+					"hx": 0.97,
+					"hy": 3.015,
+					"hz": 0.6,
+					"rotationY": 1.354
+				},
+				{
+					"type": "box",
+					"x": 0.964,
+					"z": 11.009,
+					"hx": 1.002,
+					"hy": 2.926,
+					"hz": 1.074,
+					"rotationY": 0.849
+				},
+				{
+					"type": "box",
+					"x": -1.858,
+					"z": 7.883,
+					"hx": 0.514,
+					"hy": 1.811,
+					"hz": 0.882,
+					"rotationY": 1.27
+				},
+				{
+					"type": "box",
+					"x": -4.876,
+					"z": 7.92,
+					"hx": 0.932,
+					"hy": 1.44,
+					"hz": 0.987,
+					"rotationY": 2.38
+				},
+				{
+					"type": "box",
+					"x": -8.31,
+					"z": 6.546,
+					"hx": 0.537,
+					"hy": 3.886,
+					"hz": 0.73,
+					"rotationY": 2.707
+				},
+				{
+					"type": "box",
+					"x": -8.798,
+					"z": 3.137,
+					"hx": 1.122,
+					"hy": 3.313,
+					"hz": 0.982,
+					"rotationY": 3.008
+				},
+				{
+					"type": "box",
+					"x": -9.184,
+					"z": -0.708,
+					"hx": 0.994,
+					"hy": 3.301,
+					"hz": 0.919,
+					"rotationY": 2.916
+				},
+				{
+					"type": "box",
+					"x": -9.697,
+					"z": -3.912,
+					"hx": 0.987,
+					"hy": 2.716,
+					"hz": 0.93,
+					"rotationY": 1.957
+				},
+				{
+					"type": "box",
+					"x": -6.195,
+					"z": -6.384,
+					"hx": 0.704,
+					"hy": 1.512,
+					"hz": 1.079,
+					"rotationY": 0.233
+				},
+				{
+					"type": "box",
+					"x": -3.621,
+					"z": -7.444,
+					"hx": 0.808,
+					"hy": 3.608,
+					"hz": 0.821,
+					"rotationY": 2.129
+				},
+				{
+					"type": "box",
+					"x": -1.604,
+					"z": -9.815,
+					"hx": 0.897,
+					"hy": 3.378,
+					"hz": 0.699,
+					"rotationY": 0.456
+				},
+				{
+					"type": "box",
+					"x": 1.833,
+					"z": -8.456,
+					"hx": 0.804,
+					"hy": 3.056,
+					"hz": 0.651,
+					"rotationY": 0.092
+				},
+				{
+					"type": "box",
+					"x": 6.408,
+					"z": -9.263,
+					"hx": 1.04,
+					"hy": 2.909,
+					"hz": 0.961,
+					"rotationY": 1.27
+				},
+				{
+					"type": "box",
+					"x": 7.44,
+					"z": -5.657,
+					"hx": 0.833,
+					"hy": 3.551,
+					"hz": 1.052,
+					"rotationY": 2.985
+				},
+				{
+					"type": "box",
+					"x": 8.21,
+					"z": -1.985,
+					"hx": 0.933,
+					"hy": 2.373,
+					"hz": 1.116,
+					"rotationY": 2.408
+				},
+				{
+					"type": "cylinder",
+					"x": 3.794,
+					"z": 2.073,
+					"radius": 0.14,
+					"halfHeight": 1
+				},
+				{
+					"type": "cylinder",
+					"x": -0.866,
+					"z": 4.607,
+					"radius": 0.14,
+					"halfHeight": 1
+				},
+				{
+					"type": "cylinder",
+					"x": -5.505,
+					"z": 0.71,
+					"radius": 0.14,
+					"halfHeight": 1
+				},
+				{
+					"type": "cylinder",
+					"x": -2.011,
+					"z": -4.244,
+					"radius": 0.14,
+					"halfHeight": 1
+				},
+				{
+					"type": "cylinder",
+					"x": 3.344,
+					"z": -3.157,
+					"radius": 0.14,
+					"halfHeight": 1
+				},
+				{
+					"type": "box",
+					"x": 2.8,
+					"z": 0,
+					"hx": 0.65,
+					"hy": 0.25,
+					"hz": 0.11,
+					"rotationY": 1.571
+				},
+				{
+					"type": "box",
+					"x": 1.4,
+					"z": 2.425,
+					"hx": 0.65,
+					"hy": 0.25,
+					"hz": 0.11,
+					"rotationY": 2.618
+				},
+				{
+					"type": "box",
+					"x": -1.4,
+					"z": 2.425,
+					"hx": 0.65,
+					"hy": 0.25,
+					"hz": 0.11,
+					"rotationY": 3.665
+				},
+				{
+					"type": "box",
+					"x": -2.8,
+					"z": 0,
+					"hx": 0.65,
+					"hy": 0.25,
+					"hz": 0.11,
+					"rotationY": 4.712
+				},
+				{
+					"type": "box",
+					"x": -1.4,
+					"z": -2.425,
+					"hx": 0.65,
+					"hy": 0.25,
+					"hz": 0.11,
+					"rotationY": 5.76
+				},
+				{
+					"type": "box",
+					"x": 1.4,
+					"z": -2.425,
+					"hx": 0.65,
+					"hy": 0.25,
+					"hz": 0.11,
+					"rotationY": 6.807
+				}
+			]
+		},
+		{
+			"name": "beach",
+			"label": "Beach",
+			"kind": "outdoor",
+			"blurb": "Bright sand, palm trees, parasols, and a turquoise sea.",
+			"scene": "beach/scene.glb",
+			"hdr": "beach/env.hdr",
+			"preview": "beach/preview.jpg",
+			"terrain": {
+				"amplitude": 0.5,
+				"color": "#d8c79a",
+				"seed": 2208
+			},
+			"sky": {
+				"top": "#2f7dd8",
+				"bottom": "#bfe9f7"
+			},
+			"light": {
+				"ambient": {
+					"color": "#fff8e7",
+					"intensity": 0.65
+				},
+				"hemi": {
+					"sky": "#cfe9ff",
+					"ground": "#c2b280",
+					"intensity": 0.8
+				},
+				"sun": {
+					"color": "#fff0c4",
+					"intensity": 1.9,
+					"direction": [
+						6,
+						8,
+						4
+					]
+				}
+			},
+			"envIntensity": 1,
+			"grid": null,
+			"dynamicProps": {
+				"balls": 5,
+				"crates": 0
+			},
+			"colliders": [
+				{
+					"type": "cylinder",
+					"x": -0.812,
+					"z": 7.387,
+					"radius": 0.26,
+					"halfHeight": 1.25
+				},
+				{
+					"type": "cylinder",
+					"x": -4.314,
+					"z": 5.217,
+					"radius": 0.26,
+					"halfHeight": 1.25
+				},
+				{
+					"type": "cylinder",
+					"x": -7.262,
+					"z": 4.174,
+					"radius": 0.26,
+					"halfHeight": 1.25
+				},
+				{
+					"type": "cylinder",
+					"x": -8.905,
+					"z": 1.612,
+					"radius": 0.26,
+					"halfHeight": 1.25
+				},
+				{
+					"type": "cylinder",
+					"x": -8.534,
+					"z": -2.386,
+					"radius": 0.26,
+					"halfHeight": 1.25
+				},
+				{
+					"type": "cylinder",
+					"x": -6.829,
+					"z": -4.774,
+					"radius": 0.26,
+					"halfHeight": 1.25
+				},
+				{
+					"type": "cylinder",
+					"x": -4.779,
+					"z": -7.944,
+					"radius": 0.26,
+					"halfHeight": 1.25
+				},
+				{
+					"type": "cylinder",
+					"x": -0.812,
+					"z": -7.809,
+					"radius": 0.26,
+					"halfHeight": 1.25
+				},
+				{
+					"type": "cylinder",
+					"x": -2.2,
+					"z": 2,
+					"radius": 0.1,
+					"halfHeight": 1
+				},
+				{
+					"type": "cylinder",
+					"x": 2.6,
+					"z": 1.2,
+					"radius": 0.1,
+					"halfHeight": 1
+				},
+				{
+					"type": "cylinder",
+					"x": 4.37,
+					"z": 3.428,
+					"radius": 0.506,
+					"halfHeight": 0.357
+				},
+				{
+					"type": "cylinder",
+					"x": 4.33,
+					"z": 1.355,
+					"radius": 0.548,
+					"halfHeight": 0.387
+				},
+				{
+					"type": "cylinder",
+					"x": 6.681,
+					"z": 0.638,
+					"radius": 0.386,
+					"halfHeight": 0.272
+				},
+				{
+					"type": "cylinder",
+					"x": -1.801,
+					"z": 4.95,
+					"radius": 0.608,
+					"halfHeight": 0.429
+				}
+			]
+		},
+		{
+			"name": "gallery",
+			"label": "Gallery",
+			"kind": "indoor",
+			"blurb": "White-walled exhibition space — pedestals and hung artwork.",
+			"scene": "gallery/scene.glb",
+			"hdr": "gallery/env.hdr",
+			"preview": "gallery/preview.jpg",
+			"terrain": {
+				"amplitude": 0,
+				"color": "#e9e6df",
+				"seed": 100
+			},
+			"sky": {
+				"top": "#f7f6f3",
+				"bottom": "#d9d6cf"
+			},
+			"light": {
+				"ambient": {
+					"color": "#ffffff",
+					"intensity": 0.85
+				},
+				"hemi": {
+					"sky": "#ffffff",
+					"ground": "#d9d6cf",
+					"intensity": 0.9
+				},
+				"sun": {
+					"color": "#ffffff",
+					"intensity": 1.1,
+					"direction": [
+						3,
+						10,
+						5
+					]
+				}
+			},
+			"envIntensity": 1.15,
+			"grid": null,
+			"dynamicProps": {
+				"balls": 2,
+				"crates": 0
+			},
+			"colliders": [
+				{
+					"type": "box",
+					"x": 8.5,
+					"z": 0,
+					"hx": 1.4,
+					"hy": 1.7,
+					"hz": 0.1,
+					"rotationY": 3.142
+				},
+				{
+					"type": "box",
+					"x": 7.361,
+					"z": 4.25,
+					"hx": 1.4,
+					"hy": 1.7,
+					"hz": 0.1,
+					"rotationY": 3.665
+				},
+				{
+					"type": "box",
+					"x": 4.25,
+					"z": 7.361,
+					"hx": 1.4,
+					"hy": 1.7,
+					"hz": 0.1,
+					"rotationY": 4.189
+				},
+				{
+					"type": "box",
+					"x": 0,
+					"z": 8.5,
+					"hx": 1.4,
+					"hy": 1.7,
+					"hz": 0.1,
+					"rotationY": 4.712
+				},
+				{
+					"type": "box",
+					"x": -4.25,
+					"z": 7.361,
+					"hx": 1.4,
+					"hy": 1.7,
+					"hz": 0.1,
+					"rotationY": 5.236
+				},
+				{
+					"type": "box",
+					"x": -7.361,
+					"z": 4.25,
+					"hx": 1.4,
+					"hy": 1.7,
+					"hz": 0.1,
+					"rotationY": 5.76
+				},
+				{
+					"type": "box",
+					"x": -8.5,
+					"z": 0,
+					"hx": 1.4,
+					"hy": 1.7,
+					"hz": 0.1,
+					"rotationY": 6.283
+				},
+				{
+					"type": "box",
+					"x": -7.361,
+					"z": -4.25,
+					"hx": 1.4,
+					"hy": 1.7,
+					"hz": 0.1,
+					"rotationY": 6.807
+				},
+				{
+					"type": "box",
+					"x": -4.25,
+					"z": -7.361,
+					"hx": 1.4,
+					"hy": 1.7,
+					"hz": 0.1,
+					"rotationY": 7.33
+				},
+				{
+					"type": "box",
+					"x": 0,
+					"z": -8.5,
+					"hx": 1.4,
+					"hy": 1.7,
+					"hz": 0.1,
+					"rotationY": 7.854
+				},
+				{
+					"type": "box",
+					"x": 4.25,
+					"z": -7.361,
+					"hx": 1.4,
+					"hy": 1.7,
+					"hz": 0.1,
+					"rotationY": 8.378
+				},
+				{
+					"type": "box",
+					"x": 7.361,
+					"z": -4.25,
+					"hx": 1.4,
+					"hy": 1.7,
+					"hz": 0.1,
+					"rotationY": 8.901
+				},
+				{
+					"type": "cylinder",
+					"x": 3.118,
+					"z": 1.8,
+					"radius": 0.36,
+					"halfHeight": 0.85
+				},
+				{
+					"type": "cylinder",
+					"x": 0,
+					"z": 3.6,
+					"radius": 0.36,
+					"halfHeight": 0.85
+				},
+				{
+					"type": "cylinder",
+					"x": -3.118,
+					"z": 1.8,
+					"radius": 0.36,
+					"halfHeight": 0.85
+				},
+				{
+					"type": "cylinder",
+					"x": -3.118,
+					"z": -1.8,
+					"radius": 0.36,
+					"halfHeight": 0.85
+				},
+				{
+					"type": "cylinder",
+					"x": 0,
+					"z": -3.6,
+					"radius": 0.36,
+					"halfHeight": 0.85
+				},
+				{
+					"type": "cylinder",
+					"x": 3.118,
+					"z": -1.8,
+					"radius": 0.36,
+					"halfHeight": 0.85
+				}
+			]
+		},
+		{
+			"name": "void",
+			"label": "Void",
+			"kind": "abstract",
+			"blurb": "A minimal grid plane under a soft gradient — pure focus.",
+			"scene": null,
+			"hdr": null,
+			"preview": "void/preview.jpg",
+			"terrain": {
+				"amplitude": 0,
+				"color": "#0c0e16",
+				"seed": 7
+			},
+			"sky": {
+				"top": "#10131f",
+				"bottom": "#1b2740"
+			},
+			"light": {
+				"ambient": {
+					"color": "#8aa0d8",
+					"intensity": 0.45
+				},
+				"hemi": {
+					"sky": "#26406e",
+					"ground": "#0a0c14",
+					"intensity": 0.55
+				},
+				"sun": {
+					"color": "#aab8ff",
+					"intensity": 0.9,
+					"direction": [
+						2,
+						8,
+						4
+					]
+				}
+			},
+			"envIntensity": 0.5,
+			"grid": {
+				"color": "#3a5e9e",
+				"accent": "#6ea8ff",
+				"size": 24,
+				"divisions": 24
+			},
+			"dynamicProps": {
+				"balls": 3,
+				"crates": 0
+			},
+			"colliders": []
+		},
+		{
+			"name": "office",
+			"label": "Office",
+			"kind": "indoor",
+			"blurb": "The three.ws virtual office — desks, plants, and a brand wall.",
+			"scene": "office/scene.glb",
+			"hdr": "office/env.hdr",
+			"preview": "office/preview.jpg",
+			"terrain": {
+				"amplitude": 0,
+				"color": "#2b2f3a",
+				"seed": 808
+			},
+			"sky": {
+				"top": "#aab4c8",
+				"bottom": "#7e8aa0"
+			},
+			"light": {
+				"ambient": {
+					"color": "#eaf0ff",
+					"intensity": 0.7
+				},
+				"hemi": {
+					"sky": "#cdd8ee",
+					"ground": "#2b2f3a",
+					"intensity": 0.7
+				},
+				"sun": {
+					"color": "#fbfdff",
+					"intensity": 1.2,
+					"direction": [
+						4,
+						9,
+						5
+					]
+				}
+			},
+			"envIntensity": 0.95,
+			"grid": null,
+			"dynamicProps": {
+				"balls": 2,
+				"crates": 2
+			},
+			"colliders": [
+				{
+					"type": "box",
+					"x": 4.147,
+					"z": 1.753,
+					"hx": 0.8,
+					"hy": 0.4,
+					"hz": 0.4,
+					"rotationY": 1.971
+				},
+				{
+					"type": "box",
+					"x": 0.531,
+					"z": 4.273,
+					"hx": 0.8,
+					"hy": 0.4,
+					"hz": 0.4,
+					"rotationY": 3.018
+				},
+				{
+					"type": "box",
+					"x": -3.903,
+					"z": 2.95,
+					"hx": 0.8,
+					"hy": 0.4,
+					"hz": 0.4,
+					"rotationY": 4.065
+				},
+				{
+					"type": "box",
+					"x": -4.114,
+					"z": -1.74,
+					"hx": 0.8,
+					"hy": 0.4,
+					"hz": 0.4,
+					"rotationY": 5.112
+				},
+				{
+					"type": "box",
+					"x": -0.573,
+					"z": -4.615,
+					"hx": 0.8,
+					"hy": 0.4,
+					"hz": 0.4,
+					"rotationY": 6.16
+				},
+				{
+					"type": "box",
+					"x": 3.375,
+					"z": -2.551,
+					"hx": 0.8,
+					"hy": 0.4,
+					"hz": 0.4,
+					"rotationY": 7.207
+				},
+				{
+					"type": "cylinder",
+					"x": 4.525,
+					"z": 4.525,
+					"radius": 0.3,
+					"halfHeight": 0.25
+				},
+				{
+					"type": "cylinder",
+					"x": -4.525,
+					"z": 4.525,
+					"radius": 0.3,
+					"halfHeight": 0.25
+				},
+				{
+					"type": "cylinder",
+					"x": -4.525,
+					"z": -4.525,
+					"radius": 0.3,
+					"halfHeight": 0.25
+				},
+				{
+					"type": "cylinder",
+					"x": 4.525,
+					"z": -4.525,
+					"radius": 0.3,
+					"halfHeight": 0.25
+				},
+				{
+					"type": "cylinder",
+					"x": 0,
+					"z": 2.6,
+					"radius": 1.3,
+					"halfHeight": 0.4
+				}
+			]
+		}
+	]
+}

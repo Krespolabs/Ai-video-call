@@ -1,0 +1,25 @@
+{
+	"$schema": "NPC dialogue table for the walk scene (Task 19). Slots: greeter, guide-wait, guide-arrive ({landmark} token). landmarks steer the guide NPC.",
+	"greeter": [
+		"Welcome to the park — the grass is yours to wander.",
+		"Hey, glad you made it. Plenty of shade if you want it.",
+		"Good to see you out here. Take the long way around.",
+		"Welcome in. The benches are a nice spot to pause."
+	],
+	"guide-wait": [
+		"Take your time — I'll wait by the path.",
+		"No rush, the park isn't going anywhere.",
+		"I'll hold up here until you catch up."
+	],
+	"guide-arrive": [
+		"And here we are — {landmark}.",
+		"This is {landmark}. Lovely under the trees, isn't it?",
+		"Welcome to {landmark}. Stay as long as you like."
+	],
+	"landmarks": [
+		{ "name": "the old shade tree", "pos": [-4.15, 0, 4.167] },
+		{ "name": "the far benches", "pos": [2.6, 0, -1.6] },
+		{ "name": "the north lawn", "pos": [-0.271, 0, 9.848] },
+		{ "name": "the south clearing", "pos": [0.347, 0, -8.791] }
+	]
+}

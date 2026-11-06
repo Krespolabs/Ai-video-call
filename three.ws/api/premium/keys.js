@@ -1,0 +1,91 @@
+// POST /api/premium/keys: rotate or revoke the signed-in user's premium key.
+//
+// body: { action: 'rotate' | 'revoke', id: '<x402 subscription id>' }
+//
+// Session + CSRF authed. Only keys minted by a premium-pass purchase that is
+// linked to this user (meta.source = 'premium-pass', meta.user_id = session
+// user) can be managed here. Partner/AWS keys live at
+// /api/user/x402-subscriptions, and wallet-only purchases (no session at buy
+// time) manage nothing here by design: the key follows the account that
+// bought it.
+//
+// rotate returns the fresh plaintext exactly once and re-links the pass row
+// so status/mine keep reporting the live key.
+
+import { cors, json, error, wrap, method, readJson, rateLimited } from '../_lib/http.js';
+import { sql } from '../_lib/db.js';
+import { limits } from '../_lib/rate-limit.js';
+import { getSessionUser } from '../_lib/auth.js';
+import { requireCsrf } from '../_lib/csrf.js';
+import { createSubscription, revokeSubscription } from '../_lib/x402/api-keys.js';
+
+export default wrap(async (req, res) => {
+	if (cors(req, res, { methods: 'POST,OPTIONS', credentials: true })) return;
+	if (!method(req, res, ['POST'])) return;
+
+	let user;
+	try {
+		user = await getSessionUser(req);
+	} catch {
+		user = null;
+	}
+	if (!user) return json(res, 401, { error: 'unauthenticated' });
+	if (!(await requireCsrf(req, res, user.id))) return;
+
+	// Per-account, after auth: rotate mints a fresh x402_subscriptions row on
+	// every call, so the bucket meters the principal doing the minting.
+	const rl = await limits.premiumKeysUser(user.id);
+	if (!rl.success) return rateLimited(res, rl, 'too many key operations; try again later');
+
+	const body = await readJson(req).catch(() => null);
+	const action = String(body?.action || '');
+	const id = String(body?.id || '').trim();
+	if (!['rotate', 'revoke'].includes(action)) {
+		return error(res, 400, 'bad_action', 'action must be rotate or revoke');
+	}
+	if (!id) return error(res, 400, 'bad_id', 'id is required');
+
+	const [key] = await sql`
+		select id, name, rate_limit_per_minute, expires_at, revoked_at, meta
+		from x402_subscriptions
+		where id = ${id}
+		limit 1
+	`;
+	if (!key || key.meta?.source !== 'premium-pass' || key.meta?.user_id !== user.id) {
+		return error(res, 404, 'key_not_found', 'no premium key with that id belongs to this account');
+	}
+
+	if (action === 'revoke') {
+		await revokeSubscription(id);
+		return json(res, 200, { revoked: true, id }, { 'cache-control': 'no-store' });
+	}
+
+	// rotate: mint a replacement with the same expiry/limits/meta, re-point the
+	// pass rows at it, and only then revoke the old credential.
+	//
+	// The order is load-bearing. Revoking first means a failed mint leaves a
+	// paying customer with no key at all and no way back (a second rotate hits
+	// the key_revoked branch below), so a transient DB blip would cost them the
+	// pass they paid for. Minting first makes the worst case a stale key that
+	// still expires with the pass, and the buyer is never locked out. A failed
+	// revoke still propagates as a 5xx so a rotation is never reported as done
+	// while the old credential is live.
+	if (key.revoked_at) return error(res, 409, 'key_revoked', 'key is revoked: buy or renew a pass to get a new one');
+	const fresh = await createSubscription({
+		name: key.name,
+		rateLimitPerMinute: key.rate_limit_per_minute,
+		expiresAt: key.expires_at,
+		meta: key.meta,
+		createdBy: user.id,
+	});
+	await sql`
+		update premium_passes set api_subscription_id = ${fresh.id}
+		where api_subscription_id = ${id}
+	`;
+	await revokeSubscription(id);
+	return json(
+		res, 200,
+		{ rotated: true, id: fresh.id, key_prefix: fresh.key_prefix, api_key: fresh.token },
+		{ 'cache-control': 'no-store' },
+	);
+});

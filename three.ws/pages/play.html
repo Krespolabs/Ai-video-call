@@ -1,0 +1,299 @@
+<!doctype html>
+<html lang="en">
+	<head>
+		<script>/* three.ws theme boot, no-flash; runtime in /theme-switcher.js */(function(){try{var m=localStorage.getItem('twx_theme');var l=m==='auto'?(window.matchMedia&&window.matchMedia('(prefers-color-scheme: light)').matches):m==='light';document.documentElement.setAttribute('data-theme',l?'light':'dark');}catch(e){document.documentElement.setAttribute('data-theme','dark');}})();</script>
+		<script>/* embed bg, ?bg=transparent composites the world onto the host page (e.g. the IBM x402 showcase) instead of a black box. Set before first paint so there is no dark flash. */(function(){try{if(new URLSearchParams(location.search).get('bg')==='transparent')document.documentElement.setAttribute('data-bg','transparent');}catch(e){}})();</script>
+		<meta charset="utf-8" />
+		<title data-i18n="play.meta_title">Play · Coin Communities, three.ws</title>
+		<meta
+			name="viewport"
+			content="width=device-width, initial-scale=1, viewport-fit=cover"
+		/>
+		<meta
+			name="description"
+			content="Coin Communities, a browser isometric MMO on three.ws. Join coin communities, gather, fight, trade, and explore a shared world. Sign in with your wallet and play."
+		 data-i18n-attr="content:play.meta_description"/>
+		<meta name="theme-color" content="#060607" />
+
+		<!--
+			Multiplayer server URL, the deployed Colyseus host (Cloud Run).
+			Local dev ignores this and uses ws://localhost:2567 automatically
+			(see defaultServerUrl in src/game/community-net.js), so
+			`npm run dev:walk-all` still works out of the box.
+		-->
+		<meta name="game-server" content="wss://three-ws-multiplayer-93741856042.us-central1.run.app" />
+
+		<link rel="icon" href="/favicon.ico" sizes="any" />
+		<link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+		<link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png" />
+		<link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png" />
+		<link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+		<link rel="manifest" href="/manifest.webmanifest" />
+
+		<meta property="og:type" content="website" />
+		<meta property="og:site_name" content="three.ws" />
+		<meta property="og:title" content="Play · Coin Communities"  data-i18n-attr="content:play.meta_og_title"/>
+		<meta property="og:description" content="A browser isometric MMO on three.ws, join coin communities, gather, fight, trade, explore."  data-i18n-attr="content:play.meta_og_description"/>
+		<meta property="og:url" content="https://three.ws/play" />
+	<meta property="og:image" content="https://three.ws/api/page-og?s=crypto&amp;t=Play&amp;d=Jump+into+a+live+coin+community+world+and+explore+it+with+your+avatar.&amp;p=%2Fplay" />
+	<meta property="og:image:width" content="1200" />
+	<meta property="og:image:height" content="630" />
+	<meta name="twitter:card" content="summary_large_image" />
+	<meta name="twitter:site" content="@trythreews" />
+	<meta name="twitter:title" content="Play · Coin Communities, three.ws"  data-i18n-attr="content:play.meta_twitter_title"/>
+	<meta name="twitter:description" content="Play in your coin's 3D community world. Walk, chat, and hang out with fellow holders."  data-i18n-attr="content:play.meta_twitter_description"/>
+	<meta name="twitter:image" content="https://three.ws/api/page-og?s=crypto&amp;t=Play&amp;d=Jump+into+a+live+coin+community+world+and+explore+it+with+your+avatar.&amp;p=%2Fplay" />
+
+		<!--
+			Brand typography. coincommunities.css asks for Inter everywhere, but this
+			page never loaded a face for it, so the whole surface (including the boot
+			wordmark) silently rendered in the OS default. Preload the latin subset so
+			the loader's first paint is already on-brand, no FOUT.
+			See docs/DESIGN-TOKENS.md, standalone pages must load /fonts/fonts.css.
+		-->
+		<link rel="preload" href="/fonts/inter-latin.woff2" as="font" type="font/woff2" crossorigin />
+		<link rel="stylesheet" href="/fonts/fonts.css" />
+		<link rel="stylesheet" href="/src/game/coincommunities.css" />
+
+	<link rel="canonical" href="https://three.ws/play">
+	<!--
+		oEmbed discovery. api/play-oembed.js answers for /play, /play?coin=<mint> and
+		/play/<mint>, so a consumer that finds these tags (WordPress, Ghost, Discord,
+		Notion, iframely/embed.ly editors) unfurls a coin world as a live 3D embed
+		rather than a plain link card. Both formats the provider supports are listed;
+		the spec lets the consumer pick either.
+	-->
+	<link rel="alternate" type="application/json+oembed" href="https://three.ws/api/play-oembed?url=https%3A%2F%2Fthree.ws%2Fplay&amp;format=json" title="three.ws Coin Communities">
+	<link rel="alternate" type="text/xml+oembed" href="https://three.ws/api/play-oembed?url=https%3A%2F%2Fthree.ws%2Fplay&amp;format=xml" title="three.ws Coin Communities">
+	<meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1">
+	<meta property="og:locale" content="en_US">
+	<meta property="og:image:alt" content="Play, three.ws">
+	<script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"WebPage","name":"Play","description":"Jump into a live coin community world and explore it with your avatar.","url":"https://three.ws/play","isPartOf":{"@type":"WebSite","name":"three.ws","url":"https://three.ws"},"primaryImageOfPage":"https://three.ws/api/page-og?s=crypto&t=Play&d=Jump+into+a+live+coin+community+world+and+explore+it+with+your+avatar.&p=%2Fplay"}]}</script>
+</head>
+	<body>
+		<div id="kx-loading">
+			<div class="kx-loading-card">
+				<img class="kx-loading-logo" src="/three.svg" alt="three.ws" width="38" height="38" />
+				<div class="kx-loading-mark">COIN COMMUNITIES</div>
+				<!--
+					Deep-link identity. A shared /play?coin=…&name=…&symbol=…&image=… link
+					already carries everything needed to say WHICH world is opening, so the
+					inline script below fills this in before the app bundle has even parsed.
+					Stays hidden on a plain /play visit.
+				-->
+				<div class="kx-boot-coin" hidden>
+					<span class="kx-boot-coin-art"><img alt="" width="44" height="44" /><span class="kx-boot-coin-mono" aria-hidden="true"></span></span>
+					<span class="kx-boot-coin-text">
+						<span class="kx-boot-coin-name"></span>
+						<span class="kx-boot-coin-sym"></span>
+					</span>
+				</div>
+				<div class="kx-boot-stage">
+					<canvas id="kx-boot-avatar" aria-hidden="true"></canvas>
+					<div class="kx-boot-fallback" aria-hidden="true"></div>
+				</div>
+				<div class="kx-loading-sub">Joining the community…</div>
+				<div class="kx-boot-bar" role="status" aria-label="Loading"><span></span></div>
+			</div>
+		</div>
+
+		<script>
+		/* Deep-link identity on the loader, inline on purpose: the app bundle takes a
+		   moment to arrive, and for that whole window a shared world link showed a
+		   generic "COIN COMMUNITIES / Joining the community…" with no hint of WHICH
+		   community. Everything needed is already in the URL, so paint it now. The tab
+		   title moves too, so a link parked in a background tab reads as the world it
+		   opens. The app re-asserts both once it knows the real coin. */
+		(function () {
+			try {
+				var p = new URLSearchParams(location.search);
+				if (!p.get('coin')) return;
+				/* Bound the length a shared link can inject, and cut on a word boundary
+				   so an over-long community name doesn't leave a dangling letter. */
+				var trim = function (s, max) {
+					var v = (s || '').trim().replace(/\s+/g, ' ');
+					if (v.length <= max) return v;
+					var cut = v.slice(0, max);
+					var sp = cut.lastIndexOf(' ');
+					return (sp > max * 0.6 ? cut.slice(0, sp) : cut).replace(/[\s.,;:-]+$/, '');
+				};
+				var name = trim(p.get('name'), 28);
+				var sym = trim(p.get('symbol'), 12).replace(/^\$/, '').toUpperCase();
+				/* Only same-origin paths (the /api/img proxy) and https URLs. Anything
+				   else in a shared link is not art we should point an <img> at. */
+				var raw = (p.get('image') || '').trim();
+				var art = (raw.charAt(0) === '/' && raw.charAt(1) !== '/') || /^https:\/\//i.test(raw) ? raw : '';
+				if (!name && !sym && !art) return;
+
+				var box = document.querySelector('.kx-boot-coin');
+				var img = box.querySelector('img');
+				/* Monogram stand-in: shown until the art decodes, and kept for good if
+				   the fetch fails (an IPFS gateway on a bad venue connection), so the
+				   slot is never a broken-image glyph. */
+				box.querySelector('.kx-boot-coin-mono').textContent = (sym || name || '?').charAt(0).toUpperCase();
+				if (art) {
+					img.addEventListener('load', function () { box.classList.add('kx-boot-coin-ok'); });
+					img.addEventListener('error', function () { img.remove(); });
+					img.src = art;
+				} else {
+					img.remove();
+				}
+				box.querySelector('.kx-boot-coin-name').textContent = name || 'Coin community';
+				box.querySelector('.kx-boot-coin-sym').textContent = sym ? '$' + sym : '';
+				box.hidden = false;
+				document.querySelector('.kx-loading-card').classList.add('kx-has-coin');
+
+				var label = sym ? '$' + sym : name;
+				document.querySelector('.kx-loading-sub').textContent = 'Entering ' + (name || label) + '…';
+				/* Stash the untouched title so leaving the world can restore it verbatim
+				   (coincommunities.js _setTabTitle) instead of re-spelling it. */
+				if (label) {
+					document.documentElement.dataset.lobbyTitle = document.title;
+					document.title = label + ' · Play · three.ws';
+				}
+			} catch (e) { /* the generic loader stands in */ }
+		})();
+		</script>
+
+		<!--
+			The world itself is a keyboard stop, not a decorative image: Tab lands
+			here, the label says what it is and how to drive it, and role=application
+			tells a screen reader to pass keystrokes through instead of intercepting
+			them for its own browse-mode shortcuts.
+		-->
+		<canvas
+			id="kx-canvas"
+			tabindex="0"
+			role="application"
+			aria-label="The 3D coin community world. Walk with W A S D or the arrow keys, hold Shift to run, Space to jump, drag or use the mouse to look around. Press Enter to open chat, Q for emotes, E to talk to whoever is nearby, and Z to hide the panels."
+			data-i18n-attr="aria-label:play.canvas_label"
+		></canvas>
+
+		<script>
+		/* Boot watchdog: inline on purpose so it works even when the app bundle
+		   itself is what failed (the classic stale-chunk 404 right after a deploy).
+		   While the #kx-loading card is still up, a failed script/stylesheet load,
+		   an uncaught boot error, or 45s of silence replaces the spinner with a
+		   real error card (mirroring renderBootError's markup) instead of leaving
+		   the loader sweeping forever with no recovery path. Once boot completes
+		   (the app adds .kx-hidden or removes the node) the watchdog disarms. */
+		(function () {
+			var fired = false;
+			function bootPending() {
+				var l = document.getElementById('kx-loading');
+				return l && !l.classList.contains('kx-hidden') && !l.querySelector('.kx-boot-error');
+			}
+			function fail(title, body) {
+				if (fired || !bootPending()) return;
+				fired = true;
+				var l = document.getElementById('kx-loading');
+				var card = document.createElement('div');
+				card.className = 'kx-loading-card kx-boot-error';
+				card.setAttribute('role', 'alert');
+				/* Inline fallback styling: if the stylesheet is what 404ed, the card
+				   must still be readable. */
+				card.style.cssText = 'max-width:420px;padding:28px;text-align:center;color:#eee;font-family:system-ui,sans-serif;';
+				var mark = document.createElement('div');
+				mark.className = 'kx-loading-mark';
+				mark.textContent = title;
+				mark.style.cssText = 'font-weight:700;letter-spacing:.08em;margin-bottom:10px;';
+				var msg = document.createElement('p');
+				msg.className = 'kx-boot-error-msg';
+				msg.textContent = body;
+				msg.style.cssText = 'opacity:.8;font-size:14px;line-height:1.5;margin:0 0 18px;';
+				var actions = document.createElement('div');
+				actions.className = 'kx-boot-error-actions';
+				/* This card exists because a stylesheet may be exactly what failed, so
+				   the two things a stranded player needs, a thumb-sized target and a
+				   visible focus ring, cannot be left to coincommunities.css. Inline
+				   style attributes cannot express :focus-visible, so the rules ride
+				   along in their own <style> element. */
+				var ring = document.createElement('style');
+				ring.textContent = '.kx-boot-error-btn:focus-visible,.kx-boot-error-link:focus-visible{outline:2px solid #fff;outline-offset:2px;}';
+				card.appendChild(ring);
+				var retry = document.createElement('button');
+				retry.type = 'button';
+				retry.className = 'kx-boot-error-btn';
+				retry.textContent = 'Try again';
+				retry.style.cssText = 'min-height:44px;padding:12px 22px;border-radius:8px;border:1px solid #555;background:#191a1c;color:#fff;cursor:pointer;font-size:14px;';
+				retry.addEventListener('click', function () {
+					/* Hard reload: a stale cached HTML referencing dead chunks needs a
+					   revalidated document, not a memory-cache replay. */
+					location.reload();
+				});
+				var home = document.createElement('a');
+				home.className = 'kx-boot-error-link';
+				home.href = '/';
+				home.textContent = 'Back to three.ws';
+				home.style.cssText = 'display:inline-flex;align-items:center;min-height:44px;padding:0 10px;margin-left:14px;color:#9ab;font-size:14px;';
+				actions.appendChild(retry);
+				actions.appendChild(home);
+				card.appendChild(mark);
+				card.appendChild(msg);
+				card.appendChild(actions);
+				l.replaceChildren(card);
+				retry.focus();
+			}
+			/* Which failures are actually boot-fatal.
+
+			   This watchdog exists for one thing: a stale cached HTML pointing at
+			   chunks a deploy already removed, where nothing will ever finish and
+			   only a reload helps. Everything else that reaches these listeners is
+			   noise, and covering a world that is loading fine with a full-screen
+			   "Couldn't load the world" is a worse failure than the one being
+			   guarded against. Two visitors we expect at an event proved the old
+			   rules too eager:
+
+			   1. An ad blocker or privacy extension blocks one of the optional
+			      extras (/brand.js, /i18n.js) or any third-party script. That is a
+			      resource error on a SCRIPT tag, which used to fail instantly even
+			      though the game modules were downloading normally. Only a
+			      same-origin, non-optional script or stylesheet counts now.
+			   2. Flaky wifi makes a background request reject, or the multiplayer
+			      socket fails to open. Every fetch boundary in the app handles its
+			      own failure and community-net reconnects with backoff, so neither
+			      is a boot failure. Network-shaped rejections are ignored outright,
+			      and anything else gets a grace long enough for a slow but healthy
+			      boot to finish and disarm it (bootPending). */
+			var OPTIONAL_SCRIPTS = /\/(brand|i18n|theme-switcher)\.js(\?|$)/;
+			function isNetworkNoise(v) {
+				var s = (v && (v.message || v.name)) || String(v || '');
+				return /Failed to fetch|NetworkError|Load failed|ERR_BLOCKED|ERR_FAILED|AbortError|network error|WebSocket/i.test(s);
+			}
+			function failSoon(title, body) {
+				setTimeout(function () { fail(title, body); }, 20000);
+			}
+			window.addEventListener('error', function (e) {
+				var t = e && e.target;
+				if (t && (t.tagName === 'SCRIPT' || t.tagName === 'LINK')) {
+					var url = t.src || t.href || '';
+					/* Cross-origin scripts and the optional extras are blockable by
+					   design; the world does not depend on any of them. */
+					if (url && url.indexOf(location.origin) !== 0) return;
+					if (OPTIONAL_SCRIPTS.test(url)) return;
+					fail('Couldn’t load the world', 'A file failed to load. This usually fixes itself on a reload; the site may have just been updated.');
+				} else if (e && (e.error || e.message)) {
+					if (isNetworkNoise(e.error || e.message)) return;
+					failSoon('Couldn’t load the world', 'Something went wrong while starting Coin Communities. Reload to try again.');
+				}
+			}, true);
+			window.addEventListener('unhandledrejection', function (e) {
+				if (isNetworkNoise(e && e.reason)) return;
+				failSoon('Couldn’t load the world', 'Something went wrong while starting Coin Communities. Reload to try again.');
+			});
+			setTimeout(function () {
+				fail('Taking too long to load', 'The world hasn’t finished loading. Check your connection and try again.');
+			}, 45000);
+		})();
+		</script>
+
+		<script type="module" src="/src/game/boot-avatar.js"></script>
+		<script type="module" src="/src/game/coincommunities.js"></script>
+		<script type="module" src="/src/game/ambient-crowd.js"></script>
+		<script type="module" src="/src/game/event-countdown.js"></script>
+		<script type="module" src="/src/game/meetup-event.js"></script>
+		<script src="/brand.js" defer></script>
+	<!-- Runtime i18n: detects locale, swaps annotated copy, mounts <lang-switcher>. -->
+	<script type="module" src="/i18n.js"></script>
+</body>
+</html>

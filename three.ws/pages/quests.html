@@ -1,0 +1,71 @@
+<!doctype html>
+<html lang="en">
+	<head>
+		<script>/* three.ws theme boot */(function(){try{var m=localStorage.getItem('twx_theme');var l=m==='auto'?(window.matchMedia&&window.matchMedia('(prefers-color-scheme: light)').matches):m==='light';document.documentElement.setAttribute('data-theme',l?'light':'dark');}catch(e){document.documentElement.setAttribute('data-theme','dark');}})();</script>
+		<meta charset="utf-8" />
+		<script src="/referral-capture.js"></script>
+		<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+		<title data-i18n="quests.page_title">Daily Trading Quests · three.ws</title>
+		<meta name="description" data-i18n-attr="content:quests.meta_desc" content="Five small trading quests that reset every UTC midnight: make three trades, fork a verified trade, ghost-copy a new agent, act on a copy intent, and let your agent close a winner. Every quest is scored from on-chain proof. Earn XP, levels, and badges." />
+		<meta property="og:type" content="website" />
+		<meta property="og:site_name" content="three.ws" />
+		<meta property="og:url" content="https://three.ws/quests" />
+		<meta property="og:title" data-i18n-attr="content:quests.share_title" content="Daily Trading Quests · three.ws" />
+		<meta property="og:description" data-i18n-attr="content:quests.share_desc" content="Five trading quests a day, scored from on-chain proof. Clear three to keep your streak alive." />
+		<meta property="og:image" content="https://three.ws/api/page-og?s=crypto&amp;t=Daily+Trading+Quests&amp;d=Five+trading+quests+that+reset+every+UTC+midnight%3A+make+three+trades%2C+fork+a+verified+trade%2C+ghost-copy+a+new+agent%2C+act+on+a+copy+intent%2C+and+let+your+agent&amp;p=%2Fquests" />
+		<meta property="og:image:width" content="1200" />
+		<meta property="og:image:height" content="630" />
+		<meta property="og:image:alt" content="Daily Trading Quests on three.ws" />
+		<meta name="twitter:card" content="summary_large_image" />
+		<meta name="twitter:site" content="@trythreews" />
+		<meta name="twitter:title" data-i18n-attr="content:quests.share_title" content="Daily Trading Quests · three.ws" />
+		<meta name="twitter:description" data-i18n-attr="content:quests.share_desc" content="Five trading quests a day, scored from on-chain proof. Clear three to keep your streak alive." />
+		<meta name="twitter:image" content="https://three.ws/api/page-og?s=crypto&amp;t=Daily+Trading+Quests&amp;d=Five+trading+quests+that+reset+every+UTC+midnight%3A+make+three+trades%2C+fork+a+verified+trade%2C+ghost-copy+a+new+agent%2C+act+on+a+copy+intent%2C+and+let+your+agent&amp;p=%2Fquests" />
+		<meta name="theme-color" content="#0a0a0a" />
+		<link rel="canonical" href="https://three.ws/quests" />
+		<meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1" />
+		<link rel="icon" href="/favicon.ico" sizes="any" />
+		<link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+		<link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+		<link rel="manifest" href="/manifest.webmanifest" />
+		<link rel="stylesheet" href="/fonts/fonts.css" />
+		<link rel="stylesheet" href="/nav.css" />
+		<link rel="stylesheet" href="/src/syndicates.css" />
+		<link rel="stylesheet" href="/footer.css" />
+		<script defer src="/footer-newsletter.js"></script>
+	
+	<meta property="og:locale" content="en_US">
+	<script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"WebPage","name":"Daily Trading Quests","description":"Five trading quests that reset every UTC midnight: make three trades, fork a verified trade, ghost-copy a new agent, act on a copy intent, and let your agent close a winner. Scored from on-chain proof, rewarded with XP, levels and badges.","url":"https://three.ws/quests","isPartOf":{"@type":"WebSite","name":"three.ws","url":"https://three.ws"},"primaryImageOfPage":"https://three.ws/api/page-og?s=crypto&t=Daily+Trading+Quests&d=Five+trading+quests+that+reset+every+UTC+midnight%3A+make+three+trades%2C+fork+a+verified+trade%2C+ghost-copy+a+new+agent%2C+act+on+a+copy+intent%2C+and+let+your+agent&p=%2Fquests"}]}</script>
+</head>
+	<body>
+		<header><div id="nav-container"></div></header>
+		<script src="/nav.js"></script>
+
+		<main class="sy" aria-labelledby="qx-title">
+			<p class="sy-kicker"><span data-i18n="quests.kicker_label">Daily trading quests · reset</span> <span id="qxReset">at 00:00 UTC</span></p>
+			<h1 id="qx-title" class="sy-title" data-i18n="quests.title">Today's quests</h1>
+			<p class="sy-sub" data-i18n="quests.sub">
+				Five small goals a day, each scored from proof rather than a click: trades verified on-chain,
+				forks you signed, leaders you ghost-copied for the first time, copy intents you acted on, and
+				your own agent's live wins. Clear three in a UTC day to keep your streak alive.
+			</p>
+			<div id="qxRoot" aria-live="polite" aria-busy="true">
+				<div style="display:grid;gap:12px">
+					<div class="sy-skel" style="height:110px"></div>
+					<div class="sy-skel" style="height:74px"></div>
+					<div class="sy-skel" style="height:74px"></div>
+					<div class="sy-skel" style="height:74px"></div>
+				</div>
+			</div>
+		</main>
+
+		<div id="syToast" class="sy-toast" role="status" aria-live="polite"></div>
+
+		<script type="module" src="/src/quests.js"></script>
+		<script src="/brand.js" defer></script>
+		<div id="footer-container"></div>
+		<script src="/footer.js"></script>
+		<!-- Runtime i18n: detects locale, swaps annotated copy, mounts <lang-switcher>. -->
+		<script type="module" src="/i18n.js"></script>
+	</body>
+</html>

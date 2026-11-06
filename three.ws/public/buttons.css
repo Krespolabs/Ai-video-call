@@ -1,0 +1,280 @@
+/* ══════════════════════════════════════════════════════════════════════════════
+ * CANONICAL BUTTON SYSTEM — three.ws shared layer  (B03)
+ *
+ * The single source of truth for every button on the platform. One `.btn` base
+ * plus BEM variant/size modifiers — used everywhere to replace the 380+ bespoke
+ * button classes that fragmented the UI.
+ *
+ *   Variants:  --primary   --secondary (default)   --ghost   --danger
+ *   Sizes:     --sm        (md = default)           --lg
+ *   Layout:    --block (full-width)                 --icon (square)
+ *   States:    :hover  :active  :focus-visible  [disabled]/[aria-disabled]
+ *              [aria-busy='true'] (real CSS spinner — no setTimeout)
+ *
+ * PORTABLE BY DESIGN. This file is self-sufficient: it declares the button
+ * component tokens with literal fallbacks to the canonical B01 primitives, and
+ * the rules carry fallbacks for the raw primitives they touch. So it renders
+ * correctly whether or not the heavy /style.css is also loaded — drop a single
+ *   <link rel="stylesheet" href="/buttons.css">
+ * on any surface and the buttons are on-brand. /style.css @imports this file, so
+ * every page that already loads /style.css gets it for free.
+ *
+ * Markup:
+ *   <button class="btn btn--primary">Deploy</button>
+ *   <a class="btn btn--ghost btn--sm" href="…">Cancel</a>
+ *   <button class="btn btn--danger" aria-busy="true">Deleting…</button>
+ * ══════════════════════════════════════════════════════════════════════════════ */
+
+:root {
+	/* Primary — white fill, dark ink (the main CTA per surface) */
+	--btn-primary-bg:        var(--accent, #ffffff);
+	--btn-primary-fg:        var(--on-accent, #0a0a0a);
+	--btn-primary-border:    transparent;
+	--btn-primary-bg-hover:  rgba(255, 255, 255, 0.88);
+	--btn-primary-bg-active: rgba(255, 255, 255, 0.76);
+
+	/* Secondary — subtle glass fill with a visible border (the default .btn) */
+	--btn-secondary-bg:        var(--surface-3, rgba(255, 255, 255, 0.08));
+	--btn-secondary-fg:        var(--ink, var(--ink));
+	--btn-secondary-border:    var(--stroke-strong, rgba(255, 255, 255, 0.14));
+	--btn-secondary-bg-hover:  rgba(255, 255, 255, 0.12);
+	--btn-secondary-bg-active: rgba(255, 255, 255, 0.16);
+
+	/* Ghost — transparent, text-only; surface appears on hover */
+	--btn-ghost-bg:        transparent;
+	--btn-ghost-fg:        var(--ink, var(--ink));
+	--btn-ghost-border:    transparent;
+	--btn-ghost-bg-hover:  var(--surface-2, rgba(255, 255, 255, 0.05));
+	--btn-ghost-bg-active: var(--surface-3, rgba(255, 255, 255, 0.08));
+
+	/* Danger — derived from --danger (#f87171 = rgb(248 113 113)) */
+	--btn-danger-bg:        rgba(248, 113, 113, 0.12);
+	--btn-danger-fg:        var(--danger, var(--danger));
+	--btn-danger-border:    rgba(248, 113, 113, 0.28);
+	--btn-danger-bg-hover:  rgba(248, 113, 113, 0.20);
+	--btn-danger-bg-active: rgba(248, 113, 113, 0.30);
+
+	/* Shared shape / spacing */
+	--btn-radius:    var(--radius-control, 10px);
+	--btn-pad-x:     var(--space-md, 1rem);
+	--btn-pad-y:     var(--space-sm, 0.618rem);
+	--btn-text-size: var(--text-sm, 0.764rem);
+	--btn-font:      var(--font-body, 'Inter', system-ui, sans-serif);
+
+	/* Interactive-state tokens (shared with the rest of the system) */
+	--focus-ring-color:  var(--accent, #ffffff);
+	--focus-ring-width:  2px;
+	--focus-ring-offset: 2px;
+	--disabled-opacity:  0.4;
+	--disabled-cursor:   not-allowed;
+}
+
+/* ── Base ─────────────────────────────────────────────────────────────────── */
+.btn {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	gap: var(--space-xs, 0.382rem);
+	padding: var(--btn-pad-y) var(--btn-pad-x);
+	background: var(--btn-secondary-bg);
+	border: 1px solid var(--btn-secondary-border);
+	border-radius: var(--btn-radius);
+	color: var(--btn-secondary-fg);
+	font-family: var(--btn-font);
+	font-size: var(--btn-text-size);
+	font-weight: 500;
+	line-height: 1.25;
+	cursor: pointer;
+	text-decoration: none;
+	white-space: nowrap;
+	user-select: none;
+	-webkit-user-select: none;
+	appearance: none;
+	-webkit-appearance: none;
+	vertical-align: middle;
+	position: relative;
+	overflow: hidden;
+	transition:
+		background var(--duration-fast) var(--ease-standard),
+		border-color var(--duration-fast) var(--ease-standard),
+		color var(--duration-fast) var(--ease-standard),
+		opacity var(--duration-fast) var(--ease-standard),
+		transform var(--duration-instant) var(--ease-standard),
+		box-shadow var(--duration-fast) var(--ease-standard);
+}
+
+/* ── Hover ────────────────────────────────────────────────────────────────── */
+.btn:hover:not(:disabled):not([aria-disabled='true']) {
+	background: var(--btn-secondary-bg-hover);
+	border-color: var(--stroke-strong, rgba(255, 255, 255, 0.14));
+}
+
+/* ── Active ───────────────────────────────────────────────────────────────── */
+.btn:active:not(:disabled):not([aria-disabled='true']) {
+	background: var(--btn-secondary-bg-active);
+	transform: scale(0.97);
+}
+
+/* ── Focus ring (a11y) ────────────────────────────────────────────────────── */
+.btn:focus-visible {
+	outline: var(--focus-ring-width) solid var(--focus-ring-color);
+	outline-offset: var(--focus-ring-offset);
+}
+
+/* ── Disabled ─────────────────────────────────────────────────────────────── */
+.btn:disabled,
+.btn[aria-disabled='true'] {
+	opacity: var(--disabled-opacity);
+	cursor: var(--disabled-cursor);
+	pointer-events: none;
+}
+
+/* ── Loading (aria-busy='true') — text hidden, real CSS spinner via ::after ── */
+.btn[aria-busy='true'] {
+	color: transparent !important;
+	cursor: wait;
+	pointer-events: none;
+}
+.btn[aria-busy='true']::after {
+	content: '';
+	position: absolute;
+	inset: 0;
+	margin: auto;
+	width: 14px;
+	height: 14px;
+	border: 2px solid var(--btn-secondary-fg);
+	border-top-color: transparent;
+	border-radius: 50%;
+	animation: btn-spin 0.7s linear infinite;
+}
+.btn--primary[aria-busy='true']::after { border-color: var(--btn-primary-fg); border-top-color: transparent; }
+.btn--ghost[aria-busy='true']::after   { border-color: var(--btn-ghost-fg);   border-top-color: transparent; }
+.btn--danger[aria-busy='true']::after  { border-color: var(--btn-danger-fg);  border-top-color: transparent; }
+@keyframes btn-spin { to { transform: rotate(360deg); } }
+
+/* ── Variant — primary ────────────────────────────────────────────────────── */
+.btn--primary {
+	background: var(--btn-primary-bg);
+	border-color: var(--btn-primary-border);
+	color: var(--btn-primary-fg);
+	font-weight: 600;
+}
+.btn--primary:hover:not(:disabled):not([aria-disabled='true']) {
+	background: var(--btn-primary-bg-hover);
+	border-color: var(--btn-primary-bg-hover);
+}
+.btn--primary:active:not(:disabled):not([aria-disabled='true']) {
+	background: var(--btn-primary-bg-active);
+	border-color: var(--btn-primary-bg-active);
+}
+
+/* ── Variant — forge (Text → 3D) ──────────────────────────────────────────── */
+/* The generation suite's signature: the Forge iris gradient as a hairline
+   border, with a live pulse dot. Dark-surface pages only (the gradient
+   border is painted over a near-black padding-box). */
+.btn--forge {
+	--btn-forge-surface: var(--bg-1, #141414);
+	border-color: transparent;
+	color: var(--text, #e8e8e8);
+	background:
+		linear-gradient(var(--btn-forge-surface), var(--btn-forge-surface)) padding-box,
+		linear-gradient(120deg, rgba(255, 180, 84, 0.5), rgba(255, 106, 213, 0.5) 38%, rgba(139, 92, 246, 0.5) 64%, rgba(79, 195, 255, 0.5)) border-box;
+}
+.btn--forge:hover:not(:disabled):not([aria-disabled='true']) {
+	border-color: transparent;
+	background:
+		linear-gradient(var(--btn-forge-surface), var(--btn-forge-surface)) padding-box,
+		linear-gradient(120deg, #ffb454, #ff6ad5 38%, #8b5cf6 64%, #4fc3ff) border-box;
+	box-shadow: 0 0 18px rgba(139, 92, 246, 0.18);
+}
+.btn--forge:active:not(:disabled):not([aria-disabled='true']) {
+	box-shadow: 0 0 10px rgba(139, 92, 246, 0.12);
+}
+.btn--forge .btn-forge-dot {
+	width: 6px;
+	height: 6px;
+	flex: 0 0 auto;
+	border-radius: 50%;
+	background: conic-gradient(from 210deg, #ffb454, #ff6ad5, #8b5cf6, #4fc3ff, #ffb454);
+	animation: btn-forge-pulse 2.4s var(--ease-standard, ease-in-out) infinite;
+}
+@keyframes btn-forge-pulse {
+	0%, 100% { box-shadow: 0 0 0 0 rgba(139, 92, 246, 0.45); }
+	50%      { box-shadow: 0 0 0 4px rgba(139, 92, 246, 0); }
+}
+@media (prefers-reduced-motion: reduce) {
+	.btn--forge .btn-forge-dot { animation: none; }
+}
+
+/* ── Variant — secondary (explicit alias of the default style) ────────────── */
+.btn--secondary {
+	background: var(--btn-secondary-bg);
+	border-color: var(--btn-secondary-border);
+	color: var(--btn-secondary-fg);
+}
+
+/* ── Variant — ghost ──────────────────────────────────────────────────────── */
+.btn--ghost {
+	background: var(--btn-ghost-bg);
+	border-color: var(--btn-ghost-border);
+	color: var(--btn-ghost-fg);
+}
+.btn--ghost:hover:not(:disabled):not([aria-disabled='true']) {
+	background: var(--btn-ghost-bg-hover);
+	border-color: var(--stroke, rgba(255, 255, 255, 0.08));
+}
+.btn--ghost:active:not(:disabled):not([aria-disabled='true']) {
+	background: var(--btn-ghost-bg-active);
+}
+
+/* ── Variant — danger ─────────────────────────────────────────────────────── */
+.btn--danger {
+	background: var(--btn-danger-bg);
+	border-color: var(--btn-danger-border);
+	color: var(--btn-danger-fg);
+}
+.btn--danger:hover:not(:disabled):not([aria-disabled='true']) {
+	background: var(--btn-danger-bg-hover);
+	border-color: rgba(248, 113, 113, 0.5);
+}
+.btn--danger:active:not(:disabled):not([aria-disabled='true']) {
+	background: var(--btn-danger-bg-active);
+}
+
+/* ── Size — small ─────────────────────────────────────────────────────────── */
+.btn--sm {
+	padding: var(--space-xs, 0.382rem) var(--space-sm, 0.618rem);
+	font-size: var(--text-xs, 0.618rem);
+	border-radius: var(--radius-lg, 8px);
+	gap: var(--space-3xs, 0.146rem);
+}
+
+/* ── Size — large ─────────────────────────────────────────────────────────── */
+.btn--lg {
+	padding: var(--space-md, 1rem) var(--space-xl, 2.618rem);
+	font-size: var(--text-base, 1rem);
+	font-weight: 600;
+	border-radius: var(--radius-card, 14px);
+}
+
+/* ── Full-width utility ───────────────────────────────────────────────────── */
+.btn--block {
+	width: 100%;
+	justify-content: center;
+}
+
+/* ── Icon-only (square) ───────────────────────────────────────────────────── */
+.btn--icon {
+	padding: var(--btn-pad-y);
+	aspect-ratio: 1;
+}
+
+/* ── Optional arrow microinteraction — a trailing → that slides on hover ───── */
+.btn .arrow { transition: transform var(--duration-fast) var(--ease-standard); }
+.btn:hover .arrow { transform: translateX(3px); }
+
+@media (prefers-reduced-motion: reduce) {
+	.btn { transition: none !important; }
+	.btn .arrow { transition: none !important; }
+	.btn[aria-busy='true']::after { animation: none; border-top-color: transparent; opacity: 0.6; }
+}

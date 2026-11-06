@@ -1,0 +1,29 @@
+
+ RUN  v4.1.9 /workspaces/three.ws
+
+ ✓ tests/embed-gate.test.js > normalizeMinAmount > passes through a positive finite number 2ms
+ ✓ tests/embed-gate.test.js > normalizeMinAmount > treats zero, negative, NaN, and non-numeric input as invalid (0) 1ms
+ ✓ tests/embed-gate.test.js > normalizeMinAmount > clamps an absurd value to the max ceiling 0ms
+ ✓ tests/embed-gate.test.js > normalizeMint > defaults to $THREE when no mint is supplied 1ms
+ ✓ tests/embed-gate.test.js > normalizeMint > passes through a trimmed runtime mint — the coin-agnostic plumbing exception 0ms
+ ✓ tests/embed-gate.test.js > meetsGateThreshold — gate pass/fail by balance > passes when the balance meets the requirement exactly 1ms
+ ✓ tests/embed-gate.test.js > meetsGateThreshold — gate pass/fail by balance > passes when the balance exceeds the requirement 0ms
+ ✓ tests/embed-gate.test.js > meetsGateThreshold — gate pass/fail by balance > fails when the balance is below the requirement 0ms
+ ✓ tests/embed-gate.test.js > meetsGateThreshold — gate pass/fail by balance > fails a zero balance against any positive requirement 1ms
+ ✓ tests/embed-gate.test.js > getSplTokenBalance — real Solana RPC read, gate pass/fail end-to-end > sums balances across every token account the RPC returns (a real holder — PASS) 2ms
+ ✓ tests/embed-gate.test.js > getSplTokenBalance — real Solana RPC read, gate pass/fail end-to-end > returns 0 for a wallet with no token accounts for this mint (a non-holder — FAIL) 1ms
+ ✓ tests/embed-gate.test.js > getSplTokenBalance — real Solana RPC read, gate pass/fail end-to-end > fails over to the next RPC endpoint when the first is down, without losing the result 3ms
+ ✓ tests/embed-gate.test.js > getSplTokenBalance — real Solana RPC read, gate pass/fail end-to-end > throws when every endpoint fails, so the caller can render a designed error instead of a wrong balance 7ms
+ ✓ tests/embed-gate.test.js > embed gate access tokens — sign/verify and expiry > mints a token that verifies and round-trips every claim 16ms
+ ✓ tests/embed-gate.test.js > embed gate access tokens — sign/verify and expiry > rejects an expired token — the anti-abuse re-verification trigger 3ms
+ ✓ tests/embed-gate.test.js > embed gate access tokens — sign/verify and expiry > rejects a token whose signature was tampered with 3ms
+ ✓ tests/embed-gate.test.js > embed gate access tokens — sign/verify and expiry > rejects a token whose payload was tampered with (amount escalation attempt) 1ms
+ ✓ tests/embed-gate.test.js > embed gate access tokens — sign/verify and expiry > rejects a token issued for a different asset 2ms
+ ✓ tests/embed-gate.test.js > embed gate access tokens — sign/verify and expiry > rejects a token issued for a since-superseded gate id (creator raised the requirement) 1ms
+ ✓ tests/embed-gate.test.js > embed gate access tokens — sign/verify and expiry > rejects malformed input without throwing 0ms
+
+ Test Files  1 passed (1)
+      Tests  20 passed (20)
+   Start at  01:25:42
+   Duration  1.16s (transform 393ms, setup 0ms, import 871ms, tests 52ms, environment 0ms)
+

@@ -1,0 +1,2952 @@
+/* Dark-only theme layer (QB-07). The page loads /nav.css, so the canonical
+   vocabulary resolves here; the --ad-* names are aliases of it, not a second
+   palette. The card radius, elevation and skeleton values below used to be
+   hand-copied literals of the canonical tokens, which meant a change to
+   public/tokens.css never reached this page. The [data-theme='light'] half of
+   the selector keeps a globally-chosen light theme from half-flipping a surface
+   whose remaining literals are dark. */
+:root,
+/* Doubled :root is a deliberate specificity bump (0,3,0): the token sheet's own
+   [data-theme='light'] block would otherwise win on document order and half-flip
+   this dark-only surface. */
+:root:root[data-theme='light'] {
+	color-scheme: dark;
+	--bg-1: #1a1a1a;
+	--ink-dim: #888888;
+	--accent-violet: #c4b5fd;
+
+	--ad-bg: #0d0d0d;
+	--ad-bg-2: #141414;
+	--ad-card: #181818;
+	--ad-line: rgba(255, 255, 255, 0.07);
+	--ad-line-2: rgba(255, 255, 255, 0.12);
+	--ad-text: #e7e9ee;
+	--ad-muted: rgba(231, 233, 238, 0.55);
+	--ad-dim: rgba(231, 233, 238, 0.35);
+	/* Named violet, painted grey: the platform violet is a token now, so this
+	   alias carries the identity hue the name always promised (and lifts inline
+	   links off 4.6:1 grey). */
+	--ad-violet: var(--accent-violet);
+	--ad-green: var(--success);
+	--ad-amber: #f5a524;
+	--ad-cyan: #57c7ff;
+
+	--radius-card: var(--radius-lg);
+	--skeleton-radius: 5px;
+}
+
+* {
+	box-sizing: border-box;
+}
+html,
+body {
+	margin: 0;
+	padding: 0;
+	background: var(--ad-bg);
+	color: var(--ad-text);
+	font-family: 'Inter', system-ui, sans-serif;
+	/* Contain the global nav's mega-menu panels, which are absolutely
+	   positioned and bleed past the viewport on mid-width screens. Every
+	   other page clips this; this standalone page must too, or it gets a
+	   stray horizontal scrollbar. `clip` (not `hidden`) so the sticky
+	   sidebar keeps working — `hidden` would establish a scroll container
+	   and break `position: sticky`. */
+	overflow-x: clip;
+}
+a {
+	color: inherit;
+	text-decoration: none;
+}
+
+.ad-shell {
+	display: grid;
+	grid-template-columns: 220px 1fr;
+	min-height: 100vh;
+}
+
+.ad-sidebar {
+	border-right: 1px solid var(--ad-line);
+	padding: 22px 18px;
+	display: flex;
+	flex-direction: column;
+	gap: 24px;
+	position: sticky;
+	top: 0;
+	height: 100vh;
+}
+.ad-brand {
+	font-weight: 600;
+	letter-spacing: 0.02em;
+}
+.ad-nav {
+	display: flex;
+	flex-direction: column;
+	gap: 4px;
+}
+.ad-nav a {
+	padding: 8px 10px;
+	border-radius: 8px;
+	color: var(--ad-muted);
+	font-size: 14px;
+}
+.ad-nav a:hover {
+	background: rgba(255, 255, 255, 0.04);
+	color: var(--ad-text);
+}
+.ad-nav a.active {
+	color: var(--ad-text);
+	background: rgba(255, 255, 255, 0.05);
+}
+.ad-beta {
+	font-size: 9px;
+	color: var(--ad-violet);
+	margin-left: 6px;
+	letter-spacing: 0.1em;
+}
+.ad-side-foot {
+	margin-top: auto;
+	display: flex;
+	flex-direction: column;
+	gap: 6px;
+	font-size: 13px;
+	color: var(--ad-muted);
+}
+
+.ad-main {
+	padding: 0;
+	/* Full-page: fill the 1fr track instead of a narrow centered column.
+	   Cap on ultra-wide so the card grid doesn't sprawl past a comfortable
+	   reading field, but otherwise use the whole width. */
+	max-width: 2400px;
+	margin: 0 auto;
+	width: 100%;
+	/* Grid item: allow the 1fr track to shrink below the content's
+	   min-content width so long monospace URLs / mono blocks can't blow
+	   the page out horizontally on narrow viewports. */
+	min-width: 0;
+}
+
+/* Card field — tile the stacked cards across the full width. This is a
+   CSS Grid, not a CSS multi-column context, on purpose: multi-column
+   (`column-width`) strands every card into the leftmost column and lets the
+   page overflow straight down whenever its content can't balance — the
+   "single narrow column beside a huge dead gutter, page runs off the bottom"
+   failure this page used to hit. `repeat(auto-fit, minmax(min(100%, 360px),
+   1fr))` can't do that: it packs as many ~360px tracks as fit and STRETCHES
+   them to fill the row, collapsing empty tracks so a short field (few cards)
+   still spans the full width instead of hugging the left edge. `min(100%,
+   360px)` keeps a lone card full-width instead of overflowing on sub-360px
+   viewports. The hero stays full-width above this grid; the footer below. */
+.ad-cards {
+	display: grid;
+	grid-template-columns: repeat(auto-fit, minmax(min(100%, 360px), 1fr));
+	align-items: start;
+	gap: 16px;
+	padding: 4px 24px 0;
+}
+.ad-cards > .ad-card,
+.ad-cards > details {
+	margin: 0;
+	/* Let a grid track shrink below its content's min-content width so a wide
+	   child (mono address, live canvas, embed) can't blow a column out and
+	   force the whole field wider than the viewport. */
+	min-width: 0;
+}
+
+.ad-banner {
+	background: linear-gradient(90deg, var(--bg-1), #222222);
+	color: var(--ad-text);
+	font-size: 12px;
+	text-align: center;
+	padding: 8px 12px;
+	border-bottom: 1px solid var(--ad-line);
+}
+
+.ad-topbar {
+	display: flex;
+	gap: 10px;
+	padding: 14px 24px;
+	align-items: center;
+	border-bottom: 1px solid var(--ad-line);
+}
+.ad-search {
+	flex: 1;
+	min-width: 0;
+	background: var(--ad-bg-2);
+	border: 1px solid var(--ad-line);
+	color: var(--ad-text);
+	border-radius: 8px;
+	padding: 8px 12px;
+	font-family: inherit;
+	font-size: 13px;
+}
+.ad-search:focus {
+	outline: none;
+	border-color: var(--ad-line-2);
+}
+.ad-actions {
+	display: flex;
+	gap: 8px;
+}
+.ad-hero-actions {
+	display: flex;
+	gap: 8px;
+	flex-wrap: wrap;
+	justify-content: center;
+	margin-top: 12px;
+}
+
+.ad-btn {
+	background: var(--ad-bg-2);
+	color: var(--ad-text);
+	border: 1px solid var(--ad-line);
+	border-radius: 8px;
+	padding: 7px 14px;
+	font-family: inherit;
+	font-size: 13px;
+	cursor: pointer;
+	display: inline-flex;
+	align-items: center;
+	transition: border-color var(--duration-fast), transform var(--duration-instant);
+}
+.ad-btn:hover {
+	border-color: var(--ad-line-2);
+}
+.ad-btn:active {
+	border-color: var(--ad-line-2);
+	transform: translateY(1px);
+}
+.ad-btn:focus-visible {
+	outline: 2px solid var(--ad-cyan);
+	outline-offset: 2px;
+}
+.ad-btn-primary {
+	background: #fff;
+	color: #000;
+	border-color: #fff;
+}
+
+.ad-back-row {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 12px;
+	flex-wrap: wrap;
+	margin-right: 24px;
+}
+.ad-back {
+	display: inline-block;
+	margin: 22px 24px 8px;
+	color: var(--ad-muted);
+	font-size: 13px;
+}
+.ad-back:hover {
+	color: var(--ad-text);
+}
+
+.ad-hero {
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	gap: 0;
+	padding: 0 24px 24px;
+	position: relative;
+}
+
+/* Radial glow banner behind avatar */
+.ad-hero-glow {
+	position: absolute;
+	top: 0; left: 0; right: 0;
+	height: 320px;
+	pointer-events: none;
+	z-index: 0;
+}
+
+/* Avatar container — centered, 280px tall */
+.ad-hero-avatar-wrap {
+	position: relative;
+	width: 240px;
+	height: 280px;
+	z-index: 1;
+	cursor: pointer;
+	margin-top: 16px;
+}
+.ad-hero-avatar-wrap:hover .ad-hero-avatar-overlay { opacity: 1; }
+
+.ad-hero-avatar-overlay {
+	position: absolute;
+	inset: 0;
+	border-radius: 18px;
+	background: rgba(0,0,0,.25);
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	opacity: 0;
+	transition: opacity var(--duration-fast);
+	z-index: 2;
+}
+.ad-hero-avatar-overlay svg { color: #fff; }
+
+.ad-hero-avatar {
+	width: 240px;
+	height: 280px;
+	border-radius: 18px;
+	object-fit: cover;
+	background: var(--ad-bg-2);
+	border: 1px solid var(--ad-line);
+	display: block;
+}
+
+/* Hero avatar is a live WebGL stage (real idle animation, never a T-pose). */
+div.ad-hero-avatar {
+	position: relative;
+	width: 240px;
+	height: 280px;
+	border-radius: 18px;
+	overflow: hidden;
+	background: transparent;
+	border: 1px solid var(--ad-line);
+}
+div.ad-hero-avatar canvas {
+	display: block;
+	width: 100% !important;
+	height: 100% !important;
+	border-radius: 18px;
+}
+
+.ad-hero-body {
+	width: 100%;
+	max-width: 560px;
+	text-align: center;
+	z-index: 1;
+	margin-top: 16px;
+}
+.ad-hero-title {
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	gap: 10px;
+	flex-wrap: wrap;
+}
+.ad-hero-title h1 {
+	margin: 0;
+	font-size: 28px;
+	font-weight: 700;
+	letter-spacing: -0.02em;
+}
+.ad-status {
+	display: inline-flex;
+	align-items: center;
+	gap: 6px;
+	background: rgba(74, 222, 128, 0.08);
+	color: var(--ad-green);
+	border: 1px solid rgba(74, 222, 128, 0.25);
+	padding: 3px 10px;
+	border-radius: 999px;
+	font-size: 12px;
+}
+.ad-status::before {
+	content: '';
+	width: 6px;
+	height: 6px;
+	border-radius: 50%;
+	background: var(--ad-green);
+}
+.ad-status.ad-status-inactive {
+	background: rgba(231, 233, 238, 0.06);
+	color: var(--ad-muted);
+	border-color: var(--ad-line-2);
+}
+.ad-status.ad-status-inactive::before {
+	background: var(--ad-dim);
+}
+/* Pulsing on-chain badge */
+.ad-onchain-live {
+	display: inline-flex;
+	align-items: center;
+	gap: 5px;
+	font-size: 11px;
+	font-weight: 700;
+	letter-spacing: .06em;
+	text-transform: uppercase;
+	color: #10b981;
+	background: rgba(16,185,129,.1);
+	border: 1px solid rgba(16,185,129,.3);
+	border-radius: 999px;
+	padding: 3px 10px;
+	margin-top: 8px;
+}
+.ad-onchain-live::before {
+	content: '';
+	width: 7px; height: 7px;
+	border-radius: 50%;
+	background: #10b981;
+	animation: ad-dot-pulse 2s ease-in-out infinite;
+}
+@keyframes ad-dot-pulse {
+	0%,100% { opacity: 1; transform: scale(1); }
+	50% { opacity: .4; transform: scale(.65); }
+}
+
+/* Share float button in hero */
+.ad-hero-share-float {
+	position: absolute;
+	top: 20px; right: 0;
+	z-index: 2;
+	width: 36px; height: 36px;
+	border-radius: 50%;
+	background: rgba(255,255,255,.06);
+	border: 1px solid rgba(255,255,255,.1);
+	display: flex; align-items: center; justify-content: center;
+	cursor: pointer;
+	color: var(--ad-muted);
+	transition: background var(--duration-fast), color var(--duration-fast);
+}
+.ad-hero-share-float:hover {
+	background: rgba(255,255,255,.12);
+	color: var(--ad-text);
+}
+
+/* Fullscreen 3D viewer modal */
+.ad-3d-modal {
+	position: fixed; inset: 0; z-index: 10000;
+	background: rgba(0,0,0,.92);
+	display: flex; align-items: center; justify-content: center;
+}
+.ad-3d-modal.hidden { display: none; }
+.ad-3d-modal-inner {
+	position: relative;
+	width: min(680px, 96vw);
+	height: min(680px, 80vh);
+}
+.ad-3d-modal-close {
+	position: absolute;
+	top: -40px; right: 0;
+	background: none; border: none;
+	color: rgba(255,255,255,.6); font-size: 22px; cursor: pointer;
+	line-height: 1;
+}
+.ad-3d-modal-close:hover { color: #fff; }
+.ad-3d-modal #ad-avatar-modal-3d {
+	position: relative;
+	width: 100%; height: 100%;
+	border-radius: 20px;
+	overflow: hidden;
+	background: var(--ad-bg-2);
+}
+.ad-3d-modal #ad-avatar-modal-3d canvas {
+	display: block;
+	width: 100% !important;
+	height: 100% !important;
+	border-radius: 20px;
+}
+.ad-3d-modal-world {
+	position: absolute;
+	bottom: 16px; left: 50%;
+	transform: translateX(-50%);
+	display: inline-flex; align-items: center; gap: 7px;
+	padding: 9px 16px;
+	border-radius: 999px;
+	background: rgba(255,255,255,.1);
+	border: 1px solid rgba(255,255,255,.16);
+	color: #fff;
+	font-size: 13px; font-weight: 600;
+	text-decoration: none;
+	backdrop-filter: blur(8px);
+	transition: background var(--duration-fast), transform var(--duration-fast);
+}
+.ad-3d-modal-world:hover {
+	background: rgba(255,255,255,.18);
+	transform: translateX(-50%) translateY(-1px);
+}
+
+/* Embed disclosure */
+.ad-embed-disclosure summary {
+	cursor: pointer;
+	list-style: none;
+	display: flex; align-items: center; gap: 6px;
+	font-size: 13px; color: var(--ad-muted);
+	padding: 10px 20px;
+	user-select: none;
+}
+.ad-embed-disclosure summary::-webkit-details-marker { display: none; }
+.ad-embed-disclosure summary::before {
+	content: '›'; font-size: 16px; transition: transform var(--duration-base);
+}
+.ad-embed-disclosure[open] summary::before { transform: rotate(90deg); }
+.ad-embed-disclosure summary:hover { color: var(--ad-text); }
+
+.ad-hero-meta {
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	gap: 8px;
+	color: var(--ad-muted);
+	font-size: 13px;
+	margin-top: 6px;
+}
+.ad-mono {
+	font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+.ad-dot {
+	color: var(--ad-dim);
+}
+.ad-hero-desc {
+	color: var(--ad-muted);
+	font-size: 14px;
+	line-height: 1.55;
+	margin: 10px auto 10px;
+	white-space: pre-wrap;
+	overflow: hidden;
+	display: -webkit-box;
+	-webkit-line-clamp: 2;
+	-webkit-box-orient: vertical;
+	max-width: 440px;
+}
+.ad-hero-trust {
+	display: flex;
+	gap: 8px;
+	flex-wrap: wrap;
+	justify-content: center;
+}
+
+.ad-card {
+	background: var(--ad-card);
+	border: 1px solid var(--ad-line);
+	border-radius: 16px;
+	padding: 18px 20px;
+	margin: 12px 24px;
+	box-shadow: var(--shadow-2);
+}
+.ad-card-head {
+	display: flex;
+	align-items: center;
+	gap: 10px;
+	margin-bottom: 14px;
+}
+.ad-card-head h2,
+.ad-card-title {
+	margin: 0;
+	font-size: 12px;
+	letter-spacing: 0.14em;
+	font-weight: 500;
+	color: var(--ad-text);
+}
+.ad-token-cta {
+	display: inline-flex;
+	align-items: center;
+	gap: 6px;
+	margin-top: 12px;
+	padding: 9px 14px;
+	border-radius: 9px;
+	background: rgba(120, 200, 140, 0.16);
+	border: 1px solid rgba(120, 200, 140, 0.42);
+	color: #c6f0d6;
+	font-size: 13px;
+	font-weight: 600;
+	letter-spacing: -0.005em;
+	text-decoration: none;
+	cursor: pointer;
+	transition:
+		background var(--duration-fast),
+		border-color var(--duration-fast),
+		color var(--duration-fast);
+}
+.ad-token-cta:hover:not(:disabled) {
+	background: rgba(120, 200, 140, 0.26);
+	border-color: rgba(120, 200, 140, 0.65);
+	color: #d8f5e2;
+}
+.ad-token-cta:disabled {
+	opacity: 0.55;
+	cursor: wait;
+}
+
+.ad-bullet {
+	width: 8px;
+	height: 8px;
+	border-radius: 50%;
+	background: var(--ad-cyan);
+}
+.ad-bullet-amber {
+	background: var(--ad-amber);
+}
+.ad-bullet-green {
+	background: var(--ad-green);
+}
+.ad-bullet-dim {
+	background: var(--ad-dim);
+}
+.ad-bullet-muted {
+	background: var(--ad-dim);
+}
+
+.ad-pill {
+	display: inline-flex;
+	align-items: center;
+	font-size: 11px;
+	padding: 3px 9px;
+	border-radius: 999px;
+	border: 1px solid var(--ad-line-2);
+	color: var(--ad-muted);
+}
+.ad-pill-muted {
+	margin-left: auto;
+}
+.ad-pill-amber {
+	color: var(--ad-amber);
+	border-color: rgba(245, 165, 36, 0.3);
+	background: rgba(245, 165, 36, 0.08);
+}
+.ad-pill-violet {
+	color: var(--ad-violet);
+	border-color: rgba(255, 255, 255, 0.15);
+	background: rgba(255, 255, 255, 0.04);
+}
+.ad-pill-green {
+	color: var(--ad-green);
+	border-color: rgba(74, 222, 128, 0.3);
+	background: rgba(74, 222, 128, 0.08);
+}
+.ad-pill-seeker {
+	color: var(--ad-green);
+	border-color: rgba(74, 222, 128, 0.35);
+	background: linear-gradient(135deg, rgba(74, 222, 128, 0.14), rgba(96, 165, 250, 0.1));
+	cursor: help;
+}
+.ad-pill-cyan {
+	color: var(--ad-cyan);
+	border-color: rgba(87, 199, 255, 0.3);
+	background: rgba(87, 199, 255, 0.08);
+}
+.ad-pill-red {
+	color: var(--danger);
+	border-color: rgba(248, 113, 113, 0.35);
+	background: rgba(248, 113, 113, 0.08);
+}
+
+.ad-services {
+	display: flex;
+	flex-direction: column;
+	gap: 10px;
+}
+.ad-svc {
+	border: 1px solid var(--ad-line);
+	border-radius: 12px;
+	padding: 12px 14px;
+	background: rgba(255, 255, 255, 0.015);
+}
+.ad-svc-head {
+	display: flex;
+	gap: 10px;
+	align-items: center;
+	margin-bottom: 8px;
+}
+.ad-svc-tag {
+	font-size: 11px;
+	letter-spacing: 0.1em;
+	padding: 3px 8px;
+	border-radius: 6px;
+	background: rgba(255, 255, 255, 0.06);
+	color: var(--ad-text);
+}
+.ad-svc-version {
+	color: var(--ad-muted);
+	font-size: 12px;
+}
+.ad-svc-link {
+	display: flex;
+	gap: 8px;
+	align-items: center;
+	background: var(--ad-bg-2);
+	border: 1px solid var(--ad-line);
+	border-radius: 8px;
+	padding: 8px 10px;
+	font-family: ui-monospace, monospace;
+	font-size: 12px;
+	color: var(--ad-text);
+	overflow: hidden;
+}
+.ad-svc-link span {
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+	flex: 1;
+	min-width: 0;
+}
+.ad-svc-meta {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 8px;
+	margin-top: 10px;
+	align-items: center;
+	font-size: 12px;
+}
+.ad-svc-meta-label {
+	color: var(--ad-dim);
+	letter-spacing: 0.1em;
+	font-size: 10px;
+	margin-right: 4px;
+}
+.ad-chip {
+	font-size: 11px;
+	padding: 3px 8px;
+	border-radius: 6px;
+	background: rgba(255, 255, 255, 0.05);
+	color: var(--ad-muted);
+	border: 1px solid var(--ad-line);
+}
+
+.ad-row {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	padding: 6px 0;
+}
+.ad-row-split {
+	justify-content: space-between;
+}
+.ad-balance {
+	font-size: 14px;
+	margin-top: 8px;
+}
+.ad-muted {
+	color: var(--ad-muted);
+	font-size: 13px;
+}
+
+.ad-sub {
+	font-size: 10px;
+	letter-spacing: 0.16em;
+	color: var(--ad-dim);
+	margin: 12px 0 8px;
+}
+.ad-trust-pills {
+	display: flex;
+	gap: 8px;
+	flex-wrap: wrap;
+}
+
+.ad-collapse {
+	padding: 0;
+}
+.ad-collapse summary {
+	list-style: none;
+	cursor: pointer;
+	padding: 18px 20px;
+	display: flex;
+	align-items: center;
+	gap: 10px;
+}
+.ad-collapse summary::-webkit-details-marker {
+	display: none;
+}
+.ad-collapse summary::after {
+	content: '⌄';
+	margin-left: auto;
+	color: var(--ad-muted);
+}
+.ad-raw {
+	margin: 0;
+	padding: 0 20px 18px;
+	font-size: 11px;
+	color: var(--ad-muted);
+	white-space: pre-wrap;
+	word-break: break-all;
+	font-family: ui-monospace, monospace;
+	max-height: 320px;
+	overflow: auto;
+}
+
+.ad-protocols {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 6px;
+	margin-top: 4px;
+}
+
+.ad-cta-row {
+	display: flex;
+	flex-direction: column;
+	gap: 8px;
+	margin-top: 16px;
+}
+.ad-cta {
+	display: block;
+	text-align: center;
+	border: 1px solid var(--ad-line-2);
+	border-radius: 10px;
+	padding: 11px;
+	font-size: 13px;
+	color: var(--ad-text);
+}
+.ad-cta:hover {
+	background: rgba(255, 255, 255, 0.03);
+}
+
+.ad-copy {
+	background: transparent;
+	border: none;
+	cursor: pointer;
+	color: var(--ad-dim);
+	font-size: 13px;
+	padding: 2px 4px;
+}
+.ad-copy:hover {
+	color: var(--ad-text);
+}
+
+.ad-foot {
+	display: flex;
+	justify-content: space-between;
+	padding: 30px 24px;
+	color: var(--ad-dim);
+	font-size: 12px;
+	border-top: 1px solid var(--ad-line);
+	margin-top: 20px;
+}
+.ad-foot a:hover {
+	color: var(--ad-text);
+}
+
+/* Below 1024px the 220px sidebar leaves too little room for the card field
+   to form two columns. Drop the sidebar (its links live in the global nav
+   too) and give the content the full width so the grid can tile two-up. */
+@media (max-width: 1024px) {
+	.ad-shell {
+		grid-template-columns: 1fr;
+	}
+	.ad-sidebar {
+		display: none;
+	}
+}
+
+@media (max-width: 480px) {
+	.ad-topbar {
+		flex-wrap: wrap;
+		padding: 12px 16px;
+	}
+	.ad-search {
+		flex: 1 1 100%;
+		order: 2;
+	}
+	.ad-actions {
+		flex: 1 1 100%;
+		justify-content: flex-end;
+	}
+	.ad-back {
+		margin: 16px 16px 8px;
+	}
+	.ad-back-row {
+		margin-right: 16px;
+	}
+	.ad-hero {
+		padding: 0 16px 20px;
+	}
+	.ad-cards {
+		padding: 4px 16px 0;
+	}
+}
+
+.ad-bullet-red {
+	background: var(--danger);
+}
+.ad-pill-live {
+	color: var(--danger);
+	border-color: rgba(248, 113, 113, 0.3);
+	background: rgba(248, 113, 113, 0.08);
+	margin-left: auto;
+}
+.ad-livestream-embed {
+	aspect-ratio: 16 / 9;
+	background: #000;
+	border-radius: 12px;
+	overflow: hidden;
+	border: 1px solid var(--ad-line);
+}
+.ad-livestream-embed iframe {
+	width: 100%;
+	height: 100%;
+	border: 0;
+}
+
+.hidden {
+	display: none;
+}
+
+.ad-form-group {
+	margin-bottom: 16px;
+}
+
+.ad-form-group label {
+	display: block;
+	font-size: 12px;
+	color: var(--ad-muted);
+	margin-bottom: 6px;
+}
+
+.ad-input {
+	width: 100%;
+	background: var(--ad-bg-2);
+	border: 1px solid var(--ad-line);
+	color: var(--ad-text);
+	border-radius: 8px;
+	padding: 10px 12px;
+	font-family: inherit;
+	font-size: 14px;
+}
+
+.ad-input:focus {
+	outline: none;
+	border-color: var(--ad-line-2);
+}
+
+.ad-resolved {
+	margin-top: 6px;
+	font-family: ui-monospace, monospace;
+	font-size: 12px;
+	color: var(--ad-muted);
+	word-break: break-all;
+}
+
+.ad-resolved.ok {
+	color: #81c784;
+}
+.ad-resolved.warn {
+	color: #ff8a80;
+}
+.ad-resolved.loading {
+	color: var(--ad-muted);
+	font-style: italic;
+}
+
+/* ── Reviews ─────────────────────────────────────────────────────────────── */
+
+.ad-reviews-summary {
+	display: flex;
+	gap: 24px;
+	align-items: center;
+	padding: 16px 0 20px;
+	border-bottom: 1px solid var(--ad-line);
+	margin-bottom: 20px;
+}
+.ad-reviews-score {
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	min-width: 80px;
+}
+.ad-reviews-avg {
+	font-size: 40px;
+	font-weight: 700;
+	line-height: 1;
+	letter-spacing: -0.03em;
+}
+.ad-reviews-stars {
+	display: flex;
+	gap: 2px;
+	margin-top: 6px;
+}
+.ad-reviews-total {
+	font-size: 12px;
+	color: var(--ad-muted);
+	margin-top: 4px;
+}
+.ad-reviews-bars {
+	flex: 1;
+	display: flex;
+	flex-direction: column;
+	gap: 5px;
+}
+.ad-reviews-bar-row {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	font-size: 12px;
+}
+.ad-reviews-bar-label {
+	color: var(--ad-muted);
+	min-width: 14px;
+	text-align: right;
+}
+.ad-reviews-bar-track {
+	flex: 1;
+	height: 6px;
+	background: rgba(255, 255, 255, 0.08);
+	border-radius: 3px;
+	overflow: hidden;
+}
+.ad-reviews-bar-fill {
+	height: 100%;
+	background: var(--ad-amber);
+	border-radius: 3px;
+	transition: width var(--duration-slow) var(--ease-standard);
+}
+.ad-reviews-bar-count {
+	min-width: 20px;
+	color: var(--ad-muted);
+}
+
+/* star widget */
+.ad-star {
+	font-size: 16px;
+	color: rgba(255, 255, 255, 0.2);
+	transition: color var(--duration-instant);
+	user-select: none;
+}
+.ad-star.filled {
+	color: var(--ad-amber);
+}
+.ad-star.half {
+	color: var(--ad-amber);
+}
+
+/* write-review form */
+.ad-review-form {
+	background: var(--ad-bg-2);
+	border: 1px solid var(--ad-line);
+	border-radius: 10px;
+	padding: 16px;
+	margin-bottom: 20px;
+}
+.ad-review-form-title {
+	font-size: 13px;
+	font-weight: 600;
+	margin-bottom: 12px;
+}
+.ad-review-star-picker {
+	display: flex;
+	gap: 4px;
+	margin-bottom: 12px;
+	cursor: pointer;
+}
+.ad-review-star-picker .ad-star {
+	font-size: 24px;
+	cursor: pointer;
+	transition:
+		transform var(--duration-instant),
+		color var(--duration-instant);
+}
+.ad-review-star-picker .ad-star:hover {
+	transform: scale(1.15);
+}
+.ad-review-textarea {
+	width: 100%;
+	background: var(--ad-bg);
+	border: 1px solid var(--ad-line);
+	color: var(--ad-text);
+	border-radius: 8px;
+	padding: 10px 12px;
+	font-family: inherit;
+	font-size: 13px;
+	resize: vertical;
+	min-height: 80px;
+	box-sizing: border-box;
+	transition: border-color var(--duration-fast);
+}
+.ad-review-textarea:focus {
+	outline: none;
+	border-color: var(--ad-line-2);
+}
+.ad-review-form-footer {
+	display: flex;
+	justify-content: space-between;
+	align-items: center;
+	margin-top: 10px;
+}
+.ad-review-char-count {
+	font-size: 11px;
+	color: var(--ad-muted);
+}
+.ad-review-form-actions {
+	display: flex;
+	gap: 8px;
+}
+.ad-review-submit {
+	background: #fff;
+	color: #000;
+	border: none;
+	border-radius: 8px;
+	padding: 7px 16px;
+	font-family: inherit;
+	font-size: 13px;
+	font-weight: 600;
+	cursor: pointer;
+	transition: opacity var(--duration-fast);
+}
+.ad-review-submit:disabled {
+	opacity: 0.45;
+	cursor: default;
+}
+.ad-review-submit:not(:disabled):hover {
+	opacity: 0.88;
+}
+.ad-review-delete {
+	background: transparent;
+	color: var(--ad-muted);
+	border: 1px solid var(--ad-line);
+	border-radius: 8px;
+	padding: 7px 12px;
+	font-family: inherit;
+	font-size: 13px;
+	cursor: pointer;
+}
+.ad-review-delete:hover {
+	color: #ff8a80;
+	border-color: #ff8a80;
+}
+
+/* review list */
+.ad-review-item {
+	padding: 16px 0;
+	border-bottom: 1px solid var(--ad-line);
+}
+.ad-review-item:last-child {
+	border-bottom: none;
+}
+.ad-review-item-head {
+	display: flex;
+	align-items: center;
+	gap: 10px;
+	margin-bottom: 8px;
+}
+.ad-review-avatar {
+	width: 32px;
+	height: 32px;
+	border-radius: 50%;
+	object-fit: cover;
+	background: var(--ad-bg-2);
+	border: 1px solid var(--ad-line);
+	flex-shrink: 0;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	font-size: 13px;
+	font-weight: 600;
+}
+.ad-review-meta {
+	flex: 1;
+	min-width: 0;
+}
+.ad-review-author {
+	font-size: 13px;
+	font-weight: 600;
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
+}
+.ad-review-date {
+	font-size: 11px;
+	color: var(--ad-muted);
+}
+.ad-review-item-stars {
+	display: flex;
+	gap: 2px;
+}
+.ad-review-item-stars .ad-star {
+	font-size: 13px;
+}
+.ad-review-body {
+	font-size: 13px;
+	color: var(--ad-text);
+	line-height: 1.55;
+	margin-top: 4px;
+	white-space: pre-wrap;
+	word-break: break-word;
+}
+.ad-review-mine-actions {
+	display: flex;
+	gap: 8px;
+	margin-top: 8px;
+}
+.ad-review-mine-btn {
+	background: none;
+	border: 1px solid var(--ad-line);
+	color: var(--ad-muted);
+	border-radius: 6px;
+	padding: 3px 10px;
+	font-size: 11px;
+	font-family: inherit;
+	cursor: pointer;
+}
+.ad-review-mine-btn:hover {
+	color: var(--ad-text);
+	border-color: var(--ad-line-2);
+}
+.ad-review-mine-btn.danger:hover {
+	color: #ff8a80;
+	border-color: #ff8a80;
+}
+
+.ad-reviews-empty {
+	padding: 28px 0;
+	text-align: center;
+	color: var(--ad-muted);
+	font-size: 14px;
+}
+.ad-reviews-empty strong {
+	display: block;
+	font-size: 16px;
+	margin-bottom: 6px;
+	color: var(--ad-text);
+}
+.ad-reviews-error {
+	padding: 12px;
+	color: #ff8a80;
+	font-size: 13px;
+	text-align: center;
+}
+.ad-reviews-signin-prompt {
+	background: var(--ad-bg-2);
+	border: 1px solid var(--ad-line);
+	border-radius: 10px;
+	padding: 14px 16px;
+	font-size: 13px;
+	color: var(--ad-muted);
+	margin-bottom: 20px;
+	text-align: center;
+}
+.ad-reviews-signin-prompt a {
+	color: var(--ad-violet);
+	text-decoration: underline;
+}
+
+/* skeleton shimmer for reviews */
+.ad-reviews-skeleton {
+	padding: 12px 0;
+}
+.ad-review-skel-row {
+	display: flex;
+	gap: 10px;
+	align-items: flex-start;
+	margin-bottom: 20px;
+}
+.ad-review-skel-avatar {
+	width: 32px;
+	height: 32px;
+	border-radius: 50%;
+	flex-shrink: 0;
+}
+.ad-review-skel-lines {
+	flex: 1;
+	display: flex;
+	flex-direction: column;
+	gap: 8px;
+}
+.ad-review-skel-line {
+	height: 12px;
+	border-radius: 6px;
+}
+.ad-review-skel-line.short {
+	width: 40%;
+}
+.ad-review-skel-line.med {
+	width: 70%;
+}
+.ad-review-skel-line.long {
+	width: 90%;
+}
+
+/* ───────────────────────────────────────────────────────────────────────────
+   Marketplace-feature enrichment (agent-detail-market.js)
+   3D avatar · hero meta/actions · live preview · skills/pricing · sale panel ·
+   embed · similar · versions · creator modal · payment modal.
+   Tokens mirror :root above; monochrome surface, no chroma accents.
+─────────────────────────────────────────────────────────────────────────── */
+
+/* Hero metadata row */
+.ad-market-meta {
+	display: flex;
+	align-items: center;
+	flex-wrap: wrap;
+	gap: 8px;
+	margin-top: 8px;
+	font-size: 13px;
+	color: var(--ad-muted);
+}
+.ad-author-btn {
+	background: none;
+	border: 0;
+	padding: 0;
+	color: var(--ad-text);
+	font: inherit;
+	font-weight: 600;
+	cursor: pointer;
+	border-bottom: 1px dashed var(--ad-line-2);
+}
+.ad-author-btn:hover:not(:disabled) {
+	color: #fff;
+	border-bottom-color: var(--ad-text);
+}
+.ad-author-btn:disabled {
+	cursor: default;
+	border-bottom: 0;
+	color: var(--ad-muted);
+}
+.ad-cat-pill,
+.ad-stat-pill {
+	display: inline-flex;
+	align-items: center;
+	padding: 2px 9px;
+	border-radius: 999px;
+	border: 1px solid var(--ad-line);
+	background: var(--ad-bg-2);
+	font-size: 12px;
+	color: var(--ad-muted);
+}
+
+/* Owner action bar — edit, manage, deploy CTAs shown only to the agent owner */
+.ad-owner-bar {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	flex-wrap: wrap;
+	margin: 10px 0 6px;
+	padding: 10px 12px;
+	background: rgba(139, 92, 246, 0.07);
+	border: 1px solid rgba(139, 92, 246, 0.18);
+	border-radius: 10px;
+}
+.ad-owner-bar .ad-btn {
+	font-size: 12.5px;
+	padding: 6px 13px;
+	text-decoration: none;
+}
+.ad-btn-deploy {
+	background: rgba(139, 92, 246, 0.15) !important;
+	border-color: rgba(139, 92, 246, 0.4) !important;
+	color: var(--accent-violet) !important;
+}
+.ad-btn-deploy:hover {
+	background: rgba(139, 92, 246, 0.25) !important;
+}
+
+/* Deploy slot in BLOCKCHAIN DETAILS — inline OnchainDeployButton */
+.ad-deploy-slot {
+	margin: 12px 0 4px;
+}
+.ad-deploy-slot:empty {
+	display: none;
+}
+
+/* Hero actions */
+.ad-market-actions {
+	display: inline-flex;
+	gap: 8px;
+	flex-wrap: wrap;
+}
+#ad-bookmark.on {
+	color: var(--ad-amber);
+	border-color: rgba(245, 165, 36, 0.4);
+}
+
+/* ── Live preview ──────────────────────────────────────────────────────── */
+.ad-preview-hint {
+	margin-left: auto;
+	font-size: 12px;
+	color: var(--ad-dim);
+}
+.ad-preview-thread {
+	display: flex;
+	flex-direction: column;
+	gap: 8px;
+	max-height: 320px;
+	overflow-y: auto;
+	padding: 4px 2px;
+	margin-bottom: 12px;
+}
+.market-preview-msg {
+	display: flex;
+}
+.market-preview-msg.user {
+	justify-content: flex-end;
+}
+.market-preview-msg.assistant {
+	justify-content: flex-start;
+}
+.market-preview-bubble {
+	max-width: 80%;
+	padding: 9px 13px;
+	border-radius: 14px;
+	font-size: 14px;
+	line-height: 1.5;
+	white-space: pre-wrap;
+	word-break: break-word;
+}
+.market-preview-msg.user .market-preview-bubble {
+	background: var(--ad-text);
+	color: var(--ad-bg);
+	border-bottom-right-radius: 4px;
+}
+.market-preview-msg.assistant .market-preview-bubble {
+	background: var(--ad-bg-2);
+	border: 1px solid var(--ad-line);
+	color: var(--ad-text);
+	border-bottom-left-radius: 4px;
+}
+.market-preview-bubble.streaming::after {
+	content: '▋';
+	animation: ad-blink 1s steps(2) infinite;
+	margin-left: 1px;
+}
+@keyframes ad-blink {
+	0%,
+	50% {
+		opacity: 1;
+	}
+	50.01%,
+	100% {
+		opacity: 0;
+	}
+}
+.ad-preview-form {
+	display: flex;
+	gap: 8px;
+}
+.ad-preview-input {
+	flex: 1;
+	min-width: 0;
+	padding: 10px 13px;
+	border-radius: 10px;
+	border: 1px solid var(--ad-line-2);
+	background: var(--ad-bg-2);
+	color: var(--ad-text);
+	font: inherit;
+	font-size: 14px;
+}
+.ad-preview-input:focus {
+	outline: none;
+	border-color: var(--ad-text);
+}
+.ad-preview-footer {
+	margin-top: 8px;
+	font-size: 12px;
+	color: var(--ad-dim);
+	min-height: 14px;
+}
+.ad-preview-footer.err {
+	color: #ff6b6b;
+}
+
+/* ── Skills & pricing ──────────────────────────────────────────────────── */
+.ad-pricing-summary {
+	display: flex;
+	align-items: center;
+	gap: 6px;
+	padding: 8px 12px;
+	margin-bottom: 12px;
+	border-radius: 10px;
+	background: rgba(245, 165, 36, 0.08);
+	border: 1px solid rgba(245, 165, 36, 0.2);
+	font-size: 13px;
+	color: var(--ad-text);
+}
+.ad-pricing-icon {
+	display: inline-flex;
+	width: 18px;
+	height: 18px;
+	align-items: center;
+	justify-content: center;
+	border-radius: 50%;
+	background: var(--ad-amber);
+	color: #000;
+	font-weight: 700;
+	font-size: 12px;
+}
+.ad-skill-row {
+	display: flex;
+	align-items: center;
+	gap: 10px;
+	flex-wrap: wrap;
+	padding: 10px 0;
+	border-bottom: 1px solid var(--ad-line);
+}
+.ad-skill-row:last-child {
+	border-bottom: 0;
+}
+/* Arrived here from a deep link naming one skill (e.g. the Buy CTA on
+   /conversions). Marking the row is what makes the landing legible on an agent
+   selling a dozen skills; the tint fades once it has done its job. */
+.ad-skill-row--focused {
+	background: color-mix(in srgb, var(--ad-cyan) 12%, transparent);
+	box-shadow: inset 2px 0 0 var(--ad-cyan);
+	border-radius: 6px;
+	padding-left: 10px;
+	animation: ad-skill-focus-fade 2.4s ease-out 1.6s forwards;
+}
+@keyframes ad-skill-focus-fade {
+	to {
+		background: transparent;
+		box-shadow: inset 2px 0 0 transparent;
+	}
+}
+@media (prefers-reduced-motion: reduce) {
+	.ad-skill-row--focused {
+		animation: none;
+	}
+}
+.ad-skill-name {
+	font-size: 14px;
+	color: var(--ad-text);
+	font-weight: 500;
+}
+.ad-skill-actions {
+	display: inline-flex;
+	align-items: center;
+	gap: 6px;
+	margin-left: auto;
+	flex-wrap: wrap;
+}
+.ad-price-badge {
+	display: inline-flex;
+	padding: 3px 10px;
+	border-radius: 999px;
+	font-size: 12px;
+	font-weight: 600;
+	border: 1px solid var(--ad-line-2);
+}
+.ad-price-badge.free {
+	color: var(--ad-green);
+	border-color: rgba(74, 222, 128, 0.3);
+}
+.ad-price-badge.paid {
+	color: var(--ad-amber);
+	border-color: rgba(245, 165, 36, 0.35);
+}
+.ad-price-badge.owned {
+	color: var(--ad-green);
+	border-color: rgba(74, 222, 128, 0.3);
+	background: rgba(74, 222, 128, 0.08);
+}
+.ad-price-badge.pwyw {
+	color: var(--accent-violet);
+	border-color: rgba(167, 139, 250, 0.4);
+	background: rgba(167, 139, 250, 0.08);
+}
+.ad-price-badge.gated {
+	color: #7dd3fc;
+	border-color: rgba(56, 189, 248, 0.4);
+	background: rgba(56, 189, 248, 0.08);
+}
+.ad-skill-btn.gated-collection {
+	text-decoration: none;
+	font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+	font-size: 11px;
+}
+.ad-skill-btn {
+	padding: 5px 12px;
+	border-radius: 8px;
+	border: 1px solid var(--ad-line-2);
+	background: var(--ad-bg-2);
+	color: var(--ad-text);
+	font: inherit;
+	font-size: 12px;
+	font-weight: 600;
+	cursor: pointer;
+	transition:
+		background var(--duration-fast),
+		border-color var(--duration-fast);
+}
+.ad-skill-btn:hover {
+	background: rgba(255, 255, 255, 0.06);
+	border-color: var(--ad-text);
+}
+.ad-skill-btn.purchase-btn {
+	background: var(--ad-text);
+	color: var(--ad-bg);
+	border-color: var(--ad-text);
+}
+.ad-skill-btn.purchase-btn:hover {
+	background: #fff;
+}
+#ad-pricing-library {
+	margin-top: 14px;
+}
+
+/* ── Subscription tiers ────────────────────────────────────────────────── */
+.ad-bullet-violet {
+	background: var(--accent-violet-strong);
+}
+.ad-tiers-sub {
+	font-size: 13px;
+	color: var(--ad-muted);
+	margin: 0 0 14px;
+}
+.ad-tiers-body {
+	display: grid;
+	grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+	gap: 12px;
+}
+.ad-tier {
+	display: flex;
+	flex-direction: column;
+	gap: 10px;
+	padding: 14px;
+	border: 1px solid var(--ad-line-2);
+	border-radius: 12px;
+	background: var(--ad-bg-2);
+	transition:
+		border-color var(--duration-fast),
+		transform var(--duration-fast);
+}
+.ad-tier:hover {
+	border-color: rgba(167, 139, 250, 0.5);
+	transform: translateY(-1px);
+}
+.ad-tier-head {
+	display: flex;
+	align-items: baseline;
+	justify-content: space-between;
+	gap: 8px;
+}
+.ad-tier-name {
+	font-size: 14px;
+	font-weight: 600;
+	color: var(--ad-text);
+}
+.ad-tier-price {
+	font-size: 18px;
+	font-weight: 700;
+	color: var(--ad-text);
+	white-space: nowrap;
+}
+.ad-tier-cycle {
+	font-size: 12px;
+	font-weight: 500;
+	color: var(--ad-muted);
+}
+.ad-tier-perks {
+	list-style: none;
+	margin: 0;
+	padding: 0;
+	display: flex;
+	flex-direction: column;
+	gap: 6px;
+}
+.ad-tier-perks li {
+	position: relative;
+	padding-left: 18px;
+	font-size: 12.5px;
+	color: var(--ad-muted);
+	line-height: 1.4;
+}
+.ad-tier-perks li::before {
+	content: "✓";
+	position: absolute;
+	left: 0;
+	color: var(--accent-violet-strong);
+	font-weight: 700;
+}
+.ad-tier-foot {
+	margin-top: auto;
+}
+.ad-tier-btn {
+	width: 100%;
+	padding: 8px 12px;
+	border-radius: 9px;
+	border: 1px solid transparent;
+	background: var(--accent-violet-strong);
+	color: #14101f;
+	font: inherit;
+	font-size: 13px;
+	font-weight: 700;
+	cursor: pointer;
+	transition:
+		background var(--duration-fast),
+		transform var(--duration-instant);
+}
+.ad-tier-btn:hover {
+	background: #b9a4fb;
+}
+.ad-tier-btn:active {
+	transform: translateY(1px);
+}
+.ad-tier-btn:focus-visible {
+	outline: 2px solid var(--accent-violet);
+	outline-offset: 2px;
+}
+.ad-tier-note {
+	font-size: 12px;
+	color: var(--ad-muted);
+	font-style: italic;
+}
+
+/* ── Sale / ownership panel ────────────────────────────────────────────── */
+.ad-sale-eyebrow {
+	font-size: 12px;
+	letter-spacing: 0.08em;
+	text-transform: uppercase;
+	color: var(--ad-muted);
+}
+.ad-sale-price {
+	font-size: 24px;
+	font-weight: 700;
+	margin: 4px 0 14px;
+	color: var(--ad-text);
+}
+.ad-sale-price.free {
+	color: var(--ad-green);
+}
+.ad-sale-field {
+	display: block;
+	font-size: 12px;
+	color: var(--ad-muted);
+	margin-bottom: 12px;
+}
+.ad-sale-field input {
+	display: block;
+	width: 100%;
+	box-sizing: border-box;
+	margin-top: 5px;
+	padding: 9px 12px;
+	border-radius: 9px;
+	border: 1px solid var(--ad-line-2);
+	background: var(--ad-bg-2);
+	color: var(--ad-text);
+	font: inherit;
+	font-size: 14px;
+}
+.ad-sale-field input:focus {
+	outline: none;
+	border-color: var(--ad-text);
+}
+.ad-sale-input-wrap {
+	position: relative;
+	display: block;
+}
+.ad-sale-currency {
+	position: absolute;
+	right: 12px;
+	top: 50%;
+	transform: translateY(-50%);
+	font-size: 12px;
+	color: var(--ad-dim);
+	margin-top: 2px;
+}
+.ad-sale-actions {
+	display: flex;
+	gap: 8px;
+	margin-top: 4px;
+}
+.ad-sale-status {
+	font-size: 13px;
+	margin: 10px 0 0;
+	min-height: 16px;
+}
+.ad-sale-status.err {
+	color: #ff6b6b;
+}
+.ad-sale-status.ok {
+	color: var(--ad-green);
+}
+.ad-sale-hint {
+	font-size: 12px;
+	color: var(--ad-dim);
+	margin: 8px 0 0;
+	line-height: 1.5;
+}
+
+/* ── Embed ─────────────────────────────────────────────────────────────── */
+.ad-embed-lede {
+	font-size: 13px;
+	color: var(--ad-muted);
+	margin: 0 0 16px;
+}
+.ad-embed-section {
+	margin-bottom: 14px;
+}
+.ad-embed-label {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	margin-bottom: 6px;
+	font-size: 12px;
+	color: var(--ad-muted);
+}
+.ad-embed-copy {
+	padding: 3px 11px;
+	border-radius: 7px;
+	border: 1px solid var(--ad-line-2);
+	background: var(--ad-bg-2);
+	color: var(--ad-text);
+	font: inherit;
+	font-size: 11px;
+	font-weight: 600;
+	cursor: pointer;
+}
+.ad-embed-copy:hover {
+	background: rgba(255, 255, 255, 0.06);
+}
+.ad-embed-copy.copied {
+	color: var(--ad-green);
+	border-color: rgba(74, 222, 128, 0.3);
+}
+.ad-embed-code {
+	margin: 0;
+	padding: 12px 14px;
+	border-radius: 10px;
+	background: var(--ad-bg);
+	border: 1px solid var(--ad-line);
+	font-family: 'SF Mono', ui-monospace, monospace;
+	font-size: 12px;
+	line-height: 1.5;
+	color: var(--ad-text);
+	overflow-x: auto;
+	white-space: pre;
+}
+
+/* Brief highlight when the ?view=embed deep-link scrolls to the embed card. */
+.ad-embed-card.ad-embed-flash {
+	animation: ad-embed-flash 1.6s ease-out;
+}
+@keyframes ad-embed-flash {
+	0%, 15% { box-shadow: 0 0 0 2px var(--ad-accent, #6366f1), 0 0 22px rgba(99, 102, 241, 0.55); }
+	100% { box-shadow: 0 0 0 0 transparent, 0 0 0 transparent; }
+}
+@media (prefers-reduced-motion: reduce) {
+	.ad-embed-card.ad-embed-flash { animation: none; }
+}
+
+/* ── Version history ───────────────────────────────────────────────────── */
+.ad-versions {
+	list-style: none;
+	margin: 0;
+	padding: 0;
+}
+.ad-version-row {
+	display: grid;
+	grid-template-columns: auto 1fr auto;
+	gap: 12px;
+	align-items: center;
+	padding: 10px 0;
+	border-bottom: 1px solid var(--ad-line);
+}
+.ad-version-row:last-child {
+	border-bottom: 0;
+}
+.ad-version-tag {
+	font-family: 'SF Mono', ui-monospace, monospace;
+	font-size: 12px;
+	color: var(--ad-amber);
+}
+.ad-version-log {
+	font-size: 13px;
+	color: var(--ad-text);
+}
+.ad-version-when {
+	font-size: 12px;
+	color: var(--ad-dim);
+	white-space: nowrap;
+}
+
+/* ── Similar agents ────────────────────────────────────────────────────── */
+.ad-similar-grid {
+	display: grid;
+	grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
+	gap: 12px;
+}
+.ad-similar-item {
+	display: block;
+	text-decoration: none;
+	color: inherit;
+	padding: 12px;
+	border-radius: 12px;
+	background: var(--ad-bg-2);
+	border: 1px solid var(--ad-line);
+	transition:
+		border-color var(--duration-fast),
+		transform var(--duration-fast);
+}
+.ad-similar-item:hover {
+	border-color: var(--ad-line-2);
+	transform: translateY(-2px);
+}
+.ad-similar-thumb {
+	width: 100%;
+	aspect-ratio: 1;
+	border-radius: 9px;
+	background: var(--ad-bg) center/cover no-repeat;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	font-size: 28px;
+	font-weight: 700;
+	color: var(--ad-muted);
+	margin-bottom: 9px;
+}
+.ad-similar-name {
+	font-size: 13px;
+	font-weight: 600;
+	color: var(--ad-text);
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
+}
+.ad-similar-meta {
+	font-size: 11px;
+	color: var(--ad-dim);
+	margin-top: 3px;
+}
+
+/* ── Creator modal ─────────────────────────────────────────────────────── */
+.creator-modal-overlay {
+	position: fixed;
+	inset: 0;
+	z-index: 1000;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	padding: 20px;
+	background: rgba(0, 0, 0, 0.7);
+	opacity: 0;
+	transition: opacity var(--duration-base);
+	-webkit-backdrop-filter: blur(4px);
+	backdrop-filter: blur(4px);
+}
+.creator-modal-overlay.show {
+	opacity: 1;
+}
+/* Without this the unconditional `display:flex` above defeats the `hidden`
+   attribute, leaving an invisible (opacity:0) full-viewport layer that swallows
+   every click on the page. */
+.creator-modal-overlay[hidden] {
+	display: none;
+}
+.creator-modal {
+	position: relative;
+	width: min(720px, 100%);
+	max-height: 86vh;
+	overflow-y: auto;
+	background: var(--ad-card);
+	border: 1px solid var(--ad-line-2);
+	border-radius: 16px;
+	padding: 24px;
+	box-shadow: var(--shadow-2);
+}
+.creator-modal-close {
+	position: absolute;
+	top: 14px;
+	right: 14px;
+	width: 30px;
+	height: 30px;
+	border-radius: 8px;
+	border: 1px solid var(--ad-line);
+	background: var(--ad-bg-2);
+	color: var(--ad-text);
+	font-size: 18px;
+	cursor: pointer;
+}
+.creator-modal-close:hover {
+	background: rgba(255, 255, 255, 0.06);
+}
+.creator-modal-head {
+	display: flex;
+	gap: 16px;
+	align-items: center;
+	margin-bottom: 22px;
+}
+.creator-modal-avatar {
+	width: 64px;
+	height: 64px;
+	border-radius: 50%;
+	background: var(--ad-bg-2) center/cover no-repeat;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	font-size: 26px;
+	font-weight: 700;
+	color: var(--ad-muted);
+	flex-shrink: 0;
+}
+.creator-modal-eyebrow {
+	font-size: 11px;
+	letter-spacing: 0.08em;
+	text-transform: uppercase;
+	color: var(--ad-dim);
+}
+.creator-modal-title {
+	margin: 2px 0 0;
+	font-size: 22px;
+	color: var(--ad-text);
+}
+.creator-modal-handle {
+	font-size: 13px;
+	color: var(--ad-muted);
+	margin-top: 2px;
+}
+.creator-modal-stats {
+	display: flex;
+	gap: 16px;
+	margin-top: 8px;
+	font-size: 12px;
+	color: var(--ad-muted);
+}
+.creator-modal-stats strong {
+	color: var(--ad-text);
+	margin-right: 4px;
+}
+.creator-modal-body {
+	display: grid;
+	gap: 22px;
+}
+.creator-modal-sectiontitle {
+	font-size: 13px;
+	color: var(--ad-text);
+	margin: 0 0 12px;
+}
+.creator-modal-grid {
+	display: grid;
+	grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+	gap: 12px;
+}
+.creator-mini-card {
+	padding: 10px;
+	border-radius: 11px;
+	background: var(--ad-bg-2);
+	border: 1px solid var(--ad-line);
+	cursor: pointer;
+	transition:
+		border-color var(--duration-fast),
+		transform var(--duration-fast);
+}
+.creator-mini-card:hover {
+	border-color: var(--ad-line-2);
+	transform: translateY(-2px);
+}
+.creator-mini-card .thumb {
+	width: 100%;
+	aspect-ratio: 1;
+	border-radius: 8px;
+	background: var(--ad-bg) center/cover no-repeat;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	font-size: 22px;
+	font-weight: 700;
+	color: var(--ad-muted);
+	margin-bottom: 8px;
+}
+.creator-mini-card .name {
+	font-size: 12px;
+	font-weight: 600;
+	color: var(--ad-text);
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
+}
+.creator-mini-card .meta {
+	font-size: 10px;
+	color: var(--ad-dim);
+	margin-top: 3px;
+	display: flex;
+	gap: 5px;
+	flex-wrap: wrap;
+}
+.market-empty {
+	font-size: 13px;
+	color: var(--ad-dim);
+	padding: 8px 0;
+}
+
+/* ── Payment modal (shared engine) ─────────────────────────────────────── */
+.market-modal-overlay {
+	position: fixed;
+	inset: 0;
+	z-index: 1100;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	padding: 20px;
+	background: rgba(0, 0, 0, 0.72);
+	-webkit-backdrop-filter: blur(4px);
+	backdrop-filter: blur(4px);
+}
+/* The shared skill-purchase modal is injected with a `hidden` attribute and
+   toggled via overlay.hidden. Without this, the unconditional `display:flex`
+   above overrides the UA `[hidden]{display:none}` rule and the (blank) modal
+   shows on page load. */
+.market-modal-overlay[hidden] {
+	display: none;
+}
+.market-modal {
+	position: relative;
+	width: min(440px, 100%);
+	/* Overlay pads 20px top+bottom, so cap the box at the viewport minus that
+	   gutter. Without this the modal had no height limit: a tall purchase form
+	   (wallet area + price + confirm + QR) grew past the viewport and, because
+	   the overlay centers with align-items, pushed its header above the top
+	   edge and the Confirm button below the bottom — both unreachable, since
+	   neither the overlay nor the box scrolled. dvh tracks the real visible
+	   height on mobile; vh is the older-UA fallback. */
+	max-height: calc(100vh - 40px);
+	max-height: calc(100dvh - 40px);
+	display: flex;
+	flex-direction: column;
+	background: var(--ad-card);
+	border: 1px solid var(--ad-line-2);
+	border-radius: 16px;
+	box-shadow: var(--shadow-2);
+	overflow: hidden;
+}
+.market-modal-head {
+	flex-shrink: 0;
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	padding: 18px 20px;
+	border-bottom: 1px solid var(--ad-line);
+}
+.market-modal-head h2 {
+	margin: 0;
+	font-size: 17px;
+	color: var(--ad-text);
+}
+.market-modal-close {
+	width: 30px;
+	height: 30px;
+	border-radius: 8px;
+	border: 1px solid var(--ad-line);
+	background: var(--ad-bg-2);
+	color: var(--ad-text);
+	font-size: 18px;
+	cursor: pointer;
+}
+.market-modal-close:hover {
+	background: rgba(255, 255, 255, 0.06);
+}
+.payment-modal-body {
+	padding: 20px;
+	/* The modal is a capped-height flex column; let the form scroll inside it
+	   (min-height:0 lets a flex child shrink below its content) while the
+	   header stays pinned, so the Confirm button is always reachable. */
+	min-height: 0;
+	overflow-y: auto;
+	-webkit-overflow-scrolling: touch;
+}
+.payment-modal-badge {
+	display: flex;
+	gap: 8px;
+	align-items: flex-start;
+	padding: 9px 12px;
+	border-radius: 9px;
+	margin-bottom: 14px;
+	font-size: 12px;
+	line-height: 1.5;
+	background: var(--ad-bg-2);
+	border: 1px solid var(--ad-line);
+	color: var(--ad-muted);
+}
+.payment-modal-badge.warn {
+	background: rgba(245, 165, 36, 0.08);
+	border-color: rgba(245, 165, 36, 0.25);
+	color: var(--ad-text);
+}
+.payment-modal-badge.info {
+	background: rgba(87, 199, 255, 0.08);
+	border-color: rgba(87, 199, 255, 0.25);
+	color: var(--ad-text);
+}
+#payment-modal-lede {
+	font-size: 13px;
+	color: var(--ad-muted);
+	margin: 0 0 12px;
+}
+.payment-item {
+	display: flex;
+	flex-direction: column;
+	gap: 2px;
+	padding: 12px 14px;
+	border-radius: 10px;
+	background: var(--ad-bg-2);
+	border: 1px solid var(--ad-line);
+	margin-bottom: 12px;
+}
+.payment-item strong {
+	font-size: 15px;
+	color: var(--ad-text);
+}
+.payment-item span {
+	font-size: 11px;
+	color: var(--ad-dim);
+}
+.payment-item em {
+	font-size: 13px;
+	color: var(--ad-muted);
+	font-style: normal;
+}
+.payment-price {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	padding: 12px 0;
+	margin-bottom: 14px;
+	border-top: 1px solid var(--ad-line);
+	border-bottom: 1px solid var(--ad-line);
+}
+.payment-price span {
+	font-size: 13px;
+	color: var(--ad-muted);
+}
+.payment-price strong {
+	font-size: 18px;
+	color: var(--ad-text);
+}
+/* Pay-what-you-want amount entry (shown in place of a fixed total). */
+.payment-pwyw {
+	margin: 4px 0 14px;
+	display: flex;
+	flex-direction: column;
+	gap: 6px;
+}
+.payment-pwyw-label {
+	font-size: 13px;
+	font-weight: 600;
+	color: var(--ad-text);
+}
+.payment-pwyw-row {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+}
+.payment-pwyw-input {
+	flex: 1 1 auto;
+	min-width: 0;
+	padding: 10px 12px;
+	border-radius: 9px;
+	border: 1px solid var(--ad-line);
+	background: var(--ad-bg-2);
+	color: var(--ad-text);
+	font: inherit;
+	font-size: 15px;
+	font-variant-numeric: tabular-nums;
+	box-sizing: border-box;
+}
+.payment-pwyw-input::placeholder {
+	color: var(--ad-dim);
+}
+.payment-pwyw-input:focus {
+	outline: none;
+	border-color: var(--ad-text);
+}
+.payment-pwyw-unit {
+	font-size: 13px;
+	font-weight: 600;
+	color: var(--ad-muted);
+	flex-shrink: 0;
+}
+.payment-pwyw-hint {
+	font-size: 12px;
+	min-height: 14px;
+	color: var(--ad-muted);
+}
+.payment-pwyw-hint.ok {
+	color: var(--ad-green);
+}
+.payment-pwyw-hint.err {
+	color: #ff6b6b;
+}
+
+.payment-gift {
+	margin-bottom: 14px;
+}
+.payment-gift-toggle {
+	display: flex;
+	align-items: center;
+	gap: 9px;
+	cursor: pointer;
+	font-size: 13px;
+	color: var(--ad-muted);
+	user-select: none;
+}
+.payment-gift-toggle:hover {
+	color: var(--ad-text);
+}
+.payment-gift-toggle input[type='checkbox'] {
+	width: 16px;
+	height: 16px;
+	margin: 0;
+	cursor: pointer;
+	accent-color: var(--ad-text);
+	flex-shrink: 0;
+}
+.payment-gift-toggle-text {
+	line-height: 1.4;
+}
+.payment-gift-recipient {
+	margin-top: 10px;
+	display: flex;
+	flex-direction: column;
+	gap: 6px;
+}
+.payment-gift-input {
+	width: 100%;
+	padding: 9px 12px;
+	border-radius: 9px;
+	border: 1px solid var(--ad-line);
+	background: var(--ad-bg-2);
+	color: var(--ad-text);
+	font: inherit;
+	font-size: 13px;
+	box-sizing: border-box;
+}
+.payment-gift-input::placeholder {
+	color: var(--ad-dim);
+}
+.payment-gift-input:focus {
+	outline: none;
+	border-color: var(--ad-text);
+}
+.payment-gift-status {
+	font-size: 12px;
+	min-height: 14px;
+	color: var(--ad-muted);
+}
+.payment-gift-status.ok {
+	color: var(--ad-green);
+}
+.payment-gift-status.err {
+	color: #ff6b6b;
+}
+.payment-wallet-area {
+	display: flex;
+	flex-direction: column;
+	gap: 8px;
+	margin-bottom: 14px;
+}
+.payment-wallet-area p {
+	margin: 0;
+	font-size: 13px;
+	color: var(--ad-muted);
+}
+.payment-wallet-area p.small {
+	font-size: 11px;
+	color: var(--ad-dim);
+}
+.payment-wallet-area a {
+	color: var(--ad-text);
+}
+/* Agent-wallet payment options: an owned agent pays from its own custodial
+   balance, so there is no browser-wallet popup at all. Rendered above the
+   browser wallet buttons and visually separated from them. */
+.agent-wallet-options {
+	display: flex;
+	flex-direction: column;
+	gap: 6px;
+	padding-bottom: 10px;
+	margin-bottom: 4px;
+	border-bottom: 1px solid var(--ad-line);
+}
+.agent-wallet-options .agent-wallet-label {
+	margin: 0 0 2px;
+}
+.agent-wallet-pick {
+	background: transparent;
+	color: var(--ad-text);
+	border: 1px solid var(--ad-green);
+	text-align: left;
+	transition: background var(--duration-fast) var(--ease-standard), border-color var(--duration-fast) var(--ease-standard);
+}
+.agent-wallet-pick:hover:not(:disabled) {
+	background: rgba(74, 222, 128, 0.12);
+}
+.agent-wallet-pick:disabled {
+	border-color: var(--ad-line-2);
+	color: var(--ad-dim);
+	cursor: not-allowed;
+}
+.agent-wallet-pick:focus-visible {
+	outline: 2px solid var(--ad-green);
+	outline-offset: 2px;
+}
+.btn-primary,
+.payment-confirm-btn {
+	width: 100%;
+	padding: 11px 16px;
+	border-radius: 10px;
+	border: 1px solid var(--ad-text);
+	background: var(--ad-text);
+	color: var(--ad-bg);
+	font: inherit;
+	font-size: 14px;
+	font-weight: 600;
+	cursor: pointer;
+	text-align: center;
+	text-decoration: none;
+	box-sizing: border-box;
+}
+.btn-primary:hover,
+.payment-confirm-btn:hover {
+	background: #fff;
+}
+.btn-primary:disabled,
+.payment-confirm-btn:disabled {
+	opacity: 0.5;
+	cursor: not-allowed;
+}
+.btn-secondary {
+	width: 100%;
+	padding: 11px 16px;
+	border-radius: 10px;
+	border: 1px solid var(--ad-line-2);
+	background: var(--ad-bg-2);
+	color: var(--ad-text);
+	font: inherit;
+	font-size: 14px;
+	font-weight: 600;
+	cursor: pointer;
+	text-align: center;
+	text-decoration: none;
+	box-sizing: border-box;
+}
+.btn-secondary:hover {
+	background: rgba(255, 255, 255, 0.06);
+}
+.wallet-pick {
+	margin-bottom: 6px;
+}
+.payment-qr {
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	gap: 8px;
+	margin: 12px 0;
+}
+.payment-qr .muted {
+	font-size: 11px;
+	color: var(--ad-dim);
+	text-align: center;
+}
+.payment-qr-swap {
+	border: 0;
+	background: none;
+	padding: 4px 6px;
+	border-radius: 6px;
+	font: inherit;
+	font-size: 11px;
+	color: var(--ad-muted);
+	text-decoration: underline;
+	cursor: pointer;
+	transition: color var(--duration-fast) var(--ease-standard), background var(--duration-fast) var(--ease-standard);
+}
+.payment-qr-swap:hover {
+	color: var(--ad-text);
+	background: rgba(255, 255, 255, 0.06);
+}
+.payment-qr-swap:active {
+	background: rgba(255, 255, 255, 0.1);
+}
+.payment-qr-swap:focus-visible {
+	outline: 2px solid var(--ad-text);
+	outline-offset: 2px;
+}
+.payment-status {
+	font-size: 13px;
+	margin-top: 12px;
+	min-height: 16px;
+	color: var(--ad-muted);
+}
+.payment-status.err {
+	color: #ff6b6b;
+}
+.payment-status.ok {
+	color: var(--ad-green);
+}
+.payment-modal-retry p {
+	margin: 0 0 8px;
+	font-size: 13px;
+	color: var(--ad-text);
+}
+.retry-tx {
+	font-size: 12px;
+	color: var(--ad-dim);
+	margin-bottom: 10px;
+}
+.retry-tx a {
+	color: var(--ad-text);
+}
+.retry-actions {
+	display: flex;
+	gap: 8px;
+}
+.retry-primary {
+	flex: 1;
+	padding: 9px;
+	border-radius: 9px;
+	border: 1px solid var(--ad-text);
+	background: var(--ad-text);
+	color: var(--ad-bg);
+	font: inherit;
+	font-weight: 600;
+	cursor: pointer;
+}
+.retry-secondary {
+	flex: 1;
+	padding: 9px;
+	border-radius: 9px;
+	border: 1px solid var(--ad-line-2);
+	background: var(--ad-bg-2);
+	color: var(--ad-text);
+	font: inherit;
+	font-weight: 600;
+	cursor: pointer;
+}
+.payment-modal-success {
+	padding: 30px 24px;
+	text-align: center;
+	min-height: 0;
+	overflow-y: auto;
+	-webkit-overflow-scrolling: touch;
+}
+.ps-check {
+	width: 52px;
+	height: 52px;
+	margin: 0 auto 14px;
+	border-radius: 50%;
+	background: rgba(74, 222, 128, 0.12);
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	font-size: 26px;
+	color: var(--ad-green);
+}
+.ps-title {
+	margin: 0 0 6px;
+	font-size: 19px;
+	color: var(--ad-text);
+}
+.ps-sub {
+	margin: 0 0 18px;
+	font-size: 13px;
+	color: var(--ad-muted);
+	line-height: 1.5;
+}
+.ps-actions {
+	display: flex;
+	flex-direction: column;
+	gap: 8px;
+}
+.muted {
+	color: var(--ad-muted);
+}
+.muted.small {
+	font-size: 11px;
+}
+
+@media (max-width: 640px) {
+	.ad-version-row {
+		grid-template-columns: auto 1fr;
+	}
+	.ad-version-when {
+		grid-column: 2;
+	}
+}
+
+/* ───────────────────────────────────────────────────────────────────────────
+   Holder cohorts panel (agent-detail.js → renderHolderCohorts)
+   Live audience segmentation under an agent token: size cohorts, whale share,
+   and concentration. Tokens mirror :root; cyan→green fill, no new chroma.
+─────────────────────────────────────────────────────────────────────────── */
+.ad-cohorts {
+	margin-top: 14px;
+	padding-top: 12px;
+	border-top: 1px solid var(--ad-line);
+}
+.ad-cohorts-head {
+	display: flex;
+	align-items: baseline;
+	justify-content: space-between;
+	gap: 10px;
+}
+.ad-cohorts-title {
+	font-size: 11px;
+	font-weight: 600;
+	letter-spacing: 0.14em;
+	color: var(--ad-muted);
+}
+.ad-cohorts-count {
+	font-size: 15px;
+	font-weight: 700;
+	color: var(--ad-text);
+	font-variant-numeric: tabular-nums;
+}
+.ad-cohorts-body {
+	margin-top: 10px;
+	display: flex;
+	flex-direction: column;
+	gap: 8px;
+}
+.ad-cohort-row {
+	display: grid;
+	grid-template-columns: minmax(86px, auto) 1fr auto;
+	align-items: center;
+	gap: 10px;
+	font-size: 12px;
+}
+.ad-cohort-name {
+	display: inline-flex;
+	align-items: center;
+	gap: 6px;
+	color: var(--ad-text);
+	white-space: nowrap;
+}
+.ad-cohort-icon {
+	font-size: 12px;
+	line-height: 1;
+}
+.ad-cohort-bar {
+	height: 6px;
+	min-width: 40px;
+	border-radius: 999px;
+	background: var(--ad-line);
+	overflow: hidden;
+}
+.ad-cohort-fill {
+	display: block;
+	height: 100%;
+	border-radius: inherit;
+	background: linear-gradient(90deg, var(--ad-cyan), var(--ad-green));
+	transition: width var(--duration-slow) var(--ease-standard);
+}
+.ad-cohort-val {
+	color: var(--ad-muted);
+	font-size: 11px;
+	font-variant-numeric: tabular-nums;
+	white-space: nowrap;
+}
+.ad-cohorts-conc {
+	margin-top: 12px;
+	display: flex;
+	align-items: center;
+	flex-wrap: wrap;
+	gap: 8px;
+}
+.ad-conc-chip {
+	font-size: 10.5px;
+	font-weight: 600;
+	letter-spacing: 0.02em;
+	padding: 2px 8px;
+	border-radius: 999px;
+	border: 1px solid var(--ad-line-2);
+	color: var(--ad-muted);
+}
+.ad-conc-healthy {
+	color: var(--ad-green);
+	border-color: rgba(74, 222, 128, 0.35);
+	background: rgba(74, 222, 128, 0.1);
+}
+.ad-conc-moderate {
+	color: var(--ad-cyan);
+	border-color: rgba(87, 199, 255, 0.35);
+	background: rgba(87, 199, 255, 0.1);
+}
+.ad-conc-high {
+	color: var(--ad-amber);
+	border-color: rgba(245, 165, 36, 0.35);
+	background: rgba(245, 165, 36, 0.1);
+}
+.ad-conc-very-high {
+	color: var(--danger);
+	border-color: rgba(248, 113, 113, 0.35);
+	background: rgba(248, 113, 113, 0.1);
+}
+.ad-cohorts-conc-detail {
+	color: var(--ad-muted);
+	font-size: 11px;
+	font-variant-numeric: tabular-nums;
+}
+.ad-cohorts-note {
+	margin-top: 8px;
+	font-size: 10.5px;
+	line-height: 1.4;
+	color: var(--ad-dim);
+}
+.ad-cohorts-empty {
+	margin-top: 10px;
+	font-size: 12px;
+	color: var(--ad-muted);
+}
+.ad-cohorts-err {
+	margin-top: 10px;
+	display: flex;
+	align-items: center;
+	gap: 10px;
+	font-size: 12px;
+}
+.ad-cohorts-retry {
+	background: none;
+	border: 1px solid var(--ad-line-2);
+	color: var(--ad-text);
+	border-radius: 7px;
+	padding: 3px 10px;
+	font-size: 11px;
+	cursor: pointer;
+	transition:
+		background var(--duration-fast),
+		border-color var(--duration-fast);
+}
+.ad-cohorts-retry:hover {
+	background: rgba(255, 255, 255, 0.04);
+	border-color: var(--ad-line-2);
+}
+.ad-skel {
+	position: relative;
+	overflow: hidden;
+	background: var(--skeleton-base);
+	border-radius: var(--skeleton-radius);
+}
+.ad-skel::after {
+	content: '';
+	position: absolute;
+	inset: 0;
+	transform: translateX(-100%);
+	background: linear-gradient(90deg, transparent, var(--skeleton-sheen), transparent);
+	animation: ad-cohort-shimmer 1.4s infinite;
+}
+.ad-skel-count {
+	display: inline-block;
+	width: 44px;
+	height: 16px;
+}
+.ad-skel-row {
+	height: 18px;
+	width: 100%;
+}
+@keyframes ad-cohort-shimmer {
+	100% {
+		transform: translateX(100%);
+	}
+}
+@media (prefers-reduced-motion: reduce) {
+	.ad-skel::after {
+		animation: none;
+	}
+	.ad-cohort-fill {
+		transition: none;
+	}
+}
+
+/* ── Launch history (pump_agent_mints registry) ────────────────────────────── */
+.ad-launch-history {
+	margin-top: 14px;
+	border-top: 1px solid var(--ad-line);
+	padding-top: 12px;
+	display: flex;
+	flex-direction: column;
+	gap: 6px;
+}
+.ad-launch-history-head {
+	font-size: 11px;
+	letter-spacing: 0.12em;
+	text-transform: uppercase;
+	color: var(--ad-dim);
+	margin-bottom: 2px;
+}
+.ad-launch-row {
+	display: flex;
+	align-items: baseline;
+	gap: 10px;
+	padding: 7px 10px;
+	border-radius: 8px;
+	border: 1px solid transparent;
+	text-decoration: none;
+	color: var(--ad-text);
+	font-size: 13px;
+	transition:
+		background var(--duration-fast),
+		border-color var(--duration-fast);
+}
+.ad-launch-row:hover {
+	background: rgba(255, 255, 255, 0.04);
+	border-color: var(--ad-line);
+}
+.ad-launch-row:focus-visible {
+	outline: 2px solid var(--ad-cyan);
+	outline-offset: 2px;
+}
+.ad-launch-symbol {
+	font-weight: 600;
+	min-width: 0;
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
+}
+.ad-launch-mint {
+	color: var(--ad-dim);
+	font-size: 12px;
+}
+.ad-launch-time {
+	color: var(--ad-dim);
+	font-size: 12px;
+	white-space: nowrap;
+}
+/* Shared coin-status `row` variant fills the launch-history anchor. */
+.ad-launch-row .csc-row {
+	width: 100%;
+}
+/* Token chip — shared coin-status `chip` variant, spaced above the CTA. */
+.ad-token-chip {
+	margin-bottom: 10px;
+}
+.ad-launch-feed-link {
+	margin-top: 6px;
+	font-size: 12.5px;
+	color: var(--ad-muted);
+	text-decoration: none;
+	transition: color var(--duration-fast);
+}
+.ad-launch-feed-link:hover {
+	color: var(--ad-text);
+}
+.ad-launch-feed-link:focus-visible {
+	outline: 2px solid var(--ad-cyan);
+	outline-offset: 2px;
+}
+
+/* ── Agent Genome lineage panel ───────────────────────────────────────────── */
+.ad-bullet-violet { background: var(--accent-violet-strong); }
+.ad-lineage { display: flex; flex-direction: column; gap: 8px; }
+.ad-lineage-section-label {
+	font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.08em;
+	color: var(--ad-muted, #8a8f9c); margin-top: 6px;
+}
+.ad-lineage-node {
+	display: flex; align-items: center; gap: 10px;
+	padding: 8px 10px; border-radius: 10px; text-decoration: none;
+	border: 1px solid var(--ad-stroke, #23262f); color: var(--ad-ink, #e8eaf0);
+	transition: border-color var(--duration-fast) var(--ease-standard), transform var(--duration-fast) var(--ease-standard);
+}
+.ad-lineage-node:hover { border-color: var(--accent-violet-strong); transform: translateX(2px); }
+.ad-lineage-role { font-size: 0.66rem; text-transform: uppercase; letter-spacing: 0.06em; color: var(--ad-muted, #8a8f9c); min-width: 58px; }
+.ad-lineage-name { font-weight: 600; flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ad-lineage-gen { font-size: 0.72rem; color: var(--ad-muted, #8a8f9c); }
+.ad-lineage-tier {
+	font-size: 0.62rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em;
+	padding: 2px 7px; border-radius: 999px; border: 1px solid transparent;
+}
+.ad-lineage-tier[data-tier='common']    { color: #8a8f9c; border-color: #2b2f3a; }
+.ad-lineage-tier[data-tier='uncommon']  { color: #5fd1a0; border-color: #1f5a45; }
+.ad-lineage-tier[data-tier='rare']      { color: #7aa2ff; border-color: #2c4a8f; }
+.ad-lineage-tier[data-tier='legendary'] { color: #ffd479; border-color: #7a5e1f; background: rgba(255,212,121,0.10); }
+.ad-lineage-verify-row { display: flex; align-items: center; gap: 10px; margin-top: 4px; flex-wrap: wrap; }
+.ad-lineage-verdict { font-size: 0.74rem; color: var(--ad-muted, #8a8f9c); }
+.ad-lineage-verdict[data-ok='1'] { color: #5fd1a0; }
+.ad-lineage-verdict[data-ok='0'] { color: #f4a3ad; }
+.ad-lineage-breed { margin-top: 8px; align-self: flex-start; text-decoration: none; }
+@media (prefers-reduced-motion: reduce) { .ad-lineage-node { transition: none; } }
+
+/* ── Avatar playground strip (gesture chips + fx + accent pills) ─────────── */
+.ad-playground {
+	margin-top: 14px;
+	max-width: 720px;
+	width: 100%;
+}
+.ad-playground .apg {
+	justify-content: center;
+}
+
+/* ── Hot takes: rotating one-liners under the hero description ───────────── */
+.ad-hot-take {
+	margin: 6px 0 0;
+	font-size: 13px;
+	color: var(--ad-muted);
+	opacity: 0;
+	transition: opacity var(--duration-slow) var(--ease-standard);
+	min-height: 18px;
+}
+.ad-hot-take--in {
+	opacity: 1;
+}
+.ad-hot-take-mark {
+	font-family: ui-monospace, 'SF Mono', Menlo, monospace;
+	color: var(--ad-violet);
+	letter-spacing: 0.05em;
+}
+
+/* ── Connect-via-MCP card ────────────────────────────────────────────────── */
+.ad-mcp-tabs {
+	display: flex;
+	gap: 6px;
+	margin: 0 0 10px;
+	flex-wrap: wrap;
+}
+.ad-mcp-tab {
+	appearance: none;
+	border: 1px solid var(--ad-line);
+	background: transparent;
+	color: var(--ad-muted);
+	border-radius: 999px;
+	padding: 5px 12px;
+	font-size: 12px;
+	cursor: pointer;
+	transition: color var(--duration-fast), border-color var(--duration-fast), background var(--duration-fast);
+}
+.ad-mcp-tab:hover {
+	color: var(--ad-text);
+	border-color: rgba(255, 255, 255, 0.22);
+}
+.ad-mcp-tab:focus-visible {
+	outline: 2px solid var(--ad-violet);
+	outline-offset: 2px;
+}
+.ad-mcp-tab--on {
+	color: var(--ad-text);
+	border-color: var(--ad-violet);
+	background: rgba(167, 139, 250, 0.1);
+}
+
+/* Proof-phase promo overlays on skill pricing rows */
+.ad-price-list {
+	color: var(--ad-muted);
+	opacity: 0.7;
+	margin-right: 4px;
+	font-weight: 400;
+}
+.ad-price-badge.promo {
+	background: rgba(52, 211, 153, 0.1);
+	border: 1px solid rgba(52, 211, 153, 0.35);
+	color: var(--ad-green);
+	font-variant-numeric: tabular-nums;
+}
+
+/* ── Interactive states (QB-07) ────────────────────────────────────────────
+   Four controls set cursor: pointer with no hover rule. The two retry buttons
+   are the ones that hurt: they only appear after something already failed, and
+   a recovery action that gives no feedback under the pointer reads as broken
+   too. Focus and disabled come from the floors in public/tokens.css. */
+.ad-collapse summary,
+.payment-gift-toggle input[type='checkbox'],
+.retry-primary,
+.retry-secondary {
+	transition:
+		background var(--duration-fast) var(--ease-standard),
+		border-color var(--duration-fast) var(--ease-standard),
+		color var(--duration-fast) var(--ease-standard),
+		transform var(--duration-fast) var(--ease-standard);
+}
+
+.ad-collapse summary:hover {
+	background: var(--ad-bg-2);
+}
+
+.ad-collapse summary:hover::after {
+	color: var(--ad-text);
+}
+
+.payment-gift-toggle input[type='checkbox']:hover {
+	transform: scale(1.12);
+}
+
+.retry-primary:hover {
+	background: var(--ink-bright);
+	border-color: var(--ink-bright);
+}
+
+.retry-secondary:hover {
+	border-color: var(--ad-text);
+	color: var(--ad-text);
+}
+
+.retry-primary:active,
+.retry-secondary:active {
+	transform: translateY(1px);
+}

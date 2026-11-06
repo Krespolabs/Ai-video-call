@@ -1,0 +1,25 @@
+{
+  "mode": "capcheck",
+  "serverInfo": {
+    "name": "3d-agent-mcp",
+    "version": "1.2.1"
+  },
+  "capcheck": {
+    "ok": false,
+    "error": "confirmation_required",
+    "message": "this hire costs $0.05, at or above the $0.02 confirmation threshold — re-call with confirm: true to authorize it",
+    "quotedPriceUsd": "$0.05",
+    "guardrails": {
+      "priceUsd": 0.05,
+      "maxPerCallUsd": 1,
+      "callerMaxSpendUsd": null,
+      "effectivePerCallUsd": 1,
+      "confirmThresholdUsd": 0.02,
+      "maxPerSessionUsd": 5,
+      "sessionSpentUsd": 0,
+      "sessionRemainingUsd": 5,
+      "projectedSessionUsd": 0.05
+    }
+  },
+  "isError": true
+}

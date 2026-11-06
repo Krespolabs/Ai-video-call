@@ -1,0 +1,189 @@
+<!doctype html>
+<html lang="en">
+	<head>
+		<script>/* three.ws theme boot (no-flash); runtime in /theme-switcher.js */(function(){try{var m=localStorage.getItem('twx_theme');var l=m==='auto'?(window.matchMedia&&window.matchMedia('(prefers-color-scheme: light)').matches):m==='light';document.documentElement.setAttribute('data-theme',l?'light':'dark');}catch(e){document.documentElement.setAttribute('data-theme','dark');}})();</script>
+		<meta charset="utf-8" />
+		<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+		<title data-i18n="docs_world.meta_title">Docs World · three.ws</title>
+		<meta
+			name="description"
+			content="The three.ws documentation as a walkable 3D world. Every docs section is a glowing pavilion; walk your avatar up to one and read the real pages inside the scene."
+		 data-i18n-attr="content:docs_world.meta_description"/>
+		<link rel="canonical" href="https://three.ws/docs/world" />
+		<meta property="og:type" content="website" />
+		<meta property="og:site_name" content="three.ws" />
+		<meta property="og:url" content="https://three.ws/docs/world" />
+		<meta property="og:title" content="Docs World · three.ws"  data-i18n-attr="content:docs_world.meta_og_title"/>
+		<meta
+			property="og:description"
+			content="Documentation you can walk through: 14 sections as glowing pavilions, your avatar, and the live docs rendered in-world."
+		 data-i18n-attr="content:docs_world.meta_og_description"/>
+		<meta property="og:image" content="https://three.ws/api/page-og?s=learn&amp;t=Docs+World+%28immersive+3D+docs%29&amp;d=The+full+three.ws+documentation+as+a+walkable+3D+world%3A+every+docs+section+is+a+glowing+pavilion%2C+and+the+live+pages+render+inside+the+scene.&amp;p=%2Fdocs%2Fworld" />
+		<meta property="og:image:width" content="1200" />
+		<meta property="og:image:height" content="630" />
+		<meta name="twitter:card" content="summary_large_image" />
+		<meta name="twitter:site" content="@trythreews" />
+		<meta name="twitter:title" content="Docs World · three.ws"  data-i18n-attr="content:docs_world.meta_twitter_title"/>
+		<meta
+			name="twitter:description"
+			content="Documentation you can walk through: 14 sections as glowing pavilions, your avatar, and the live docs rendered in-world."
+		 data-i18n-attr="content:docs_world.meta_twitter_description"/>
+		<meta name="twitter:image" content="https://three.ws/api/page-og?s=learn&amp;t=Docs+World+%28immersive+3D+docs%29&amp;d=The+full+three.ws+documentation+as+a+walkable+3D+world%3A+every+docs+section+is+a+glowing+pavilion%2C+and+the+live+pages+render+inside+the+scene.&amp;p=%2Fdocs%2Fworld" />
+		<meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1" />
+		<link rel="icon" href="/favicon.ico" sizes="any" />
+		<link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+		<link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+		<link rel="stylesheet" href="/fonts/fonts.css" />
+		<link rel="stylesheet" href="/docs-world.css" />
+	
+	<meta property="og:locale" content="en_US">
+	<meta property="og:image:alt" content="Docs World (immersive 3D docs) · three.ws">
+	<script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"WebPage","name":"Docs World (immersive 3D docs)","description":"The full three.ws documentation as a walkable 3D world: every docs section is a glowing pavilion, and the live pages render inside the scene.","url":"https://three.ws/docs/world","isPartOf":{"@type":"WebSite","name":"three.ws","url":"https://three.ws"},"primaryImageOfPage":"https://three.ws/api/page-og?s=learn&t=Docs+World+%28immersive+3D+docs%29&d=The+full+three.ws+documentation+as+a+walkable+3D+world%3A+every+docs+section+is+a+glowing+pavilion%2C+and+the+live+pages+render+inside+the+scene.&p=%2Fdocs%2Fworld"},{"@type":"BreadcrumbList","itemListElement":[{"@type":"ListItem","position":1,"name":"Home","item":"https://three.ws/"},{"@type":"ListItem","position":2,"name":"Docs","item":"https://three.ws/docs"},{"@type":"ListItem","position":3,"name":"World","item":"https://three.ws/docs/world"}]}]}</script>
+</head>
+	<body>
+		<main class="dw-stage">
+			<canvas id="dw-canvas" aria-label="Docs World 3D scene. Use WASD or arrow keys to walk, or open the index for a list of sections." tabindex="0"></canvas>
+		</main>
+
+		<!-- HUD: revealed by main.js once the scene is up -->
+		<div id="dw-hud" hidden>
+			<div class="dw-hud-top">
+				<a class="dw-chip" href="/docs" id="dw-back" data-tip="Leave the world and read the same pages as a normal docs site" data-i18n-html="docs_world.classic_docs">←<span class="dw-chip-label"> Classic docs</span></a>
+				<button class="dw-chip" type="button" id="dw-index-btn" aria-haspopup="true" data-tip="Every section, as a list. Picking one takes you straight to its pavilion." data-i18n-html="docs_world.index">☰<span class="dw-chip-label"> Index</span></button>
+				<button class="dw-chip dw-chip-search" type="button" id="dw-search-btn" data-tip="Search every page and let the world walk you there. [[/]] or [[Ctrl]]+[[K]]" data-i18n-html="docs_world.search_docs">
+					<span aria-hidden="true">⌕</span><span class="dw-chip-label"> Search docs</span><kbd class="dw-chip-kbd">/</kbd>
+				</button>
+				<div class="dw-hud-spacer"></div>
+				<button class="dw-chip" type="button" id="dw-camera-btn" data-tip="Cycle follow, cinematic, first person and top down. [[C]]" data-i18n="docs_world.follow">Follow</button>
+				<button class="dw-chip" type="button" id="dw-help-btn" aria-label="Controls help" data-tip="Controls, and replay the welcome tour" data-i18n-attr="aria-label:docs_world.controls_help_arialabel">?</button>
+			</div>
+
+			<button class="dw-prompt" type="button" id="dw-prompt" hidden>
+				<span data-i18n-html="docs_world.e_enter_label"><kbd>E</kbd> Enter</span> <strong id="dw-prompt-label"></strong>
+			</button>
+
+			<!-- Wayfinder: live route readout, shown only while a route is running -->
+			<div class="dw-way" id="dw-way" hidden>
+				<span class="dw-way-dot" id="dw-way-dot" aria-hidden="true"></span>
+				<span class="dw-way-text">
+					<span class="dw-way-label" id="dw-way-label"></span>
+					<span class="dw-way-sub" id="dw-way-sub"></span>
+				</span>
+				<button class="dw-way-act" type="button" id="dw-way-read" data-tip="Skip the walk and open the page now" data-i18n="docs_world.read_now">Read now</button>
+				<button class="dw-way-cancel" type="button" id="dw-way-cancel" aria-label="Stop guiding me" data-tip="Stop guiding me" data-i18n-attr="aria-label:docs_world.stop_guiding_me_arialabel">✕</button>
+			</div>
+
+			<div class="dw-hint" id="dw-hint">WASD walk · Shift run · drag look · E enter · <kbd>/</kbd> search</div>
+
+			<div class="dw-joystick" id="dw-joystick" hidden aria-hidden="true">
+				<div class="dw-joystick-thumb" id="dw-joystick-thumb"></div>
+			</div>
+		</div>
+
+		<!-- Section index: keyboard-reachable list of every pavilion -->
+		<div class="dw-index" id="dw-index" role="dialog" aria-label="Docs sections" hidden>
+			<div class="dw-index-head">
+				<h2 data-i18n="docs_world.sections">Sections</h2>
+				<button class="dw-close" type="button" id="dw-index-close" aria-label="Close index" data-i18n-attr="aria-label:docs_world.close_index_arialabel">✕</button>
+			</div>
+			<div class="dw-index-list" id="dw-index-list"></div>
+		</div>
+
+		<!-- Controls help -->
+		<div class="dw-help" id="dw-help" role="dialog" aria-label="Controls" hidden>
+			<button class="dw-close" type="button" id="dw-help-close" aria-label="Close help" data-i18n-attr="aria-label:docs_world.close_help_arialabel">✕</button>
+			<h2 data-i18n="docs_world.controls">Controls</h2>
+			<table>
+				<tr><td data-i18n="docs_world.walk">Walk</td><td data-i18n="docs_world.wasd_arrows_left_side_joystick">WASD / arrows / left-side joystick</td></tr>
+				<tr><td data-i18n="docs_world.run">Run</td><td data-i18n="docs_world.shift_push_the_joystick_to_its_edge">Shift (push the joystick to its edge)</td></tr>
+				<tr><td data-i18n="docs_world.look">Look</td><td data-i18n="docs_world.drag_anywhere_scroll_to_zoom">Drag anywhere · scroll to zoom</td></tr>
+				<tr><td data-i18n="docs_world.find_a_page">Find a page</td><td data-i18n-html="docs_world.or_ctrl_k_searches_every_page"><kbd>/</kbd> or <kbd>Ctrl</kbd>+<kbd>K</kbd> searches every page</td></tr>
+				<tr><td data-i18n="docs_world.guided_walk">Guided walk</td><td data-i18n="docs_world.shift_enter_on_a_search_result_routes">Shift+Enter on a search result routes you there</td></tr>
+				<tr><td data-i18n="docs_world.open_a_section">Open a section</td><td data-i18n="docs_world.walk_close_and_press_e_or_tap">Walk close and press E, or tap its pavilion</td></tr>
+				<tr><td data-i18n="docs_world.camera">Camera</td><td data-i18n="docs_world.c_cycles_follow_cinematic_first_person_top">C cycles follow / cinematic / first person / top down</td></tr>
+				<tr><td data-i18n="docs_world.close_panels">Close panels</td><td data-i18n="docs_world.esc">Esc</td></tr>
+			</table>
+			<button class="dw-btn ghost" type="button" id="dw-tour-replay" data-i18n="docs_world.replay_the_welcome_tour">Replay the welcome tour</button>
+		</div>
+
+		<!-- Search palette: every page, one keystroke away -->
+		<div class="dw-search" id="dw-search" role="dialog" aria-label="Search the documentation" hidden>
+			<div class="dw-search-card">
+				<div class="dw-search-head">
+					<span class="dw-search-icon" aria-hidden="true">⌕</span>
+					<input
+						id="dw-search-input"
+						type="text"
+						role="combobox"
+						aria-expanded="true"
+						aria-controls="dw-search-results"
+						aria-autocomplete="list"
+						autocomplete="off"
+						spellcheck="false"
+						placeholder="Search every page…"
+						aria-label="Search every documentation page"
+					/>
+					<button class="dw-close" type="button" id="dw-search-close" aria-label="Close search" data-i18n-attr="aria-label:docs_world.close_search_arialabel">✕</button>
+				</div>
+				<div class="dw-search-results" id="dw-search-results" role="listbox" aria-label="Search results"></div>
+				<p class="dw-search-empty" id="dw-search-empty" hidden data-i18n-html="docs_world.no_page_matches_that_try_a_shorter">
+					No page matches that. Try a shorter word, or open the <a href="/docs">classic docs</a> index.
+				</p>
+				<div class="dw-search-foot">
+					<span data-i18n-html="docs_world.move"><kbd>↑</kbd><kbd>↓</kbd> move</span>
+					<span data-i18n-html="docs_world.enter_read"><kbd>Enter</kbd> read</span>
+					<span data-i18n-html="docs_world.shift_enter_walk_me_there"><kbd>Shift</kbd>+<kbd>Enter</kbd> walk me there</span>
+					<span data-i18n-html="docs_world.esc_close"><kbd>Esc</kbd> close</span>
+				</div>
+			</div>
+		</div>
+
+		<!-- Section page list -->
+		<div class="dw-panel" id="dw-panel" role="dialog" aria-labelledby="dw-panel-title" hidden>
+			<div class="dw-panel-head">
+				<h2 id="dw-panel-title"></h2>
+				<button class="dw-close" type="button" id="dw-panel-close" aria-label="Close section" data-i18n-attr="aria-label:docs_world.close_section_arialabel">✕</button>
+			</div>
+			<div class="dw-panel-list" id="dw-panel-list"></div>
+		</div>
+
+		<!-- In-world doc reader -->
+		<div class="dw-reader" id="dw-reader" role="dialog" aria-label="Documentation reader" hidden>
+			<div class="dw-reader-card">
+				<div class="dw-reader-head">
+					<span class="dw-reader-crumb" id="dw-reader-crumb"></span>
+					<a class="dw-reader-classic" id="dw-reader-classic" href="/docs" data-i18n="docs_world.open_in_classic_docs">Open in classic docs ↗</a>
+					<button class="dw-close" type="button" id="dw-reader-close" aria-label="Close reader" data-i18n-attr="aria-label:docs_world.close_reader_arialabel">✕</button>
+				</div>
+				<div class="dw-reader-body" id="dw-reader-body"></div>
+				<div class="dw-reader-foot">
+					<button class="dw-btn ghost" type="button" id="dw-reader-prev" data-i18n="docs_world.previous">← Previous</button>
+					<button class="dw-btn ghost" type="button" id="dw-reader-next" data-i18n="docs_world.next">Next →</button>
+				</div>
+			</div>
+		</div>
+
+		<!-- Boot / capability states -->
+		<div class="dw-center" id="dw-loading">
+			<div class="dw-spinner" aria-hidden="true"></div>
+			<h1 data-i18n="docs_world.entering_the_docs_world">Entering the Docs World…</h1>
+			<p data-i18n="docs_world.loading_the_documentation_and_warming_up_the">Loading the documentation and warming up the scene.</p>
+		</div>
+		<div class="dw-center" id="dw-fallback" hidden>
+			<h1 id="dw-fallback-title" data-i18n="docs_world.this_device_can_t_open_the_3d">This device can't open the 3D world</h1>
+			<p id="dw-fallback-sub" data-i18n="docs_world.webgl_isn_t_available_in_this_browser">
+				WebGL isn't available in this browser. The classic docs carry exactly the
+				same content, no 3D required.
+			</p>
+			<div class="dw-fallback-actions">
+				<!-- Shown only for failures a reload can actually fix (a dropped
+				     manifest fetch), never for a device that has no WebGL at all. -->
+				<button class="dw-btn" type="button" id="dw-fallback-retry" hidden data-i18n="docs_world.try_again">Try again</button>
+				<a class="dw-btn" id="dw-fallback-classic" href="/docs" data-i18n="docs_world.open_the_classic_docs">Open the classic docs</a>
+			</div>
+		</div>
+
+		<script type="module" src="/src/docs-world/main.js"></script>
+		<script type="module" src="/i18n.js"></script>
+	</body>
+</html>

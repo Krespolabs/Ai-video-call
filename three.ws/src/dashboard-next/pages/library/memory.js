@@ -1,0 +1,213 @@
+// Library → Memory tab.
+// Lists every memory entry across all of the user's agents and lets
+// them add a note attached to a chosen agent.
+
+import { get, post, esc, relTime } from '../../api.js';
+import { emptyStateHTML, errorStateHTML, attachRetry, skeletonHTML } from '../../../shared/state-kit.js';
+
+function friendly(err) {
+	if (!err) return 'Something went wrong.';
+	const status = err.status || 0;
+	const msg = err.message || String(err);
+	if (status === 401 || /unauthorized|sign in|bearer/i.test(msg)) return 'Your session expired — refresh the page.';
+	if (status === 403 || /forbidden/i.test(msg))                   return "You don't have permission for that.";
+	if (status === 429 || /rate.?limit/i.test(msg))                 return 'Slow down — try again in a moment.';
+	return msg.replace(/^HTTP\s+\d+\s*/i, '') || 'Unknown error.';
+}
+
+export async function renderMemory(host) {
+	host.innerHTML = `
+		<div class="mem-head">
+			<div>
+				<h2 class="dn-panel-title" style="font-size:17px;margin:0 0 4px">Persistent agent memory</h2>
+				<div class="dn-panel-sub" style="margin:0">Notes your agents have saved from past conversations — or add your own.</div>
+			</div>
+			<button class="dn-btn primary" id="mem-add-toggle" type="button" aria-expanded="false" aria-controls="mem-add">+ Add a note</button>
+		</div>
+
+		<div id="mem-add" class="mem-add" hidden>
+			<form class="mem-add-form" id="mem-add-form">
+				<label class="mem-field">
+					<span>Attach to agent</span>
+					<select id="mem-add-agent" required></select>
+				</label>
+				<label class="mem-field">
+					<span>Type</span>
+					<select id="mem-add-type">
+						<option value="user">user</option>
+						<option value="feedback">feedback</option>
+						<option value="project" selected>project</option>
+						<option value="reference">reference</option>
+					</select>
+				</label>
+				<label class="mem-field mem-field-full">
+					<span>Content</span>
+					<textarea id="mem-add-content" maxlength="10000" rows="4" placeholder="What should this agent remember?"></textarea>
+				</label>
+				<div class="mem-add-actions">
+					<span id="mem-add-status" class="mem-add-status"></span>
+					<button type="button" class="dn-btn ghost" id="mem-add-cancel">Cancel</button>
+					<button type="button" class="dn-btn primary" id="mem-add-submit">Save</button>
+				</div>
+			</form>
+		</div>
+
+		<div id="mem-list"></div>
+
+		<style>
+			.mem-head { display:flex; align-items:flex-end; justify-content:space-between; gap:14px; margin-bottom:14px; flex-wrap:wrap; }
+			.mem-add { border:1px solid rgba(255,255,255,0.10); background:rgba(255,255,255,0.03); border-radius:12px; padding:14px; margin-bottom:14px; }
+			.mem-add-form { display:grid; grid-template-columns:1fr 1fr; gap:10px; }
+			.mem-field { display:flex; flex-direction:column; gap:4px; font-size:12px; color:var(--nxt-ink-dim); }
+			.mem-field-full { grid-column:1/-1; }
+			.mem-field select, .mem-field textarea {
+				background:#0a0a14; border:1px solid rgba(255,255,255,0.1); color:var(--nxt-ink);
+				border-radius:8px; padding:8px 10px; font:inherit; resize:vertical;
+			}
+			.mem-add-actions { grid-column:1/-1; display:flex; justify-content:flex-end; gap:8px; align-items:center; }
+			.mem-add-status { font-size:12px; color:var(--nxt-ink-fade); margin-right:auto; }
+
+			.mem-list { display:flex; flex-direction:column; gap:8px; }
+			.mem-card { border:1px solid rgba(255,255,255,0.08); background:rgba(255,255,255,0.02); border-radius:10px; padding:12px 14px; }
+			.mem-card-head { display:flex; align-items:center; gap:8px; flex-wrap:wrap; margin-bottom:6px; font-size:12px; color:var(--nxt-ink-fade); }
+			.mem-card-body { font-size:13px; color:var(--nxt-ink); white-space:pre-wrap; word-break:break-word; line-height:1.5; }
+			.mem-card-body.collapsed { display:-webkit-box; -webkit-line-clamp:3; -webkit-box-orient:vertical; overflow:hidden; }
+			.mem-card-expand { background:none; border:none; color:var(--nxt-accent, #c8cad0); cursor:pointer; padding:4px 0 0; font-size:12px; font:inherit; }
+			.mem-type-user      { color:#dddfe4; border-color:rgba(221,223,228,0.3) !important; }
+			.mem-type-feedback  { color:#c8cad0; border-color:rgba(200,202,208,0.3) !important; }
+			.mem-type-project   { color:#b8bcc4; border-color:rgba(184,188,196,0.3) !important; }
+			.mem-type-reference { color:#a8adb5; border-color:rgba(168,173,181,0.3) !important; }
+		</style>
+	`;
+
+	const listEl = host.querySelector('#mem-list');
+	listEl.innerHTML = `<div class="mem-list">${skeletonHTML(4, 'text')}</div>`;
+
+	let agents = [];
+	try {
+		const res = await get('/api/agents');
+		agents = res?.agents || [];
+	} catch (err) {
+		listEl.innerHTML = errorStateHTML({ title: "Couldn't load agents", body: esc(friendly(err)) });
+		attachRetry(listEl, () => renderMemory(host));
+		host.querySelector('#mem-add-toggle').disabled = true;
+		return;
+	}
+
+	if (!agents.length) {
+		listEl.innerHTML = emptyStateHTML({
+			icon: '🧠',
+			title: "You don't have any agents yet",
+			body: 'Memories are scoped to an agent. Create one to start saving notes it can recall later.',
+			actions: [{ label: 'Create an agent', href: '/create', primary: true }],
+		});
+		host.querySelector('#mem-add-toggle').disabled = true;
+		return;
+	}
+
+	const agentSel = host.querySelector('#mem-add-agent');
+	agentSel.innerHTML = agents
+		.map((a) => `<option value="${esc(a.id)}">${esc(a.name || a.id)}</option>`)
+		.join('');
+
+	const agentNameById = new Map(agents.map((a) => [a.id, a.name || a.id]));
+
+	const all = [];
+	const errors = [];
+	await Promise.all(
+		agents.map(async (a) => {
+			try {
+				const r = await get(`/api/agent-memory?agentId=${encodeURIComponent(a.id)}&limit=500`);
+				for (const e of (r?.entries || [])) all.push({ ...e, _agentId: a.id });
+			} catch (err) {
+				errors.push({ agent: a.name || a.id, message: err.message || String(err) });
+			}
+		}),
+	);
+
+	all.sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
+
+	renderList();
+
+	function renderList() {
+		const html = [];
+		if (errors.length) {
+			html.push(`<div class="dn-empty" style="margin-bottom:12px"><h3>Some agents' memories couldn't be loaded</h3><p>${errors.map((e) => `${esc(e.agent)}: ${esc(friendly({ message: e.message }))}`).join(' · ')}</p></div>`);
+		}
+		if (!all.length) {
+			html.push(emptyStateHTML({
+				title: 'No memories yet',
+				body: 'Your agents will save notes here from their conversations — or you can add one yourself.',
+				actions: [{ label: '+ Add a note', id: 'mem-empty-add', primary: true }],
+			}));
+		} else {
+			html.push('<div class="mem-list">');
+			for (const e of all) {
+				const t = e.type || 'project';
+				html.push(`
+					<div class="mem-card">
+						<div class="mem-card-head">
+							<span class="dn-tag mem-type-${esc(t)}">${esc(t)}</span>
+							<span><strong>${esc(agentNameById.get(e._agentId) || 'agent')}</strong></span>
+							<span>· ${esc(relTime(e.createdAt || Date.now()))}</span>
+							${typeof e.salience === 'number' ? `<span>· salience ${e.salience.toFixed(2)}</span>` : ''}
+						</div>
+						<div class="mem-card-body collapsed" data-mem-body>${esc(e.content || '')}</div>
+						${e.content && e.content.length > 240 ? '<button class="mem-card-expand" type="button">Show more</button>' : ''}
+					</div>
+				`);
+			}
+			html.push('</div>');
+		}
+		listEl.innerHTML = html.join('');
+		listEl.querySelectorAll('.mem-card-expand').forEach((btn) => {
+			btn.addEventListener('click', () => {
+				const body = btn.previousElementSibling;
+				const collapsed = body.classList.toggle('collapsed');
+				btn.textContent = collapsed ? 'Show more' : 'Show less';
+			});
+		});
+		listEl.querySelector('[data-sk-action="mem-empty-add"]')?.addEventListener('click', () => {
+			host.querySelector('#mem-add-toggle')?.click();
+			host.querySelector('#mem-add-content')?.focus();
+		});
+	}
+
+	const addPanel  = host.querySelector('#mem-add');
+	const toggleBtn = host.querySelector('#mem-add-toggle');
+	const cancelBtn = host.querySelector('#mem-add-cancel');
+	const submitBtn = host.querySelector('#mem-add-submit');
+	const statusEl  = host.querySelector('#mem-add-status');
+
+	function setAddOpen(open) {
+		addPanel.hidden = !open;
+		toggleBtn.setAttribute('aria-expanded', String(open));
+	}
+	toggleBtn.addEventListener('click', () => setAddOpen(addPanel.hidden));
+	cancelBtn.addEventListener('click', () => setAddOpen(false));
+	submitBtn.addEventListener('click', async () => {
+		const agentId = agentSel.value;
+		const type    = host.querySelector('#mem-add-type').value;
+		const content = host.querySelector('#mem-add-content').value.trim();
+		if (!agentId)  { statusEl.textContent = 'Pick an agent.';      return; }
+		if (!content)  { statusEl.textContent = 'Write something.';     return; }
+		submitBtn.disabled = true;
+		statusEl.textContent = 'Saving…';
+		try {
+			const res = await post('/api/agent-memory', {
+				agentId,
+				entry: { type, content, salience: 0.6 },
+			});
+			const saved = res?.entry;
+			if (saved) all.unshift({ ...saved, _agentId: agentId });
+			renderList();
+			statusEl.textContent = 'Saved.';
+			host.querySelector('#mem-add-content').value = '';
+			setTimeout(() => { statusEl.textContent = ''; setAddOpen(false); }, 600);
+		} catch (err) {
+			statusEl.textContent = friendly(err);
+		} finally {
+			submitBtn.disabled = false;
+		}
+	});
+}

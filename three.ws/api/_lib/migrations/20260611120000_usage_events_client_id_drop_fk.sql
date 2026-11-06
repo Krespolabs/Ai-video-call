@@ -1,0 +1,26 @@
+-- usage_events.client_id — drop the oauth_clients foreign key.
+--
+-- client_id was declared `text references oauth_clients(client_id)` so it could
+-- hold the OAuth client principal of an event. But the column is also the
+-- natural attribution slot for ANONYMOUS surfaces that have no OAuth client:
+--
+--   • /forge image→3D writes the anonymous browser-client hash
+--     (api/forge.js → vision validate → recordVisionSpend → usage_events)
+--   • /guardian/assess writes the caller IP (api/guardian/assess.js)
+--
+-- Neither value exists in oauth_clients, so every such insert violated the FK
+-- (Postgres 23503) and Neon's SQL-over-HTTP returned 400. The write is
+-- fire-and-forget (api/_lib/usage.js queues it in a microtask and swallows the
+-- error), so it never broke a request — but it spammed prod logs on every
+-- forge/guardian call and silently dropped the spend/telemetry row, defeating
+-- the LLM cost accounting the usage_events_llm_cost migration added.
+--
+-- usage_events is an append-only analytics/billing log, not relational data that
+-- needs join integrity or cascade. Dropping the FK lets client_id be a free-text
+-- attribution label (real OAuth client id for authenticated calls, hash/IP for
+-- anonymous ones) and also preserves billing history if an OAuth client is later
+-- deleted (the old `on delete set null` would have erased the attribution).
+--
+-- Idempotent — safe to re-run.
+
+alter table usage_events drop constraint if exists usage_events_client_id_fkey;

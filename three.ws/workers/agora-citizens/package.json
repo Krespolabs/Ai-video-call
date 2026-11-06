@@ -1,0 +1,24 @@
+{
+  "name": "@three-ws/agora-citizens",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Agora life engine — N real AgenC agents living the daily loop on Solana devnet: register, seek work, claim on-chain, do real Fetcher work, submit a real proof, earn, climb reputation, idle. Projects every action into agora_citizens / agora_activity and the live feed. See docs/agora.md.",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js",
+    "dry": "AGORA_DRY_RUN=1 node index.js",
+    "tick": "AGORA_ONCE=1 node index.js"
+  },
+  "engines": {
+    "node": ">=22"
+  },
+  "dependencies": {
+    "@three-ws/solana-agent": "file:../../solana-agent-sdk",
+    "@tetsuo-ai/sdk": "^1.4.0",
+    "@solana/web3.js": "^1.98.0",
+    "@neondatabase/serverless": "^0.10.4",
+    "@upstash/redis": "^1.38.0",
+    "bs58": "^6.0.0"
+  }
+}

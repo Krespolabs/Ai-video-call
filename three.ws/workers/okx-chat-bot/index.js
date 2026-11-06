@@ -1,0 +1,411 @@
+// okx-chat-bot: always-on host for the OKX.AI marketplace chat bot (agent #2632).
+//
+// Marketplace chat for our listing is delivered over XMTP to a local `okx-a2a`
+// daemon backed by an `onchainos` wallet session. Both used to live on a
+// developer codespace, which cannot stay up: a rebuild wiped the CLIs and an
+// idle nap killed the daemon (observed alive 21:09, dead by 03:13 the same
+// night). OKX's chat test then reports "no delivery in 30 min" and the listing
+// gets flagged offline. This worker is the durable host.
+//
+// What it owns:
+//   1. State      restore the wallet/XMTP identity from GCS, snapshot it back
+//   2. Workspace  rebuild the AI subsession's briefing + skills from the image
+//   3. Daemon     supervise `okx-a2a run` with capped backoff restarts
+//   4. Health     /readyz strict readiness, every other path liveness
+//   5. Heartbeat  bot_heartbeat row → /api/healthz subsystems → gcp-triage
+//   6. Alerts     a logged-out session pages a human WITH the exact commands
+//
+// Run: node workers/okx-chat-bot  (npm run worker:okx-bot)
+// Deploy: workers/okx-chat-bot/cloudbuild.yaml. See the README for the one-time
+// bucket/secret setup and why --max-instances=1 is load-bearing.
+
+import { mkdir } from 'node:fs/promises';
+import { sendOpsAlert } from '../../api/_lib/alerts.js';
+import { sql } from '../../api/_lib/db.js';
+import { applyLane, loadConfig, paths } from './config.js';
+import { agentRefresh, beginLogin, daemonStatus, exec, walletStatus } from './cli.js';
+import { startHealthServer } from './health-server.js';
+import { electProvider, loginCodex } from './provider.js';
+import { classify, loginInstructions } from './session.js';
+import { restoreState, snapshotState } from './state.js';
+import { createSupervisor } from './supervisor.js';
+import { createLease, sqlLeaseStore } from './lease.js';
+import { buildWorkspace } from './workspace.js';
+import { log } from './log.js';
+
+const WORKER = 'okx-chat-bot';
+const BOOT_AT = new Date().toISOString();
+
+/**
+ * The single-writer lease (lease.js), or null on a host with no shared state.
+ * Held from before the state restore until after the final snapshot, so no two
+ * hosts ever restore, run or snapshot the bot's identity at the same time.
+ */
+let lease = null;
+
+/** May this host write the shared state right now? */
+const mayWrite = () => !lease || lease.fresh();
+
+/** Live health, refreshed by the session probe and read by the HTTP handlers. */
+const live = {
+	verdict: { status: 'unknown', ready: false, reason: 'booting', detail: 'probe has not run yet', needsHumanLogin: false },
+	checkedAt: 0,
+	daemon: 'unknown',
+	wallet: null,
+	agents: { agentCount: 0, activeClients: 0 },
+	login: null,
+	workspace: null,
+	stateRestore: null,
+	// What the provider's own API last answered. Null until the first probe lands,
+	// which is why classify() treats a missing verdict as "no opinion" rather than
+	// as a failure: a host must not read red for a probe that has not run yet.
+	providerProbe: null,
+	// What EVERY lane in the chain last answered. The elected lane's verdict is
+	// `providerProbe`; this is the whole picture, so a human reading /readyz can
+	// see which credential to fund rather than only that one of them was refused.
+	providerLanes: [],
+	// The single-writer lease's state (lease.js), null on a host without one.
+	lease: null,
+};
+
+async function heartbeat(cfg, supervisor) {
+	const meta = {
+		bootAt: BOOT_AT,
+		agentId: cfg.agentId,
+		host: cfg.host,
+		hostDurable: cfg.hostDurable,
+		health: live.verdict.status,
+		ready: live.verdict.ready,
+		reason: live.verdict.reason,
+		detail: live.verdict.detail,
+		needsHumanLogin: live.verdict.needsHumanLogin,
+		loggedIn: live.wallet?.loggedIn ?? null,
+		agentCount: live.agents.agentCount,
+		activeClients: live.agents.activeClients,
+		provider: cfg.provider,
+		providerTransport: cfg.providerTransport,
+		providerCredentialed: cfg.providerCredentialed,
+		providerLane: cfg.activeLane?.id ?? null,
+		providerVerdict: live.providerProbe?.code ?? null,
+		providerChain: live.providerLanes.map((l) => ({ lane: l.lane, code: l.code })),
+		daemonRestarts: supervisor.stats().restarts,
+		checkedAt: live.checkedAt,
+		// Marks this host as lease-aware. A successor treats a beat WITHOUT this
+		// field as a host that predates the lease and waits it out (lease.js).
+		leaseHolder: lease?.state.holder ?? null,
+	};
+	try {
+		await sql`
+			INSERT INTO bot_heartbeat (worker, mode, last_beat_at, meta)
+			VALUES (${WORKER}, ${cfg.provider}, now(), ${JSON.stringify(meta)}::jsonb)
+			ON CONFLICT (worker) DO UPDATE
+			SET mode = excluded.mode, last_beat_at = excluded.last_beat_at, meta = excluded.meta
+		`;
+	} catch (err) {
+		log.warn('heartbeat write failed', { err: err?.message });
+	}
+}
+
+// A session expiry is the one failure only a human can clear, so it must page
+// loudly and carry the commands. Alert on the transition into the bad state,
+// then at most every cfg.alertRepeatMs while it persists, so one overnight
+// expiry does not become a hundred notifications.
+let lastAlertReason = null;
+let lastAlertAt = 0;
+async function maybeAlert(cfg, verdict) {
+	if (verdict.status === 'ok' || verdict.status === 'unknown') {
+		if (lastAlertReason) {
+			lastAlertReason = null;
+			await sendOpsAlert('OKX chat bot recovered', `agent #${cfg.agentId} is reachable again: ${verdict.detail}`, {
+				severity: 'info',
+			}).catch(() => {});
+		}
+		return;
+	}
+	const now = Date.now();
+	const changed = verdict.reason !== lastAlertReason;
+	if (!changed && now - lastAlertAt < cfg.alertRepeatMs) return;
+	lastAlertReason = verdict.reason;
+	lastAlertAt = now;
+
+	const lines = [`agent #${cfg.agentId}: ${verdict.detail}`];
+	if (verdict.needsHumanLogin) lines.push('', 'Fix (needs a human):', ...loginInstructions(live.login?.loginUrl, live.login?.authSessionId));
+	await sendOpsAlert(`OKX chat bot ${verdict.status}: ${verdict.reason}`, lines.join('\n'), {
+		severity: verdict.status === 'down' ? 'critical' : 'warn',
+	}).catch((err) => log.warn('ops alert failed', { err: err?.message }));
+}
+
+// Ask every AI lane whether it still serves this host, and move to the best one.
+//
+// Kept off the session probe's path: these are network calls to third parties,
+// and a slow one must not delay the verdict about whether XMTP is delivering. A
+// transient `unreachable` answer is remembered as-is, because classify()
+// deliberately does not fail readiness on it.
+//
+// Election is what makes a dead credential survivable. The host used to hold one
+// lane, so the Vertex billing hold on 2026-09-04 left it unable to author a
+// single reply even though other credentials were configured. Now the lane that
+// answers is the lane that serves, and a lane that recovers is picked up on the
+// next tick with no deploy.
+async function electProviderLane(cfg, supervisor) {
+	const before = live.providerProbe?.code ?? null;
+	const beforeLane = cfg.activeLane?.id ?? null;
+	const { elected, verdict, lanes } = await electProvider(cfg.chain);
+	live.providerLanes = lanes;
+	if (verdict) live.providerProbe = verdict;
+
+	if (elected && elected.id !== beforeLane) {
+		applyLane(cfg, elected);
+		log.info('provider lane elected', { lane: elected.id, transport: elected.transport, from: beforeLane });
+		// The adapter reads the provider out of ~/.okx-agent-task/config.toml, and
+		// the spawned CLI reads its credentials out of the daemon's environment.
+		// Both are set at spawn time, so a lane change is only real once the daemon
+		// has been replaced with one that carries it.
+		await exec(cfg, 'okx-a2a', ['config', 'provider', '--provider', cfg.provider], { timeoutMs: 30_000 });
+		const codexLogin = await loginCodex(cfg);
+		if (codexLogin.ran) log[codexLogin.ok ? 'info' : 'error']('codex login', codexLogin);
+		await supervisor.restart(`ai lane ${beforeLane || 'none'} -> ${elected.id}`);
+	}
+
+	if (live.providerProbe && live.providerProbe.code !== before) {
+		log[live.providerProbe.code === 'unauthorized' ? 'error' : 'info']('provider credential', {
+			provider: cfg.provider,
+			transport: cfg.providerTransport,
+			lane: live.providerProbe.lane,
+			code: live.providerProbe.code,
+			detail: live.providerProbe.detail,
+			lanes: lanes.map((l) => `${l.lane}=${l.code}`).join(' '),
+		});
+	}
+}
+
+// One probe at a time. A probe can legitimately outrun its own interval (the
+// three CLI calls are bounded at 15s + 30s + 90s), and two in flight would race
+// on the login mint below: both would see `live.login` empty and start a second
+// auth session, invalidating the URL a human is halfway through using.
+let probing = false;
+async function probeSession(cfg, supervisor) {
+	if (probing) {
+		log.warn('probe still running, skipping this tick', { sinceMs: Date.now() - live.checkedAt });
+		return;
+	}
+	probing = true;
+	try {
+		await runProbe(cfg, supervisor);
+	} finally {
+		probing = false;
+	}
+}
+
+async function runProbe(cfg, supervisor) {
+	const daemon = await daemonStatus(cfg);
+	const wallet = daemon.startsWith('running') ? await walletStatus(cfg) : null;
+	const agents = wallet?.loggedIn ? await agentRefresh(cfg) : { agentCount: 0, activeClients: 0 };
+	const verdict = classify({
+		daemon,
+		wallet,
+		agents,
+		providerCredentialed: cfg.providerCredentialed,
+		providerProbe: live.providerProbe,
+		daemonChild: supervisor.stats(),
+	});
+
+	// Mint a fresh login URL only when one is actually needed, and only when we
+	// do not already hold an unused one: `login --phase init` starts a new auth
+	// session server-side, so calling it every probe would invalidate the URL a
+	// human is halfway through using.
+	if (verdict.needsHumanLogin && !live.login) {
+		live.login = await beginLogin(cfg);
+	} else if (!verdict.needsHumanLogin) {
+		live.login = null;
+	}
+
+	const changed = verdict.reason !== live.verdict.reason;
+	live.daemon = daemon;
+	live.wallet = wallet;
+	live.agents = agents;
+	live.verdict = verdict;
+	live.checkedAt = Date.now();
+
+	if (changed) {
+		log[verdict.status === 'ok' ? 'info' : 'warn']('health changed', {
+			status: verdict.status,
+			reason: verdict.reason,
+			detail: verdict.detail,
+		});
+	}
+	await maybeAlert(cfg, verdict);
+	await heartbeat(cfg, supervisor);
+}
+
+async function main() {
+	const cfg = loadConfig();
+	const p = paths(cfg);
+	log.info('boot', {
+		home: cfg.home,
+		agentId: cfg.agentId,
+		host: cfg.host,
+		hostDurable: cfg.hostDurable,
+		provider: cfg.provider,
+		providerReason: cfg.providerReason,
+		chain: cfg.chain.map((l) => l.id).join(' > ') || 'none',
+		stateBucket: cfg.stateBucket || null,
+	});
+	if (!cfg.providerCredentialed) {
+		log.error('no AI-provider credential: the daemon will receive chat but cannot author replies', {
+			provider: cfg.provider,
+			needs: 'CLAUDE_CODE_USE_VERTEX=1 (preferred), ANTHROPIC_API_KEY, or OPENAI_API_KEY',
+		});
+	}
+
+	// The health server comes up first, before the lease wait. Cloud Run's
+	// startup probe has to pass for a rollout to move traffic and SIGTERM the old
+	// instance, and the old instance releasing the lease is exactly what this one
+	// is waiting for: holding the probe behind the lease would deadlock the deploy.
+	const supervisor = createSupervisor(cfg, p);
+	const server = startHealthServer(cfg, live, supervisor, BOOT_AT);
+
+	// A SIGTERM that lands while waiting has nothing to save: this host never
+	// restored, ran or snapshotted anything.
+	const waitAbort = new AbortController();
+	const onEarlySignal = (signal) => {
+		log.info('shutdown before taking the lease', { signal });
+		waitAbort.abort();
+		server?.close();
+		process.exit(0);
+	};
+	process.once('SIGTERM', onEarlySignal);
+	process.once('SIGINT', onEarlySignal);
+
+	if (cfg.leaseRequired) {
+		lease = createLease({
+			store: sqlLeaseStore(sql),
+			host: cfg.host,
+			ttlMs: cfg.leaseTtlMs,
+			renewMs: cfg.leaseRenewMs,
+			pollMs: cfg.leasePollMs,
+			legacyStaleMs: cfg.legacyBeatStaleMs,
+			onLost: (reason) => void fence(cfg, supervisor, reason),
+		});
+		live.lease = lease.state;
+		live.verdict = {
+			status: 'unknown',
+			ready: false,
+			reason: 'lease_wait',
+			detail: 'waiting for the single-writer lease before restoring the bot identity',
+			needsHumanLogin: false,
+		};
+		const got = await lease.acquire({
+			signal: waitAbort.signal,
+			onWait: (reason) => {
+				live.verdict = { ...live.verdict, detail: `waiting for the single-writer lease: ${reason}` };
+			},
+		});
+		if (!got) return;
+		lease.start();
+		live.verdict = { status: 'unknown', ready: false, reason: 'booting', detail: 'lease held, restoring state', needsHumanLogin: false };
+	} else {
+		log.warn('no state bucket: running without the single-writer lease (fine for a local run, never for Cloud Run)');
+	}
+	process.off('SIGTERM', onEarlySignal);
+	process.off('SIGINT', onEarlySignal);
+
+	await mkdir(p.agentTask, { recursive: true });
+	live.stateRestore = await restoreState(cfg);
+	await mkdir(p.logs, { recursive: true });
+	live.workspace = await buildWorkspace(cfg, p);
+
+	// Provider + permission preset are persisted in ~/.okx-agent-task/config.toml,
+	// which the restored snapshot may carry from an older posture. Re-assert both
+	// so the deployed configuration always wins over the snapshot. Bypass matters:
+	// without it the subsession stalls on a tool-approval prompt nobody is there to
+	// answer, which reads to the buyer as an unresponsive bot.
+	await exec(cfg, 'okx-a2a', ['config', 'provider', '--provider', cfg.provider], { timeoutMs: 30_000 });
+	await exec(cfg, 'okx-a2a', ['config', 'permissions', '--preset', 'bypass'], { timeoutMs: 30_000 });
+
+	// Codex reads ~/.codex/auth.json, never OPENAI_API_KEY from the environment,
+	// so without this the key is present, the CLI spawns, and every reply dies on
+	// a 401 the buyer only experiences as silence. No-op for every other provider.
+	const codexLogin = await loginCodex(cfg);
+	if (codexLogin.ran) log[codexLogin.ok ? 'info' : 'error']('codex login', codexLogin);
+
+	supervisor.start();
+
+	const probe = () => probeSession(cfg, supervisor).catch((err) => log.error('probe failed', { err: err?.message }));
+	const probeTimer = setInterval(probe, cfg.sessionProbeMs);
+	// The heartbeat runs on its own timer rather than only at the end of a probe.
+	// A probe can outlast the freshness window /api/healthz judges this host by,
+	// so tying the beat to it would let one slow CLI call read as "the host is
+	// gone" while the bot is perfectly online.
+	const heartbeatTimer = setInterval(
+		() => heartbeat(cfg, supervisor).catch((err) => log.warn('heartbeat failed', { err: err?.message })),
+		cfg.heartbeatMs,
+	);
+	const snapshotTimer = setInterval(() => {
+		if (!mayWrite()) return log.warn('snapshot skipped: the single-writer lease is not fresh', {});
+		snapshotState(cfg, { reason: 'timer' }).catch(() => {});
+	}, cfg.snapshotMs);
+	const providerProbeTimer = setInterval(
+		() => electProviderLane(cfg, supervisor).catch((err) => log.warn('provider probe failed', { err: err?.message })),
+		cfg.providerProbeMs,
+	);
+	// Run the first election immediately, but off the boot path: a slow provider
+	// must delay the verdict, never the daemon that receives the chat.
+	electProviderLane(cfg, supervisor).catch((err) => log.warn('provider probe failed', { err: err?.message }));
+	// A first verdict early enough to be useful. It can legitimately land before
+	// the daemon has claimed its lock, which classify() reports as
+	// `daemon_starting` rather than `daemon_down`, so an ordinary boot no longer
+	// pages critical and recovers a minute later.
+	setTimeout(probe, 10_000);
+
+	let draining = false;
+	const shutdown = async (signal) => {
+		if (draining) return;
+		draining = true;
+		log.info('shutdown', { signal });
+		clearInterval(probeTimer);
+		clearInterval(heartbeatTimer);
+		clearInterval(snapshotTimer);
+		clearInterval(providerProbeTimer);
+		server?.close();
+		// Order matters: stop the daemon FIRST so its sqlite files are quiesced,
+		// then snapshot. A live-copy snapshot can tear; this one cannot. The
+		// snapshot is written only while the lease is still ours, and the lease is
+		// released only after it, so the successor restores exactly this state.
+		await supervisor.stop();
+		if (mayWrite()) await snapshotState(cfg, { reason: signal });
+		else log.error('final snapshot skipped: the single-writer lease is not held', { signal });
+		await lease?.release();
+		log.info('bye', {});
+		process.exit(0);
+	};
+	process.on('SIGINT', () => shutdown('SIGINT'));
+	process.on('SIGTERM', () => shutdown('SIGTERM'));
+	process.on('unhandledRejection', (err) => log.error('unhandledRejection', { err: err?.message }));
+}
+
+/**
+ * The lease is gone (another host took it, or it could not be renewed before it
+ * would expire). Another host may already be writing the identity, so this one
+ * stops its daemon and exits WITHOUT a snapshot: writing one now is exactly the
+ * clobber the lease exists to prevent. Cloud Run restarts the container, and the
+ * fresh process waits for the lease like any other.
+ */
+let fencing = false;
+async function fence(cfg, supervisor, reason) {
+	if (fencing) return;
+	fencing = true;
+	live.verdict = { status: 'down', ready: false, reason: 'lease_lost', detail: `single-writer lease lost: ${reason}`, needsHumanLogin: false };
+	await sendOpsAlert(
+		'OKX chat bot fenced itself',
+		`agent #${cfg.agentId} on ${cfg.host} lost the single-writer lease (${reason}) and stopped its daemon without snapshotting. It restarts and waits for the lease; no action is needed unless this repeats.`,
+		{ severity: 'warn' },
+	).catch(() => {});
+	await supervisor.stop(5_000).catch(() => {});
+	process.exit(75);
+}
+
+main().catch((err) => {
+	log.error('fatal', { err: err?.message, stack: err?.stack });
+	process.exit(1);
+});

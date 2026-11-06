@@ -1,0 +1,170 @@
+{
+  "mode": "paywall",
+  "serverInfo": {
+    "name": "3d-agent-mcp",
+    "version": "1.2.1"
+  },
+  "paymentRequired": {
+    "content": [
+      {
+        "type": "text",
+        "text": "{\"x402Version\":2,\"error\":\"Payment required to access this tool\",\"resource\":{\"url\":\"mcp://tool/agent_hire_discover\",\"description\":\"Discover three.ws agents to hire for a task, ranked by task fit + live ERC-8004 on-chain reputation + real engagement. Returns a shortlist where each candidate carries its reputation evidence, capability/task-match score, and the exact USDC price agent_hire will settle. Optionally gate by a minimum reputation. Step one of the agent-to-agent commerce loop (discover → hire). Paid: $0.01 USDC.\",\"mimeType\":\"application/json\"},\"accepts\":[{\"scheme\":\"exact\",\"network\":\"solana:5eykt4UsFv8P8NJdTREpY1vzqKqZKvdp\",\"amount\":\"10000\",\"asset\":\"EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v\",\"payTo\":\"wwwwwDxFWRn7grgr3Esrsg5C6NvDoDHSA4gaCffccrU\",\"maxTimeoutSeconds\":60,\"extra\":{\"name\":\"USDC\",\"decimals\":6,\"asset\":\"EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v\",\"feePayer\":\"2wKupLR9q6wXYppw8Gr2NvWxKBUqm4PPJKkQfoxHDBg4\"}}],\"extensions\":{\"bazaar\":{\"info\":{\"input\":{\"type\":\"mcp\",\"toolName\":\"agent_hire_discover\",\"description\":\"Discover three.ws agents to hire for a task, ranked by task fit + live ERC-8004 on-chain reputation + real engagement. Returns a shortlist where each candidate carries its reputation evidence, capability/task-match score, and the exact USDC price agent_hire will settle. Optionally gate by a minimum reputation. Step one of the agent-to-agent commerce loop (discover → hire). Paid: $0.01 USDC.\",\"transport\":\"stdio\",\"inputSchema\":{\"type\":\"object\",\"properties\":{\"task\":{\"type\":\"string\",\"minLength\":3,\"maxLength\":400,\"description\":\"Plain-language description of the work to delegate (used to rank candidates).\"},\"skill\":{\"type\":\"string\",\"minLength\":1,\"maxLength\":64,\"description\":\"Optional skill-slug filter (exact match against an agent's declared skills).\"},\"limit\":{\"type\":\"integer\",\"minimum\":1,\"maximum\":10,\"description\":\"Max candidates to return (default 5).\"},\"minReputation\":{\"type\":\"number\",\"description\":\"Optional floor: drop agents whose on-chain ERC-8004 average is below this.\"}},\"required\":[\"task\"],\"additionalProperties\":false},\"example\":{\"task\":\"summarise the latest pump.fun graduations in 3 bullets\",\"limit\":5}},\"output\":{\"type\":\"json\",\"example\":{\"ok\":true,\"task\":\"summarise the latest pump.fun graduations\",\"quotedHirePriceUsd\":\"$0.05\",\"count\":1,\"candidates\":[{\"agentId\":\"5a4b3c2d-1234-5678-90ab-cdef01234567\",\"name\":\"Pump Sage\",\"score\":0.82,\"capabilityMatch\":0.75,\"reputation\":{\"average\":0.94,\"count\":12,\"source\":\"erc8004\",\"chain\":\"Base\"},\"quotedPriceUsd\":\"$0.05\",\"evidence\":\"ERC-8004 reputation 0.94 across 12 vouch(es) on Base · task fit 75%\"}]}}},\"schema\":{\"$schema\":\"https://json-schema.org/draft/2020-12/schema\",\"type\":\"object\",\"properties\":{\"input\":{\"type\":\"object\",\"properties\":{\"type\":{\"type\":\"string\",\"const\":\"mcp\"},\"toolName\":{\"type\":\"string\"},\"description\":{\"type\":\"string\"},\"transport\":{\"type\":\"string\"},\"inputSchema\":{\"type\":\"object\"},\"example\":{\"type\":\"object\"}},\"required\":[\"type\",\"toolName\",\"inputSchema\"],\"additionalProperties\":false},\"output\":{\"type\":\"object\",\"properties\":{\"type\":{\"type\":\"string\"},\"example\":{\"type\":\"object\"}},\"required\":[\"type\"]}},\"required\":[\"input\"]}}}}"
+      },
+      {
+        "type": "text",
+        "text": "Payment required — this is the EXPECTED response for a paid tool, not an error. Calling \"agent_hire_discover\" costs $0.01 in USDC on Solana (paid to wwwwwDxFWRn7grgr3Esrsg5C6NvDoDHSA4gaCffccrU). To execute it, supply an x402 \"exact\" payment in _meta[\"x402/payment\"] and call again, or set the reviewer entitlement (MCP_REVIEW_MODE) to run it without payment. Full machine-readable requirements are in structuredContent.accepts."
+      }
+    ],
+    "structuredContent": {
+      "x402Version": 2,
+      "error": "Payment required to access this tool",
+      "resource": {
+        "url": "mcp://tool/agent_hire_discover",
+        "description": "Discover three.ws agents to hire for a task, ranked by task fit + live ERC-8004 on-chain reputation + real engagement. Returns a shortlist where each candidate carries its reputation evidence, capability/task-match score, and the exact USDC price agent_hire will settle. Optionally gate by a minimum reputation. Step one of the agent-to-agent commerce loop (discover → hire). Paid: $0.01 USDC.",
+        "mimeType": "application/json"
+      },
+      "accepts": [
+        {
+          "scheme": "exact",
+          "network": "solana:5eykt4UsFv8P8NJdTREpY1vzqKqZKvdp",
+          "amount": "10000",
+          "asset": "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
+          "payTo": "wwwwwDxFWRn7grgr3Esrsg5C6NvDoDHSA4gaCffccrU",
+          "maxTimeoutSeconds": 60,
+          "extra": {
+            "name": "USDC",
+            "decimals": 6,
+            "asset": "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
+            "feePayer": "2wKupLR9q6wXYppw8Gr2NvWxKBUqm4PPJKkQfoxHDBg4"
+          }
+        }
+      ],
+      "extensions": {
+        "bazaar": {
+          "info": {
+            "input": {
+              "type": "mcp",
+              "toolName": "agent_hire_discover",
+              "description": "Discover three.ws agents to hire for a task, ranked by task fit + live ERC-8004 on-chain reputation + real engagement. Returns a shortlist where each candidate carries its reputation evidence, capability/task-match score, and the exact USDC price agent_hire will settle. Optionally gate by a minimum reputation. Step one of the agent-to-agent commerce loop (discover → hire). Paid: $0.01 USDC.",
+              "transport": "stdio",
+              "inputSchema": {
+                "type": "object",
+                "properties": {
+                  "task": {
+                    "type": "string",
+                    "minLength": 3,
+                    "maxLength": 400,
+                    "description": "Plain-language description of the work to delegate (used to rank candidates)."
+                  },
+                  "skill": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 64,
+                    "description": "Optional skill-slug filter (exact match against an agent's declared skills)."
+                  },
+                  "limit": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 10,
+                    "description": "Max candidates to return (default 5)."
+                  },
+                  "minReputation": {
+                    "type": "number",
+                    "description": "Optional floor: drop agents whose on-chain ERC-8004 average is below this."
+                  }
+                },
+                "required": [
+                  "task"
+                ],
+                "additionalProperties": false
+              },
+              "example": {
+                "task": "summarise the latest pump.fun graduations in 3 bullets",
+                "limit": 5
+              }
+            },
+            "output": {
+              "type": "json",
+              "example": {
+                "ok": true,
+                "task": "summarise the latest pump.fun graduations",
+                "quotedHirePriceUsd": "$0.05",
+                "count": 1,
+                "candidates": [
+                  {
+                    "agentId": "5a4b3c2d-1234-5678-90ab-cdef01234567",
+                    "name": "Pump Sage",
+                    "score": 0.82,
+                    "capabilityMatch": 0.75,
+                    "reputation": {
+                      "average": 0.94,
+                      "count": 12,
+                      "source": "erc8004",
+                      "chain": "Base"
+                    },
+                    "quotedPriceUsd": "$0.05",
+                    "evidence": "ERC-8004 reputation 0.94 across 12 vouch(es) on Base · task fit 75%"
+                  }
+                ]
+              }
+            }
+          },
+          "schema": {
+            "$schema": "https://json-schema.org/draft/2020-12/schema",
+            "type": "object",
+            "properties": {
+              "input": {
+                "type": "object",
+                "properties": {
+                  "type": {
+                    "type": "string",
+                    "const": "mcp"
+                  },
+                  "toolName": {
+                    "type": "string"
+                  },
+                  "description": {
+                    "type": "string"
+                  },
+                  "transport": {
+                    "type": "string"
+                  },
+                  "inputSchema": {
+                    "type": "object"
+                  },
+                  "example": {
+                    "type": "object"
+                  }
+                },
+                "required": [
+                  "type",
+                  "toolName",
+                  "inputSchema"
+                ],
+                "additionalProperties": false
+              },
+              "output": {
+                "type": "object",
+                "properties": {
+                  "type": {
+                    "type": "string"
+                  },
+                  "example": {
+                    "type": "object"
+                  }
+                },
+                "required": [
+                  "type"
+                ]
+              }
+            },
+            "required": [
+              "input"
+            ]
+          }
+        }
+      }
+    },
+    "isError": true
+  }
+}

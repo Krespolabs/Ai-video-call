@@ -1,0 +1,38 @@
+{
+  "glbUrl": "https://three.ws/cdn/creations/demo.glb",
+  "arLaunchUrl": "https://three.ws/api/ar?src=https%3A%2F%2Fthree.ws%2Fcdn%2Fcreations%2Fdemo.glb&title=Robot%20mascot",
+  "viewerUrl": "https://three.ws/viewer?src=https%3A%2F%2Fthree.ws%2Fcdn%2Fcreations%2Fdemo.glb&title=Robot%20mascot",
+  "sceneViewerUrl": "intent://arvr.google.com/scene-viewer/1.2?file=https%3A%2F%2Fthree.ws%2Fcdn%2Fcreations%2Fdemo.glb&mode=ar_preferred&title=Robot+mascot#Intent;scheme=https;package=com.google.ar.core;action=android.intent.action.VIEW;S.browser_fallback_url=https%3A%2F%2Fthree.ws%2Fviewer%3Fsrc%3Dhttps%253A%252F%252Fthree.ws%252Fcdn%252Fcreations%252Fdemo.glb%26title%3DRobot%2520mascot;end;",
+  "format": "glb",
+  "spatial": {
+    "spatialMcpVersion": "0.1",
+    "kind": "model",
+    "scene": {
+      "glbUrl": "https://three.ws/cdn/creations/demo.glb",
+      "format": "glb"
+    },
+    "camera": {
+      "autoRotate": true
+    },
+    "environment": {
+      "image": "neutral",
+      "exposure": 1,
+      "shadowIntensity": 1
+    },
+    "affordances": {
+      "orbit": true,
+      "zoom": true,
+      "fullscreen": true,
+      "download": true
+    },
+    "ar": {
+      "glbUrl": "https://three.ws/cdn/creations/demo.glb",
+      "launchUrl": "https://three.ws/api/ar?src=https%3A%2F%2Fthree.ws%2Fcdn%2Fcreations%2Fdemo.glb&title=Robot%20mascot",
+      "supported": true
+    },
+    "meta": {
+      "title": "Robot mascot",
+      "viewerUrl": "https://three.ws/viewer?src=https%3A%2F%2Fthree.ws%2Fcdn%2Fcreations%2Fdemo.glb&title=Robot%20mascot"
+    }
+  }
+}

@@ -1,0 +1,318 @@
+#!/usr/bin/env node
+// Drives a real Chromium through every state of the live-event countdown on
+// /play: the lobby banner + in-world pill (src/game/event-countdown.js). Run it
+// before an event goes live; it is the go/no-go evidence that the countdown a
+// holder sees is the countdown that actually ticks.
+//
+//   npm run verify:event                       # against a local `npm run dev`
+//   BASE=https://three.ws npm run verify:event # against production
+//
+// The three states (upcoming, live, over) are exercised by serving a different
+// /event.json body per case, which is the same thing as editing the file except
+// it cannot leave the repo in a wrong state halfway through. Nothing else is
+// stubbed: the modules, the DOM, the clock, and the styling are the real ones,
+// and the assertions read computed style, not source.
+//
+// Exits 0 when every check passes, 1 otherwise, so it works as a gate.
+
+import { chromium } from 'playwright';
+
+const BASE = (process.env.BASE || 'http://localhost:3000').replace(/\/$/, '');
+const COIN = 'FeMbDoX7R1Psc4GEcvJdsbNbZA3bfztcyDCatJVJpump';
+const EVENT_LINK = `/play?coin=${COIN}&name=three.ws&symbol=three`;
+const NAME = '$THREE First Holders Meetup';
+const TAGLINE = 'The first live gathering in the three.ws world.';
+
+// /play boots a full Three.js world; give it room on a cold dev server.
+const WORLD_TIMEOUT = 120000;
+const PAGE_TIMEOUT = 45000;
+
+let failures = 0;
+let checks = 0;
+const check = (label, ok, detail = '') => {
+	checks++;
+	if (!ok) failures++;
+	console.log(`  ${ok ? 'ok  ' : 'FAIL'}  ${label}${detail ? '   ' + detail : ''}`);
+};
+
+function cfg({ startsIn, endsIn }) {
+	const now = Date.now();
+	return JSON.stringify({
+		id: 'three-first-meetup',
+		name: NAME,
+		tagline: `${TAGLINE} Drop in, hang out, win prizes.`,
+		startsAt: new Date(now + startsIn).toISOString(),
+		endsAt: new Date(now + endsIn).toISOString(),
+		link: EVENT_LINK,
+		linkLabel: 'Join the $THREE world',
+		// meetup-event.js reads the same file; keep its agenda present so the
+		// in-world experience layer behaves exactly as it does in production.
+		agenda: [
+			{ atMin: 0, title: 'Doors open in the plaza', detail: 'Say hi in chat', icon: '\u{1F44B}' },
+			{ atMin: 20, title: 'King of the Totem showdown', detail: 'Hold the gold ring', icon: '\u{1F451}' },
+		],
+	});
+}
+
+// Console noise that predates the countdown and is unrelated to it: the sandbox
+// has no outbound network and swiftshader narrates its own stalls.
+const IGNORE = [/favicon/i, /Failed to load resource/i, /net::ERR_/i, /WebGL/i, /THREE\./i, /\[vite\]/i, /websocket/i];
+const ownErrors = (errs) => errs.filter((e) => !IGNORE.some((re) => re.test(e)));
+
+// A first visit to /play opens the welcome dialog (src/game/play-intro.js): modal,
+// focus-trapped, and sitting over the lobby, so it swallows the pointer events the
+// hover checks below depend on. It shows once per browser off `cc-lobby-intro-v1`,
+// and it mounts later than the countdown banner does, so racing it with a click is
+// unreliable. Arrive as a returning player instead, which is the state the event
+// surfaces are actually judged in.
+const INTRO_SEEN = 'cc-lobby-intro-v1';
+
+const browser = await chromium.launch({
+	args: ['--use-gl=swiftshader', '--enable-unsafe-swiftshader'],
+});
+
+async function newPage({ body, viewport, reducedMotion, storage }) {
+	const ctx = await browser.newContext({
+		viewport: viewport || { width: 1440, height: 900 },
+		reducedMotion: reducedMotion || 'no-preference',
+		storageState: storage,
+	});
+	const page = await ctx.newPage();
+	await page.addInitScript((k) => {
+		try { localStorage.setItem(k, '1'); } catch { /* private mode: the dialog just re-opens */ }
+	}, INTRO_SEEN);
+	const errors = [];
+	page.on('console', (m) => { if (m.type() === 'error') errors.push(m.text()); });
+	page.on('pageerror', (e) => errors.push('pageerror: ' + e.message));
+	// Third-party beacons (analytics, fonts, CDNs) hang for their full timeout
+	// where there is no outbound network, stalling load events that have nothing
+	// to do with this feature. The event surfaces are entirely first-party.
+	await page.route('**/*', (r) => {
+		const u = r.request().url();
+		if (u.startsWith(BASE) || u.startsWith('data:') || u.startsWith('blob:')) return r.continue();
+		return r.abort();
+	});
+	if (body) {
+		await page.route('**/event.json*', (r) =>
+			r.fulfill({ status: 200, contentType: 'application/json', body }));
+	}
+	return { ctx, page, errors };
+}
+
+// A dev server shared with other work restarts under you, and a Vite config
+// reload takes it offline for up to half a minute. A single failed navigation
+// says nothing about the feature, so ride the restart out rather than reporting
+// someone else's edit as a countdown failure.
+async function go(page, path) {
+	let last;
+	for (let attempt = 0; attempt < 12; attempt++) {
+		try {
+			await page.goto(BASE + path, { waitUntil: 'commit', timeout: PAGE_TIMEOUT });
+			return;
+		} catch (err) {
+			last = err;
+			await page.waitForTimeout(10000);
+		}
+	}
+	throw last;
+}
+
+// /play renders a full 3D world; on a software rasterizer its main thread is
+// busy enough that Playwright's actionability polling can starve on an element
+// that is plainly there. Wait with an in-page predicate instead: one evaluation
+// per poll, no hit-testing, and it survives the HMR reloads other agents trigger
+// in this shared worktree.
+const waitFor = (page, selector, { gone = false, timeout = WORLD_TIMEOUT } = {}) =>
+	page.waitForFunction(
+		([sel, want]) => (document.querySelector(sel) === null) === want,
+		[selector, gone],
+		{ timeout, polling: 250 },
+	);
+
+// The pill only shows itself once the player is in-world (the lobby is hidden).
+const waitForPill = (page) => page.waitForFunction(() => {
+	const p = document.querySelector('.cc-event-pill');
+	return !!p && !p.hidden;
+}, null, { timeout: WORLD_TIMEOUT, polling: 250 });
+
+const cssAnim = (loc) => loc.evaluate((n) => getComputedStyle(n).animationName);
+
+// /play renders a full 3D world on a software rasterizer here, which can starve
+// a 1s interval for several seconds at a time. Sampling twice with a fixed sleep
+// reports that jank as a stopped clock, so wait for the value to actually move.
+async function ticks(page, selector, label) {
+	const before = await page.locator(selector).textContent();
+	const moved = await page.waitForFunction(
+		([sel, prev]) => {
+			const n = document.querySelector(sel);
+			return !!n && n.textContent !== prev;
+		},
+		[selector, before],
+		{ timeout: 30000 },
+	).then(() => true, () => false);
+	const after = await page.locator(selector).textContent().catch(() => '(gone)');
+	check(label, moved, `${before} -> ${after}`);
+}
+
+// ── /play lobby banner: upcoming ───────────────────────────────────────────
+console.log('\n/play lobby banner, upcoming');
+{
+	const { ctx, page, errors } = await newPage({ body: cfg({ startsIn: 3 * 86400e3, endsIn: 4 * 86400e3 }) });
+	await go(page, '/play');
+	await waitFor(page, '.cc-event-banner');
+	const b = page.locator('.cc-event-banner');
+	check('state is upcoming', (await b.getAttribute('data-state')) === 'upcoming');
+	check('event name rendered', (await b.locator('.cc-event-name').textContent()) === NAME);
+	check('tagline rendered', (await b.locator('.cc-event-tagline').textContent()).includes('live gathering'));
+	const when = await b.locator('.cc-event-when').textContent();
+	check('start time in the visitor timezone', /^Starts .+\d{1,2}:\d\d/.test(when), JSON.stringify(when));
+	const labels = await b.locator('.cc-event-seg span').allTextContents();
+	check('D/H/M/S segments', JSON.stringify(labels) === '["days","hrs","min","sec"]', JSON.stringify(labels));
+
+	await ticks(page, '.cc-event-banner .cc-event-seg:last-child b', 'clock ticks');
+
+	const cta = b.locator('.cc-event-cta');
+	check('CTA points into the $THREE world', (await cta.getAttribute('href')).includes(COIN));
+	const rest = await cta.evaluate((n) => getComputedStyle(n).boxShadow);
+	await cta.hover();
+	await page.waitForTimeout(250);
+	check('CTA hover state', (await cta.evaluate((n) => getComputedStyle(n).boxShadow)) !== rest);
+	check('CTA focus-visible ring',
+		(await cta.evaluate((n) => { n.focus(); return getComputedStyle(n).outlineWidth; })) !== '0px');
+	check('pill stays hidden in the lobby', await page.locator('.cc-event-pill').isHidden());
+	check('no console errors', ownErrors(errors).length === 0, ownErrors(errors).join(' | '));
+	await ctx.close();
+}
+
+// ── /play: upcoming flips to live with no reload ───────────────────────────
+console.log('\n/play, upcoming flips to live with no reload');
+{
+	const { ctx, page, errors } = await newPage({ body: cfg({ startsIn: 10000, endsIn: 3600e3 }) });
+	await go(page, '/play');
+	await waitFor(page, '.cc-event-banner[data-state="upcoming"]');
+	check('mounts as upcoming', true);
+	await waitFor(page, '.cc-event-banner[data-state="live"]', { timeout: 30000 });
+	check('flips to live in place', true);
+	check('kicker reads live', (await page.locator('.cc-event-banner .cc-event-kicker').textContent()).trim() === 'Live now');
+	check('clock reads LIVE', (await page.locator('.cc-event-clock b').textContent()) === 'LIVE');
+	check('live dot pulses', (await cssAnim(page.locator('.cc-event-banner .cc-event-dot'))) === 'cc-event-pulse');
+	check('no console errors', ownErrors(errors).length === 0, ownErrors(errors).join(' | '));
+	await ctx.close();
+}
+
+// ── /play: reduced motion ──────────────────────────────────────────────────
+console.log('\n/play, prefers-reduced-motion');
+{
+	const { ctx, page } = await newPage({ body: cfg({ startsIn: -60e3, endsIn: 3600e3 }), reducedMotion: 'reduce' });
+	await go(page, '/play');
+	await waitFor(page, '.cc-event-banner[data-state="live"]');
+	check('no pulse animation', (await cssAnim(page.locator('.cc-event-banner .cc-event-dot'))) === 'none');
+	await ctx.close();
+}
+
+// ── /play: the event ends while the page is open ───────────────────────────
+console.log('\n/play, the event ends while the page is open');
+{
+	const { ctx, page, errors } = await newPage({ body: cfg({ startsIn: -3600e3, endsIn: 12000 }) });
+	await go(page, '/play');
+	await waitFor(page, '.cc-event-banner');
+	check('mounted while live', true);
+	await waitFor(page, '.cc-event-banner', { gone: true, timeout: 30000 });
+	check('banner unmounts at endsAt', true);
+	check('pill unmounts at endsAt', (await page.locator('.cc-event-pill').count()) === 0);
+	check('no console errors', ownErrors(errors).length === 0, ownErrors(errors).join(' | '));
+	await ctx.close();
+}
+
+// ── /play: an already-ended event owes the player zero pixels ──────────────
+console.log('\n/play, an already-ended event mounts nothing');
+{
+	const { ctx, page } = await newPage({ body: cfg({ startsIn: -7200e3, endsIn: -3600e3 }) });
+	await go(page, '/play');
+	await waitFor(page, '#cc-lobby .cc-lobby-inner');
+	await page.waitForTimeout(5000);
+	check('nothing mounted', (await page.locator('.cc-event-banner, .cc-event-pill').count()) === 0);
+	await ctx.close();
+}
+
+// ── /play in-world pill ────────────────────────────────────────────────────
+console.log('\n/play in-world pill');
+{
+	const body = cfg({ startsIn: 3 * 86400e3, endsIn: 4 * 86400e3 });
+	const { ctx, page, errors } = await newPage({ body });
+	await go(page, EVENT_LINK);
+	await waitForPill(page);
+	check('pill visible in-world', true);
+	await ticks(page, '.cc-event-pill [role="timer"]', 'pill clock ticks');
+	check('CTA absent while standing in the event world',
+		(await page.locator('.cc-event-pill a').count()) === 0);
+
+	const x = page.locator('.cc-event-pill-x');
+	const xRest = await x.evaluate((n) => getComputedStyle(n).backgroundColor);
+	await x.hover();
+	await page.waitForTimeout(250);
+	check('dismiss hover state', (await x.evaluate((n) => getComputedStyle(n).backgroundColor)) !== xRest);
+	check('dismiss focus ring',
+		(await x.evaluate((n) => { n.focus(); return getComputedStyle(n).outlineWidth; })) !== '0px');
+	await x.click();
+	await page.waitForTimeout(300);
+	check('dismiss removes the pill', (await page.locator('.cc-event-pill').count()) === 0);
+	const keys = await page.evaluate(() => Object.keys(localStorage).filter((k) => k.startsWith('cc-event-dismissed:')));
+	check('dismissal persisted to localStorage', keys.length === 1, JSON.stringify(keys));
+	check('no console errors', ownErrors(errors).length === 0, ownErrors(errors).join(' | '));
+
+	const storage = await ctx.storageState();
+	await ctx.close();
+
+	const again = await newPage({ body, storage });
+	await go(again.page, EVENT_LINK);
+	await waitFor(again.page, '.cc-event-banner');
+	await again.page.waitForTimeout(4000);
+	check('dismissal survives a reload', (await again.page.locator('.cc-event-pill').count()) === 0);
+	check('lobby banner still shown after dismissal', (await again.page.locator('.cc-event-banner').count()) === 1);
+	await again.ctx.close();
+}
+
+// ── /play at 375px ─────────────────────────────────────────────────────────
+console.log('\n/play at 375px');
+{
+	const { ctx, page } = await newPage({
+		body: cfg({ startsIn: 3 * 86400e3, endsIn: 4 * 86400e3 }),
+		viewport: { width: 375, height: 812 },
+	});
+	await go(page, EVENT_LINK);
+	await waitFor(page, '.cc-event-banner');
+	const doc = await page.evaluate(() => ({
+		scrollW: document.documentElement.scrollWidth,
+		clientW: document.documentElement.clientWidth,
+	}));
+	check('page does not scroll sideways', doc.scrollW <= doc.clientW + 1, JSON.stringify(doc));
+	const bb = await page.locator('.cc-event-banner').boundingBox();
+	check('banner fits the viewport', bb.x >= -1 && bb.x + bb.width <= 376, JSON.stringify(bb));
+
+	await waitForPill(page);
+	const overlap = await page.evaluate(() => {
+		const p = document.querySelector('.cc-event-pill').getBoundingClientRect();
+		const hits = [];
+		const sels = ['#cc-joystick', '.cc-joystick', '#cc-chat', '.cc-chat', '.cc-chat-log', '.cc-chat-input',
+			'.cc-touch', '#cc-touch-controls', '.cc-touch-controls', '.cc-action-btn'];
+		for (const sel of sels) {
+			for (const n of document.querySelectorAll(sel)) {
+				if (n.offsetParent === null && getComputedStyle(n).position !== 'fixed') continue;
+				const r = n.getBoundingClientRect();
+				if (r.width === 0 || r.height === 0) continue;
+				if (!(r.right < p.left || r.left > p.right || r.bottom < p.top || r.top > p.bottom)) hits.push(sel);
+			}
+		}
+		return { pill: p.toJSON(), hits, viewportH: innerHeight };
+	});
+	check('pill fits the viewport',
+		overlap.pill.x >= -1 && overlap.pill.x + overlap.pill.width <= 376
+		&& overlap.pill.top >= 0 && overlap.pill.bottom <= overlap.viewportH + 1, JSON.stringify(overlap.pill));
+	check('pill clears chat and the touch controls', overlap.hits.length === 0, JSON.stringify(overlap.hits));
+	await ctx.close();
+}
+
+await browser.close();
+console.log(`\n${failures === 0 ? 'PASS' : 'FAIL'}: ${checks - failures}/${checks} checks passed against ${BASE}`);
+process.exit(failures === 0 ? 0 : 1);

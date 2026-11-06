@@ -1,0 +1,234 @@
+{
+	"id": "drive-copilot",
+	"contentHash": "d122767e1bef88e1866a4dd257121941bad91d98272187d1146f9ba829893651",
+	"reviewedAt": "2026-10-01T07:44:20.763Z",
+	"passed": true,
+	"blockers": [],
+	"texts": [
+		"Put your phone in the cradle, open Drive, and your agent rides along.\n\nThe page starts in Driving: a face, a voice, four controls, and no keyboard. Hold Talk and speak. The reply comes back in one or two short sentences, spoken in full and clamped to two lines on screen. Park, and Type unlocks. Night is the default, because a bright panel at speed is glare.",
+		"It is the same talk loop the site already runs (mic, transcript, reply, voice, lip sync on a rigged avatar), sized for a car panel. Runs on a head unit browser or a phone in a cradle: three.ws/drive",
+		"\"Repeat that\", \"stop talking\", \"louder\" and \"night mode\" are answered by the page itself, with no round trip to a server."
+	],
+	"lint": [],
+	"verification": {
+		"ok": true,
+		"checks": [
+			{
+				"claim": "Put your phone in the cradle",
+				"kind": "evidence:page",
+				"target": "https://three.ws/docs/carplay",
+				"ok": true,
+				"detail": "live page shows \"on a phone in a cradle\""
+			},
+			{
+				"claim": "The page starts in Driving",
+				"kind": "evidence:page",
+				"target": "https://three.ws/docs/carplay",
+				"ok": true,
+				"detail": "live page shows \"The page starts in Driving and hides text entry\""
+			},
+			{
+				"claim": "The page starts in Driving",
+				"kind": "evidence:proof",
+				"target": "Ready",
+				"ok": true,
+				"detail": "the run waited for and saw \"Ready\""
+			},
+			{
+				"claim": "four controls, and no keyboard",
+				"kind": "evidence:page",
+				"target": "https://three.ws/docs/carplay",
+				"ok": true,
+				"detail": "live page shows \"Four controls, no more. Hands free, Repeat, Stop, Type.\""
+			},
+			{
+				"claim": "four controls, and no keyboard",
+				"kind": "evidence:page",
+				"target": "https://three.ws/docs/carplay",
+				"ok": true,
+				"detail": "live page shows \"hides text entry\""
+			},
+			{
+				"claim": "Hold Talk and speak",
+				"kind": "evidence:file",
+				"target": "pages/drive.html",
+				"ok": true,
+				"detail": "file supports the claim"
+			},
+			{
+				"claim": "The reply comes back in one or two short sentences",
+				"kind": "evidence:file",
+				"target": "src/drive/index.js",
+				"ok": true,
+				"detail": "file supports the claim"
+			},
+			{
+				"claim": "The reply comes back in one or two short sentences",
+				"kind": "evidence:proof",
+				"target": "/api/chat",
+				"ok": true,
+				"detail": "POST /api/chat answered 200 in 6.8 s"
+			},
+			{
+				"claim": "spoken in full and clamped to two lines on screen",
+				"kind": "evidence:page",
+				"target": "https://three.ws/docs/carplay",
+				"ok": true,
+				"detail": "live page shows \"The reply is clamped to two lines and spoken in full\""
+			},
+			{
+				"claim": "spoken in full and clamped to two lines on screen",
+				"kind": "evidence:proof",
+				"target": "Speaking",
+				"ok": true,
+				"detail": "the run waited for and saw \"Speaking\""
+			},
+			{
+				"claim": "Park, and Type unlocks",
+				"kind": "evidence:file",
+				"target": "src/drive/index.js",
+				"ok": true,
+				"detail": "file supports the claim"
+			},
+			{
+				"claim": "Park, and Type unlocks",
+				"kind": "evidence:proof",
+				"target": "Parked",
+				"ok": true,
+				"detail": "the run waited for and saw \"Parked\""
+			},
+			{
+				"claim": "Night is the default, because a bright panel at speed is glare",
+				"kind": "evidence:page",
+				"target": "https://three.ws/docs/carplay",
+				"ok": true,
+				"detail": "live page shows \"Night is the default because a bright panel at speed is glare\""
+			},
+			{
+				"claim": "It is the same talk loop the site already runs (mic, transcript, reply, voice, lip sync on a rigged avatar)",
+				"kind": "evidence:page",
+				"target": "https://three.ws/docs/carplay",
+				"ok": true,
+				"detail": "live page shows \"The loop is the platform's existing one, unchanged\""
+			},
+			{
+				"claim": "It is the same talk loop the site already runs (mic, transcript, reply, voice, lip sync on a rigged avatar)",
+				"kind": "evidence:page",
+				"target": "https://three.ws/docs/carplay",
+				"ok": true,
+				"detail": "live page shows \"audio into the lipsync driver and onto a real rigged avatar\""
+			},
+			{
+				"claim": "Runs on a head unit browser or a phone in a cradle",
+				"kind": "evidence:page",
+				"target": "https://three.ws/docs/carplay",
+				"ok": true,
+				"detail": "live page shows \"on a head unit browser, on a phone in a cradle\""
+			},
+			{
+				"claim": "are answered by the page itself, with no round trip to a server",
+				"kind": "evidence:page",
+				"target": "https://three.ws/docs/carplay",
+				"ok": true,
+				"detail": "live page shows \"Local commands with no round trip\""
+			},
+			{
+				"claim": "are answered by the page itself, with no round trip to a server",
+				"kind": "evidence:page",
+				"target": "https://three.ws/docs/carplay",
+				"ok": true,
+				"detail": "live page shows \"are answered by the page itself\""
+			},
+			{
+				"claim": "\"Repeat that\", \"stop talking\", \"louder\" and \"night mode\" are answered by the page itself, with no round trip to a server",
+				"kind": "evidence:file",
+				"target": "src/drive/commands.js",
+				"ok": true,
+				"detail": "file supports the claim"
+			},
+			{
+				"claim": "\"Repeat that\", \"stop talking\", \"louder\" and \"night mode\" are answered by the page itself, with no round trip to a server",
+				"kind": "evidence:file",
+				"target": "src/drive/commands.js",
+				"ok": true,
+				"detail": "file supports the claim"
+			},
+			{
+				"claim": "\"Repeat that\", \"stop talking\", \"louder\" and \"night mode\" are answered by the page itself, with no round trip to a server",
+				"kind": "evidence:file",
+				"target": "src/drive/commands.js",
+				"ok": true,
+				"detail": "file supports the claim"
+			},
+			{
+				"claim": "\"Repeat that\", \"stop talking\", \"louder\" and \"night mode\" are answered by the page itself, with no round trip to a server",
+				"kind": "evidence:file",
+				"target": "src/drive/commands.js",
+				"ok": true,
+				"detail": "file supports the claim"
+			},
+			{
+				"claim": "\"Repeat that\", \"stop talking\", \"louder\" and \"night mode\" are answered by the page itself, with no round trip to a server",
+				"kind": "evidence:file",
+				"target": "src/drive/commands.js",
+				"ok": true,
+				"detail": "file supports the claim"
+			},
+			{
+				"kind": "probe:scenario",
+				"target": "the filmed scenario",
+				"ok": true,
+				"detail": "12 steps passed against the live product"
+			},
+			{
+				"kind": "probe:api",
+				"target": "the Drive page is up",
+				"ok": true,
+				"detail": "HTTP 200, expectations met"
+			},
+			{
+				"kind": "link",
+				"target": "https://three.ws/drive",
+				"ok": true,
+				"detail": "HTTP 200"
+			}
+		]
+	},
+	"editor": {
+		"verdict": "publish",
+		"scores": {
+			"accuracy": 5,
+			"clarity": 4,
+			"specificity": 5,
+			"voice": 5,
+			"professionalism": 5,
+			"visual": 5
+		},
+		"issues": [
+			{
+				"severity": "minor",
+				"area": "clarity",
+				"quote": "Put your phone in the cradle, open Drive, and your agent rides along.",
+				"problem": "The head post never names the thing as a product (\"three.ws Drive\") before using \"Drive\", so a reader new to the platform does a small amount of inferring, though post two's URL and the reel's first caption (\"three.ws Drive: your agent on a car screen\") resolve it. Not worth a recut; the thread stands alone as written.",
+				"fix": "Optional polish only: no change required for publication."
+			}
+		],
+		"rewrite": {
+			"posts": [
+				"Put your phone in the cradle, open Drive, and your agent rides along.\n\nThe page starts in Driving: a face, a voice, four controls, and no keyboard. Hold Talk and speak. The reply comes back in one or two short sentences, spoken in full and clamped to two lines on screen. Park, and Type unlocks. Night is the default, because a bright panel at speed is glare.",
+				"It is the same talk loop the site already runs (mic, transcript, reply, voice, lip sync on a rigged avatar), sized for a car panel. Runs on a head unit browser or a phone in a cradle: three.ws/drive",
+				"\"Repeat that\", \"stop talking\", \"louder\" and \"night mode\" are answered by the page itself, with no round trip to a server."
+			],
+			"altText": []
+		},
+		"summary": "Every claim is verified against the live docs, the source files, and the filmed run (12 steps passed, /api/chat answered 200, states Ready/Parked/Speaking observed), and the reel frames match both the captions and the copy. Voice contract is clean: no hashtags, emoji, dashes, hype openers, or withholding teaser; the only nit is that the head post uses \"Drive\" before naming it, which the reel caption and the URL resolve. Ship it.",
+		"model": "nvidia:moonshotai/kimi-k3",
+		"fallbacks": [
+			"Vertex 403: {\n  \"error\": {\n    \"code\": 403,\n    \"message\": \"Request had insufficient authentication scopes.\",\n    \"status\": \"PERMISSION_DENIED\",\n    \"details\": [\n      {\n        \"@type\": \"type.googleapis.com/goog",
+			"openrouter 402: {\"error\":{\"message\":\"Insufficient credits. Add more using https://openrouter.ai/settings/credits\",\"code\":402,\"metadata\":{\"limit_source\":\"openrouter_credits\",\"remedy_hint\":\"Add credits at https://openr",
+			"openai 429: {\n    \"error\": {\n        \"message\": \"Your account is not active, please check your billing details on our website.\",\n        \"type\": \"billing_not_active\",\n        \"param\": null,\n        \"code\": \"billi"
+		],
+		"rewriteFindings": []
+	},
+	"editorError": null
+}

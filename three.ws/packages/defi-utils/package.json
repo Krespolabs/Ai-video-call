@@ -1,0 +1,50 @@
+{
+	"name": "@three-ws/defi-utils",
+	"version": "0.1.0",
+	"description": "Zero-dependency single source of truth for chain IDs, native tokens, token addresses, ERC-20 ABI fragments, and address/amount validation + formatting across EVM chains and Solana.",
+	"keywords": [
+		"three.ws",
+		"defi",
+		"evm",
+		"solana",
+		"chain-id",
+		"erc20",
+		"token-address",
+		"address-validation"
+	],
+	"author": "three.ws <support@three.ws> (https://three.ws)",
+	"license": "Apache-2.0",
+	"homepage": "https://three.ws",
+	"repository": {
+		"type": "git",
+		"url": "git+https://github.com/nirholas/three.ws.git",
+		"directory": "packages/defi-utils"
+	},
+	"private": true,
+	"type": "module",
+	"main": "./src/index.js",
+	"module": "./src/index.js",
+	"exports": {
+		".": {
+			"import": "./src/index.js",
+			"default": "./src/index.js"
+		},
+		"./chains": "./src/chains.js",
+		"./validation": "./src/validation.js",
+		"./format": "./src/format.js"
+	},
+	"files": [
+		"src",
+		"README.md",
+		"LICENSE"
+	],
+	"dependencies": {
+		"bs58": "^6.0.0"
+	},
+	"engines": {
+		"node": ">=18"
+	},
+	"bugs": {
+		"url": "https://github.com/nirholas/three.ws/issues"
+	}
+}

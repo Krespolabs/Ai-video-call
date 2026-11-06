@@ -1,0 +1,336 @@
+<!doctype html>
+<html lang="en">
+	<head>
+		<style>/* three.ws hidden-guard — make the `hidden` attribute authoritative; see scripts/lib/hidden-guard.mjs */[hidden]{display:none!important}</style>
+		<meta charset="utf-8" />
+		<meta http-equiv="X-UA-Compatible" content="IE=edge" />
+		<title data-i18n="walk_embed.meta_title">Walk Embed · three.ws</title>
+		<meta name="robots" content="noindex" />
+		<meta
+			name="viewport"
+			content="width=device-width, initial-scale=1, viewport-fit=cover"
+		/>
+		<meta name="author" content="nirholas" />
+		<meta
+			name="description"
+			content="Embeddable walking 3D avatar — drop into any page via iframe."
+		 data-i18n-attr="content:walk_embed.meta_description"/>
+	<meta property="og:type" content="website" />
+	<meta property="og:site_name" content="three.ws" />
+	<meta property="og:url" content="https://three.ws/walk-embed" />
+	<meta property="og:title" content="Walk Embed Generator · three.ws"  data-i18n-attr="content:walk_embed.meta_og_title"/>
+	<meta property="og:description" content="Generate embed code for the three.ws walk avatar — drop a walking 3D avatar on any website with one HTML tag."  data-i18n-attr="content:walk_embed.meta_og_description"/>
+	<meta property="og:image" content="https://three.ws/og-image.png" />
+	<meta property="og:image:width" content="1200" />
+	<meta property="og:image:height" content="630" />
+	<meta name="twitter:card" content="summary_large_image" />
+	<meta name="twitter:site" content="@trythreews" />
+	<meta name="twitter:title" content="Walk Embed Generator · three.ws"  data-i18n-attr="content:walk_embed.meta_twitter_title"/>
+	<meta name="twitter:description" content="Generate embed code for the three.ws walk avatar — drop a walking 3D avatar on any website with one HTML tag."  data-i18n-attr="content:walk_embed.meta_twitter_description"/>
+	<meta name="twitter:image" content="https://three.ws/og-image.png" />
+		<meta name="theme-color" content="#000000" />
+
+		<!--
+			Embed page is intentionally chrome-less. No nav, no footer, no
+			multiplayer pill. Hosts that drop this into an <iframe> get just
+			the walking avatar + (optionally) the joystick. Multiplayer is
+			disabled because random embeds shouldn't connect strangers to
+			one shared room.
+		-->
+		<meta name="walk-embed" content="1" />
+
+		<link rel="icon" href="/favicon.ico" sizes="any" />
+		<link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+		<link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png" />
+		<link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png" />
+		<link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+		<link rel="manifest" href="/manifest.webmanifest" />
+
+		<style>
+			html, body {
+				margin: 0;
+				padding: 0;
+				width: 100%;
+				height: 100%;
+				overflow: hidden;
+				background: transparent;
+				color: #fafafa;
+				font-family: 'Inter', system-ui, -apple-system, sans-serif;
+				-webkit-font-smoothing: antialiased;
+				touch-action: none;
+				overscroll-behavior: none;
+			}
+
+			#walk-stage {
+				position: fixed;
+				inset: 0;
+				background: transparent;
+			}
+
+			#walk-canvas {
+				position: fixed;
+				inset: 0;
+				width: 100vw;
+				height: 100vh;
+				z-index: 2;
+				display: block;
+			}
+
+			#walk-joystick {
+				position: fixed;
+				z-index: 5;
+				left: 16px;
+				bottom: calc(16px + env(safe-area-inset-bottom, 0));
+				width: 110px;
+				height: 110px;
+				touch-action: none;
+				pointer-events: auto;
+				display: none;
+			}
+			#walk-stage[data-controls="joystick"] #walk-joystick { display: block; }
+
+			#walk-status {
+				position: fixed;
+				z-index: 6;
+				left: 50%;
+				bottom: 16px;
+				transform: translateX(-50%);
+				background: rgba(17, 17, 17, 0.72);
+				border: 1px solid rgba(255, 255, 255, 0.08);
+				border-radius: 999px;
+				padding: 6px 12px;
+				font-size: 11px;
+				color: #a1a1aa;
+				backdrop-filter: blur(10px);
+				-webkit-backdrop-filter: blur(10px);
+				pointer-events: none;
+				transition: opacity 0.2s ease;
+			}
+			#walk-status.is-error { color: var(--danger, #f87171); border-color: rgba(248, 113, 113, 0.5); }
+			#walk-status.is-hidden { opacity: 0; }
+
+			/* ── Loading poster ───────────────────────────────────────────────
+			   A silhouette + shimmer shown until the avatar's first frame, so a
+			   host page never sees a blank transparent hole while the GLB loads.
+			   Fades out (and is removed) on walk:ready. */
+			#walk-poster {
+				position: fixed;
+				inset: 0;
+				z-index: 4;
+				display: flex;
+				align-items: flex-end;
+				justify-content: center;
+				pointer-events: none;
+				transition: opacity 0.45s ease;
+			}
+			#walk-poster.is-hidden { opacity: 0; }
+			#walk-poster svg {
+				width: 38%;
+				max-width: 180px;
+				height: auto;
+				margin-bottom: 8%;
+				opacity: 0.5;
+			}
+			#walk-poster .poster-shimmer {
+				fill: rgba(255, 255, 255, 0.16);
+			}
+			@media (prefers-reduced-motion: no-preference) {
+				#walk-poster svg { animation: poster-bob 2.4s ease-in-out infinite; }
+				#walk-poster .poster-shimmer { animation: poster-pulse 1.6s ease-in-out infinite; }
+			}
+			@keyframes poster-bob {
+				0%, 100% { transform: translateY(0); }
+				50% { transform: translateY(-5px); }
+			}
+			@keyframes poster-pulse {
+				0%, 100% { opacity: 0.35; }
+				50% { opacity: 0.85; }
+			}
+
+			/* ── Control hint ─────────────────────────────────────────────────
+			   One-time affordance so visitors discover the avatar is interactive.
+			   Dismissed on first input or after a timeout (see walk-embed.js). */
+			#walk-hint {
+				position: fixed;
+				z-index: 6;
+				left: 50%;
+				top: 14px;
+				transform: translate(-50%, -6px);
+				max-width: calc(100% - 28px);
+				display: flex;
+				align-items: center;
+				gap: 7px;
+				background: rgba(17, 17, 17, 0.74);
+				border: 1px solid rgba(255, 255, 255, 0.1);
+				border-radius: 999px;
+				padding: 7px 14px;
+				font-size: 11.5px;
+				line-height: 1.3;
+				color: #e4e4e7;
+				white-space: nowrap;
+				backdrop-filter: blur(10px);
+				-webkit-backdrop-filter: blur(10px);
+				pointer-events: none;
+				opacity: 0;
+				transition: opacity 0.35s ease, transform 0.35s ease;
+			}
+			#walk-hint.is-visible { opacity: 1; transform: translate(-50%, 0); }
+			#walk-hint svg { flex: 0 0 auto; opacity: 0.8; }
+
+			/* ── Gesture buttons (opt-in via ?gestures=true) ──────────────────── */
+			#walk-gestures {
+				position: fixed;
+				z-index: 6;
+				right: 14px;
+				bottom: calc(58px + env(safe-area-inset-bottom, 0));
+				display: none;
+				flex-direction: column;
+				gap: 8px;
+			}
+			#walk-stage[data-gestures="true"] #walk-gestures { display: flex; }
+			.walk-gesture-btn {
+				width: 44px;
+				height: 44px;
+				display: flex;
+				align-items: center;
+				justify-content: center;
+				font-size: 20px;
+				border-radius: 50%;
+				border: 1px solid rgba(255, 255, 255, 0.14);
+				background: rgba(17, 17, 17, 0.66);
+				color: #fafafa;
+				cursor: pointer;
+				padding: 0;
+				backdrop-filter: blur(10px);
+				-webkit-backdrop-filter: blur(10px);
+				transition: background 0.15s ease, transform 0.1s ease, border-color 0.15s ease;
+				pointer-events: auto;
+			}
+			.walk-gesture-btn:hover { background: rgba(40, 40, 40, 0.82); border-color: rgba(255, 255, 255, 0.28); }
+			.walk-gesture-btn:active { transform: scale(0.92); }
+			.walk-gesture-btn:focus-visible { outline: 2px solid #6366f1; outline-offset: 2px; }
+
+			/* ── Attribution badge ────────────────────────────────────────────
+			   The embed is the distribution channel — every dropped avatar links
+			   home. Subtle by default; hidden entirely with ?badge=false. */
+			#walk-badge {
+				position: fixed;
+				z-index: 7;
+				right: 10px;
+				bottom: calc(10px + env(safe-area-inset-bottom, 0));
+				display: inline-flex;
+				align-items: center;
+				gap: 5px;
+				padding: 4px 9px 4px 7px;
+				font-size: 10.5px;
+				font-weight: 600;
+				letter-spacing: 0.01em;
+				color: #d4d4d8;
+				text-decoration: none;
+				background: rgba(10, 10, 10, 0.5);
+				border: 1px solid rgba(255, 255, 255, 0.1);
+				border-radius: 999px;
+				backdrop-filter: blur(8px);
+				-webkit-backdrop-filter: blur(8px);
+				opacity: 0.62;
+				transition: opacity 0.18s ease, background 0.18s ease;
+			}
+			#walk-badge:hover { opacity: 1; background: rgba(20, 20, 24, 0.78); }
+			#walk-badge:focus-visible { outline: 2px solid #6366f1; outline-offset: 2px; opacity: 1; }
+			#walk-badge .badge-dot {
+				width: 13px;
+				height: 13px;
+				flex: 0 0 auto;
+				border-radius: 4px;
+				background: linear-gradient(135deg, #6366f1, #8b5cf6);
+			}
+		</style>
+	</head>
+	<body data-no-lang-switcher>
+		<div id="walk-stage" data-controls="joystick">
+			<canvas
+				id="walk-canvas"
+				role="img"
+				aria-label="Interactive 3D walking avatar. Use the joystick or W A S D keys to move, drag to look around, and tap the ground to walk there."
+				tabindex="0"
+			></canvas>
+
+			<!-- Loading poster: silhouette shown until the first avatar frame. -->
+			<div id="walk-poster" aria-hidden="true">
+				<svg viewBox="0 0 64 96" fill="none" xmlns="http://www.w3.org/2000/svg">
+					<circle class="poster-shimmer" cx="32" cy="16" r="11" />
+					<rect class="poster-shimmer" x="18" y="31" width="28" height="42" rx="13" />
+					<rect class="poster-shimmer" x="22" y="68" width="8" height="26" rx="4" />
+					<rect class="poster-shimmer" x="34" y="68" width="8" height="26" rx="4" />
+				</svg>
+			</div>
+
+			<div id="walk-joystick" role="group" aria-label="Movement joystick"></div>
+
+			<!-- One-time discovery hint; text is set by the runtime per control mode. -->
+			<div id="walk-hint" role="status" aria-live="polite">
+				<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M9 11l3 3 8-8"/><path d="M21 12v6a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h7"/></svg>
+				<span id="walk-hint-text"></span>
+			</div>
+
+			<!-- Optional end-user gesture controls (?gestures=true). -->
+			<div id="walk-gestures" aria-label="Avatar gestures">
+				<button type="button" class="walk-gesture-btn" data-gesture="wave" title="Wave" aria-label="Make the avatar wave" data-i18n-attr="aria-label:walk_embed.make_the_avatar_wave_arialabel;title:walk_embed.wave_title">👋</button>
+				<button type="button" class="walk-gesture-btn" data-gesture="jump" title="Jump" aria-label="Make the avatar jump" data-i18n-attr="aria-label:walk_embed.make_the_avatar_jump_arialabel;title:walk_embed.jump_title"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19V5"/><path d="m5 12 7-7 7 7"/></svg></button>
+			</div>
+
+			<div id="walk-status">loading avatar…</div>
+
+			<!-- Attribution / made-with badge. Removed when ?badge=false. -->
+			<a id="walk-badge" href="https://three.ws/studio?ref=walk-embed" target="_blank" rel="noopener" title="Make your own, at three.ws" data-i18n-html="walk_embed.three_ws" data-i18n-attr="title:walk_embed.make_your_own_three_ws_title">
+				<span class="badge-dot" aria-hidden="true"></span>
+				<span>three.ws</span>
+			</a>
+		</div>
+
+		<!--
+			The postMessage contract (src/walk-embed-events.js) is the single
+			source of truth for the host ↔ iframe protocol. We load it here
+			explicitly — both so the runtime's transitive import is obvious to
+			anyone reading this page, and so the public vocabulary (supported
+			gestures, environments, control modes, protocol version) is readable
+			from the embed window itself via `window.WALK_EMBED_PROTOCOL`. The
+			interactive playground on /docs/walk-embed-api reads it to populate
+			its command pickers, and it gives integrators a way to feature-detect
+			what this build of the embed accepts. Constants only — no internal
+			runtime state is ever exposed here.
+		-->
+		<script type="module">
+			import {
+				CHANNEL,
+				PROTOCOL_VERSION,
+				INBOUND,
+				OUTBOUND,
+				ENV_IDS,
+				GESTURES,
+				CONTROL_MODES,
+				WORLD_RADIUS,
+			} from '/src/walk-embed-events.js';
+			window.WALK_EMBED_PROTOCOL = Object.freeze({
+				channel: CHANNEL,
+				version: PROTOCOL_VERSION,
+				inbound: INBOUND,
+				outbound: OUTBOUND,
+				environments: ENV_IDS,
+				gestures: GESTURES,
+				controls: CONTROL_MODES,
+				worldRadius: WORLD_RADIUS,
+			});
+		</script>
+
+		<!--
+			The walking-avatar runtime. It imports the same contract module and
+			installs installEmbedBridge() against its live scene, so inbound
+			commands drive the real avatar and outbound events fire from real
+			lifecycle points.
+		-->
+		<script type="module" src="/src/walk-embed.js"></script>
+		<!-- Runtime i18n: detects locale, swaps annotated copy, mounts <lang-switcher>. -->
+	<script type="module" src="/i18n.js"></script>
+</body>
+</html>

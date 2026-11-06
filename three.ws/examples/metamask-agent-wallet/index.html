@@ -1,0 +1,283 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Agent Wallet · MetaMask × three.ws</title>
+<style>
+  :root {
+    --bg: #0a0b0f;
+    --surface: #12141b;
+    --surface-2: #1a1d27;
+    --border: #262a38;
+    --text: #e8eaf0;
+    --text-dim: #8b91a5;
+    --accent: #f6851b;      /* MetaMask orange */
+    --accent-soft: rgba(246, 133, 27, 0.12);
+    --green: #34d399;
+    --green-soft: rgba(52, 211, 153, 0.12);
+    --red: #f87171;
+    --red-soft: rgba(248, 113, 113, 0.1);
+    --mono: 'SF Mono', ui-monospace, 'Cascadia Code', Menlo, monospace;
+    --radius: 14px;
+  }
+  * { box-sizing: border-box; margin: 0; }
+  body {
+    background: radial-gradient(1200px 600px at 70% -10%, rgba(246,133,27,0.07), transparent), var(--bg);
+    color: var(--text);
+    font: 15px/1.55 system-ui, -apple-system, 'Segoe UI', sans-serif;
+    min-height: 100vh;
+    padding: 48px 20px 80px;
+  }
+  main { max-width: 720px; margin: 0 auto; display: grid; gap: 20px; }
+
+  header { margin-bottom: 8px; }
+  .eyebrow {
+    display: inline-flex; align-items: center; gap: 8px;
+    font-size: 12px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase;
+    color: var(--accent); background: var(--accent-soft);
+    padding: 5px 12px; border-radius: 999px; margin-bottom: 14px;
+  }
+  .eyebrow::before { content: ''; width: 7px; height: 7px; border-radius: 50%; background: var(--accent); }
+  h1 { font-size: 26px; font-weight: 650; letter-spacing: -0.02em; }
+  header p { color: var(--text-dim); margin-top: 6px; max-width: 56ch; }
+
+  .card {
+    background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius);
+    padding: 24px; transition: border-color 0.2s ease;
+  }
+  .card:hover { border-color: #323748; }
+  .card h2 { font-size: 13px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; color: var(--text-dim); margin-bottom: 16px; }
+
+  .row { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+  .badge {
+    display: inline-flex; align-items: center; gap: 6px;
+    font-size: 12px; font-weight: 600; padding: 4px 10px; border-radius: 999px;
+  }
+  .badge.ok { color: var(--green); background: var(--green-soft); }
+  .badge.ok::before { content: ''; width: 6px; height: 6px; border-radius: 50%; background: var(--green); }
+  .badge.err { color: var(--red); background: var(--red-soft); }
+
+  .address {
+    font-family: var(--mono); font-size: 14px; color: var(--text);
+    background: var(--surface-2); border: 1px solid var(--border); border-radius: 8px;
+    padding: 10px 12px; display: flex; align-items: center; gap: 10px;
+    overflow-wrap: anywhere; margin-top: 4px;
+  }
+  .copy-btn {
+    flex-shrink: 0; background: none; border: 1px solid var(--border); border-radius: 6px;
+    color: var(--text-dim); font-size: 12px; padding: 4px 10px; cursor: pointer;
+    transition: all 0.15s ease;
+  }
+  .copy-btn:hover { color: var(--text); border-color: var(--text-dim); }
+  .copy-btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  .copy-btn:active { transform: scale(0.96); }
+
+  .stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 12px; margin-top: 18px; }
+  .stat { background: var(--surface-2); border-radius: 10px; padding: 14px 16px; }
+  .stat .label { font-size: 12px; color: var(--text-dim); margin-bottom: 4px; }
+  .stat .value { font-size: 20px; font-weight: 650; font-variant-numeric: tabular-nums; }
+  .stat .hint { font-size: 11.5px; color: var(--text-dim); margin-top: 4px; }
+
+  label { display: block; font-size: 13px; color: var(--text-dim); margin-bottom: 8px; }
+  textarea {
+    width: 100%; min-height: 76px; resize: vertical;
+    background: var(--surface-2); border: 1px solid var(--border); border-radius: 10px;
+    color: var(--text); font: 14px/1.5 var(--mono); padding: 12px;
+    transition: border-color 0.15s ease;
+  }
+  textarea:hover { border-color: #323748; }
+  textarea:focus { outline: none; border-color: var(--accent); }
+
+  .sign-btn {
+    margin-top: 14px; display: inline-flex; align-items: center; gap: 8px;
+    background: var(--accent); color: #14100a; border: none; border-radius: 10px;
+    font-size: 14px; font-weight: 650; padding: 11px 22px; cursor: pointer;
+    transition: all 0.15s ease;
+  }
+  .sign-btn:hover:not(:disabled) { filter: brightness(1.1); transform: translateY(-1px); }
+  .sign-btn:focus-visible { outline: 2px solid var(--text); outline-offset: 2px; }
+  .sign-btn:active:not(:disabled) { transform: translateY(0); }
+  .sign-btn:disabled { opacity: 0.55; cursor: wait; }
+  .spinner {
+    width: 14px; height: 14px; border-radius: 50%;
+    border: 2px solid rgba(20,16,10,0.3); border-top-color: #14100a;
+    animation: spin 0.7s linear infinite;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  .result {
+    margin-top: 18px; border-radius: 10px; padding: 16px;
+    background: var(--surface-2); border: 1px solid var(--border);
+    opacity: 0; transform: translateY(4px); transition: opacity 0.25s ease, transform 0.25s ease;
+  }
+  .result.show { opacity: 1; transform: none; }
+  .result .sig {
+    font-family: var(--mono); font-size: 12px; color: var(--text-dim);
+    overflow-wrap: anywhere; margin-top: 10px; line-height: 1.7;
+  }
+  .verify-line { display: flex; align-items: center; gap: 8px; font-weight: 600; }
+  .verify-line.ok { color: var(--green); }
+  .verify-line.bad { color: var(--red); }
+  .meta-line { font-size: 12.5px; color: var(--text-dim); margin-top: 6px; }
+
+  .skeleton { border-radius: 8px; background: linear-gradient(90deg, var(--surface-2) 25%, #20242f 50%, var(--surface-2) 75%); background-size: 200% 100%; animation: shimmer 1.4s infinite; }
+  @keyframes shimmer { to { background-position: -200% 0; } }
+
+  .error-box {
+    background: var(--red-soft); border: 1px solid rgba(248,113,113,0.3); border-radius: 10px;
+    padding: 14px 16px; color: var(--red); font-size: 14px;
+    display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap;
+  }
+  .retry-btn {
+    background: none; border: 1px solid var(--red); border-radius: 8px; color: var(--red);
+    font-size: 13px; font-weight: 600; padding: 6px 14px; cursor: pointer; transition: all 0.15s ease;
+  }
+  .retry-btn:hover { background: var(--red); color: var(--bg); }
+  .retry-btn:focus-visible { outline: 2px solid var(--red); outline-offset: 2px; }
+
+  footer { text-align: center; color: var(--text-dim); font-size: 12.5px; margin-top: 10px; }
+  footer code { font-family: var(--mono); background: var(--surface-2); padding: 2px 6px; border-radius: 5px; }
+
+  @media (max-width: 480px) {
+    body { padding: 28px 14px 60px; }
+    h1 { font-size: 22px; }
+    .card { padding: 18px; }
+  }
+</style>
+</head>
+<body>
+<main>
+  <header>
+    <span class="eyebrow">Live demo · server wallet</span>
+    <h1>Agent Wallet — powered by MetaMask</h1>
+    <p>A three.ws agent holding a real MetaMask server wallet via the Agentic CLI.
+       Everything below is live: real session, real chain data, real signatures verified with viem.</p>
+  </header>
+
+  <section class="card" id="wallet-card" aria-busy="true">
+    <h2>Agent wallet</h2>
+    <div id="wallet-body">
+      <div class="skeleton" style="height:28px;width:40%;margin-bottom:12px"></div>
+      <div class="skeleton" style="height:44px;margin-bottom:12px"></div>
+      <div class="skeleton" style="height:72px"></div>
+    </div>
+  </section>
+
+  <section class="card">
+    <h2>Prove control — sign &amp; verify</h2>
+    <label for="message">Message the agent will sign (EIP-191 personal_sign)</label>
+    <textarea id="message" maxlength="500" spellcheck="false"></textarea>
+    <button class="sign-btn" id="sign-btn" type="button">
+      <span id="sign-label">Sign with MetaMask</span>
+    </button>
+    <div class="result" id="result" role="status" aria-live="polite"></div>
+  </section>
+
+  <footer>
+    Bridge: <code>examples/metamask-agent-wallet/server.mjs</code> →
+    MetaMask Agentic CLI (<code>mm</code>) · signature recovery via <code>viem.verifyMessage</code>
+  </footer>
+</main>
+
+<script>
+  const $ = (id) => document.getElementById(id);
+  const short = (a) => a.slice(0, 6) + '…' + a.slice(-4);
+
+  $('message').value = `I am the three.ws agent in control of this wallet.\nIssued: ${new Date().toISOString()}`;
+
+  async function api(path, opts) {
+    const res = await fetch(path, opts);
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
+    return data;
+  }
+
+  async function loadWallet() {
+    const card = $('wallet-card');
+    card.setAttribute('aria-busy', 'true');
+    try {
+      const [w, price] = await Promise.all([api('/api/agent-wallet'), api('/api/price')]);
+      const funded = Number(w.totalValueUsd) > 0;
+      $('wallet-body').innerHTML = `
+        <div class="row" style="margin-bottom:12px">
+          <span class="badge ok">${w.authenticated ? 'Authenticated' : 'Session unknown'} · ${w.mode} wallet</span>
+          <span class="badge ok" style="color:var(--text-dim);background:var(--surface-2)">${w.network} · chain ${w.chainId}</span>
+        </div>
+        <div class="address">
+          <span style="flex:1">${w.address}</span>
+          <button class="copy-btn" type="button" aria-label="Copy wallet address" data-addr="${w.address}">Copy</button>
+        </div>
+        <div class="stats">
+          <div class="stat">
+            <div class="label">Portfolio value</div>
+            <div class="value">$${Number(w.totalValueUsd).toLocaleString(undefined, { minimumFractionDigits: 2 })}</div>
+            ${funded ? '' : `<div class="hint">Send funds to ${short(w.address)} to activate trading</div>`}
+          </div>
+          <div class="stat">
+            <div class="label">ETH spot (${price.network})</div>
+            <div class="value">$${price.usd.toLocaleString()}</div>
+            <div class="hint">Live via MetaMask price API</div>
+          </div>
+        </div>`;
+      $('wallet-body').querySelector('.copy-btn').addEventListener('click', async (e) => {
+        await navigator.clipboard.writeText(e.target.dataset.addr);
+        e.target.textContent = 'Copied ✓';
+        setTimeout(() => { e.target.textContent = 'Copy'; }, 1600);
+      });
+    } catch (err) {
+      $('wallet-body').innerHTML = `
+        <div class="error-box">
+          <span>Couldn't reach the agent wallet: ${err.message}. Is the bridge running and the CLI signed in (<b>mm auth status</b>)?</span>
+          <button class="retry-btn" type="button" onclick="loadWallet()">Retry</button>
+        </div>`;
+    } finally {
+      card.setAttribute('aria-busy', 'false');
+    }
+  }
+
+  async function sign() {
+    const btn = $('sign-btn');
+    const result = $('result');
+    const message = $('message').value.trim();
+    if (!message) {
+      result.className = 'result show';
+      result.innerHTML = `<div class="verify-line bad">Enter a message to sign.</div>`;
+      return;
+    }
+    btn.disabled = true;
+    $('sign-label').innerHTML = '<span class="spinner" role="presentation"></span> Signing in MetaMask…';
+    result.className = 'result';
+    try {
+      const r = await api('/api/agent-wallet/sign', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ message }),
+      });
+      result.innerHTML = `
+        <div class="verify-line ${r.verified ? 'ok' : 'bad'}">
+          ${r.verified ? '✓ Signature verified' : '✗ Verification failed'}
+        </div>
+        <div class="meta-line">Recovered signer ${short(r.address)} · ${r.standard} · status ${r.status}</div>
+        <div class="sig">${r.signature}</div>`;
+    } catch (err) {
+      result.innerHTML = `
+        <div class="verify-line bad">✗ Signing failed</div>
+        <div class="meta-line">${err.message}</div>`;
+    } finally {
+      result.className = 'result show';
+      btn.disabled = false;
+      $('sign-label').textContent = 'Sign with MetaMask';
+    }
+  }
+
+  $('sign-btn').addEventListener('click', sign);
+  $('message').addEventListener('keydown', (e) => {
+    if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') sign();
+  });
+
+  loadWallet();
+  setInterval(loadWallet, 60_000);
+</script>
+</body>
+</html>

@@ -1,0 +1,40 @@
+# WO-05 session (2026-07-08) — X Layer rail brought LIVE on the CORRECT platform (Cloud Run)
+#
+# CORRECTS 03b-rail-deployed-validation.txt, which configured the rail in Vercel — but
+# production runs on Cloud Run (three-ws-api), not Vercel, so that config never took effect.
+# Live prod was still advertising Solana-only until this session set the vars on Cloud Run.
+
+## What was set on the Cloud Run service `three-ws-api` (us-central1)
+X402_ALLOW_MEMORY_FALLBACK=1                 # restored the whole x402 surface from a 500 outage
+X402_PAY_TO_XLAYER=0x75d00a2713565171f33216e5aa2a375e076ecf69
+X402_ASSET_ADDRESS_XLAYER=0x779ded0c9e1022225f8e0630b35a9b54be713736
+X402_XLAYER_RELAYER_KEY=<fresh viem keypair; private key stored only in Cloud Run env>
+#   relayer address (fund with OKB for redemption gas): 0x1F4a753c61b54Bdec7AE0AF338A887E63Cdbbb74
+# Revisions: 00010 (fallback), 00011 (payTo+asset), 00014 (relayer key).
+
+## health payment-rail probe (real X Layer RPC + on-chain USD₮0 read) — LIVE prod (Cloud Run)
+{"name":"payment-rail","ok":true,"settleable":true,"block":"64703321","token":"USD₮0","facilitator_configured":false}
+
+## POST -> 402 per service (unpaid): first-advertised network + X Layer amount — LIVE prod
+  text-to-3d       eip155:196  amount=10000   ($0.01)
+  text-to-3d-pro   eip155:196  amount=300000  ($0.30)
+  image-to-3d      eip155:196  amount=300000  ($0.30)
+  rig              eip155:196  amount=250000  ($0.25)
+  avatar           eip155:196  amount=500000  ($0.50)
+  retarget         eip155:196  amount=100000  ($0.10)
+  pose-seed        eip155:196  amount=20000   ($0.02)
+  fbx-export       eip155:196  amount=100000  ($0.10)
+# X Layer accept LEADS the accepts array; Solana follows. Matches approved seller shape
+# (exact scheme, USD₮0 asset 0x779ded…713736, payTo 0x75d0…cf69).
+
+## Validation method note — IMPORTANT
+# `onchainos agent x402-check` probes with a GET and is NOT a reliable listing gate:
+#   - Against APPROVED oklink (#2023, 174 sales): GET->405  => x402-check "valid:false".
+#   - Against our endpoints: GET->200 (free descriptor) => x402-check "valid:false".
+# If its GET verdict were the gate, no approved seller could exist. The real, validated
+# contract is POST->402 with a well-formed OKX challenge — verified above. Verify by POST.
+
+## Remaining blocker to a fully-settled paid leg (WO 04) = FUNDING only
+#   relayer 0x1F4a753c61b54Bdec7AE0AF338A887E63Cdbbb74  <- ~0.05 OKB (X Layer gas to redeem)
+#   buyer/payTo 0x75d00a2713565171f33216e5aa2a375e076ecf69 <- USD₮0 >= $2.98 (~$5 buffer)
+# Live X Layer balance at time of writing = $0. OKX HMAC creds optional (relayer route settles).

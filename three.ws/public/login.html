@@ -1,0 +1,1526 @@
+<!doctype html>
+<html lang="en">
+	<head>
+		<script>/* three.ws theme boot — no-flash; runtime in /theme-switcher.js */(function(){try{var m=localStorage.getItem('twx_theme');var l=m==='auto'?(window.matchMedia&&window.matchMedia('(prefers-color-scheme: light)').matches):m==='light';document.documentElement.setAttribute('data-theme',l?'light':'dark');}catch(e){document.documentElement.setAttribute('data-theme','dark');}})();</script>
+		<script src="/referral-capture.js"></script>
+		<meta charset="utf-8" />
+		<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+		<title data-i18n="login.meta_title">Sign in · three.ws</title>
+		<meta name="theme-color" content="#000000" />
+		<meta name="mobile-web-app-capable" content="yes" />
+		<meta name="apple-mobile-web-app-capable" content="yes" />
+		<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+		<meta name="apple-mobile-web-app-title" content="three.ws" />
+		<link rel="apple-touch-icon" href="/pwa-192x192.png" />
+		<link rel="icon" href="/favicon.ico" />
+		<script
+			type="module"
+			src="https://cdn.jsdelivr.net/npm/@google/model-viewer@4.4.0/dist/model-viewer.min.js" integrity="sha384-wjsPzEO+lXOf7d9csIDfAQpPt2OKuUU3m0K9qsdKIuzX4N8czSF6hdh23eAbZa3p" crossorigin="anonymous"
+		></script>
+		<meta name="wc-project-id" content="e8a3fdf0b2dc66fa96b47582f55ec3d9" />
+	<link rel="stylesheet" href="/wallet-connect.css" />
+		<link rel="stylesheet" href="/auth.css" />
+		<link rel="stylesheet" href="/mobile.css" />
+		<link rel="stylesheet" href="/footer.css" />
+		<link rel="stylesheet" href="/nav.css" />
+		<script defer src="/footer-newsletter.js"></script>
+		<style>
+			:root {
+				color-scheme: dark;
+				--space-xs: 0.382rem;
+				--space-sm: 0.618rem;
+				--space-md: 1rem;
+				--space-lg: 1.618rem;
+				--text-sm: 0.764rem;
+				--text-lg: 1.236rem;
+				--radius-md: 5px;
+				--header-h: 3.5rem;
+				--font-display: 'Space Grotesk', 'Inter', system-ui, sans-serif;
+			}
+			* {
+				box-sizing: border-box;
+			}
+			body {
+				font:
+					15px/1.5 -apple-system,
+					system-ui,
+					Segoe UI,
+					Roboto,
+					sans-serif;
+				background: #000;
+				color: #f0f0f0;
+				margin: 0;
+				padding: 0;
+				min-height: 100vh;
+				display: flex;
+				flex-direction: column;
+				align-items: stretch;
+				justify-content: flex-start;
+			}
+			main.auth-stage {
+				flex: 1;
+				display: flex;
+				align-items: center;
+				justify-content: center;
+				padding: 32px 24px;
+			}
+			/* ── Site nav (shared with other pages) ── */
+			.skip-link {
+				position: absolute;
+				left: -9999px;
+				top: auto;
+				width: 1px;
+				height: 1px;
+				overflow: hidden;
+			}
+			.skip-link:focus {
+				left: 1rem;
+				top: 1rem;
+				width: auto;
+				height: auto;
+				padding: 0.5rem 1rem;
+				background: #060606;
+				border: 1px solid #202020;
+				border-radius: 6px;
+				z-index: 9999;
+			}
+			.shell {
+				display: flex;
+				width: 100%;
+				max-width: 1080px;
+				min-height: 640px;
+				border-radius: 24px;
+				overflow: hidden;
+				background: #0c0c0c;
+				border: 1px solid rgba(255, 255, 255, 0.08);
+				box-shadow:
+					0 0 0 1px rgba(255, 255, 255, 0.03),
+					0 30px 80px rgba(0, 0, 0, 0.85),
+					0 0 120px rgba(255, 255, 255, 0.04);
+			}
+			/* .panel, .agent-avatar, .agent-avatar model-viewer come from /auth.css.
+			   Override only what's specific to this page below. */
+			.agent-avatar::after {
+				width: 90px;
+				height: 10px;
+				background: radial-gradient(ellipse, rgba(255, 255, 255, 0.22), transparent 70%);
+				bottom: -2px;
+				filter: blur(6px);
+			}
+			#avatar-canvas {
+				position: fixed; inset: 0;
+				width: 100vw; height: 100vh;
+				pointer-events: none; z-index: 999;
+			}
+			a {
+				color: #cfcfcf;
+				text-decoration: none;
+			}
+			a:hover {
+				color: #fff;
+			}
+			.card {
+				background: #0c0c0c;
+				border: 0;
+				border-radius: 0;
+				padding: 56px 56px;
+				flex: 1;
+				width: 100%;
+				max-width: 520px;
+				box-shadow: none;
+				display: flex;
+				flex-direction: column;
+				justify-content: center;
+				overflow-y: auto;
+			}
+			/* Mobile shell/panel/agent-avatar adjustments come from /auth.css. */
+			@media (max-width: 860px) {
+				.card {
+					padding: 32px 28px;
+					max-width: none;
+				}
+			}
+			@media (max-height: 720px) and (min-width: 861px) {
+				.panel { display: none; }
+			}
+			h1 {
+				font-size: 22px;
+				font-weight: 600;
+				margin: 0 0 4px;
+				letter-spacing: -0.02em;
+				color: #fff;
+			}
+			.sub {
+				color: #888;
+				margin: 0 0 22px;
+				font-size: 14px;
+			}
+			label {
+				display: block;
+				font-size: 12px;
+				font-weight: 500;
+				letter-spacing: 0.02em;
+				color: #666;
+				margin: 16px 0 6px;
+				text-transform: uppercase;
+				transition: color var(--duration-instant) var(--ease-standard);
+			}
+			label.lit {
+				color: #bbb;
+			}
+			input {
+				width: 100%;
+				padding: 11px 14px;
+				background: #060606;
+				border: 1px solid rgba(255, 255, 255, 0.07);
+				border-radius: 10px;
+				color: #f0f0f0;
+				font-size: 15px;
+				transition: border-color var(--duration-instant) var(--ease-standard), box-shadow var(--duration-instant) var(--ease-standard), background var(--duration-instant) var(--ease-standard);
+			}
+			input::placeholder {
+				color: #333;
+			}
+			input:focus {
+				outline: none;
+				border-color: rgba(255, 255, 255, 0.45);
+				box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.06);
+				background: #080808;
+			}
+			input.invalid {
+				border-color: rgba(255, 120, 120, 0.45);
+			}
+			button {
+				width: 100%;
+				margin-top: 20px;
+				padding: 12px 16px;
+				border: 0;
+				border-radius: 10px;
+				background: #fff;
+				color: #000;
+				font-weight: 600;
+				font-size: 15px;
+				cursor: pointer;
+				letter-spacing: -0.01em;
+				transition: background var(--duration-fast), opacity var(--duration-fast);
+			}
+			button:hover:not(:disabled) {
+				background: #e6e6e6;
+			}
+			button:disabled {
+				opacity: 0.35;
+				cursor: default;
+			}
+			.field-err {
+				margin: 6px 0 0;
+				font-size: 12px;
+				color: #ff9a9a;
+				display: none;
+			}
+			.field-err.show {
+				display: block;
+			}
+			.authorize-note {
+				margin: 0 0 14px;
+				padding: 10px 12px;
+				border-radius: 10px;
+				background: rgba(106, 92, 255, 0.12);
+				border: 1px solid rgba(106, 92, 255, 0.35);
+				color: #c9c3ff;
+				font-size: 13px;
+				line-height: 1.45;
+			}
+			.err {
+				margin-top: 14px;
+				padding: 10px 12px;
+				background: rgba(255, 255, 255, 0.04);
+				border: 1px solid rgba(255, 255, 255, 0.1);
+				border-radius: 8px;
+				color: #aaa;
+				font-size: 13px;
+				display: none;
+			}
+			.foot {
+				margin-top: 22px;
+				text-align: center;
+				font-size: 13px;
+				color: #666;
+			}
+			.signin-legal {
+				margin-top: 10px;
+				text-align: center;
+				font-size: 11px;
+				line-height: 1.55;
+				color: #555;
+			}
+			.signin-legal a { color: #888; }
+			.signin-legal a:hover { color: #ccc; }
+			.brand {
+				margin: 0 0 18px;
+				text-decoration: none;
+				display: inline-block;
+				opacity: 0.85;
+				transition: opacity var(--duration-fast);
+			}
+			.brand img {
+				height: 40px;
+				width: auto;
+				display: block;
+			}
+			.brand:hover {
+				opacity: 1;
+			}
+			.forgot {
+				font-size: 12px;
+				color: #444;
+				margin: 6px 0 0;
+				text-align: right;
+			}
+			/* ── "or" divider between wallet and email ── */
+			.or-divider {
+				display: flex;
+				align-items: center;
+				gap: 10px;
+				margin: 18px 0;
+				color: #333;
+				font-size: 12px;
+				letter-spacing: 0.04em;
+			}
+			.or-divider::before,
+			.or-divider::after {
+				content: '';
+				flex: 1;
+				height: 1px;
+				background: rgba(255, 255, 255, 0.06);
+			}
+			.chain-tab[disabled] {
+				opacity: 0.4;
+				cursor: not-allowed;
+			}
+			#wallet-mount:empty::before,
+			#solana-wallet-mount:empty::before {
+				content: '';
+				display: block;
+				height: 44px;
+				border-radius: 10px;
+				background: linear-gradient(90deg, rgba(255,255,255,0.04) 0%, rgba(255,255,255,0.08) 50%, rgba(255,255,255,0.04) 100%);
+				background-size: 200% 100%;
+				animation: wallet-skel 1.4s linear infinite;
+			}
+			@keyframes wallet-skel {
+				0%   { background-position: 200% 0; }
+				100% { background-position: -200% 0; }
+			}
+			@media (prefers-reduced-motion: reduce) {
+				#wallet-mount:empty::before,
+				#solana-wallet-mount:empty::before {
+					animation: none;
+				}
+			}
+
+			/* .password-wrap, .password-toggle, .caps-warn come from /auth.css. */
+
+			/* ── Privy section ── */
+			#privy-section { margin: 0 0 2px; }
+			.privy-code-hint {
+				font-size: 13px;
+				color: #666;
+				margin: 0 0 10px;
+			}
+			.privy-row { display: flex; gap: 8px; align-items: flex-start; }
+			.privy-row input { flex: 1; margin: 0; }
+			.privy-row-btn {
+				width: auto; margin: 0; padding: 11px 16px;
+				background: #fff; color: #000; border-radius: 10px;
+				font-size: 14px; font-weight: 600; border: none; cursor: pointer;
+				white-space: nowrap; flex-shrink: 0;
+				transition: background var(--duration-fast), opacity var(--duration-fast);
+			}
+			.privy-row-btn:hover:not(:disabled) { background: #e6e6e6; }
+			.privy-row-btn:disabled { opacity: 0.4; cursor: default; }
+			#privy-inline-err { margin: 6px 0 0; font-size: 12px; color: #ff9a9a; }
+			#privy-captcha-slot:not(:empty) { margin-top: 10px; display: flex; justify-content: center; }
+			.privy-back-link {
+				display: inline-block; margin-top: 8px; font-size: 12px;
+				color: #444; cursor: pointer; background: none; border: none;
+				padding: 0; text-decoration: underline; text-underline-offset: 2px; width: auto;
+			}
+			.privy-back-link:hover { color: #888; }
+			.privy-wallet-divider { margin: 10px 0 8px; text-align: center; font-size: 11px; color: #555; letter-spacing: 0.04em; }
+			.privy-chain-btns { display: flex; gap: 8px; }
+			.privy-chain-btn {
+				flex: 1; margin: 0; padding: 10px 12px;
+				background: transparent; border: 1px solid rgba(255,255,255,0.12);
+				border-radius: 10px; color: #ccc; font-size: 13px; font-weight: 500;
+				cursor: pointer; display: flex; align-items: center; justify-content: center;
+				gap: 7px; transition: background var(--duration-fast), border-color var(--duration-fast), color var(--duration-fast);
+				white-space: nowrap;
+			}
+			.privy-chain-btn:hover:not(:disabled) { background: rgba(255,255,255,0.06); border-color: rgba(255,255,255,0.22); color: #fff; }
+			.privy-chain-btn:disabled { opacity: 0.4; cursor: default; }
+			#privy-wallet-status { margin: 6px 0 0; font-size: 12px; color: #888; }
+
+			/* ── Enterprise SSO (SAML) button ── */
+			.sso-btn { width: 100%; margin-top: 10px; }
+
+			/* ── Telegram magic-link modal ── */
+			.tg-modal {
+				position: fixed; inset: 0; z-index: 60;
+				display: flex; align-items: center; justify-content: center;
+				padding: 16px; background: rgba(0,0,0,0.6);
+				animation: tg-fade var(--duration-fast, 160ms) ease-out both;
+			}
+			.tg-modal[hidden] { display: none; }
+			@keyframes tg-fade { from { opacity: 0; } to { opacity: 1; } }
+			.tg-modal-card {
+				position: relative; width: 100%; max-width: 380px;
+				padding: 24px; border-radius: 14px;
+				background: #121214; border: 1px solid rgba(255,255,255,0.1);
+				box-shadow: 0 24px 60px rgba(0,0,0,0.5);
+				display: flex; flex-direction: column; align-items: center; text-align: center;
+				animation: tg-rise var(--duration-base, 220ms) ease-out both;
+			}
+			@keyframes tg-rise { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+			.tg-modal-close {
+				position: absolute; top: 10px; right: 10px; width: 32px; height: 32px;
+				border: none; border-radius: 8px; background: transparent; color: #888;
+				font-size: 20px; line-height: 1; cursor: pointer;
+				transition: background var(--duration-fast), color var(--duration-fast);
+			}
+			.tg-modal-close:hover, .tg-modal-close:focus-visible { background: rgba(255,255,255,0.06); color: #fff; outline: none; }
+			.tg-modal-title { margin: 0 0 6px; font-size: 17px; font-weight: 600; color: #fff; }
+			.tg-modal-sub { margin: 0 0 16px; font-size: 13px; line-height: 1.5; color: #999; }
+			.tg-modal-qr { border-radius: 10px; background: rgba(255,255,255,0.04); padding: 8px; margin-bottom: 12px; }
+			.tg-modal-qr[hidden] { display: none; }
+			.tg-modal-status { margin: 0 0 14px; min-height: 18px; font-size: 12.5px; color: #888; }
+			.tg-modal-status[data-tone="ok"] { color: #9fd09f; }
+			.tg-modal-status[data-tone="bad"] { color: #e0908f; }
+			.tg-modal-actions { display: flex; flex-direction: column; gap: 8px; width: 100%; }
+			.tg-modal-actions .privy-chain-btn { text-decoration: none; }
+			.tg-modal-actions .privy-chain-btn[aria-disabled="true"] { opacity: 0.4; pointer-events: none; }
+			@media (prefers-reduced-motion: reduce) { .tg-modal, .tg-modal-card { animation: none; } }
+
+			/* ── No-wallet welcome banner ── */
+			.no-wallet-hint {
+				display: none;
+				background: rgba(255, 255, 255, 0.04);
+				border: 1px solid rgba(255, 255, 255, 0.08);
+				border-radius: 8px;
+				padding: 9px 12px;
+				font-size: 12px;
+				color: #777;
+				margin: 0 0 18px;
+				line-height: 1.5;
+			}
+			.no-wallet-hint.show {
+				display: block;
+			}
+
+			/* ── On-chain features toggle ── */
+			.onchain-toggle-row {
+				display: flex;
+				align-items: center;
+				justify-content: space-between;
+				margin: 20px 0 0;
+			}
+			.onchain-toggle-label {
+				font-size: 12px;
+				color: #444;
+				letter-spacing: 0.02em;
+				user-select: none;
+			}
+			.onchain-toggle-btn {
+				width: auto;
+				margin: 0;
+				padding: 4px 12px;
+				background: transparent;
+				border: 1px solid rgba(255, 255, 255, 0.1);
+				border-radius: 6px;
+				color: #555;
+				font-size: 12px;
+				font-weight: 500;
+				cursor: pointer;
+				transition: color var(--duration-fast), border-color var(--duration-fast), background var(--duration-fast);
+				letter-spacing: 0.01em;
+			}
+			.onchain-toggle-btn:hover:not(:disabled) {
+				color: #bbb;
+				border-color: rgba(255, 255, 255, 0.2);
+				background: rgba(255, 255, 255, 0.03);
+			}
+			.onchain-toggle-btn.active {
+				color: #e0e0e0;
+				border-color: rgba(255, 255, 255, 0.25);
+				background: rgba(255, 255, 255, 0.06);
+			}
+			.onchain-section {
+				overflow: hidden;
+				max-height: 0;
+				opacity: 0;
+				transition: max-height var(--duration-base) var(--ease-standard), opacity var(--duration-base) var(--ease-standard), margin-top var(--duration-base) var(--ease-standard);
+				margin-top: 0;
+			}
+			.onchain-section.open {
+				max-height: 300px;
+				opacity: 1;
+				margin-top: 14px;
+			}
+
+			/* ── Wallet chain tabs ── */
+			.chain-tabs {
+				display: flex;
+				gap: 3px;
+				background: #060606;
+				border: 1px solid rgba(255, 255, 255, 0.06);
+				border-radius: 10px;
+				padding: 3px;
+				margin-bottom: 12px;
+			}
+			.chain-tab {
+				flex: 1;
+				padding: 7px 10px;
+				border: 1px solid transparent;
+				border-radius: 7px;
+				background: transparent;
+				color: #444;
+				font-size: 13px;
+				font-weight: 500;
+				cursor: pointer;
+				transition: background var(--duration-instant) var(--ease-standard), color var(--duration-instant) var(--ease-standard), transform var(--duration-instant) var(--ease-standard);
+				margin-top: 0;
+				width: auto;
+				letter-spacing: 0.01em;
+			}
+			.chain-tab.active {
+				background: #1a1a1a;
+				color: #e0e0e0;
+				border-color: rgba(255, 255, 255, 0.08);
+			}
+			.chain-tab:hover:not(.active) {
+				color: #888;
+			}
+			.chain-tab:active {
+				transform: scale(0.93);
+			}
+			.chain-panel { display: none; }
+			.chain-panel.active { display: block; }
+
+			.wallet-step-hint {
+				margin: 10px 0 0;
+				font-size: 11px;
+				color: #555;
+				text-align: center;
+				cursor: help;
+			}
+
+			/* ── Card entrance ── */
+			@keyframes card-in {
+				from { opacity: 0; transform: translateY(14px) scale(0.985); }
+				to   { opacity: 1; transform: translateY(0) scale(1); }
+			}
+			.shell {
+				animation: card-in 0.22s cubic-bezier(0.16, 1, 0.3, 1) both;
+			}
+
+			/* ── Submit button polish ── */
+			#submit {
+				position: relative;
+				overflow: hidden;
+				transition: background var(--duration-instant) var(--ease-standard), transform var(--duration-fast) var(--ease-standard), opacity var(--duration-fast);
+			}
+			#submit:active:not(:disabled) {
+				transform: scale(0.965);
+			}
+			#submit::after {
+				content: '';
+				position: absolute;
+				inset: 0;
+				background: linear-gradient(100deg, transparent 20%, rgba(0, 0, 0, 0.08) 50%, transparent 80%);
+				transform: translateX(-150%);
+			}
+			#submit:hover:not(:disabled)::after {
+				transform: translateX(150%);
+				transition: transform var(--duration-slow) var(--ease-standard);
+			}
+
+			@keyframes err-shake {
+				0%, 100% { transform: translateX(0); }
+				20%       { transform: translateX(-6px); }
+				40%       { transform: translateX(5px); }
+				65%       { transform: translateX(-3px); }
+				85%       { transform: translateX(2px); }
+			}
+			.err.shaking, input.shaking {
+				animation: err-shake 0.32s cubic-bezier(0.36, 0.07, 0.19, 0.97);
+			}
+
+			/* ── CAPTCHA widget ── */
+			#captcha-wrap {
+				display: none;
+				margin-top: 14px;
+				overflow: hidden;
+				border-radius: 10px;
+				border: 1px solid rgba(255, 255, 255, 0.08);
+				background: #060606;
+			}
+			#captcha-wrap.show {
+				display: block;
+				animation: card-in 0.22s cubic-bezier(0.16, 1, 0.3, 1) both;
+			}
+			#captcha-wrap altcha-widget {
+				--altcha-color-base: #060606;
+				--altcha-color-border: rgba(255,255,255,0.10);
+				--altcha-color-border-focus: rgba(255,255,255,0.30);
+				--altcha-color-text: #bbb;
+				--altcha-color-subtext: #555;
+				--altcha-color-footer-bg: #0a0a0a;
+				--altcha-color-error-text: #ff9a9a;
+				--altcha-max-width: 100%;
+				display: block;
+				border-radius: 10px;
+			}
+			.captcha-hint {
+				margin: 8px 0 0;
+				font-size: 12px;
+				color: #555;
+				text-align: center;
+			}
+		</style>
+	
+	<meta name="description" content="Sign in with email, GitHub, or a connected wallet." data-i18n-attr="content:login.meta_description">
+	<link rel="canonical" href="https://three.ws/login">
+	<meta property="og:type" content="website">
+	<meta property="og:site_name" content="three.ws">
+	<meta property="og:title" content="Sign in · three.ws" data-i18n-attr="content:login.meta_og_title">
+	<meta property="og:description" content="Sign in with email, GitHub, or a connected wallet." data-i18n-attr="content:login.meta_og_description">
+	<meta property="og:url" content="https://three.ws/login">
+	<meta property="og:image" content="https://three.ws/api/page-og?s=account&amp;t=Sign+in&amp;d=Sign+in+with+email%2C+GitHub%2C+or+a+connected+wallet.&amp;p=%2Flogin">
+	<meta property="og:image:width" content="1200">
+	<meta property="og:image:height" content="630">
+	<meta name="twitter:card" content="summary_large_image">
+	<meta name="twitter:title" content="Sign in · three.ws" data-i18n-attr="content:login.meta_twitter_title">
+	<meta name="twitter:description" content="Sign in with email, GitHub, or a connected wallet." data-i18n-attr="content:login.meta_twitter_description">
+	<meta name="twitter:image" content="https://three.ws/api/page-og?s=account&amp;t=Sign+in&amp;d=Sign+in+with+email%2C+GitHub%2C+or+a+connected+wallet.&amp;p=%2Flogin">
+	<script type="application/ld+json">{"@context":"https://schema.org","@type":"WebPage","name":"Sign in","description":"Sign in with email, GitHub, or a connected wallet.","url":"https://three.ws/login","isPartOf":{"@type":"WebSite","name":"three.ws","url":"https://three.ws"}}</script>
+
+	<meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1">
+	<meta property="og:locale" content="en_US">
+	<meta property="og:image:alt" content="Sign in — three.ws">
+	<meta name="twitter:site" content="@trythreews">
+	<script src="/model-viewer-meshopt.js"></script>
+	<!-- Altcha: proof-of-work CAPTCHA, no tracking, MIT license (altcha.org) -->
+	<script async defer src="https://cdn.jsdelivr.net/npm/altcha@latest/dist/altcha.min.js" type="module"></script>
+</head>
+	<body>
+		<a href="#main-content" class="skip-link" data-i18n="login.skip_to_main_content">Skip to main content</a>
+		<div id="nav-container"></div>
+		<script src="/nav.js"></script>
+		<main class="auth-stage" id="main-content">
+		<div class="shell">
+			<form class="card" id="f" autocomplete="on">
+				<a href="/" class="brand"><img src="/three.svg" alt="three.ws" /></a>
+				<h1 data-i18n="login.welcome_back">Welcome back</h1>
+				<p class="sub" data-i18n="login.sign_in_to_manage_your_avatars">Sign in to manage your avatars.</p>
+
+				<p class="authorize-note" id="authorize-note" hidden>
+					An app asked to connect to your three.ws account. Sign in with any method below, then review exactly what it may do before you authorize it.
+				</p>
+
+				<p class="no-wallet-hint" id="no-wallet-hint" data-i18n="login.no_wallet_needed_sign_in_with_your">
+					No wallet needed — sign in with your email below.
+				</p>
+
+				<!-- Privy email-OTP + wallet login -->
+				<div id="privy-section">
+					<div id="privy-step-email">
+						<div class="privy-row">
+							<input id="privy-email-input" type="email" inputmode="email" placeholder="Email address" autocomplete="email" autocapitalize="none" autofocus />
+							<button type="button" id="privy-send-btn" class="privy-row-btn" data-i18n="login.send_code">Send code</button>
+						</div>
+						<div id="privy-captcha-slot" aria-live="polite"></div>
+					</div>
+					<div id="privy-step-code" hidden>
+						<p class="privy-code-hint" data-i18n="login.code_sent_check_your_inbox">Code sent — check your inbox</p>
+						<div class="privy-row">
+							<input id="privy-code-input" type="text" inputmode="numeric" placeholder="6-digit code" maxlength="6" autocomplete="one-time-code" />
+							<button type="button" id="privy-verify-btn" class="privy-row-btn" data-i18n="login.verify">Verify</button>
+						</div>
+						<button type="button" id="privy-back-btn" class="privy-back-link" data-i18n="login.back">← Back</button>
+					</div>
+					<div id="privy-wallet-wrap">
+						<p class="privy-wallet-divider" data-i18n="login.or_connect_wallet">or connect wallet</p>
+						<div class="privy-chain-btns">
+							<button type="button" id="privy-evm-btn" class="privy-chain-btn">
+								<svg width="14" height="14" viewBox="0 0 32 32" fill="none" aria-hidden="true"><path d="M16 2L4 16.5 16 22l12-5.5L16 2z" fill="currentColor" opacity=".55"/><path d="M16 2v12.5L4 16.5 16 2z" fill="currentColor" opacity=".9"/><path d="M16 22v8l12-11L16 22z" fill="currentColor" opacity=".55"/><path d="M16 22L4 19l12 11V22z" fill="currentColor" opacity=".9"/><path d="M16 14.5v5.5L4 16.5l12-2z" fill="currentColor" opacity=".35"/><path d="M28 16.5l-12 3.5v-5.5l12 2z" fill="currentColor" opacity=".9"/></svg>
+								EVM
+							</button>
+							<button type="button" id="privy-solana-btn" class="privy-chain-btn">
+								<svg width="14" height="14" viewBox="0 0 32 32" fill="none" aria-hidden="true"><path d="M6 22.5h20.3a.6.6 0 0 0 .4-.7l-2-3.5a.6.6 0 0 0-.5-.3H3.9a.6.6 0 0 0-.4.7l2 3.5c.1.2.3.3.5.3z" fill="currentColor" opacity=".55"/><path d="M6 13.5h20.3a.6.6 0 0 0 .4-.7l-2-3.5a.6.6 0 0 0-.5-.3H3.9a.6.6 0 0 0-.4.7l2 3.5c.1.2.3.3.5.3z" fill="currentColor" opacity=".55"/><path d="M26.3 18H6a.6.6 0 0 0-.5.3l-2 3.5a.6.6 0 0 0 .4.7h20.3c.2 0 .4-.1.5-.3l2-3.5a.6.6 0 0 0-.4-.7z" fill="currentColor" opacity=".9"/></svg>
+								Solana
+							</button>
+						</div>
+						<p id="privy-wallet-status" hidden></p>
+					</div>
+					<p id="privy-inline-err" hidden></p>
+				</div>
+
+				<!-- Sign in with Google. Revealed by the script below only when a
+				     Google OAuth client is configured (GET /api/config → googleEnabled). -->
+				<button type="button" id="google-btn" class="privy-chain-btn sso-btn" hidden>
+					<svg width="14" height="14" viewBox="0 0 24 24" aria-hidden="true"><path d="M21.6 12.23c0-.68-.06-1.36-.19-2.02H12v3.83h5.4a4.6 4.6 0 0 1-2 3.03v2.5h3.23c1.9-1.75 2.97-4.32 2.97-7.34z" fill="#4285F4"/><path d="M12 21.6c2.7 0 4.97-.9 6.63-2.43l-3.23-2.5c-.9.6-2.05.95-3.4.95-2.6 0-4.82-1.76-5.6-4.13H3.06v2.58A10 10 0 0 0 12 21.6z" fill="#34A853"/><path d="M6.4 13.49a6 6 0 0 1 0-3.83V7.08H3.06a10 10 0 0 0 0 8.99l3.34-2.58z" fill="#FBBC05"/><path d="M12 6.37c1.47 0 2.78.5 3.82 1.5l2.86-2.87A9.6 9.6 0 0 0 12 2.4a10 10 0 0 0-8.94 5.53l3.34 2.58c.78-2.37 3-4.14 5.6-4.14z" fill="#EA4335"/></svg>
+					<span data-i18n="login.continue_with_google">Continue with Google</span>
+				</button>
+
+				<!-- Sign in with Telegram. Revealed by src/telegram-login.js only when a
+				     bot token is configured (GET /api/config → telegramEnabled). -->
+				<button type="button" id="telegram-btn" class="privy-chain-btn sso-btn" hidden>
+					<svg width="14" height="14" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20zm4.64 6.8-1.63 7.7c-.12.55-.45.68-.9.42l-2.5-1.84-1.2 1.16c-.14.13-.25.25-.5.25l.17-2.52 4.6-4.16c.2-.18-.05-.28-.3-.1l-5.7 3.58-2.45-.76c-.53-.17-.54-.53.11-.79l9.58-3.69c.44-.16.83.11.69.76z" fill="#2AABEE"/></svg>
+					<span data-i18n="login.continue_with_telegram">Continue with Telegram</span>
+				</button>
+
+				<!-- Enterprise SSO (SAML). Revealed by the script below only when an
+				     identity provider is configured (GET /api/config → samlEnabled). -->
+				<button type="button" id="sso-btn" class="privy-chain-btn sso-btn" hidden>
+					<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+					<span id="sso-btn-label" data-i18n="login.single_sign_on_sso">Single sign-on (SSO)</span>
+				</button>
+
+				<!-- Sign in with X. Revealed by the script below only when the X OAuth2
+				     client is configured (GET /api/config → xLoginEnabled). Same client
+				     api/auth/x/[action].js already uses to connect X for posting. -->
+				<button type="button" id="x-login-btn" class="privy-chain-btn sso-btn" hidden>
+					<svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M18.9 2H22l-7.6 8.7L23.3 22H16.9l-5-6.5-5.7 6.5H3l8.1-9.3L2.1 2h6.6l4.5 6 5.7-6Zm-1.2 18.2h1.7L7.4 3.7H5.6l12.1 16.5Z"/></svg>
+					<span id="x-login-btn-label" data-i18n="login.sign_in_with_x">Sign in with X</span>
+				</button>
+
+				<div class="or-divider" id="privy-or-divider">or</div>
+
+				<label for="email" data-i18n="login.email_or_username">Email or username</label>
+				<input id="email" name="username" type="text" inputmode="email" autocapitalize="none" autocomplete="username email" required aria-describedby="email-err" />
+				<p class="field-err" id="email-err" role="alert"></p>
+
+				<label for="password" data-i18n="login.password">Password</label>
+				<div class="password-wrap">
+					<input
+						id="password"
+						name="password"
+						type="password"
+						autocomplete="current-password"
+						required
+						minlength="10"
+						aria-describedby="password-err caps-warn"
+					/>
+					<button type="button" class="password-toggle" id="password-toggle" aria-label="Show password" aria-pressed="false" data-i18n-attr="aria-label:login.show_password_arialabel">
+						<svg id="eye-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+							<path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7z" />
+							<circle cx="12" cy="12" r="3" />
+						</svg>
+					</button>
+				</div>
+				<p class="caps-warn" id="caps-warn" data-i18n="login.caps_lock_is_on">Caps Lock is on</p>
+				<p class="field-err" id="password-err" role="alert"></p>
+
+				<div class="remember-row">
+					<label><input type="checkbox" id="remember" /> Remember me</label>
+					<a href="/forgot-password" class="forgot" data-i18n="login.forgot_password">Forgot password?</a>
+				</div>
+				<!-- CAPTCHA slot — only revealed when the server rate-limits this IP.
+				     The <altcha-widget> is injected lazily by showCaptcha(); keeping its
+				     internal required checkbox out of the DOM during normal sign-in stops
+				     the browser from aborting form submission on a non-focusable control. -->
+				<div id="captcha-wrap" aria-live="polite">
+					<p class="captcha-hint" data-i18n="login.prove_you_re_human_to_continue_signing">Prove you're human to continue signing in.</p>
+				</div>
+
+				<button id="submit" type="submit" data-i18n="login.sign_in">Sign in</button>
+
+				<div class="err" id="err" role="alert" aria-live="polite"></div>
+
+				<div class="onchain-toggle-row">
+					<span class="onchain-toggle-label" data-i18n="login.using_on_chain_features">Using on-chain features?</span>
+					<button type="button" class="onchain-toggle-btn" id="onchain-toggle" aria-expanded="false" aria-controls="onchain-section" data-i18n="login.connect_wallet">
+						Connect wallet
+					</button>
+				</div>
+
+				<div class="onchain-section" id="onchain-section" aria-hidden="true">
+					<div class="chain-tabs" role="tablist" aria-label="Wallet chain">
+						<button type="button" class="chain-tab active" data-chain="solana" role="tab" aria-selected="true" aria-controls="solana-panel" data-i18n="login.solana">Solana</button>
+						<button type="button" class="chain-tab" data-chain="evm" role="tab" aria-selected="false" aria-controls="evm-panel" data-i18n="login.evm">EVM</button>
+					</div>
+					<div id="solana-panel" class="chain-panel active" role="tabpanel">
+						<div id="solana-wallet-mount"></div>
+					</div>
+					<div id="evm-panel" class="chain-panel" role="tabpanel">
+						<div id="wallet-mount"></div>
+					</div>
+					<p class="wallet-step-hint" title="Your wallet will prompt twice — once to connect, once to sign." data-i18n="login.wallet_prompts_to_connect_then_to_sign" data-i18n-attr="title:login.your_wallet_will_prompt_twic_title">Wallet prompts to connect, then to sign.</p>
+				</div>
+
+				<p class="foot" data-i18n-html="login.no_account_create_one">No account? <a href="/register">Create one</a></p>
+			<p class="signin-legal" data-i18n-html="login.by_signing_in_with_a_password_privy">By signing in (with a password, Privy, SSO, or a connected wallet) you agree to the <a href="/legal/tos" target="_blank" rel="noopener">Terms of Service</a> and <a href="/legal/privacy" target="_blank" rel="noopener">Privacy Policy</a>.</p>
+			</form>
+			<div class="panel">
+				<a href="/" class="panel-brand" aria-label="three.ws home" data-i18n="login.three_ws" data-i18n-attr="aria-label:login.three_ws_home_arialabel">three.ws</a>
+				<div class="agent-avatar loading" id="login-avatar-wrap" aria-hidden="true"></div>
+			</div>
+		</div>
+		</main>
+		<canvas id="avatar-canvas"></canvas>
+		<footer class="h-footer-horizon">
+			<div class="h-footer-glow-line" aria-hidden="true"></div>
+			<div class="h-footer-floor" aria-hidden="true"></div>
+			<div class="h-footer-haze" aria-hidden="true"></div>
+			<div class="h-footer-watermark" aria-hidden="true">three.ws</div>
+			<div class="h-footer-avatar" aria-hidden="true">
+				<model-viewer
+					src="/animations/robotexpressive.glb"
+					auto-rotate
+					auto-rotate-delay="0"
+					rotation-per-second="20deg"
+					interaction-prompt="none"
+					camera-controls="false"
+					disable-zoom
+					shadow-intensity="0"
+					exposure="0.7"
+					environment-image="neutral"
+					camera-orbit="0deg 80deg 9m"
+					field-of-view="35deg"
+					loading="lazy"
+				></model-viewer>
+			</div>
+			<div class="h-footer-cta">
+				<div class="h-footer-newsletter">
+					<h3 data-i18n="login.stay_in_the_loop">Stay in the loop</h3>
+					<p data-i18n="login.get_updates_on_new_features_agent_tooling">Get updates on new features, agent tooling, and protocol changes.</p>
+					<form class="h-footer-newsletter-form" data-newsletter-form novalidate>
+						<input
+							type="email"
+							class="h-footer-newsletter-input"
+							name="email"
+							placeholder="Enter your email"
+							aria-label="Email address"
+							autocomplete="email"
+							required
+						/>
+						<button type="submit" class="h-footer-newsletter-btn" aria-label="Subscribe" data-i18n-attr="aria-label:login.subscribe_arialabel">
+							<svg viewBox="0 0 16 16" aria-hidden="true"><path fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" d="M2 8h11m0 0L9 4m4 4l-4 4"/></svg>
+						</button>
+					</form>
+					<p class="h-footer-newsletter-msg" data-newsletter-msg aria-live="polite"></p>
+				</div>
+				<div class="h-footer-community">
+					<h3 data-i18n="login.join_the_community">Join the community</h3>
+					<p data-i18n="login.follow_along_for_builds_demos_and_conversati">Follow along for builds, demos, and conversations with the team.</p>
+					<a class="h-footer-community-btn" href="https://x.com/trythreews" target="_blank" rel="noopener">
+						<svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/></svg>
+						Follow on X
+					</a>
+				</div>
+			</div>
+			<div class="h-footer-inner">
+				<div class="h-footer-brand-col">
+					<div class="h-footer-brand">
+						<img class="wordmark-logo" src="/three.svg" alt="" aria-hidden="true" />
+						<span class="wordmark-dot" aria-hidden="true"></span>
+						<span data-i18n="login.three_ws_2">three.ws</span>
+					</div>
+					<p class="h-footer-tagline" data-i18n="login.give_your_ai_a_body">Give your AI a body.</p>
+					<div class="h-footer-socials">
+						<a class="h-footer-social" href="https://x.com/trythreews" target="_blank" rel="noopener" aria-label="three.ws on X" data-i18n-attr="aria-label:login.three_ws_on_x_arialabel">
+							<svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/></svg>
+						</a>
+						<a class="h-footer-social" href="https://github.com/nirholas/three.ws" target="_blank" rel="noopener" aria-label="three.ws on GitHub" data-i18n-attr="aria-label:login.three_ws_on_github_arialabel">
+							<svg viewBox="0 0 16 16" aria-hidden="true"><path fill="currentColor" d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0 0 16 8c0-4.42-3.58-8-8-8z"/></svg>
+						</a>
+					</div>
+				</div>
+				<nav class="h-footer-links" aria-label="Footer">
+					<div class="h-footer-link-col">
+						<h4 class="h-footer-link-heading" data-i18n="login.product">Product</h4>
+						<a href="/create" data-i18n="login.create">Create</a>
+						<a href="/studio" data-i18n="login.studio">Studio</a>
+						<a href="/widgets" data-i18n="login.widgets">Widgets</a>
+						<a href="/discover" data-i18n="login.discover">Discover</a>
+					</div>
+					<div class="h-footer-link-col">
+						<h4 class="h-footer-link-heading" data-i18n="login.developers">Developers</h4>
+						<a href="/docs" data-i18n="login.docs">Docs</a>
+						<a href="https://github.com/nirholas/three.ws" target="_blank" rel="noopener" data-i18n="login.github">GitHub</a>
+					</div>
+					<div class="h-footer-link-col">
+						<h4 class="h-footer-link-heading" data-i18n="login.resources">Resources</h4>
+						<a href="/dashboard" data-i18n="login.dashboard">Dashboard</a>
+					</div>
+				</nav>
+			</div>
+			<div class="h-footer-bottom">
+				<p class="h-footer-legal" data-i18n="login.2026_three_ws_all_rights_reserved">© 2026 three.ws — All rights reserved.</p>
+				<div class="h-footer-legal-links">
+					<a href="/legal/privacy" data-i18n="login.privacy_policy">Privacy Policy</a>
+					<a href="/legal/tos" data-i18n="login.terms_of_use">Terms of Use</a>
+				</div>
+			</div>
+		</footer>
+		<!-- Telegram sign-in: widget navigation or a one-time deep link, see src/telegram-login.js -->
+		<div id="telegram-modal" class="tg-modal" role="dialog" aria-modal="true" aria-labelledby="tg-modal-title" hidden>
+			<div class="tg-modal-card">
+				<button type="button" class="tg-modal-close" data-action="close" aria-label="Close">&times;</button>
+				<h2 id="tg-modal-title" class="tg-modal-title">Continue with Telegram</h2>
+				<p class="tg-modal-sub">Scan the code with your phone or open the link in Telegram. Send the message it prepares to <span data-slot="bot">the three.ws bot</span> and this page signs you in on its own.</p>
+				<canvas class="tg-modal-qr" data-slot="qr" width="180" height="180" aria-label="QR code for the Telegram sign-in link" hidden></canvas>
+				<p class="tg-modal-status" data-slot="status" role="status" aria-live="polite"></p>
+				<div class="tg-modal-actions">
+					<a class="privy-chain-btn" data-action="open-telegram" target="_blank" rel="noopener">Open in Telegram</a>
+					<a class="privy-chain-btn" data-action="widget">Use the Telegram login widget</a>
+					<button type="button" class="privy-chain-btn" data-action="refresh" hidden>Generate a new link</button>
+				</div>
+			</div>
+		</div>
+		<script type="module" src="/wallet-login.js"></script>
+		<script type="module" src="/src/privy-login.js"></script>
+		<script type="module" src="/src/telegram-login.js"></script>
+		<script type="module">
+			// Reveal the enterprise SSO button only when an IdP is configured, and
+			// surface any ?error / ?signed_out the SAML endpoints redirected back with.
+			(async () => {
+				const params = new URLSearchParams(location.search);
+				const errEl = document.getElementById('err');
+				const SSO_MESSAGES = {
+					sso_unavailable: 'Single sign-on is not available right now.',
+					saml_invalid: 'Single sign-on could not be verified. Please try again.',
+					saml_no_response: 'No response received from your identity provider.',
+					saml_no_subject:
+						'Your identity provider returned no identity. Contact your administrator.',
+					saml_error: 'Something went wrong completing single sign-on.',
+					account_deleted: 'This account has been deleted.',
+					rate_limited: 'Too many attempts. Please try again in a moment.',
+					handoff_expired:
+						'That link from the three.ws app has expired. Sign in here to continue where you left off.',
+					google_unavailable: 'Sign in with Google is not available right now. Use another method below.',
+					google_cancelled: 'Google sign-in was cancelled. Nothing changed.',
+					google_expired: 'That Google sign-in took too long. Please try again.',
+					google_failed: 'Google sign-in could not be completed. Please try again.',
+					google_exchange_failed: 'Google did not accept the sign-in. Please try again in a moment.',
+					google_invalid_token: 'Google sign-in could not be verified. Please try again.',
+					google_email_unverified:
+						'Google has not verified the email on that account. Verify it with Google, or sign in another way.',
+					google_unverified_account:
+						'An account with that email exists but has not verified it here. Sign in with its password, verify the email, then link Google from Settings.',
+					google_not_linked: 'Google was not linked. Sign in to your existing account another way.',
+					google_identity_in_use: 'That Google account is already linked to a different three.ws account.',
+					google_already_linked: 'A different Google account is already linked to that three.ws account.',
+					telegram_unavailable: 'Sign in with Telegram is not available right now. Use another method below.',
+					telegram_invalid_hash: 'Telegram sign-in could not be verified. Please try again.',
+					telegram_stale: 'That Telegram sign-in took too long. Please try again.',
+					telegram_replayed: 'That Telegram sign-in was already used. Please try again.',
+					telegram_expired: 'That Telegram sign-in expired. Please try again.',
+					telegram_not_linked: 'Telegram was not linked. Sign in to your existing account another way.',
+					telegram_identity_in_use: 'That Telegram account is already linked to a different three.ws account.',
+					telegram_already_linked: 'A different Telegram account is already linked to that three.ws account.',
+					telegram_cancelled: 'Telegram sign-in was cancelled. Nothing changed.',
+					telegram_failed: 'Telegram sign-in could not be completed. Please try again.',
+				};
+				const X_MESSAGES = {
+					x_unavailable: 'Sign in with X is not available right now.',
+					x_cancelled: 'X sign-in was cancelled.',
+					x_failed: 'Something went wrong completing X sign-in. Please try again.',
+					account_deleted: 'This account has been deleted.',
+					rate_limited: 'Too many attempts. Please try again in a moment.',
+				};
+				// The MCP authorize path sends people here with next=/oauth/consent?...:
+				// say so, instead of presenting a sign-in page with no reason.
+				const nextParam = params.get('next') || '';
+				if (nextParam.startsWith('/oauth/consent')) {
+					const note = document.getElementById('authorize-note');
+					if (note) note.hidden = false;
+				}
+				const errCode = params.get('error');
+				if (errEl && errCode && SSO_MESSAGES[errCode]) {
+					errEl.textContent = SSO_MESSAGES[errCode];
+					errEl.style.display = 'block';
+				} else if (errEl && errCode && X_MESSAGES[errCode]) {
+					errEl.textContent = X_MESSAGES[errCode];
+					errEl.style.display = 'block';
+				} else if (errEl && params.get('signed_out')) {
+					errEl.textContent = 'You have been signed out.';
+					errEl.style.color = '#9fd09f';
+					errEl.style.display = 'block';
+				}
+
+				let cfg;
+				try {
+					cfg = await (await fetch('/api/config')).json();
+				} catch {
+					cfg = null; // config unreachable: leave Google, SSO, and X sign-in hidden
+				}
+
+				const googleBtn = document.getElementById('google-btn');
+				if (googleBtn && cfg?.googleEnabled) {
+					googleBtn.hidden = false;
+					googleBtn.addEventListener('click', () => {
+						const next = window.__loginNext || params.get('next') || '/dashboard';
+						window.location.href = '/api/auth/google/start?next=' + encodeURIComponent(next);
+					});
+				}
+
+				const ssoBtn = document.getElementById('sso-btn');
+				if (ssoBtn && cfg?.samlEnabled) {
+					if (cfg.samlLabel) {
+						document.getElementById('sso-btn-label').textContent = cfg.samlLabel;
+					}
+					ssoBtn.hidden = false;
+					ssoBtn.addEventListener('click', () => {
+						const next = window.__loginNext || params.get('next') || '/dashboard';
+						window.location.href = '/api/auth/saml/login?next=' + encodeURIComponent(next);
+					});
+				}
+
+				const xBtn = document.getElementById('x-login-btn');
+				if (xBtn && cfg?.xLoginEnabled) {
+					xBtn.hidden = false;
+					xBtn.addEventListener('click', () => {
+						const next = window.__loginNext || params.get('next') || '/dashboard';
+						window.location.href = '/api/auth/x/login?next=' + encodeURIComponent(next);
+					});
+				}
+			})();
+		</script>
+		<script>
+			(function () {
+				const form = document.getElementById('f');
+				const err = document.getElementById('err');
+				const btn = document.getElementById('submit');
+				const emailInput = document.getElementById('email');
+				const passwordInput = document.getElementById('password');
+				const emailErr = document.getElementById('email-err');
+				const passwordErr = document.getElementById('password-err');
+				const capsWarn = document.getElementById('caps-warn');
+				const pwToggle = document.getElementById('password-toggle');
+
+				// ── On-chain features toggle ──
+				const onchainToggle = document.getElementById('onchain-toggle');
+				const onchainSection = document.getElementById('onchain-section');
+				let onchainOpen = false;
+
+				function setOnchainOpen(open) {
+					onchainOpen = open;
+					onchainSection.classList.toggle('open', open);
+					onchainSection.setAttribute('aria-hidden', open ? 'false' : 'true');
+					onchainToggle.setAttribute('aria-expanded', open ? 'true' : 'false');
+					onchainToggle.classList.toggle('active', open);
+					onchainToggle.textContent = open ? 'Hide wallet' : 'Connect wallet';
+					try { sessionStorage.setItem('login:onchain', open ? '1' : '0'); } catch { /* ignore */ }
+				}
+
+				onchainToggle.addEventListener('click', () => setOnchainOpen(!onchainOpen));
+
+				// Show no-wallet hint when redirected from a wallet dead-end
+				const loginParams = new URLSearchParams(location.search);
+				if (loginParams.get('from') === 'no-wallet') {
+					document.getElementById('no-wallet-hint')?.classList.add('show');
+				}
+
+				// Restore previous toggle state (skip if coming from no-wallet dead-end)
+				try {
+					const saved = sessionStorage.getItem('login:onchain');
+					if (saved === '1' && loginParams.get('from') !== 'no-wallet') setOnchainOpen(true);
+				} catch { /* ignore */ }
+
+				// ── Wallet chain tabs ──
+				const solanaTab = document.querySelector('.chain-tab[data-chain="solana"]');
+				const evmTab = document.querySelector('.chain-tab[data-chain="evm"]');
+				function activateChain(chain) {
+					document.querySelectorAll('.chain-tab').forEach((x) => {
+						const on = x.dataset.chain === chain;
+						x.classList.toggle('active', on);
+						x.setAttribute('aria-selected', on ? 'true' : 'false');
+					});
+					document.getElementById('evm-panel').classList.toggle('active', chain === 'evm');
+					document.getElementById('solana-panel').classList.toggle('active', chain === 'solana');
+				}
+				const hasSolana = !!(window.solana || window.phantom?.solana || window.backpack || window.solflare);
+				if (solanaTab && !hasSolana) {
+					solanaTab.disabled = true;
+					solanaTab.title = 'Install Phantom, Backpack, or Solflare to use Solana';
+					activateChain('evm');
+				}
+				document.querySelectorAll('.chain-tab').forEach((t) => {
+					t.addEventListener('click', () => {
+						if (t.disabled) return;
+						activateChain(t.dataset.chain);
+					});
+				});
+
+				// ── Password show/hide ──
+				pwToggle.addEventListener('click', () => {
+					const show = passwordInput.type === 'password';
+					passwordInput.type = show ? 'text' : 'password';
+					pwToggle.setAttribute('aria-pressed', show ? 'true' : 'false');
+					pwToggle.setAttribute('aria-label', show ? 'Hide password' : 'Show password');
+				});
+
+				// ── Caps lock warn ──
+				function checkCaps(e) {
+					const on = e.getModifierState && e.getModifierState('CapsLock');
+					capsWarn.classList.toggle('show', !!on);
+				}
+				passwordInput.addEventListener('keydown', checkCaps);
+				passwordInput.addEventListener('keyup', checkCaps);
+				passwordInput.addEventListener('blur', () => { capsWarn.classList.remove('show'); });
+
+				// ── Inline field errors ──
+				function setFieldError(input, errEl, msg) {
+					if (msg) {
+						errEl.textContent = msg;
+						errEl.classList.add('show');
+						input.classList.add('invalid');
+						input.classList.remove('shaking');
+						void input.offsetWidth;
+						input.classList.add('shaking');
+					} else {
+						errEl.textContent = '';
+						errEl.classList.remove('show');
+						input.classList.remove('invalid');
+					}
+				}
+				emailInput.addEventListener('input', () => setFieldError(emailInput, emailErr, ''));
+				passwordInput.addEventListener('input', () => setFieldError(passwordInput, passwordErr, ''));
+
+				// ── Label "lit" on focus + mobile scroll-into-view ──
+				const isTouch = matchMedia('(hover: none)').matches;
+				document.querySelectorAll('#f input').forEach((input) => {
+					const label = document.querySelector(`label[for="${input.id}"]`);
+					input.addEventListener('focus', () => {
+						if (label) label.classList.add('lit');
+						if (isTouch) {
+							setTimeout(() => input.scrollIntoView({ block: 'center', behavior: 'smooth' }), 250);
+						}
+					});
+					if (label) input.addEventListener('blur', () => label.classList.remove('lit'));
+				});
+
+				// ── Email prefill ──
+				const params = new URLSearchParams(location.search);
+				const LAST_EMAIL_KEY = '3dagent:last-email';
+				const prefillEmail = params.get('email') || (() => {
+					try { return localStorage.getItem(LAST_EMAIL_KEY) || ''; } catch { return ''; }
+				})();
+				if (prefillEmail) {
+					emailInput.value = prefillEmail;
+					passwordInput.focus();
+				}
+
+				// ── Auth redirect ──
+				// safeNext: inline copy of src/safe-next.js (tests/safe-next.test.js drift-guards it).
+function safeNext(raw, fallback = '/dashboard') {
+	if (typeof raw !== 'string' || raw.length === 0) return fallback;
+	// Require a single leading '/': '//evil.com' is protocol-relative, and a
+	// backslash anywhere lets '/\evil.com' normalize to '//evil.com' in the
+	// URL parser.
+	if (!raw.startsWith('/') || raw.startsWith('//')) return fallback;
+	if (raw.includes('\\')) return fallback;
+	// Control characters can smuggle a scheme past naive prefix checks.
+	// eslint-disable-next-line no-control-regex
+	if (/[\u0000-\u001f]/.test(raw)) return fallback;
+	return raw;
+}
+				const next = safeNext(
+					params.get('next') || sessionStorage.getItem('login_redirect'),
+					'/dashboard',
+				);
+				sessionStorage.removeItem('login_redirect');
+				window.__loginNext = next;
+				const navType = performance.getEntriesByType('navigation')[0]?.type;
+				if (navType !== 'back_forward') {
+					fetch('/api/auth/me', { credentials: 'include' })
+						.then((r) => {
+							if (r.ok) return r.json();
+							// 401 = not signed in: expected, stay on the form silently.
+							if (r.status === 401) return null;
+							throw new Error('session-check-failed');
+						})
+						.then((data) => {
+							if (data?.user) location.replace(next);
+						})
+						.catch(() => {
+							// Network/transport failure while checking an existing
+							// session — tell the user rather than silently showing a
+							// blank form they may already be signed in behind.
+							err.textContent =
+								"Couldn't verify your session — check your connection. You can still sign in below.";
+							err.style.display = 'block';
+						});
+				}
+
+				// ── CAPTCHA bypass ──
+				// When the server rate-limits this IP it now returns captcha_available:true.
+				// We show the Altcha proof-of-work widget instead of a hard countdown —
+				// the user solves a short CPU puzzle, gets a signed bypass token, and the
+				// next login attempt uses that token to skip the normal rate-limit bucket.
+				const captchaWrap = document.getElementById('captcha-wrap');
+				const captchaHint = captchaWrap.querySelector('.captcha-hint');
+				let altchaWidget = null;
+				let captchaToken = null;
+				let captchaPending = false;
+
+				// Create the Altcha widget on demand. It ships a hidden required
+				// checkbox; injecting it only when a captcha is actually needed keeps
+				// that control out of the form during normal sign-in, so the browser
+				// never aborts submission on a non-focusable required field.
+				function ensureCaptchaWidget() {
+					if (altchaWidget) return altchaWidget;
+					altchaWidget = document.createElement('altcha-widget');
+					altchaWidget.id = 'altcha-widget';
+					altchaWidget.setAttribute('challengeurl', '/api/auth/captcha');
+					altchaWidget.setAttribute('hidefooter', '');
+					altchaWidget.addEventListener('statechange', onCaptchaStateChange);
+					captchaWrap.insertBefore(altchaWidget, captchaHint);
+					return altchaWidget;
+				}
+
+				function showCaptcha() {
+					ensureCaptchaWidget();
+					captchaWrap.classList.add('show');
+					btn.disabled = true;
+					btn.textContent = 'Complete the check below…';
+					err.textContent = 'Too many sign-in attempts from this connection. Complete the quick check below to continue.';
+					err.style.color = '';
+					err.style.display = 'block';
+				}
+
+				function hideCaptcha() {
+					captchaWrap.classList.remove('show');
+					captchaToken = null;
+					captchaPending = false;
+					// Reset the widget so a fresh challenge is fetched next time.
+					altchaWidget?.reset?.();
+				}
+
+				// Altcha fires a 'statechange' event when the puzzle is solved.
+				// Payload is base64 JSON; we verify it server-side at /api/auth/captcha.
+				async function onCaptchaStateChange(e) {
+					if (e.detail?.state !== 'verified' || !e.detail?.payload) return;
+					if (captchaPending) return;
+					captchaPending = true;
+					btn.textContent = 'Verifying…';
+					btn.disabled = true;
+					try {
+						const r = await fetch('/api/auth/captcha', {
+							method: 'POST',
+							headers: { 'content-type': 'application/json' },
+							body: JSON.stringify({ payload: e.detail.payload }),
+						});
+						const d = await r.json().catch(() => ({}));
+						if (r.ok && d.token) {
+							captchaToken = d.token;
+							hideCaptcha();
+							// Re-submit automatically so the user doesn't have to click again.
+							btn.disabled = false;
+							btn.textContent = 'Sign in';
+							err.style.display = 'none';
+							form.dispatchEvent(new Event('submit', { cancelable: true, bubbles: true }));
+						} else {
+							captchaPending = false;
+							err.textContent = 'Verification failed — please try the puzzle again.';
+							err.style.display = 'block';
+							btn.textContent = 'Complete the check below…';
+							btn.disabled = true;
+						}
+					} catch {
+						captchaPending = false;
+						err.textContent = 'Network error verifying the puzzle — try again.';
+						err.style.display = 'block';
+						btn.textContent = 'Complete the check below…';
+						btn.disabled = true;
+					}
+				}
+
+				// ── Rate-limit cooldown (fallback when CAPTCHA is not available) ──
+				// When captcha_available is true the puzzle UI takes over instead.
+				// This fires only for rate-limited non-login paths that don't yet
+				// support CAPTCHA bypass (e.g. register).
+				let cooldownTimer = null;
+				function clearCooldown() {
+					if (cooldownTimer) { clearInterval(cooldownTimer); cooldownTimer = null; }
+				}
+				function fmtCooldown(s) {
+					if (s >= 60) {
+						const m = Math.floor(s / 60);
+						return `${m}:${String(s % 60).padStart(2, '0')}`;
+					}
+					return `${s}s`;
+				}
+				function startCooldown(seconds) {
+					clearCooldown();
+					let remaining = Math.max(1, Math.ceil(seconds));
+					btn.disabled = true;
+					const render = () => {
+						btn.textContent = `Try again in ${fmtCooldown(remaining)}`;
+						err.textContent = `Too many sign-in attempts. You can try again in ${fmtCooldown(remaining)}.`;
+						err.style.color = '';
+						err.style.display = 'block';
+					};
+					render();
+					cooldownTimer = setInterval(() => {
+						remaining -= 1;
+						if (remaining <= 0) {
+							clearCooldown();
+							btn.disabled = false;
+							btn.textContent = 'Sign in';
+							err.style.display = 'none';
+							emailInput.focus();
+							return;
+						}
+						render();
+					}, 1000);
+				}
+
+				// ── Submit ──
+				form.addEventListener('submit', async (e) => {
+					e.preventDefault();
+					err.style.display = 'none';
+					setFieldError(emailInput, emailErr, '');
+					setFieldError(passwordInput, passwordErr, '');
+
+					const email = emailInput ? emailInput.value.trim() : '';
+					const password = passwordInput ? passwordInput.value : '';
+					let bad = false;
+					if (!email) {
+						setFieldError(emailInput, emailErr, 'Enter your email or username.');
+						bad = true;
+					}
+					if (!password) {
+						setFieldError(passwordInput, passwordErr, 'Enter your password.');
+						bad = true;
+					}
+					if (bad) { window.__avatarReact?.(); return; }
+
+					clearCooldown();
+					btn.disabled = true;
+					btn.textContent = 'Signing in…';
+
+					const loginHeaders = { 'content-type': 'application/json' };
+					if (captchaToken) loginHeaders['x-captcha-token'] = captchaToken;
+
+					let res;
+					const loginTimeout = new AbortController();
+					const loginTimer = setTimeout(() => loginTimeout.abort(), 20_000);
+					try {
+						res = await fetch('/api/auth/login', {
+							method: 'POST',
+							credentials: 'include',
+							headers: loginHeaders,
+							// tosAccepted: the sign-in-wrap notice under the form ("By signing
+						// in you agree…") makes each sign-in an affirmation of the current
+						// Terms; the server re-stamps the user's accepted version.
+						body: JSON.stringify({ email, password, remember: document.getElementById('remember')?.checked || false, tosAccepted: true }),
+							signal: loginTimeout.signal,
+						});
+					} catch (err) {
+						// Transport failure or timeout — the request never reached the server
+						// (or never got a response), so the button must not stay stuck.
+						setFieldError(
+							passwordInput,
+							passwordErr,
+							err?.name === 'AbortError'
+								? 'Sign-in timed out — check your connection and try again.'
+								: 'Network error — check your connection and try again.',
+						);
+						btn.disabled = false;
+						btn.textContent = 'Sign in';
+						window.__avatarFall?.();
+						return;
+					} finally {
+						clearTimeout(loginTimer);
+					}
+
+					const data = await res.json().catch(() => ({}));
+
+					if (res.status === 429) {
+						window.__avatarFall?.();
+						// If the server says CAPTCHA is available, show the puzzle widget.
+						// If not (or if the CAPTCHA token is already exhausted), fall back
+						// to the countdown so the user still has a path forward.
+						if (data.captcha_available !== false) {
+							captchaToken = null;
+							captchaPending = false;
+							showCaptcha();
+						} else {
+							const retryAfter =
+								Number(data.retry_after) ||
+								parseInt(res.headers.get('retry-after') || '', 10) ||
+								60;
+							startCooldown(retryAfter);
+						}
+						return;
+					}
+
+					if (!res.ok) {
+						setFieldError(passwordInput, passwordErr, 'Email or password is incorrect.');
+						btn.disabled = false;
+						btn.textContent = 'Sign in';
+						window.__avatarFall?.();
+						return;
+					}
+
+					try {
+						localStorage.setItem(LAST_EMAIL_KEY, email);
+						localStorage.setItem(
+							'3dagent:auth-hint',
+							JSON.stringify({
+								authed: true,
+								name: data.user?.display_name || '',
+								ts: Date.now(),
+							}),
+						);
+					} catch {
+						/* ignore */
+					}
+					btn.textContent = 'Signed in — redirecting…';
+					// Tie the redirect to the celebration animation's own length
+					// (one dance cycle) instead of an arbitrary fixed timer, and
+					// use replace() so Back never lands the user on the login form
+					// again after they're authenticated.
+					const danceMs = window.__avatarCelebrate?.() || 1200;
+					setTimeout(
+						() => location.replace(next),
+						Math.min(Math.max(danceMs, 700), 1800),
+					);
+				});
+
+			})();
+		</script>
+		<script type="module">
+			import { createAgentUI } from '@three-ws/agent-ui';
+
+			const avatarWrap = document.getElementById('login-avatar-wrap');
+			const emailInput = document.getElementById('email');
+			const passwordInput = document.getElementById('password');
+
+			// The avatar's GLB and clip JSONs arrive over the network inside
+			// createAgentUI. Awaited at module top level, a transient fetch failure
+			// used to reject the whole module and surface as an uncaught
+			// "Failed to fetch". The avatar is decoration: if it can't load, hide
+			// its stage and let the form carry on (every caller reaches the
+			// __avatarReact / __avatarFall / __avatarCelebrate hooks via optional
+			// chaining, so their absence is already designed for).
+			let agent;
+			try {
+				agent = await createAgentUI({
+					canvas: document.getElementById('avatar-canvas'),
+					// Plant him: no camera parallax means he holds his mark and never
+					// drifts after the cursor.
+					parallax: false,
+					clips: ['idle', 'covereyes', 'facepalm', 'dance'],
+					subclips: {
+						covereyes: { start: 0, end: 48, fps: 30 },
+					},
+				});
+			} catch (err) {
+				avatarWrap?.classList.remove('loading');
+				if (avatarWrap) avatarWrap.style.display = 'none';
+				console.warn('[login] avatar unavailable, continuing without it:', err);
+			}
+
+			if (agent) {
+
+				const AVATAR_ANCHOR = { anchor: 'bottom-center', offsetY: -50 };
+
+				// Park him on his mark in the idle pose for the initial frame.
+				agent.standOn(avatarWrap, AVATAR_ANCHOR);
+				avatarWrap?.classList.remove('loading');
+
+				// The avatar lives on a viewport-fixed overlay canvas, so left alone he
+				// would stay glued to the screen and trail the viewport down into the
+				// footer as you scroll. Re-pin him to his anchor in the panel on every
+				// scroll/resize so he holds his place in the login card and slides away
+				// with it instead. Only his position is updated — the active clip is left
+				// untouched so idle / cover-eyes / facepalm / celebrate keep playing.
+				function repinAvatar() {
+					if (!agent.avatar) return;
+					// When the panel is collapsed (short-viewport breakpoint hides it)
+					// the wrap has no layout box — leave him where he is rather than
+					// snapping to the corner.
+					if (!avatarWrap.offsetParent) return;
+					const target = agent.worldOfElement(avatarWrap, AVATAR_ANCHOR);
+					agent.avatar.position.x = target.x;
+					agent.avatar.position.y = target.y;
+				}
+
+				let repinQueued = false;
+				function scheduleRepin() {
+					if (repinQueued) return;
+					repinQueued = true;
+					requestAnimationFrame(() => {
+						repinQueued = false;
+						repinAvatar();
+					});
+				}
+
+				window.addEventListener('scroll', scheduleRepin, { passive: true });
+				window.addEventListener('resize', scheduleRepin);
+
+				// The avatar shields its eyes whenever the user is typing a
+				// credential — email or password — so it never "peeks" at what
+				// you enter. It stays covered while focus moves between the two
+				// fields (or to the password show/hide toggle) and only relaxes
+				// back to idle once you leave the credential inputs entirely.
+				const credentialFields = [emailInput, passwordInput];
+
+				function coverEyes() {
+					if (agent.currentClip === 'covereyes') return;
+					agent.play('covereyes', { loop: false, hold: true });
+					agent.faceFront();
+				}
+				function uncoverEyes(e) {
+					const to = e.relatedTarget;
+					if (to && (credentialFields.includes(to) || to.closest?.('.password-wrap'))) return;
+					agent.play('idle', { loop: true });
+				}
+
+				credentialFields.forEach((field) => {
+					field.addEventListener('focus', coverEyes);
+					field.addEventListener('blur', uncoverEyes);
+				});
+
+				// Settle back to a resting pose after a one-shot reaction. If the
+				// user is still in a credential field, the eyes stay shielded;
+				// otherwise the avatar relaxes to idle.
+				function settle() {
+					const active = document.activeElement;
+					if (active && credentialFields.includes(active)) coverEyes();
+					else agent.play('idle', { loop: true });
+				}
+
+				// Empty field — a quick facepalm nudge, no full collapse.
+				window.__avatarReact = function () {
+					agent.faceFront();
+					agent.play('facepalm', { loop: false });
+					const dur = agent.clip('facepalm') * 1000;
+					setTimeout(() => {
+						if (agent.currentClip === 'facepalm') settle();
+					}, dur - 150);
+				};
+
+				// Wrong credentials — same upright facepalm nudge as an empty field.
+				// He reacts with character but stays on his feet and on his mark;
+				// he never topples or wanders.
+				window.__avatarFall = window.__avatarReact;
+
+				// Successful sign-in — a happy dance while we redirect.
+				window.__avatarCelebrate = function () {
+					agent.faceFront();
+					agent.play('dance', { loop: true });
+					// Report one dance-cycle length (ms) so the redirect can wait for a
+					// natural beat of the animation rather than a hard-coded delay.
+					const cycle = agent.clip('dance');
+					return cycle ? cycle * 1000 : 0;
+				};
+			}
+		</script>
+		<script src="/brand.js" defer></script>
+	<!-- Runtime i18n: detects locale, swaps annotated copy, mounts <lang-switcher>. -->
+	<script type="module" src="/i18n.js"></script>
+</body>
+</html>

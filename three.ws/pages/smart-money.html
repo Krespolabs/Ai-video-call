@@ -1,0 +1,1167 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+	<script>/* three.ws theme boot — no-flash; runtime in /theme-switcher.js */(function(){try{var m=localStorage.getItem('twx_theme');var l=m==='auto'?(window.matchMedia&&window.matchMedia('(prefers-color-scheme: light)').matches):m==='light';document.documentElement.setAttribute('data-theme',l?'light':'dark');}catch(e){document.documentElement.setAttribute('data-theme','dark');}})();</script>
+	<meta charset="utf-8" />
+	<script src="/referral-capture.js"></script>
+	<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+	<title data-i18n="smart_money.meta_title">Smart Money Radar — follow the wallets that actually win on pump.fun · three.ws</title>
+	<meta name="description" content="A live, first-party reputation graph of every pump.fun wallet. We cross each coin's buyers with which coins actually graduated, so you can see exactly which wallets keep picking winners — and what they're buying right now."  data-i18n-attr="content:smart_money.meta_description"/>
+	<meta property="og:title" content="Smart Money Radar · three.ws"  data-i18n-attr="content:smart_money.meta_og_title"/>
+	<meta property="og:description" content="Stop guessing. See which wallets actually win on pump.fun, and what the proven money is accumulating right now — scored from full-coverage trade data."  data-i18n-attr="content:smart_money.meta_og_description"/>
+	<meta property="og:type" content="website" />
+	<meta property="og:site_name" content="three.ws" />
+	<meta property="og:url" content="https://three.ws/smart-money" />
+	<meta property="og:image" content="https://three.ws/api/page-og?s=crypto&amp;t=Smart+Money+Radar%3A+follow+the+wallets+that+win+on+pump.fun&amp;d=A+live+first-party+reputation+graph+of+every+pump.fun+wallet.+We+cross+each+coin%27s+buyers+with+the+coins+that+actually+graduated%2C+so+you+can+see+which+wallets&amp;p=%2Fsmart-money" />
+	<meta name="twitter:card" content="summary_large_image" />
+	<meta name="twitter:title" content="Smart Money Radar — follow the wallets that actually win on pump.fun"  data-i18n-attr="content:smart_money.meta_twitter_title"/>
+	<meta name="twitter:description" content="A live reputation graph of every pump.fun wallet. See who keeps picking winners, and what they're buying right now."  data-i18n-attr="content:smart_money.meta_twitter_description"/>
+	<meta name="twitter:image" content="https://three.ws/api/page-og?s=crypto&amp;t=Smart+Money+Radar%3A+follow+the+wallets+that+win+on+pump.fun&amp;d=A+live+first-party+reputation+graph+of+every+pump.fun+wallet.+We+cross+each+coin%27s+buyers+with+the+coins+that+actually+graduated%2C+so+you+can+see+which+wallets&amp;p=%2Fsmart-money" />
+	<link rel="canonical" href="https://three.ws/smart-money" />
+	<link rel="icon" href="/favicon.ico" />
+	<link rel="stylesheet" href="/nav.css" />
+	<script type="application/ld+json">{"@context":"https://schema.org","@type":"WebPage","name":"Smart Money Radar","description":"A live first-party reputation graph of pump.fun wallets — see which wallets keep picking winners and what the proven money is buying now.","url":"https://three.ws/smart-money","isPartOf":{"@type":"WebSite","name":"three.ws","url":"https://three.ws"}}</script>
+	<style>
+		:root {
+			--bg: #06070d; --panel: rgba(14,16,24,0.72); --panel-solid: #0d0f17; --line: rgba(255,255,255,0.09);
+			--ink: #e9edf6; --muted: #8b93a7; --faint: rgba(255,255,255,0.45);
+			--cyan: #6ee7ff; --violet: #9a7bff; --gold: var(--warn); --up: #34d399; --down: var(--danger);
+			--r: 16px; --r-sm: 11px;
+			--mono: ui-monospace, "JetBrains Mono", SFMono-Regular, Menlo, monospace;
+			--shadow: 0 18px 50px -22px rgba(0,0,0,0.85), 0 1px 0 rgba(255,255,255,0.05) inset;
+			--blur: saturate(160%) blur(16px);
+		}
+		* { box-sizing: border-box; }
+		html, body { margin: 0; min-height: 100%; background: var(--bg); color: var(--ink);
+			font: 15px/1.55 Inter, ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; -webkit-font-smoothing: antialiased; }
+		body { background:
+			radial-gradient(60% 50% at 80% -5%, color-mix(in srgb, var(--violet) 16%, transparent), transparent 70%),
+			radial-gradient(50% 40% at 5% 0%, color-mix(in srgb, var(--cyan) 12%, transparent), transparent 65%), var(--bg); }
+		a { color: inherit; text-decoration: none; }
+		button { font: inherit; color: inherit; cursor: pointer; }
+		.wrap { max-width: 1160px; margin: 0 auto; padding: 0 18px 80px; }
+
+		/* hero */
+		.hero { padding: 40px 0 26px; }
+		.eyebrow { display: inline-flex; align-items: center; gap: 8px; font: 600 12px/1 var(--mono); letter-spacing: .04em;
+			text-transform: uppercase; color: var(--cyan); padding: 7px 12px; border: 1px solid color-mix(in srgb, var(--cyan) 30%, var(--line));
+			border-radius: 999px; background: color-mix(in srgb, var(--cyan) 9%, transparent); }
+		.eyebrow i { width: 7px; height: 7px; border-radius: 50%; background: var(--up); box-shadow: 0 0 0 0 rgba(52,211,153,.6); animation: pulse 1.9s infinite; }
+		@keyframes pulse { 0%{box-shadow:0 0 0 0 rgba(52,211,153,.5)} 70%{box-shadow:0 0 0 7px rgba(52,211,153,0)} 100%{box-shadow:0 0 0 0 rgba(52,211,153,0)} }
+		.hero h1 { font-size: clamp(30px, 5vw, 46px); line-height: 1.05; letter-spacing: -0.025em; margin: 18px 0 12px; font-weight: 800; }
+		.hero h1 span { background: linear-gradient(100deg, var(--cyan), var(--violet)); -webkit-background-clip: text; background-clip: text; color: transparent; }
+		.hero p { max-width: 680px; font-size: 16px; color: var(--muted); margin: 0; }
+		.statline { display: flex; flex-wrap: wrap; gap: 24px 30px; margin-top: 22px; }
+		.statline div span { display: block; font: 600 10.5px/1 var(--mono); letter-spacing: .08em; text-transform: uppercase; color: var(--faint); margin-bottom: 5px; }
+		.statline div b { font: 800 22px/1 var(--mono); font-variant-numeric: tabular-nums; }
+		.statline div small { font: 600 11px/1 var(--mono); color: var(--muted); margin-left: 4px; }
+
+		/* tabs */
+		.tabs { display: flex; gap: 8px; margin: 28px 0 18px; border-bottom: 1px solid var(--line); }
+		.tab { padding: 11px 4px; margin-bottom: -1px; border: none; background: none; color: var(--muted); font-weight: 600; font-size: 14px;
+			border-bottom: 2px solid transparent; transition: color var(--duration-base), border-color var(--duration-base); }
+		.tab:hover { color: var(--ink); }
+		.tab.on { color: var(--ink); border-bottom-color: var(--cyan); }
+		.tab .ct { font: 600 11px/1 var(--mono); color: var(--faint); margin-left: 6px; }
+
+		.view { display: none; }
+		.view.on { display: block; animation: fade .3s; }
+		@keyframes fade { from { opacity: 0; transform: translateY(4px); } }
+
+		/* controls toolbar */
+		.controls { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin: 0 0 16px; }
+		.controls .spacer { flex: 1 1 auto; }
+		.seg { display: inline-flex; padding: 3px; gap: 2px; border: 1px solid var(--line); border-radius: 999px; background: rgba(255,255,255,0.03); }
+		.seg button { padding: 6px 13px; border: none; border-radius: 999px; background: none; color: var(--muted);
+			font: 600 12.5px/1 var(--mono); transition: color var(--duration-fast), background var(--duration-fast); white-space: nowrap; }
+		.seg button:hover { color: var(--ink); }
+		.seg button.on { color: var(--ink); background: color-mix(in srgb, var(--cyan) 16%, transparent); }
+		.seg button .sc { color: var(--faint); margin-left: 5px; font-size: 11px; }
+		.seg button.on .sc { color: color-mix(in srgb, var(--cyan) 80%, var(--ink)); }
+		.field { display: inline-flex; align-items: center; gap: 7px; padding: 0 11px; height: 36px; border: 1px solid var(--line);
+			border-radius: 999px; background: rgba(255,255,255,0.03); transition: border-color var(--duration-fast); }
+		.field:focus-within { border-color: color-mix(in srgb, var(--cyan) 50%, var(--line)); }
+		.field svg { color: var(--faint); flex-shrink: 0; }
+		.field input { border: none; background: none; color: var(--ink); font: 500 13px/1 var(--mono); width: 168px; outline: none; }
+		.field input::placeholder { color: var(--faint); }
+		.field .clr { border: none; background: none; color: var(--faint); padding: 2px; font-size: 15px; line-height: 1; display: none; }
+		.field.has-val .clr { display: inline; }
+		.field .clr:hover { color: var(--ink); }
+		.select { position: relative; }
+		.select select { appearance: none; -webkit-appearance: none; height: 36px; padding: 0 32px 0 13px; border: 1px solid var(--line);
+			border-radius: 999px; background: rgba(255,255,255,0.03); color: var(--ink); font: 600 12.5px/1 var(--mono); cursor: pointer; transition: border-color var(--duration-fast); }
+		.select select:hover { border-color: color-mix(in srgb, var(--cyan) 40%, var(--line)); }
+		.select::after { content: ""; position: absolute; right: 13px; top: 50%; width: 7px; height: 7px; border-right: 1.6px solid var(--faint);
+			border-bottom: 1.6px solid var(--faint); transform: translateY(-65%) rotate(45deg); pointer-events: none; }
+
+		/* coin grid */
+		/* min() keeps the 330px track from forcing a wider-than-viewport column on a
+		   320px phone, where html/body carry overflow-x:clip and would silently shear
+		   the right edge (score badge and ☆ watch button) off every card. */
+		.grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(330px, 100%), 1fr)); gap: 14px; }
+		.sm-coin-wrap { position: relative; }
+		.sm-watch { position: absolute; top: 10px; right: 10px; z-index: 2; width: 28px; height: 28px;
+			display: grid; place-items: center; border-radius: 8px; border: 1px solid var(--line);
+			background: rgba(0,0,0,0.3); color: rgba(255,255,255,0.45); font-size: 14px; cursor: pointer;
+			transition: color var(--duration-fast), border-color var(--duration-fast); opacity: 0; }
+		.sm-coin-wrap:hover .sm-watch, .sm-watch.sm-watched, .sm-watch:focus-visible { opacity: 1; }
+		.sm-watch.sm-watched { color: #7c83ff; border-color: #7c83ff; background: rgba(124,131,255,.12); }
+		.sm-watch:hover { color: var(--ink); }
+		.sm-watch:focus-visible { outline: 2px solid #7c83ff; outline-offset: 1px; }
+		@media (hover: none) { .sm-watch { opacity: 1; } }
+		/* Fork: the card's one live action. Opens the real pump.fun trade panel for
+		   this coin (src/fork-trade.js); the visitor's own wallet signs it. The
+		   card reserves a strip for it rather than floating it over the score
+		   badge, and it stays visible: this is the page's call to action, not a
+		   hover easter egg. */
+		.sm-coin-wrap .coin { padding-bottom: 55px; }
+		.sm-fork { position: absolute; left: 15px; right: 15px; bottom: 13px; z-index: 2; height: 32px;
+			display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+			border-radius: 9px; border: 1px solid rgba(124,131,255,.45); background: rgba(124,131,255,.14);
+			color: var(--ink); font: 700 12px/1 var(--mono, ui-monospace, monospace); letter-spacing: .06em;
+			cursor: pointer; transition: background var(--duration-fast), border-color var(--duration-fast), transform var(--duration-fast); }
+		.sm-fork:hover { background: rgba(124,131,255,.3); border-color: #7c83ff; }
+		.sm-fork:active { transform: translateY(1px); }
+		.sm-fork:focus-visible { outline: 2px solid #7c83ff; outline-offset: 2px; }
+		@media (prefers-reduced-motion: reduce) { .sm-fork { transition: none; } .sm-fork:active { transform: none; } }
+		.coin { text-align: left; width: 100%; background: var(--panel); backdrop-filter: var(--blur); -webkit-backdrop-filter: var(--blur);
+			border: 1px solid var(--line); border-radius: var(--r); padding: 15px; box-shadow: var(--shadow);
+			display: flex; flex-direction: column; gap: 13px; transition: transform var(--duration-fast), border-color var(--duration-fast); }
+		.coin:hover { transform: translateY(-3px); border-color: color-mix(in srgb, var(--cyan) 42%, var(--line)); }
+		.coin-top { display: grid; grid-template-columns: 44px 1fr auto; gap: 12px; align-items: center; }
+		.coin-img { width: 44px; height: 44px; border-radius: 12px; object-fit: cover; background: radial-gradient(120% 100% at 50% 0%, #1b2233, #0d1018); border: 1px solid var(--line); display: grid; place-items: center; font: 700 17px/1 var(--mono); color: var(--faint); }
+		.coin-id { min-width: 0; }
+		.coin-sym { font-weight: 700; font-size: 15px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+		.coin-name { font-size: 12.5px; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+		.score-badge { text-align: center; }
+		.score-badge b { font: 800 24px/1 var(--mono); display: block; }
+		.score-badge span { font: 600 9px/1 var(--mono); text-transform: uppercase; letter-spacing: .08em; color: var(--faint); }
+		.s-hi { color: var(--up); } .s-mid { color: var(--gold); } .s-lo { color: var(--muted); }
+		.coin-meta { display: flex; gap: 8px; flex-wrap: wrap; }
+		.chip { font: 600 11px/1 var(--mono); padding: 5px 9px; border-radius: 8px; background: rgba(255,255,255,0.05); border: 1px solid var(--line); color: var(--muted); }
+		.chip b { color: var(--ink); }
+		.chip.cat { color: var(--violet); border-color: color-mix(in srgb, var(--violet) 30%, var(--line)); }
+		.chip.grad { color: var(--up); border-color: color-mix(in srgb, var(--up) 35%, var(--line)); }
+		.chip.age { color: var(--faint); }
+
+		/* smart-money share bar (coin card + drawer) */
+		.share { display: flex; flex-direction: column; gap: 5px; }
+		.share-head { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; }
+		.share-head .sh-l { font: 600 10px/1 var(--mono); text-transform: uppercase; letter-spacing: .07em; color: var(--faint); }
+		.share-head .sh-v { font: 700 12px/1 var(--mono); color: var(--up); font-variant-numeric: tabular-nums; }
+		.share-track { height: 6px; border-radius: 99px; background: rgba(255,255,255,0.07); overflow: hidden; }
+		.share-fill { height: 100%; border-radius: 99px; background: linear-gradient(90deg, var(--up), var(--cyan)); transition: width var(--duration-slow) var(--ease, var(--ease-standard)); }
+
+		.notable-row { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+		.nlabel { font: 600 10px/1 var(--mono); padding: 4px 7px; border-radius: 6px; white-space: nowrap; }
+		.lb-smart_money { background: color-mix(in srgb, var(--up) 18%, transparent); color: var(--up); }
+		.lb-sniper { background: color-mix(in srgb, var(--gold) 16%, transparent); color: var(--gold); }
+		.lb-dumper, .lb-rugger { background: color-mix(in srgb, var(--down) 18%, transparent); color: var(--down); }
+		.lb-neutral, .lb-fresh, .lb-unproven { background: rgba(255,255,255,0.06); color: var(--faint); }
+
+		/* wallet leaderboard */
+		.dist { display: flex; flex-direction: column; gap: 9px; margin-bottom: 14px; padding: 13px 15px; background: var(--panel);
+			border: 1px solid var(--line); border-radius: var(--r-sm); box-shadow: var(--shadow); }
+		.dist-head { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; }
+		.dist-head b { font: 600 10.5px/1 var(--mono); text-transform: uppercase; letter-spacing: .08em; color: var(--faint); }
+		.dist-head span { font: 600 11px/1 var(--mono); color: var(--muted); }
+		.dist-bar { display: flex; height: 9px; border-radius: 99px; overflow: hidden; background: rgba(255,255,255,0.05); }
+		.dist-seg { height: 100%; transition: width var(--duration-slow) var(--ease, var(--ease-standard)); min-width: 0; }
+		.dist-legend { display: flex; flex-wrap: wrap; gap: 6px 14px; }
+		.dist-key { display: inline-flex; align-items: center; gap: 6px; font: 600 11px/1 var(--mono); color: var(--muted); background: none; border: none; padding: 2px 0; cursor: pointer; }
+		.dist-key:hover { color: var(--ink); }
+		.dist-key.muted { opacity: .4; }
+		.dist-key i { width: 9px; height: 9px; border-radius: 3px; flex-shrink: 0; }
+		.dist-key b { color: var(--ink); }
+
+		.lwrap { background: var(--panel); border: 1px solid var(--line); border-radius: var(--r); overflow: hidden; box-shadow: var(--shadow); }
+		.ltable { width: 100%; border-collapse: collapse; }
+		.ltable thead th { font: 600 10.5px/1 var(--mono); text-transform: uppercase; letter-spacing: .08em; color: var(--faint);
+			border-bottom: 1px solid var(--line); padding: 12px 16px; text-align: left; background: none; white-space: nowrap; }
+		.ltable th.num, .ltable td.num { text-align: right; }
+		.ltable th.sortable { cursor: pointer; transition: color var(--duration-fast); user-select: none; }
+		.ltable th.sortable:hover { color: var(--ink); }
+		.ltable th.sortable .arr { opacity: 0; margin-left: 4px; transition: opacity var(--duration-fast); }
+		.ltable th.sortable:hover .arr { opacity: .5; }
+		.ltable th.sorted { color: var(--cyan); }
+		.ltable th.sorted .arr { opacity: 1; color: var(--cyan); }
+		.lrow { width: 100%; transition: background var(--duration-fast); cursor: pointer; }
+		.lrow td { border-bottom: 1px solid var(--line); padding: 11px 16px; vertical-align: middle; }
+		.lrow:last-child td { border-bottom: none; }
+		.lrow:hover td { background: rgba(255,255,255,0.04); }
+		.lrow:focus-visible { outline: 2px solid var(--cyan); outline-offset: -2px; }
+		.lrank { font: 700 14px/1 var(--mono); color: var(--faint); width: 38px; }
+		.lrank.top { color: var(--gold); }
+		.lw { min-width: 0; display: flex; flex-direction: column; gap: 6px; }
+		.lw-top { display: flex; align-items: center; gap: 9px; }
+		.lw-addr { font: 600 13px/1 var(--mono); overflow: hidden; text-overflow: ellipsis; }
+		.recbar { display: flex; height: 4px; width: 110px; max-width: 100%; border-radius: 99px; overflow: hidden; background: color-mix(in srgb, var(--down) 30%, transparent); }
+		.recbar i { height: 100%; background: var(--up); display: block; }
+		.lscore { font: 800 16px/1 var(--mono); font-variant-numeric: tabular-nums; }
+		.lstat { font: 600 13px/1 var(--mono); color: var(--muted); font-variant-numeric: tabular-nums; }
+		.lstat b { color: var(--ink); }
+		.lstat .lstat-k { display: none; }
+
+		/* stale / reconnecting badge */
+		.stale-bar { display: none; align-items: center; gap: 12px; flex-wrap: wrap; margin: 0 0 14px;
+			padding: 10px 14px; border-radius: var(--r-sm); border: 1px solid color-mix(in srgb, var(--gold) 40%, var(--line));
+			background: color-mix(in srgb, var(--gold) 10%, transparent); color: var(--gold);
+			font: 600 12.5px/1.4 var(--mono); animation: fade .3s; }
+		.stale-bar.on { display: flex; }
+		.stale-bar i { width: 8px; height: 8px; border-radius: 50%; background: var(--gold); flex-shrink: 0;
+			box-shadow: 0 0 0 0 rgba(251,191,36,.6); animation: pulse-gold 1.6s infinite; }
+		@keyframes pulse-gold { 0%{box-shadow:0 0 0 0 rgba(251,191,36,.5)} 70%{box-shadow:0 0 0 6px rgba(251,191,36,0)} 100%{box-shadow:0 0 0 0 rgba(251,191,36,0)} }
+		.stale-bar span { color: color-mix(in srgb, var(--gold) 70%, var(--ink)); }
+		.stale-bar .stale-retry { margin-left: auto; padding: 6px 13px; border-radius: 999px;
+			border: 1px solid color-mix(in srgb, var(--gold) 50%, var(--line)); background: rgba(0,0,0,0.2);
+			color: var(--gold); font: 600 12px/1 var(--mono); transition: transform var(--duration-fast), border-color var(--duration-fast); }
+		.stale-bar .stale-retry:hover { transform: translateY(-1px); border-color: var(--gold); }
+		.stale-bar .stale-retry:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }
+		.stale-bar .stale-retry[aria-busy="true"] { opacity: .6; pointer-events: none; }
+
+		/* drawer */
+		.drawer { position: fixed; inset: 0; z-index: 30; display: none; }
+		.drawer.open { display: block; }
+		.dr-back { position: absolute; inset: 0; background: rgba(4,5,9,0.66); backdrop-filter: blur(5px); animation: fade .25s; }
+		.dr-panel { position: absolute; right: 0; top: 0; bottom: 0; width: min(480px, 100vw); background: var(--panel-solid);
+			border-left: 1px solid var(--line); box-shadow: var(--shadow); overflow: auto; animation: slidein .3s cubic-bezier(.22,1,.36,1); }
+		@keyframes slidein { from { transform: translateX(30px); opacity: .4; } }
+		.dr-head { display: flex; align-items: center; gap: 12px; padding: 18px 20px; border-bottom: 1px solid var(--line); position: sticky; top: 0; background: var(--panel-solid); z-index: 1; }
+		.dr-back-btn { width: 32px; height: 32px; border-radius: 9px; border: 1px solid var(--line); background: rgba(255,255,255,0.03); display: none; place-items: center; flex-shrink: 0; }
+		.dr-back-btn.show { display: grid; }
+		.dr-back-btn:hover { border-color: var(--cyan); }
+		.dr-head h3 { margin: 0; font-size: 18px; letter-spacing: -0.01em; flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+		.dr-x { width: 34px; height: 34px; border-radius: 10px; border: 1px solid var(--line); background: rgba(255,255,255,0.03); display: grid; place-items: center; flex-shrink: 0; }
+		.dr-x:hover { border-color: var(--cyan); }
+		.dr-body { padding: 18px 20px; }
+		.dr-stats { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; margin-bottom: 18px; }
+		.dr-stat { background: rgba(255,255,255,0.03); border: 1px solid var(--line); border-radius: var(--r-sm); padding: 12px 14px; }
+		.dr-stat span { display: block; font: 600 10px/1 var(--mono); text-transform: uppercase; letter-spacing: .07em; color: var(--faint); margin-bottom: 6px; }
+		.dr-stat b { font: 800 19px/1 var(--mono); font-variant-numeric: tabular-nums; }
+		.dr-sec { font: 600 11px/1 var(--mono); text-transform: uppercase; letter-spacing: .09em; color: var(--faint); margin: 18px 0 10px; }
+		.copyrow { display: flex; align-items: center; gap: 8px; margin-bottom: 12px; }
+		.copybtn { display: inline-flex; align-items: center; gap: 7px; padding: 7px 12px; border-radius: 999px; border: 1px solid var(--line);
+			background: rgba(255,255,255,0.03); font: 600 12px/1 var(--mono); color: var(--muted); transition: border-color var(--duration-fast), color var(--duration-fast); }
+		.copybtn:hover { border-color: var(--cyan); color: var(--ink); }
+		.copybtn.done { color: var(--up); border-color: color-mix(in srgb, var(--up) 45%, var(--line)); }
+		.nwallet { display: grid; grid-template-columns: 1fr auto auto; gap: 10px; align-items: center; padding: 10px 0; border-bottom: 1px solid var(--line); cursor: pointer; }
+		.nwallet:last-child { border: none; }
+		.nwallet:hover { background: rgba(255,255,255,0.03); }
+		.nwallet.static { cursor: default; }
+		.nwallet.static:hover { background: none; }
+		.solscan { font: 600 12px/1 var(--mono); color: var(--cyan); }
+		.solscan:hover { text-decoration: underline; }
+
+		/* states */
+		.state { padding: 56px 22px; text-align: center; color: var(--muted); }
+		.state b { display: block; color: var(--ink); font-size: 16px; margin-bottom: 8px; }
+		.state .btn { margin-top: 16px; }
+		.dr-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 18px; }
+		.btn { display: inline-flex; align-items: center; gap: 8px; padding: 10px 16px; border-radius: 999px; border: 1px solid var(--line);
+			background: var(--panel); font-weight: 600; font-size: 13px; transition: transform var(--duration-fast), border-color var(--duration-base); }
+		.btn:hover { transform: translateY(-1px); border-color: color-mix(in srgb, var(--cyan) 50%, var(--line)); }
+		.btn.primary { background: linear-gradient(135deg, color-mix(in srgb, var(--cyan) 24%, var(--panel)), color-mix(in srgb, var(--violet) 24%, var(--panel))); border-color: color-mix(in srgb, var(--cyan) 42%, var(--line)); color: #fff; }
+		.skel { background: var(--panel); border: 1px solid var(--line); border-radius: var(--r); height: 150px;
+			position: relative; overflow: hidden; }
+		.skel::after { content: ""; position: absolute; inset: 0; background: linear-gradient(90deg, transparent, rgba(255,255,255,0.05), transparent); animation: shimmer 1.4s infinite; }
+		@keyframes shimmer { to { transform: translateX(100%); } }
+
+		.foot { margin-top: 34px; padding-top: 18px; border-top: 1px solid var(--line); font-size: 12.5px; color: var(--faint); }
+		.foot b { color: var(--muted); }
+
+		@media (max-width: 860px) {
+			.ltable th.c-narrow, .ltable td.c-narrow { display: none; }
+		}
+		@media (max-width: 620px) {
+			.ltable thead th, .lrow td { padding: 12px 12px; }
+			.lrank { width: 30px; }
+			.dr-panel { width: 100vw; }
+			.field input { width: 120px; }
+		}
+		/* ≤460px: stack each wallet into a single readable column */
+		@media (max-width: 460px) {
+			.ltable, .ltable thead, .ltable tbody, .ltable tr, .ltable td { display: block; }
+			.ltable thead { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+			.ltable th.c-narrow, .ltable td.c-narrow { display: block; }
+			.lrow { border-bottom: 1px solid var(--line); padding: 14px 16px; display: grid; grid-template-columns: auto 1fr auto; gap: 4px 10px; align-items: center; }
+			.lrow:last-child { border-bottom: none; }
+			.lrow td { border-bottom: none; padding: 0; text-align: left; }
+			.lrow:hover td { background: none; }
+			.lrow:hover { background: rgba(255,255,255,0.04); }
+			.lrank { grid-row: 1 / span 2; align-self: start; }
+			.lrow td.lw-cell { grid-column: 2; }
+			.lrow td.lscore { grid-column: 3; grid-row: 1 / span 2; text-align: right; }
+			.lstat { grid-column: 2; color: var(--muted); display: inline; margin-right: 14px; }
+			.lstat .lstat-k { display: inline; color: var(--faint); margin-right: 5px; }
+		}
+		@media (prefers-reduced-motion: reduce) { * { animation-duration: .01ms !important; } }
+
+		/* oracle conviction in coin drawer */
+		.sm-oracle-slot { margin-top: 6px; }
+		.sm-oracle-body { display: flex; align-items: center; gap: 16px; background: rgba(255,255,255,0.03); border: 1px solid var(--line); border-radius: var(--r); padding: 14px; }
+		.sm-oracle-dial { display: flex; flex-direction: column; align-items: center; flex-shrink: 0; }
+		.sm-oracle-score { font: 800 36px/1 var(--mono); font-variant-numeric: tabular-nums; letter-spacing: -0.02em; }
+		.sm-oracle-tier { font: 700 10px/1 var(--mono); text-transform: uppercase; letter-spacing: .08em; margin-top: 5px; opacity: .85; }
+		.sm-pillars { flex: 1; display: flex; flex-direction: column; gap: 7px; }
+		.sm-pillar { display: grid; grid-template-columns: 72px 1fr 30px; gap: 7px; align-items: center; }
+		.sm-pillar-lbl { font: 600 10.5px/1 var(--mono); color: var(--faint); }
+		.sm-pillar-track { height: 5px; border-radius: 99px; background: rgba(255,255,255,0.07); overflow: hidden; }
+		.sm-pillar-fill { height: 100%; border-radius: 99px; transition: width var(--duration-slow) var(--ease, var(--ease-standard)); }
+		.sm-pillar-val { font: 700 11px/1 var(--mono); text-align: right; font-variant-numeric: tabular-nums; }
+		.sm-oracle-link { display: inline-block; margin-top: 10px; font: 600 12px/1 var(--mono); color: var(--cyan); text-decoration: none; }
+		.sm-oracle-link:hover { text-decoration: underline; }
+	</style>
+
+	<meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1">
+	<meta property="og:locale" content="en_US">
+	<meta property="og:image:alt" content="Smart Money Radar — follow the wallets that win on pump.fun — three.ws">
+	<meta name="twitter:site" content="@trythreews">
+</head>
+<body>
+	<div id="nav-container"></div>
+	<script defer src="/nav.js"></script>
+
+	<main class="wrap">
+		<header class="hero">
+			<span class="eyebrow" data-i18n-html="smart_money.live_pump_fun_reputation_graph"><i></i> Live · pump.fun reputation graph</span>
+			<h1 data-i18n-html="smart_money.don_t_read_the_coin_read_the">Don't read the coin.<br><span>Read the money buying it.</span></h1>
+			<p data-i18n-html="smart_money.every_pump_fun_launch_every_wallet_every">Every pump.fun launch, every wallet, every trade — crossed against which coins actually graduated to Raydium. The result is a real track record for each wallet, and a live read on which fresh coins the <em>proven</em> money is quietly accumulating. The only edge that compounds: follow the wallets that keep being right.</p>
+			<div class="statline" id="statline">
+				<div><span data-i18n="smart_money.proven_wallets">Proven wallets</span><b id="stProven">—</b></div>
+				<div><span data-i18n="smart_money.proven_win_rate">Proven win rate</span><b id="stWinRate">—</b></div>
+				<div><span data-i18n="smart_money.tracked_capital">Tracked capital</span><b id="stCapital">—</b></div>
+				<div><span data-i18n="smart_money.coins_on_radar">Coins on radar</span><b id="stCoins">—</b></div>
+				<div><span data-i18n="smart_money.updated">Updated</span><b id="stUpdated">—</b></div>
+			</div>
+		</header>
+
+		<nav class="tabs">
+			<button class="tab on" data-view="feed" data-i18n-html="smart_money.smart_money_is_buying">Smart money is buying <span class="ct" id="ctFeed"></span></button>
+			<button class="tab" data-view="wallets" data-i18n-html="smart_money.top_wallets">Top wallets <span class="ct" id="ctWallets"></span></button>
+			<button class="tab" data-view="watchlist" data-i18n-html="smart_money.watchlist">Watchlist <span class="ct" id="ctWatch"></span></button>
+		</nav>
+
+		<div class="stale-bar" id="staleBar" role="status" aria-live="polite" hidden>
+			<i aria-hidden="true"></i>
+			<div>Reconnecting to the radar — <span id="staleDetail" data-i18n="smart_money.showing_the_last_data_we_received_which">showing the last data we received, which may be stale.</span></div>
+			<button class="stale-retry" id="staleRetry" type="button" data-i18n="smart_money.retry_now">Retry now</button>
+		</div>
+
+		<section class="view on" id="view-feed">
+			<div class="controls">
+				<div class="seg" id="feedFilter" role="tablist" aria-label="Filter coins">
+					<button data-f="fresh" class="on" role="tab" aria-selected="true" data-i18n-html="smart_money.on_radar">On radar <span class="sc" id="fcFresh"></span></button>
+					<button data-f="graduated" role="tab" aria-selected="false" data-i18n-html="smart_money.graduated">Graduated <span class="sc" id="fcGrad"></span></button>
+					<button data-f="all" role="tab" aria-selected="false" data-i18n="smart_money.all">All</button>
+				</div>
+				<div class="spacer"></div>
+				<div class="select">
+					<select id="feedSort" aria-label="Sort coins">
+						<option value="score" data-i18n="smart_money.sort_pedigree">Sort: Pedigree</option>
+						<option value="share" data-i18n="smart_money.sort_smart_money_share">Sort: Smart-money share</option>
+						<option value="volume" data-i18n="smart_money.sort_smart_buy_volume">Sort: Smart buy volume</option>
+						<option value="wallets" data-i18n="smart_money.sort_proven_wallets_in">Sort: Proven wallets in</option>
+						<option value="new" data-i18n="smart_money.sort_freshest">Sort: Freshest</option>
+					</select>
+				</div>
+			</div>
+			<div class="grid" id="feedGrid"></div>
+		</section>
+
+		<section class="view" id="view-wallets">
+			<div class="dist" id="dist" hidden>
+				<div class="dist-head"><b data-i18n="smart_money.reputation_mix">Reputation mix</b><span id="distCount"></span></div>
+				<div class="dist-bar" id="distBar"></div>
+				<div class="dist-legend" id="distLegend"></div>
+			</div>
+			<div class="controls">
+				<div class="seg" id="walletLabel" role="group" aria-label="Filter wallets by reputation">
+					<button data-l="all" class="on" data-i18n="smart_money.all_2">All</button>
+					<button data-l="smart_money" data-i18n="smart_money.smart_money">Smart money</button>
+					<button data-l="sniper" data-i18n="smart_money.snipers">Snipers</button>
+					<button data-l="dumper" data-i18n="smart_money.dumpers">Dumpers</button>
+					<button data-l="rugger" data-i18n="smart_money.ruggers">Ruggers</button>
+				</div>
+				<div class="spacer"></div>
+				<div class="field" id="walletSearchField">
+					<svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="7" cy="7" r="4.5"/><path d="M11 11l3 3" stroke-linecap="round"/></svg>
+					<input id="walletSearch" type="search" placeholder="Search or paste address" autocomplete="off" spellcheck="false" aria-label="Search wallets or paste an address" />
+					<button class="clr" id="walletSearchClr" type="button" aria-label="Clear search" data-i18n-attr="aria-label:smart_money.clear_search_arialabel">×</button>
+				</div>
+			</div>
+			<div class="lwrap">
+				<table class="ltable" aria-label="Top pump.fun wallets by reputation score">
+					<thead><tr id="walletHead"></tr></thead>
+					<tbody id="walletList"></tbody>
+				</table>
+			</div>
+		</section>
+
+		<section class="view" id="view-watchlist">
+			<div class="grid" id="watchGrid"></div>
+		</section>
+
+		<p class="foot" data-i18n="smart_money.scored_from_first_party_trade_observation_an">Scored from first-party trade observation and on-chain graduations. A wallet's reputation is its track record, not a guarantee — coins are volatile and this is not financial advice. Reputations rebuild as new outcomes land.</p>
+	</main>
+
+	<div class="drawer" id="drawer">
+		<div class="dr-back" id="drBack"></div>
+		<div class="dr-panel" role="dialog" aria-modal="true">
+			<div class="dr-head">
+				<button class="dr-back-btn" id="drBackBtn" aria-label="Back" data-i18n-attr="aria-label:smart_money.back_arialabel">
+					<svg viewBox="0 0 20 20" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5l-5 5 5 5"/></svg>
+				</button>
+				<h3 id="drTitle" data-i18n="smart_money.details">Details</h3>
+				<button class="dr-x" id="drClose" aria-label="Close" data-i18n-attr="aria-label:smart_money.close_arialabel">
+					<svg viewBox="0 0 20 20" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><path d="M5 5l10 10M15 5L5 15"/></svg>
+				</button>
+			</div>
+			<div class="dr-body" id="drBody"></div>
+		</div>
+	</div>
+
+	<script type="module">
+		import { initFork, forkButton } from '/src/fork-trade.js';
+
+		const API = '/api/pump/smart-money';
+		const $ = (id) => document.getElementById(id);
+		const fmtSol = (n) => (n == null ? '0' : (n >= 100 ? Math.round(n) : n.toFixed(n >= 10 ? 1 : 2)));
+		const fmtSolC = (n) => { n = Number(n) || 0; return n >= 1000 ? (n / 1000).toFixed(n >= 10000 ? 0 : 1) + 'k' : fmtSol(n); };
+		const short = (w) => (w ? w.slice(0, 4) + '…' + w.slice(-4) : '—');
+		const scoreClass = (s) => (s >= 70 ? 's-hi' : s >= 40 ? 's-mid' : 's-lo');
+		const labelText = { smart_money: 'smart money', sniper: 'sniper', dumper: 'dumper', rugger: 'rugger', fresh: 'fresh', neutral: 'neutral', unproven: 'new' };
+		const esc = (s) => String(s ?? '').replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+		const isAddr = (s) => /^[1-9A-HJ-NP-Za-km-z]{32,44}$/.test(String(s || '').trim());
+		const shareOf = (c) => (c.total_buy_sol > 0 ? Math.round((c.proven_buy_sol / c.total_buy_sol) * 100) : 0);
+		function ago(ts) {
+			if (!ts) return null;
+			const s = (Date.now() - new Date(ts).getTime()) / 1000;
+			if (!Number.isFinite(s) || s < 0) return null;
+			if (s < 90) return Math.max(1, Math.round(s)) + 's';
+			if (s < 3600) return Math.round(s / 60) + 'm';
+			if (s < 86400) return Math.round(s / 3600) + 'h';
+			return Math.round(s / 86400) + 'd';
+		}
+
+		const WATCH_KEY = 'ld_watchlist';
+		const readWatch = () => { try { return JSON.parse(localStorage.getItem(WATCH_KEY) || '[]'); } catch { return []; } };
+		const isWatched = (mint) => readWatch().includes(mint);
+		function toggleSmWatch(mint) {
+			try {
+				const list = readWatch();
+				const idx = list.indexOf(mint);
+				if (idx >= 0) list.splice(idx, 1); else list.unshift(mint);
+				localStorage.setItem(WATCH_KEY, JSON.stringify(list.slice(0, 200)));
+				updateWatchCount();
+				return idx < 0;
+			} catch { return false; }
+		}
+		function updateWatchCount() {
+			const n = readWatch().length;
+			$('ctWatch').textContent = n ? `(${n})` : '';
+		}
+
+		// ── view state ──────────────────────────────────────────────────────────
+		const state = {
+			coins: [],            // every scored coin (fresh + graduated) from the feed
+			wallets: [],          // full leaderboard
+			feedFilter: 'fresh',  // fresh | graduated | all
+			feedSort: 'score',
+			walletLabel: 'all',
+			walletSort: 'score',
+			walletDir: 'desc',
+			walletQuery: '',
+			watchLoaded: false,
+		};
+
+		let timer = null;
+		let hasData = false;
+		let staleSince = 0;
+		let staleFails = 0;
+
+		function showStale() {
+			const bar = $('staleBar');
+			if (!staleSince) staleSince = Date.now();
+			const mins = Math.floor((Date.now() - staleSince) / 60000);
+			const last = $('stUpdated').textContent;
+			let detail = mins >= 1
+				? `last good update was ${last || '—'} (${mins} min ago) — data may be stale.`
+				: `showing the last data we received (updated ${last || '—'}), which may be stale.`;
+			if (staleFails >= 3) detail = `couldn't reach the radar after ${staleFails} attempts — ${detail}`;
+			$('staleDetail').textContent = detail;
+			bar.hidden = false;
+			bar.classList.add('on');
+		}
+		function clearStale() {
+			staleSince = 0; staleFails = 0;
+			const bar = $('staleBar');
+			bar.classList.remove('on');
+			bar.hidden = true;
+		}
+
+		// Every caller needs to tell "the radar answered, and the answer is no data"
+		// apart from "we never reached the radar". Those are different states with
+		// different copy and different affordances (retry vs. explain), so the error
+		// carries the distinction instead of collapsing both into one message.
+		async function getJSON(url) {
+			let r;
+			try {
+				r = await fetch(url, { headers: { accept: 'application/json' } });
+			} catch (e) {
+				const err = new Error(e && e.message ? e.message : 'network request failed');
+				err.unreachable = true;
+				throw err;
+			}
+			if (!r.ok) {
+				const err = new Error(`${r.status}`);
+				err.status = r.status;
+				// A 4xx is the server's considered answer ("no such wallet"); a 5xx is
+				// the radar being down and is worth retrying.
+				err.unreachable = r.status >= 500;
+				throw err;
+			}
+			return r.json();
+		}
+
+		// ── coin card ─────────────────────────────────────────────────────────────
+		function coinCard(c, { watchOffer = true } = {}) {
+			const sc = Math.round(c.smart_money_score);
+			// Coin art lives on IPFS gateways and per-launch CDNs that answer browser
+			// requests without CORS headers, so hot-linking image_uri fills the console
+			// with net::ERR_BLOCKED_BY_ORB and renders nothing. Route it through the
+			// same-origin proxy (api/img.js), which fetches upstream server-side and
+			// falls back to a deterministic on-brand placeholder — same pattern as
+			// src/radar.js. Some coins point image_uri at a metadata .json rather than
+			// an image; the proxy resolves those to the placeholder instead of failing.
+			const imgSeed = c.symbol || c.name || c.mint || 'coin';
+			const imgFallback = `/api/img?seed=${encodeURIComponent(imgSeed)}`;
+			const img = c.image_uri && /^https?:\/\//i.test(c.image_uri)
+				? `<img class="coin-img" src="${esc(`/api/img?url=${encodeURIComponent(c.image_uri)}&seed=${encodeURIComponent(imgSeed)}`)}" alt="" loading="lazy" data-fallback-src="${esc(imgFallback)}">`
+				: `<div class="coin-img">${esc((c.symbol || '?').slice(0, 2))}</div>`;
+			const notable = (c.notable || []).slice(0, 4).map((n) =>
+				`<span class="nlabel lb-${n.label || 'neutral'}">${short(n.wallet)}</span>`).join('');
+			const share = shareOf(c);
+			const age = ago(c.first_seen_at);
+
+			const btn = document.createElement('button');
+			btn.className = 'coin';
+			btn.dataset.mint = c.mint;
+			btn.innerHTML = `
+				<div class="coin-top">
+					${img}
+					<div class="coin-id"><div class="coin-sym">${esc(c.symbol || '—')}</div><div class="coin-name">${esc(c.name || c.mint.slice(0, 10))}</div></div>
+					<div class="score-badge"><b class="${scoreClass(sc)}">${sc}</b><span>pedigree</span></div>
+				</div>
+				${c.total_buy_sol > 0 ? `<div class="share">
+					<div class="share-head"><span class="sh-l">Smart-money share of buys</span><span class="sh-v">${share}%</span></div>
+					<div class="share-track"><div class="share-fill" style="width:${share}%"></div></div>
+				</div>` : ''}
+				<div class="coin-meta">
+					<span class="chip"><b>${c.smart_wallet_count}</b> proven in</span>
+					<span class="chip"><b>${fmtSol(c.proven_buy_sol)}</b>◎ smart buy</span>
+					${c.category ? `<span class="chip cat">${esc(c.category)}</span>` : ''}
+					${c.graduated ? '<span class="chip grad">✓ graduated</span>' : (age ? `<span class="chip age">${age} old</span>` : '')}
+				</div>
+				${notable ? `<div class="notable-row">${notable}</div>` : ''}`;
+			btn.addEventListener('click', () => openCoin(c.mint));
+
+			const wrap = document.createElement('div');
+			wrap.className = 'sm-coin-wrap';
+			wrap.appendChild(btn);
+
+			// The page's whole claim is "proven wallets are in this coin". Fork is the
+			// one place that claim becomes an action: it opens the real trade panel
+			// for this mint, and the visitor's own wallet signs it.
+			const fk = document.createElement('div');
+			fk.innerHTML = forkButton({ mint: c.mint, symbol: c.symbol, name: c.name }, { label: 'Fork this trade', className: 'sm-fork' });
+			if (fk.firstElementChild) wrap.appendChild(fk.firstElementChild);
+
+			if (watchOffer) {
+				const watched = isWatched(c.mint);
+				const wb = document.createElement('button');
+				wb.className = `sm-watch${watched ? ' sm-watched' : ''}`;
+				wb.type = 'button';
+				wb.textContent = watched ? '★' : '☆';
+				const setLbl = (on) => {
+					const l = on ? 'Remove from watchlist' : 'Add to watchlist';
+					wb.setAttribute('aria-label', l); wb.title = l; wb.setAttribute('aria-pressed', String(on));
+				};
+				setLbl(watched);
+				wb.addEventListener('click', (e) => {
+					e.stopPropagation();
+					const on = toggleSmWatch(c.mint);
+					wb.textContent = on ? '★' : '☆';
+					wb.classList.toggle('sm-watched', on);
+					setLbl(on);
+				});
+				wrap.appendChild(wb);
+			}
+			return wrap;
+		}
+
+		// ── feed view ──────────────────────────────────────────────────────────────
+		const FEED_SORT = {
+			score: (c) => c.smart_money_score,
+			share: (c) => shareOf(c),
+			volume: (c) => c.proven_buy_sol,
+			wallets: (c) => c.smart_wallet_count,
+			new: (c) => new Date(c.first_seen_at || 0).getTime(),
+		};
+
+		function filteredCoins() {
+			const f = state.feedFilter;
+			let arr = state.coins.filter((c) => f === 'all' ? true : f === 'graduated' ? c.graduated : !c.graduated);
+			const val = FEED_SORT[state.feedSort] || FEED_SORT.score;
+			arr = arr.slice().sort((a, b) => (val(b) - val(a)) || (b.smart_money_score - a.smart_money_score));
+			return arr;
+		}
+
+		function renderFeed() {
+			const grid = $('feedGrid');
+			const fresh = state.coins.filter((c) => !c.graduated).length;
+			const grad = state.coins.filter((c) => c.graduated).length;
+			$('fcFresh').textContent = fresh ? fresh : '';
+			$('fcGrad').textContent = grad ? grad : '';
+			$('ctFeed').textContent = fresh ? `(${fresh})` : '';
+
+			const coins = filteredCoins();
+			if (!coins.length) {
+				grid.innerHTML = feedEmpty(grad);
+				const sw = $('feedSwitchGrad');
+				if (sw) sw.addEventListener('click', () => setFeedFilter('graduated'));
+				return;
+			}
+			grid.innerHTML = '';
+			coins.forEach((c) => grid.appendChild(coinCard(c)));
+		}
+
+		function feedEmpty(gradCount) {
+			if (state.feedFilter === 'graduated') {
+				return `<div class="state" style="grid-column:1/-1"><b>No graduations in the radar window yet.</b>
+					Coins appear here once one the radar scored reaches Raydium. The window covers the last few hours of activity.</div>`;
+			}
+			if (state.feedFilter === 'fresh') {
+				const cta = gradCount
+					? `<button class="btn primary" id="feedSwitchGrad">See ${gradCount} proven graduation${gradCount > 1 ? 's' : ''} →</button>`
+					: `<button class="btn primary" id="goWallets">Browse the proven wallets →</button>`;
+				return `<div class="state" style="grid-column:1/-1"><b>No proven money on a fresh coin yet.</b>
+					The radar lights up when wallets with a real track record start buying a new launch. As coins are judged (≈6h after launch) and reputations build, this fills in.
+					<div style="margin-top:16px">${cta}</div></div>`;
+			}
+			return `<div class="state" style="grid-column:1/-1"><b>The radar is warming up.</b>
+				No coins scored in the current window. New launches are judged ≈6h after they appear — check back shortly.</div>`;
+		}
+
+		function setFeedFilter(f) {
+			state.feedFilter = f;
+			$('feedFilter').querySelectorAll('button').forEach((b) => {
+				const on = b.dataset.f === f;
+				b.classList.toggle('on', on);
+				b.setAttribute('aria-selected', String(on));
+			});
+			renderFeed();
+		}
+
+		// ── wallets view ─────────────────────────────────────────────────────────
+		const WALLET_COLS = [
+			{ key: 'rank', label: '#', cls: 'lrank-h' },
+			{ key: 'wallet', label: 'Wallet', cls: 'lw-h' },
+			{ key: 'win', label: 'Win rate', sort: 'win', num: true },
+			{ key: 'early', label: 'Early win', sort: 'early', num: true, cls: 'c-narrow' },
+			{ key: 'dump', label: 'Dump', sort: 'dump', num: true, cls: 'c-narrow' },
+			{ key: 'record', label: 'Record', sort: 'record', num: true, cls: 'c-narrow' },
+			{ key: 'vol', label: 'Volume', sort: 'vol', num: true, cls: 'c-narrow' },
+			{ key: 'score', label: 'Score', sort: 'score', num: true },
+		];
+		const SORT_VAL = {
+			win: (w) => w.win_rate,
+			early: (w) => w.early_win_rate,
+			dump: (w) => w.dump_rate,
+			record: (w) => w.wins,
+			vol: (w) => w.buy_volume_sol,
+			score: (w) => w.smart_money_score,
+		};
+		const SORT_DEF_DIR = { win: 'desc', early: 'desc', dump: 'asc', record: 'desc', vol: 'desc', score: 'desc' };
+		const LABEL_ORDER = ['smart_money', 'sniper', 'neutral', 'fresh', 'dumper', 'rugger'];
+		const LABEL_COLOR = { smart_money: 'var(--up)', sniper: 'var(--gold)', neutral: '#94a3b8', fresh: 'rgba(255,255,255,0.3)', dumper: 'var(--down)', rugger: '#b45c5c' };
+
+		function renderWalletHead() {
+			$('walletHead').innerHTML = WALLET_COLS.map((c) => {
+				if (!c.sort) return `<th scope="col" class="${c.cls || ''}">${c.label}</th>`;
+				const sorted = state.walletSort === c.sort;
+				const arr = sorted ? (state.walletDir === 'asc' ? '↑' : '↓') : '↕';
+				return `<th scope="col" class="sortable num ${c.cls || ''} ${sorted ? 'sorted' : ''}" data-sort="${c.sort}"
+					role="button" tabindex="0" aria-sort="${sorted ? (state.walletDir === 'asc' ? 'ascending' : 'descending') : 'none'}"
+					title="Sort by ${c.label.toLowerCase()}">${c.label}<span class="arr">${arr}</span></th>`;
+			}).join('');
+			$('walletHead').querySelectorAll('th.sortable').forEach((th) => {
+				const apply = () => setWalletSort(th.dataset.sort);
+				th.addEventListener('click', apply);
+				th.addEventListener('keydown', (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); apply(); } });
+			});
+		}
+
+		function setWalletSort(key) {
+			if (state.walletSort === key) state.walletDir = state.walletDir === 'asc' ? 'desc' : 'asc';
+			else { state.walletSort = key; state.walletDir = SORT_DEF_DIR[key] || 'desc'; }
+			renderWalletHead();
+			renderWalletRows();
+		}
+
+		function filteredWallets() {
+			let arr = state.wallets;
+			if (state.walletLabel !== 'all') arr = arr.filter((w) => w.label === state.walletLabel);
+			const q = state.walletQuery.trim().toLowerCase();
+			if (q) arr = arr.filter((w) => w.wallet.toLowerCase().includes(q));
+			const val = SORT_VAL[state.walletSort] || SORT_VAL.score;
+			const dir = state.walletDir === 'asc' ? 1 : -1;
+			arr = arr.slice().sort((a, b) => (dir * (val(a) - val(b))) || (b.smart_money_score - a.smart_money_score));
+			return arr;
+		}
+
+		function walletRow(w, i) {
+			const judged = w.coins_judged || 0;
+			const winPct = judged ? Math.round((w.wins / judged) * 100) : 0;
+			return `<tr class="lrow" data-wallet="${esc(w.wallet)}" tabindex="0" role="button" aria-label="Wallet ${short(w.wallet)}, score ${Math.round(w.smart_money_score)}, ${Math.round(w.win_rate)}% win rate. Open details.">
+				<td class="lrank ${i < 3 ? 'top' : ''}">${i + 1}</td>
+				<td class="lw-cell"><div class="lw">
+					<div class="lw-top"><span class="nlabel lb-${w.label}">${labelText[w.label] || w.label}</span><span class="lw-addr">${short(w.wallet)}</span></div>
+					${judged ? `<div class="recbar" title="${w.wins} wins / ${judged} judged"><i style="width:${winPct}%"></i></div>` : ''}
+				</div></td>
+				<td class="lstat num"><span class="lstat-k">Win</span>${Math.round(w.win_rate)}%</td>
+				<td class="lstat num c-narrow"><span class="lstat-k">Early win</span>${w.early_entries ? Math.round(w.early_win_rate) + '%' : '—'}</td>
+				<td class="lstat num c-narrow"><span class="lstat-k">Dump</span>${Math.round(w.dump_rate)}%</td>
+				<td class="lstat num c-narrow"><span class="lstat-k">Record</span><b>${w.wins}</b>/${judged}</td>
+				<td class="lstat num c-narrow"><span class="lstat-k">Volume</span>${fmtSolC(w.buy_volume_sol)}◎</td>
+				<td class="lscore num ${scoreClass(w.smart_money_score)}"><span class="lstat-k">Score</span>${Math.round(w.smart_money_score)}</td>
+			</tr>`;
+		}
+
+		function renderWalletRows() {
+			const list = $('walletList');
+			const wallets = filteredWallets();
+			if (!wallets.length) {
+				const msg = state.walletQuery || state.walletLabel !== 'all'
+					? `<b>No wallets match.</b>Try a different filter or clear the search.`
+					: `<b>No wallets ranked yet.</b>The graph is still accumulating verdicts. Wallets appear here once they have a few judged coins on record.`;
+				list.innerHTML = `<tr><td colspan="${WALLET_COLS.length}"><div class="state">${msg}</div></td></tr>`;
+				return;
+			}
+			list.innerHTML = wallets.map(walletRow).join('');
+			list.querySelectorAll('.lrow').forEach((el) => {
+				const open = () => openWallet(el.dataset.wallet);
+				el.addEventListener('click', open);
+				el.addEventListener('keydown', (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); open(); } });
+			});
+		}
+
+		function renderDist() {
+			const dist = $('dist');
+			if (!state.wallets.length) { dist.hidden = true; return; }
+			dist.hidden = false;
+			const counts = {};
+			for (const w of state.wallets) counts[w.label] = (counts[w.label] || 0) + 1;
+			const total = state.wallets.length;
+			const present = LABEL_ORDER.filter((l) => counts[l]);
+			$('distCount').textContent = `${total} ranked`;
+			$('distBar').innerHTML = present.map((l) =>
+				`<div class="dist-seg" style="width:${(counts[l] / total) * 100}%;background:${LABEL_COLOR[l]}" title="${labelText[l]}: ${counts[l]}"></div>`).join('');
+			$('distLegend').innerHTML = present.map((l) => {
+				const active = state.walletLabel === 'all' || state.walletLabel === l;
+				const filt = ['smart_money', 'sniper', 'dumper', 'rugger'].includes(l);
+				return `<button class="dist-key ${active ? '' : 'muted'}" ${filt ? `data-l="${l}"` : 'disabled'} type="button">
+					<i style="background:${LABEL_COLOR[l]}"></i>${labelText[l]} <b>${counts[l]}</b></button>`;
+			}).join('');
+			$('distLegend').querySelectorAll('.dist-key[data-l]').forEach((el) =>
+				el.addEventListener('click', () => setWalletLabel(state.walletLabel === el.dataset.l ? 'all' : el.dataset.l)));
+		}
+
+		function setWalletLabel(l) {
+			state.walletLabel = l;
+			$('walletLabel').querySelectorAll('button').forEach((b) => b.classList.toggle('on', b.dataset.l === l));
+			renderDist();
+			renderWalletRows();
+		}
+
+		function renderWallets() {
+			$('ctWallets').textContent = state.wallets.length ? `(${state.wallets.length})` : '';
+			renderDist();
+			renderWalletRows();
+		}
+
+		// ── watchlist view ─────────────────────────────────────────────────────────
+		async function renderWatchlist() {
+			const grid = $('watchGrid');
+			const mints = readWatch();
+			if (!mints.length) {
+				grid.innerHTML = `<div class="state" style="grid-column:1/-1"><b>Your watchlist is empty.</b>
+					Tap the ☆ on any coin to track it here. The radar keeps scoring it so you can watch the proven money move in and out.</div>`;
+				return;
+			}
+			grid.innerHTML = Array.from({ length: Math.min(mints.length, 6) }, () => '<div class="skel"></div>').join('');
+			const results = await Promise.allSettled(mints.map((m) => getJSON(`${API}?mint=${encodeURIComponent(m)}`)));
+
+			// Every lookup failing means the radar is unreachable, not that the whole
+			// watchlist went unscored. Say so once, with a retry, instead of labelling
+			// each tracked coin "not on the radar" on the strength of a network blip.
+			if (results.every((r) => r.status === 'rejected' && r.reason?.unreachable)) {
+				grid.innerHTML = `<div class="state" style="grid-column:1/-1"><b>Couldn't reach the radar.</b>
+					Your ${mints.length} watched coin${mints.length > 1 ? 's are' : ' is'} still saved on this device. ${esc(results[0].reason.message)}
+					<button class="btn primary" id="watchRetry" type="button">Retry</button></div>`;
+				$('watchRetry').addEventListener('click', renderWatchlist);
+				return;
+			}
+
+			grid.innerHTML = '';
+			results.forEach((r, i) => {
+				if (r.status === 'fulfilled' && r.value && r.value.coin) grid.appendChild(coinCard(r.value.coin, { watchOffer: true }));
+				else grid.appendChild(watchUnscored(mints[i], r.status === 'rejected' && r.reason?.unreachable));
+			});
+		}
+
+		function watchUnscored(mint, unreachable = false) {
+			const wrap = document.createElement('div');
+			wrap.className = 'sm-coin-wrap';
+			const card = document.createElement('div');
+			card.className = 'coin';
+			card.style.opacity = '.78';
+			const headline = unreachable ? "Couldn't load this one" : 'Not on the radar yet';
+			const detail = unreachable
+				? "We couldn't reach the radar for this coin. It stays on your watchlist; try again in a moment."
+				: "The radar only scores coins from their first hours of trading. This one isn't in the current window.";
+			card.innerHTML = `
+				<div class="coin-top">
+					<div class="coin-img">${unreachable ? '!' : '?'}</div>
+					<div class="coin-id"><div class="coin-sym">${esc(mint.slice(0, 6))}…</div><div class="coin-name">${headline}</div></div>
+				</div>
+				<p style="margin:0;color:var(--muted);font-size:12.5px">${detail}</p>
+				${unreachable ? '<button class="btn" type="button" data-watch-retry>Retry</button>' : ''}
+				<a class="btn" href="https://pump.fun/${esc(mint)}" target="_blank" rel="noopener">Open on pump.fun →</a>`;
+			const retry = card.querySelector('[data-watch-retry]');
+			if (retry) retry.addEventListener('click', renderWatchlist);
+			const wb = document.createElement('button');
+			wb.className = 'sm-watch sm-watched';
+			wb.type = 'button';
+			wb.textContent = '★';
+			wb.title = 'Remove from watchlist';
+			wb.setAttribute('aria-label', 'Remove from watchlist');
+			wb.addEventListener('click', (e) => { e.stopPropagation(); toggleSmWatch(mint); renderWatchlist(); });
+			wrap.append(card, wb);
+			return wrap;
+		}
+
+		// ── drawer (with coin↔wallet cross-navigation) ──────────────────────────────
+		const TIER_COLOR = { prime: '#c084fc', strong: '#34d399', lean: '#fbbf24', watch: '#94a3b8', avoid: '#f87171' };
+		const PILLAR_COLOR = { pedigree: '#5fe3ff', structure: '#34d399', narrative: '#a07bff', momentum: '#fbbf24' };
+		let drawerStack = [];
+
+		function oraclePillarBar(label, value, color) {
+			const pct = value != null ? Math.max(0, Math.min(100, Math.round(Number(value)))) : 0;
+			return `<div class="sm-pillar">
+				<span class="sm-pillar-lbl">${esc(label)}</span>
+				<div class="sm-pillar-track"><div class="sm-pillar-fill" style="width:${pct}%;background:${color}"></div></div>
+				<span class="sm-pillar-val" style="color:${color}">${value != null ? pct : '—'}</span>
+			</div>`;
+		}
+
+		function copyRow(addr) {
+			return `<div class="copyrow">
+				<button class="copybtn" data-copy="${esc(addr)}" type="button">
+					<svg viewBox="0 0 16 16" width="13" height="13" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="5" y="5" width="9" height="9" rx="1.5"/><path d="M11 5V3.5A1.5 1.5 0 009.5 2H3.5A1.5 1.5 0 002 3.5v6A1.5 1.5 0 003.5 11H5"/></svg>
+				<span>Copy address</span></button>
+				<a class="solscan" href="https://solscan.io/account/${esc(addr)}" target="_blank" rel="noopener">Solscan →</a>
+			</div>`;
+		}
+
+		function wireCopy(root) {
+			root.querySelectorAll('.copybtn[data-copy]').forEach((b) => b.addEventListener('click', async () => {
+				try {
+					await navigator.clipboard.writeText(b.dataset.copy);
+					b.classList.add('done');
+					const span = b.querySelector('span'); const prev = span.textContent;
+					span.textContent = 'Copied';
+					setTimeout(() => { b.classList.remove('done'); span.textContent = prev; }, 1400);
+				} catch { /* clipboard blocked — Solscan link is the fallback */ }
+			}));
+		}
+
+		// Failed drawer load: retryable when the radar was unreachable, explanatory
+		// when it answered and genuinely had nothing on record.
+		function drawerFailure(err, notFoundHtml, retry) {
+			if (!err || !err.unreachable) { $('drBody').innerHTML = notFoundHtml; return; }
+			$('drBody').innerHTML = `<div class="state"><b>Couldn't reach the radar.</b>${esc(err.message)}
+				<button class="btn primary" id="drRetry" type="button">Retry</button></div>`;
+			$('drRetry').addEventListener('click', retry);
+		}
+
+		async function openCoin(mint, { push = true } = {}) {
+			if (push) drawerStack.push(() => openCoin(mint, { push: false }));
+			openDrawer('Loading…', '<div class="skel" style="height:120px"></div>');
+			try {
+				const { coin, notable } = await getJSON(`${API}?mint=${encodeURIComponent(mint)}`);
+				if (!coin) throw new Error('not scored yet'); // 200 + found:false → the designed "Not scored yet" state below
+				$('drTitle').textContent = coin.symbol || 'Coin';
+				const share = shareOf(coin);
+				const rows = (notable || []).map((n) => `<div class="nwallet" data-wallet="${esc(n.wallet)}" role="button" tabindex="0">
+					<div class="lw-top"><span class="nlabel lb-${n.label}">${labelText[n.label] || n.label}</span><span class="lw-addr">${short(n.wallet)}</span></div>
+					<div class="lstat">${fmtSol(n.buy_sol)}◎</div>
+					<div class="lscore ${scoreClass(n.score)}" style="font-size:14px">${Math.round(n.score)}</div>
+				</div>`).join('') || '<p style="color:var(--muted)">No reputable wallets identified in this coin yet.</p>';
+				$('drBody').innerHTML = `
+					<div class="dr-stats">
+						<div class="dr-stat"><span>Pedigree score</span><b class="${scoreClass(coin.smart_money_score)}">${Math.round(coin.smart_money_score)}</b></div>
+						<div class="dr-stat"><span>Proven wallets in</span><b>${coin.smart_wallet_count}</b></div>
+						<div class="dr-stat"><span>Smart buy volume</span><b>${fmtSol(coin.proven_buy_sol)}◎</b></div>
+						<div class="dr-stat"><span>Total buy volume</span><b>${fmtSol(coin.total_buy_sol)}◎</b></div>
+					</div>
+					${coin.total_buy_sol > 0 ? `<div class="share" style="margin-bottom:4px">
+						<div class="share-head"><span class="sh-l">Smart-money share of buys</span><span class="sh-v">${share}%</span></div>
+						<div class="share-track"><div class="share-fill" style="width:${share}%"></div></div>
+					</div>` : ''}
+					<div class="dr-sec">Notable wallets buying</div>
+					${rows}
+					<div id="sm-oracle-slot" class="sm-oracle-slot"><div class="skel" style="height:80px;margin-top:16px"></div></div>
+					<div class="dr-actions">
+						${forkButton({ mint: coin.mint, symbol: coin.symbol, name: coin.name }, { label: 'Fork this trade', className: 'btn primary' })}
+						${forkButton({ mint: coin.mint, symbol: coin.symbol, name: coin.name }, { label: 'Share ↗', className: 'btn', share: true })}
+						<a class="btn" href="https://pump.fun/${esc(coin.mint)}" target="_blank" rel="noopener">pump.fun →</a>
+					</div>`;
+
+				$('drBody').querySelectorAll('.nwallet[data-wallet]').forEach((el) => {
+					const go = () => openWallet(el.dataset.wallet);
+					el.addEventListener('click', go);
+					el.addEventListener('keydown', (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); go(); } });
+				});
+
+				fetch(`/api/oracle/coin?mint=${encodeURIComponent(mint)}&network=mainnet`)
+					.then((r) => r.ok ? r.json() : null).catch(() => null)
+					.then((data) => {
+						const slot = document.getElementById('sm-oracle-slot');
+						if (!slot || !slot.isConnected) return;
+						const c = data?.conviction;
+						if (!c || c.score == null) { slot.remove(); return; }
+						const p = c.pillars || {};
+						const tierColor = TIER_COLOR[c.tier] || '#94a3b8';
+						slot.innerHTML = `
+							<div class="dr-sec" style="margin-top:18px">Oracle conviction</div>
+							<div class="sm-oracle-body">
+								<div class="sm-oracle-dial">
+									<span class="sm-oracle-score" style="color:${tierColor}">${c.score}</span>
+									<span class="sm-oracle-tier" style="color:${tierColor}">${esc(c.tier || '')}</span>
+								</div>
+								<div class="sm-pillars">
+									${oraclePillarBar('Pedigree', p.pedigree, PILLAR_COLOR.pedigree)}
+									${oraclePillarBar('Structure', p.structure, PILLAR_COLOR.structure)}
+									${oraclePillarBar('Narrative', p.narrative, PILLAR_COLOR.narrative)}
+									${oraclePillarBar('Momentum', p.momentum, PILLAR_COLOR.momentum)}
+								</div>
+							</div>
+							<a href="/oracle/coin/${encodeURIComponent(mint)}" class="sm-oracle-link" target="_blank" rel="noopener">Full coin page →</a>`;
+					});
+			} catch (e) {
+				$('drTitle').textContent = 'Coin';
+				drawerFailure(
+					e,
+					`<div class="state"><b>Not scored yet.</b>This coin hasn't been picked up by the radar. The radar scores coins from their first hours of trading, so older mints fall outside the window.
+						<a class="btn" href="https://pump.fun/${esc(mint)}" target="_blank" rel="noopener">Open on pump.fun →</a></div>`,
+					() => openCoin(mint, { push: false }),
+				);
+			}
+			syncBackBtn();
+		}
+
+		async function openWallet(wallet, { push = true } = {}) {
+			if (push) drawerStack.push(() => openWallet(wallet, { push: false }));
+			openDrawer('Loading…', '<div class="skel" style="height:120px"></div>');
+			try {
+				const { wallet: w, recent_coins } = await getJSON(`${API}?wallet=${encodeURIComponent(wallet)}`);
+				$('drTitle').textContent = short(w.wallet);
+				const last = ago(w.last_active_at);
+				const coins = (recent_coins || []).slice(0, 18).map((c) => `<div class="nwallet" data-mint="${esc(c.mint)}" role="button" tabindex="0">
+					<div class="lw-top"><span class="lw-addr">${esc(c.symbol || c.mint.slice(0, 8))}</span>${c.graduated ? '<span class="nlabel lb-smart_money">graduated</span>' : ''}</div>
+					<div class="lstat">${fmtSol(c.buy_sol)}◎</div>
+					<a class="solscan" href="https://pump.fun/${esc(c.mint)}" target="_blank" rel="noopener">pump ↗</a>
+				</div>`).join('') || `<p style="color:var(--muted)">No recent coins on record. This wallet's judged trades sit outside the window the radar keeps coin-level detail for${last ? `, and it was last active ${last} ago` : ''}. Its reputation above still counts every verdict.</p>`;
+				$('drBody').innerHTML = `
+					<div style="margin-bottom:14px;display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+						<span class="nlabel lb-${w.label}">${labelText[w.label] || w.label}</span>
+						${last ? `<span class="chip age">active ${last} ago</span>` : ''}
+					</div>
+					<div class="dr-stats">
+						<div class="dr-stat"><span>Reputation</span><b class="${scoreClass(w.smart_money_score)}">${Math.round(w.smart_money_score)}</b></div>
+						<div class="dr-stat"><span>Win rate</span><b>${Math.round(w.win_rate)}%</b></div>
+						<div class="dr-stat"><span>Early win rate</span><b>${w.early_entries ? Math.round(w.early_win_rate) + '%' : '—'}</b></div>
+						<div class="dr-stat"><span>Dump rate</span><b>${Math.round(w.dump_rate)}%</b></div>
+						<div class="dr-stat"><span>Wins / judged</span><b>${w.wins}/${w.coins_judged}</b></div>
+						<div class="dr-stat"><span>Capital deployed</span><b>${fmtSolC(w.buy_volume_sol)}◎</b></div>
+					</div>
+					${w.creator_count ? `<div class="dr-stat" style="margin-bottom:18px"><span>As a coin creator</span><b>${w.creator_wins}/${w.creator_count}</b> graduated</div>` : ''}
+					${copyRow(w.wallet)}
+					<div class="dr-sec">Recent coins bought</div>
+					${coins}`;
+				wireCopy($('drBody'));
+				$('drBody').querySelectorAll('.nwallet[data-mint]').forEach((el) => {
+					const go = () => openCoin(el.dataset.mint);
+					// The card links out to pump.fun; a click on that anchor must not
+					// also open the coin drawer behind it.
+					el.addEventListener('click', (e) => { if (!e.target.closest('a')) go(); });
+					el.addEventListener('keydown', (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); go(); } });
+				});
+			} catch (e) {
+				$('drTitle').textContent = short(wallet);
+				drawerFailure(
+					e,
+					`<div class="state"><b>No track record yet.</b>We haven't recorded judged trades for this wallet. A wallet enters the graph once it buys a pump.fun launch the radar is scoring.
+						<a class="btn" href="https://solscan.io/account/${esc(wallet)}" target="_blank" rel="noopener">Solscan →</a></div>`,
+					() => openWallet(wallet, { push: false }),
+				);
+			}
+			syncBackBtn();
+		}
+
+		function syncBackBtn() {
+			$('drBackBtn').classList.toggle('show', drawerStack.length > 1);
+		}
+		function openDrawer(title, body) {
+			$('drTitle').textContent = title; $('drBody').innerHTML = body;
+			$('drawer').classList.add('open');
+			syncBackBtn();
+		}
+		function closeDrawer() { $('drawer').classList.remove('open'); drawerStack = []; syncBackBtn(); }
+		function drawerBack() {
+			drawerStack.pop();              // drop current
+			const prev = drawerStack[drawerStack.length - 1];
+			if (prev) prev(); else closeDrawer();
+		}
+		$('drBack').addEventListener('click', closeDrawer);
+		$('drClose').addEventListener('click', closeDrawer);
+		$('drBackBtn').addEventListener('click', drawerBack);
+		document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && $('drawer').classList.contains('open')) closeDrawer(); });
+
+		// ── tabs ──────────────────────────────────────────────────────────────────
+		function switchTab(view) {
+			document.querySelectorAll('.tab').forEach((x) => x.classList.toggle('on', x.dataset.view === view));
+			document.querySelectorAll('.view').forEach((v) => v.classList.toggle('on', v.id === `view-${view}`));
+			if (view === 'watchlist') renderWatchlist();
+		}
+		document.querySelectorAll('.tab').forEach((t) => t.addEventListener('click', () => switchTab(t.dataset.view)));
+
+		// feed controls
+		$('feedFilter').querySelectorAll('button').forEach((b) => b.addEventListener('click', () => setFeedFilter(b.dataset.f)));
+		$('feedSort').addEventListener('change', (e) => { state.feedSort = e.target.value; renderFeed(); });
+		document.addEventListener('click', (e) => { if (e.target && e.target.id === 'goWallets') switchTab('wallets'); });
+
+		// wallet controls
+		$('walletLabel').querySelectorAll('button').forEach((b) => b.addEventListener('click', () => setWalletLabel(b.dataset.l)));
+		const searchField = $('walletSearchField');
+		const searchInput = $('walletSearch');
+		let searchDebounce = null;
+		searchInput.addEventListener('input', (e) => {
+			const v = e.target.value;
+			searchField.classList.toggle('has-val', !!v);
+			clearTimeout(searchDebounce);
+			searchDebounce = setTimeout(() => { state.walletQuery = v; renderWalletRows(); }, 120);
+		});
+		searchInput.addEventListener('keydown', (e) => {
+			if (e.key === 'Enter') {
+				const v = searchInput.value.trim();
+				if (isAddr(v)) { openWallet(v); }            // paste any address → look it up
+			} else if (e.key === 'Escape') { clearSearch(); }
+		});
+		function clearSearch() {
+			searchInput.value = ''; state.walletQuery = '';
+			searchField.classList.remove('has-val'); renderWalletRows(); searchInput.focus();
+		}
+		$('walletSearchClr').addEventListener('click', clearSearch);
+		document.addEventListener('keydown', (e) => {
+			if (e.key === '/' && !/^(INPUT|TEXTAREA|SELECT)$/.test(document.activeElement?.tagName)) {
+				e.preventDefault(); switchTab('wallets'); searchInput.focus();
+			}
+		});
+
+		// ── data ────────────────────────────────────────────────────────────────
+		function computeStats() {
+			const proven = state.wallets.filter((w) => w.label === 'smart_money');
+			$('stProven').textContent = proven.length;
+			const avgWin = proven.length ? Math.round(proven.reduce((s, w) => s + w.win_rate, 0) / proven.length) : 0;
+			$('stWinRate').innerHTML = proven.length ? `${avgWin}<small>%</small>` : '—';
+			const cap = proven.reduce((s, w) => s + (w.buy_volume_sol || 0), 0);
+			$('stCapital').innerHTML = proven.length ? `${fmtSolC(cap)}<small>◎</small>` : '—';
+			$('stCoins').textContent = state.coins.filter((c) => !c.graduated).length;
+			$('stUpdated').textContent = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+		}
+
+		async function refresh() {
+			try {
+				const [feed, board] = await Promise.all([
+					getJSON(`${API}?limit=100&graduated=1`),
+					getJSON(`${API}?leaderboard=1&limit=100&min_coins=4`),
+				]);
+				state.coins = feed.coins || [];
+				state.wallets = board.wallets || [];
+				renderFeed();
+				renderWallets();
+				computeStats();
+				if (document.getElementById('view-watchlist').classList.contains('on')) renderWatchlist();
+				hasData = true;
+				clearStale();
+			} catch (e) {
+				if (!hasData) {
+					// Cold failure: neither the feed nor the leaderboard has ever
+					// rendered, so both tabs would be a blank void. Tell the same story
+					// in each. The watchlist fetches per mint and reports its own.
+					const why = e.status ? `The radar API answered ${e.status}.` : "We couldn't reach the radar from this browser.";
+					$('feedGrid').innerHTML = `<div class="state" style="grid-column:1/-1"><b>Couldn't reach the radar.</b>${esc(why)} Nothing is cached yet, so there is nothing to show.
+						<button class="btn primary" id="retry" type="button">Retry</button></div>`;
+					$('retry').addEventListener('click', refresh);
+					$('walletList').innerHTML = `<tr><td colspan="${WALLET_COLS.length}"><div class="state"><b>Couldn't reach the radar.</b>${esc(why)}
+						<button class="btn primary" id="walletRetry" type="button">Retry</button></div></td></tr>`;
+					$('walletRetry').addEventListener('click', refresh);
+					$('dist').hidden = true;
+				} else {
+					staleFails++;
+					showStale();
+				}
+			}
+		}
+
+		async function manualRetry() {
+			const btn = $('staleRetry');
+			btn.setAttribute('aria-busy', 'true');
+			const prev = btn.textContent;
+			btn.textContent = 'Reconnecting…';
+			try { await refresh(); }
+			finally { btn.removeAttribute('aria-busy'); btn.textContent = prev; }
+		}
+		$('staleRetry').addEventListener('click', manualRetry);
+
+		function openFromQuery() {
+			const params = new URLSearchParams(location.search);
+			const wallet = (params.get('wallet') || '').trim();
+			const mint = (params.get('mint') || '').trim();
+			const BASE58 = /^[1-9A-HJ-NP-Za-km-z]{32,44}$/;
+			if (BASE58.test(wallet)) openWallet(wallet);
+			else if (BASE58.test(mint)) openCoin(mint);
+		}
+
+		// boot
+		initFork();
+		renderWalletHead();
+		// Deep link: /smart-money?wallet=<addr> (and ?mint=<addr>) opens that drawer
+		// straight away, so a wallet cited anywhere else on the platform, the Fade
+		// Radar board included, lands on its track record instead of a board the
+		// reader has to search by eye.
+		openFromQuery();
+		updateWatchCount();
+		$('feedGrid').innerHTML = Array.from({ length: 6 }, () => '<div class="skel"></div>').join('');
+		refresh();
+		timer = setInterval(refresh, 20000);
+		document.addEventListener('visibilitychange', () => {
+			if (document.hidden) { clearInterval(timer); timer = null; }
+			else if (!timer) { refresh(); timer = setInterval(refresh, 20000); }
+		});
+	</script>
+	<!-- Runtime i18n: detects locale, swaps annotated copy, mounts <lang-switcher>. -->
+	<script type="module" src="/i18n.js"></script>
+</body>
+</html>

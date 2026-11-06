@@ -1,0 +1,48 @@
+# Normalize line endings: Git stores LF, checks out native on each platform.
+* text=auto eol=lf
+
+# Shell scripts and hooks must stay LF even on Windows checkouts.
+*.sh        text eol=lf
+.githooks/* text eol=lf
+
+# Windows-only scripts keep CRLF.
+*.bat       text eol=crlf
+*.cmd       text eol=crlf
+
+# --- Generated / vendored files: collapse in diffs and exclude from language stats ---
+package-lock.json   linguist-generated=true -diff
+CHANGELOG.md        linguist-generated=true
+public/changelog.json linguist-generated=true -diff
+public/changelog.xml  linguist-generated=true -diff
+public/llms.txt       linguist-generated=true
+public/llms-full.txt  linguist-generated=true
+*.min.js            linguist-generated=true -diff
+*.bundle.js         linguist-generated=true -diff
+
+# --- Linguist: classify the repo as code, not vendored assets ---
+docs/**             linguist-documentation
+examples/**         linguist-documentation
+*.md                linguist-detectable=true
+
+# --- Treat binary assets as binary (no diff, no EOL conversion) ---
+*.glb       binary
+*.gltf      binary
+*.fbx       binary
+*.png       binary
+*.jpg       binary
+*.jpeg      binary
+*.gif       binary
+*.webp      binary
+*.ico       binary
+*.mp3       binary
+*.mp4       binary
+*.wav       binary
+*.ogg       binary
+*.hdr       binary
+*.ktx2      binary
+*.basis     binary
+*.wasm      binary
+*.woff      binary
+*.woff2     binary
+*.ttf       binary
+*.pdf       binary

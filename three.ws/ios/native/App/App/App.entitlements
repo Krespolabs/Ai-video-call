@@ -1,0 +1,54 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<!--
+		The entitlements every build signs with. CarPlay is NOT here: Apple grants
+		it per app, and codesign refuses to sign an archive whose entitlements
+		name a capability its provisioning profile lacks, so carrying the key
+		before the grant breaks every TestFlight upload. App-CarPlay.entitlements
+		is this file plus the CarPlay key; the THREEWS_APP_ENTITLEMENTS build
+		setting picks between them (the carplay flag of ios/scripts/release.mjs), and
+		scripts/check-ios-app.mjs keeps the two files identical apart from it.
+	-->
+
+	<!--
+		Universal links. Every https://three.ws link the app can handle opens in
+		the app instead of Safari, which is what makes a shared /viewer, /irl/s/
+		or /avatars/ link land on an installed app. Paired with
+		public/.well-known/apple-app-site-association, which Apple's CDN fetches
+		over TLS with no redirects; if that file 404s or is served with the wrong
+		content type, links silently keep opening in Safari and nothing errors.
+	-->
+	<key>com.apple.developer.associated-domains</key>
+	<array>
+		<string>applinks:three.ws</string>
+		<string>applinks:www.three.ws</string>
+		<!-- Password AutoFill for the three.ws login form inside the WebView. -->
+		<string>webcredentials:three.ws</string>
+	</array>
+
+	<!--
+		APNs. Xcode rewrites this to "production" on an App Store / TestFlight
+		archive; "development" is what a device build off a personal team needs.
+	-->
+	<key>aps-environment</key>
+	<string>development</string>
+
+	<!--
+		The Agent glance home screen widget. The App Group holds the last card
+		the widget downloaded, so it keeps painting when the phone is offline,
+		and the keychain group holds the widget token this app claims from
+		threews://glance/link. Both are read-only reads of one endpoint; see
+		docs/native-widgets.md.
+	-->
+	<key>com.apple.security.application-groups</key>
+	<array>
+		<string>$(GLANCE_APP_GROUP)</string>
+	</array>
+	<key>keychain-access-groups</key>
+	<array>
+		<string>$(GLANCE_KEYCHAIN_GROUP)</string>
+	</array>
+</dict>
+</plist>

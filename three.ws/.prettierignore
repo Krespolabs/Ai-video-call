@@ -1,0 +1,46 @@
+# Dependencies and generated files
+node_modules/
+dist/
+dist-lib/
+dist-artifact/
+
+# Vendored / external library code
+contracts/lib/
+character-studio/
+docs/pumpfun-program/
+
+# Self-contained sub-projects with their own tooling (package.json, lockfile,
+# node_modules) and their own Prettier config + plugins. The root gate cannot
+# resolve their plugins (prettier-plugin-svelte/-tailwindcss), so each owns its
+# own `format`/`format:check` scripts. public/chat is chat's committed build output.
+chat/
+public/chat/
+# pump.fun Agent Skills mirror (github.com/pump-fun/pump-fun-skills) — these four
+# skills are kept byte-faithful to upstream; do not reformat. Our own reactive/
+# skill is intentionally NOT listed here, so it stays prettier-enforced.
+pump-fun-skills/create-coin/
+pump-fun-skills/swap/
+pump-fun-skills/coin-fees/
+pump-fun-skills/tokenized-agents/
+pump-fun-skills/.claude-plugin/plugin.json
+
+# Pages that ship and render in production but trip Prettier's strict HTML
+# parser — inline <script> template literals that emit markup, and an emoji
+# inside an inline-SVG favicon data-URI. Valid for the Vite build; unparseable
+# for Prettier, so they'd hard-error the check rather than warn.
+pages/home.html
+pages/forge.html
+pages/pump-live.html
+public/docs-widgets.html
+public/vanity-wallet.html
+
+# Build artifacts
+*.min.js
+public/embed-sdk.js
+public/embed.js
+public/wallet-login.js
+public/artifact.js
+public/bazaar.js
+public/bazaar.html
+public/paywall.js
+public/paywall.html

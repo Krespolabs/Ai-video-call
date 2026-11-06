@@ -1,0 +1,127 @@
+{
+	"about": "Chance that a post is followed by a volume response on the pool: the first hour after it runs at least twice the hour before. Logistic model over original post moments; see analyze/volume-model.mjs in the study repo.",
+	"generatedAt": "2026-09-18T07:51:59.050Z",
+	"asset": "three",
+	"pool": "5ByL7MZoLABYnwMPZKPKjf4MGkZ7FeBzrAnos19Pre2z",
+	"accounts": [
+		"trythreews",
+		"nichxbt"
+	],
+	"candles": {
+		"from": "2026-04-29T07:00:00.000Z",
+		"to": "2026-09-18T05:30:00.000Z",
+		"interval": "15m",
+		"pool": "5ByL7MZoLABYnwMPZKPKjf4MGkZ7FeBzrAnos19Pre2z"
+	},
+	"moments": 313,
+	"responses": 54,
+	"baseRate": 0.1725,
+	"intercept": -3.12632,
+	"excluded": [
+		"cryptoNative"
+	],
+	"features": [
+		{
+			"key": "tier1",
+			"label": "Names a tier-1 company (@IBM, @OpenAI, @nvidia, @GoogleCloud, @awscloud ...)",
+			"pattern": {
+				"source": "@(ibm|openai|awscloud|aws_partners|nvidia|nvidiaai|googlecloud|anthropicai|claude|chatgpt|microsoft|github|githubcommunity|alibaba_cloud|voguemagazine)\\b",
+				"flags": "i"
+			},
+			"weight": 0.39622,
+			"oddsRatio": 1.486,
+			"low": 0.812,
+			"high": 2.53,
+			"postsWithIt": 37
+		},
+		{
+			"key": "recognition",
+			"label": "Says partner, listed, verified, accepted, featured or joined",
+			"pattern": {
+				"source": "partner|listed|listing|verified|accepted|featured|joined|joining|member of|named an?",
+				"flags": "i"
+			},
+			"weight": 0.4903,
+			"oddsRatio": 1.633,
+			"low": 0.893,
+			"high": 2.972,
+			"postsWithIt": 49
+		},
+		{
+			"key": "launch",
+			"label": "Announces something shipped (live, launched, introducing, shipped, now)",
+			"pattern": {
+				"source": "\\blive\\b|shipped|launch|introducing|\\bnow\\b",
+				"flags": "i"
+			},
+			"weight": 0.67034,
+			"oddsRatio": 1.955,
+			"low": 1.146,
+			"high": 3.267,
+			"postsWithIt": 90
+		},
+		{
+			"key": "token",
+			"label": "Talks about the token ($THREE, burn, holders, buyback, exchange)",
+			"pattern": {
+				"source": "\\$three\\b|burn|holders|buyback|exchange",
+				"flags": "i"
+			},
+			"weight": -0.03539,
+			"oddsRatio": 0.965,
+			"low": 0.484,
+			"high": 2.004,
+			"postsWithIt": 20
+		},
+		{
+			"key": "video",
+			"label": "Carries a video",
+			"pattern": null,
+			"weight": 0.11641,
+			"oddsRatio": 1.123,
+			"low": 0.687,
+			"high": 1.793,
+			"postsWithIt": 100
+		},
+		{
+			"key": "thread",
+			"label": "Two or more posts within the hour",
+			"pattern": null,
+			"weight": 0.29186,
+			"oddsRatio": 1.339,
+			"low": 0.737,
+			"high": 2.143,
+			"postsWithIt": 217
+		},
+		{
+			"key": "long",
+			"label": "Longer than 180 characters",
+			"pattern": null,
+			"weight": 0.3861,
+			"oddsRatio": 1.471,
+			"low": 0.823,
+			"high": 2.791,
+			"postsWithIt": 150
+		},
+		{
+			"key": "usHours",
+			"label": "Posted 12:00 to 20:00 UTC (8 AM to 4 PM New York)",
+			"pattern": null,
+			"weight": 0.54704,
+			"oddsRatio": 1.728,
+			"low": 1.067,
+			"high": 2.99,
+			"postsWithIt": 88
+		},
+		{
+			"key": "company",
+			"label": "From the company account rather than the founder alone",
+			"pattern": null,
+			"weight": 0.79138,
+			"oddsRatio": 2.206,
+			"low": 1.26,
+			"high": 3.257,
+			"postsWithIt": 160
+		}
+	]
+}

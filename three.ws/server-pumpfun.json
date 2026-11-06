@@ -1,0 +1,25 @@
+{
+	"$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
+	"name": "io.github.nirholas/threews-pumpfun",
+	"title": "three.ws pump.fun MCP",
+	"websiteUrl": "https://three.ws",
+	"icons": [
+		{
+			"src": "https://three.ws/three-ws-mcp-icon.svg",
+			"mimeType": "image/svg+xml",
+			"sizes": ["any"]
+		}
+	],
+	"description": "Free pump.fun and Solana token discovery and on-chain analysis tools, by three.ws.",
+	"repository": {
+		"url": "https://github.com/nirholas/three.ws",
+		"source": "github"
+	},
+	"version": "1.0.1",
+	"remotes": [
+		{
+			"type": "streamable-http",
+			"url": "https://three.ws/api/pump-fun-mcp"
+		}
+	]
+}

@@ -1,0 +1,258 @@
+<!doctype html>
+<html lang="en">
+	<head>
+		<meta charset="utf-8" />
+		<meta name="viewport" content="width=device-width, initial-scale=1" />
+		<title data-i18n="demos_erc8004.meta_title">ERC-8004 registry browser · three.ws lab</title>
+		<meta name="description" content="Browse on-chain ERC-8004 agent identities across Base, Ethereum, Polygon, and testnets. Real data, read from the Agent0 subgraph via the agent0-sdk."  data-i18n-attr="content:demos_erc8004.meta_description"/>
+		<meta name="robots" content="noindex" />
+		<link rel="stylesheet" href="/style.css" />
+		<link rel="stylesheet" href="/nav.css" />
+		<style>
+			:root { color-scheme: dark; }
+			body { background: #060606; color: #eee; font: 15px/1.5 -apple-system, system-ui, sans-serif; margin: 0; }
+			.stage { max-width: 1080px; margin: 0 auto; padding: 48px 24px 80px; }
+			.crumb a { color: #8a8d98; text-decoration: none; }
+			.crumb a:hover { color: #3dc1ff; }
+			h1 { font-size: 28px; font-weight: 600; letter-spacing: -0.015em; margin: 14px 0 8px; }
+			.sub { color: #8a8d98; max-width: 64ch; margin: 0 0 26px; }
+			.controls { display: flex; flex-wrap: wrap; gap: 10px; align-items: end; background: #101010; border: 1.5px solid #202020; border-radius: 14px; padding: 16px; margin-bottom: 22px; }
+			.controls label { display: flex; flex-direction: column; gap: 4px; font-size: 11px; color: #8a8d98; text-transform: uppercase; letter-spacing: 0.08em; }
+			.controls select, .controls input { background: #080808; border: 1px solid #202020; color: #eee; padding: 9px 11px; border-radius: 9px; font: inherit; }
+			.controls input { min-width: 260px; }
+			.controls button { background: #3dc1ff; color: #0a0a0a; border: 0; border-radius: 9px; padding: 9px 16px; font-weight: 600; cursor: pointer; font: inherit; }
+			.controls button:disabled { opacity: 0.4; cursor: not-allowed; }
+			.results { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 12px; }
+			.agent { background: #101010; border: 1.5px solid #202020; border-radius: 12px; padding: 16px; display: flex; flex-direction: column; gap: 6px; cursor: pointer; transition: border-color var(--duration-fast), transform var(--duration-fast); }
+			.agent:hover { border-color: rgba(61, 193, 255,0.4); transform: translateY(-1px); }
+			.agent-head { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
+			.agent-name { font-size: 15px; font-weight: 600; margin: 0; }
+			.agent-id { font-family: ui-monospace, monospace; font-size: 11px; color: #8a8d98; }
+			.agent-desc { font-size: 13px; color: #b6b6cf; line-height: 1.45; margin: 0; min-height: 38px; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+			.agent-meta { display: flex; gap: 10px; font-size: 11px; color: #8a8d98; font-family: ui-monospace, monospace; margin-top: 4px; flex-wrap: wrap; }
+			.agent-meta b { color: #3dc1ff; font-weight: 600; }
+			.notice { padding: 12px 16px; border-radius: 10px; background: rgba(154,212,255,0.06); border: 1px solid rgba(154,212,255,0.2); color: #9ad4ff; font-size: 13px; margin-bottom: 14px; }
+			.notice.empty { background: rgba(255,255,255,0.02); border-color: #202020; color: #8a8d98; }
+			.notice.err { background: rgba(255,138,138,0.06); border-color: rgba(255,138,138,0.3); color: #ff8a8a; }
+			.detail { background: #101010; border: 1.5px solid #202020; border-radius: 14px; padding: 22px; margin-bottom: 22px; }
+			.detail h2 { margin: 0 0 6px; font-size: 18px; }
+			.detail-grid { display: grid; grid-template-columns: 140px 1fr; gap: 6px 14px; font-size: 13px; margin-top: 14px; }
+			.detail-grid dt { color: #8a8d98; font-size: 11.5px; text-transform: uppercase; letter-spacing: 0.06em; padding-top: 2px; }
+			.detail-grid dd { margin: 0; font-family: ui-monospace, monospace; word-break: break-all; color: #ddd; font-size: 12.5px; line-height: 1.55; }
+			.detail-grid dd a { color: #9ad4ff; }
+			.detail-close { float: right; background: rgba(255,255,255,0.06); color: #eee; border: 1px solid #202020; border-radius: 7px; padding: 4px 10px; font-size: 12px; cursor: pointer; }
+		</style>
+	</head>
+	<body>
+		<header><div id="nav-container"></div></header>
+
+		<main class="stage">
+			<p class="crumb" data-i18n-html="demos_erc8004.lab"><a href="/demos/">← lab</a></p>
+			<h1 data-i18n="demos_erc8004.erc_8004_registry_browser">ERC-8004 registry browser</h1>
+			<p class="sub" data-i18n-html="demos_erc8004.live_read_of_erc_8004_agent_identities">
+				Live read of <strong>ERC-8004</strong> agent identities across Base,
+				Ethereum, Polygon, Base Sepolia, and Sepolia. Powered by the
+				<a href="https://github.com/agent0lab/agent0-ts" target="_blank" rel="noopener" style="color:#9ad4ff">agent0-sdk</a>
+				against the Agent0 subgraph. Server proxies the queries; no API keys, no signer required.
+			</p>
+
+			<form class="controls" id="form">
+				<label>
+					Chain
+					<select id="chain">
+						<option value="8453" selected data-i18n="demos_erc8004.base_8453">Base (8453)</option>
+						<option value="1" data-i18n="demos_erc8004.ethereum_1">Ethereum (1)</option>
+						<option value="137" data-i18n="demos_erc8004.polygon_137">Polygon (137)</option>
+						<option value="84532" data-i18n="demos_erc8004.base_sepolia_84532">Base Sepolia (84532)</option>
+						<option value="11155111" data-i18n="demos_erc8004.sepolia_11155111">Sepolia (11155111)</option>
+					</select>
+				</label>
+				<label style="flex:1">
+					Search (optional)
+					<input id="q" type="text" placeholder="keyword — name, description, …" />
+				</label>
+				<label>
+					Limit
+					<select id="limit">
+						<option value="10">10</option>
+						<option value="20" selected>20</option>
+						<option value="50">50</option>
+					</select>
+				</label>
+				<button type="submit" data-i18n="demos_erc8004.search">Search</button>
+			</form>
+
+			<div id="notice"></div>
+			<div id="detail"></div>
+			<div class="results" id="results"></div>
+		</main>
+
+		<script src="/nav.js" defer></script>
+		<script type="module">
+			const $ = (id) => document.getElementById(id);
+			const form = $('form');
+			const resultsEl = $('results');
+			const noticeEl = $('notice');
+			const detailEl = $('detail');
+
+			function notice(cls, msg) {
+				noticeEl.innerHTML = '';
+				if (!msg) return;
+				const div = document.createElement('div');
+				div.className = 'notice ' + cls;
+				div.textContent = msg;
+				noticeEl.appendChild(div);
+			}
+
+			function fmtTime(seconds) {
+				if (!seconds) return '—';
+				return new Date(Number(seconds) * 1000).toLocaleString();
+			}
+
+			function shorten(addr) {
+				if (!addr) return '—';
+				if (addr.length <= 14) return addr;
+				return addr.slice(0, 8) + '…' + addr.slice(-6);
+			}
+
+			function chainExplorer(chainId, address) {
+				if (!address) return null;
+				const base = {
+					'1': 'https://etherscan.io/address/',
+					'137': 'https://polygonscan.com/address/',
+					'8453': 'https://basescan.org/address/',
+					'84532': 'https://sepolia.basescan.org/address/',
+					'11155111': 'https://sepolia.etherscan.io/address/',
+				}[String(chainId)];
+				return base ? base + address : null;
+			}
+
+			async function search(ev) {
+				ev?.preventDefault();
+				detailEl.innerHTML = '';
+				resultsEl.innerHTML = '';
+				notice('', 'Querying subgraph…');
+
+				const chain = $('chain').value;
+				const q = $('q').value.trim();
+				const limit = $('limit').value;
+
+				const url = new URL('/api/agents/8004/search', location.origin);
+				url.searchParams.set('chain', chain);
+				url.searchParams.set('limit', limit);
+				if (q) url.searchParams.set('q', q);
+
+				let res;
+				try {
+					res = await fetch(url);
+				} catch (err) {
+					notice('err', 'Network error: ' + err.message);
+					return;
+				}
+				if (!res.ok) {
+					const body = await res.text().catch(() => '');
+					notice('err', `HTTP ${res.status} — ${body.slice(0, 240)}`);
+					return;
+				}
+				const data = await res.json();
+				const agents = data.agents || [];
+				if (!agents.length) {
+					notice('empty', q
+						? `No matches for "${q}" on chain ${chain}.`
+						: `Subgraph returned 0 agents for chain ${chain}. Try a different chain.`);
+					return;
+				}
+				notice('', `${agents.length} agent${agents.length === 1 ? '' : 's'} on chain ${chain}`);
+				renderAgents(agents, chain);
+			}
+
+			function renderAgents(agents, chainId) {
+				resultsEl.innerHTML = '';
+				for (const a of agents) {
+					const card = document.createElement('div');
+					card.className = 'agent';
+					card.dataset.id = a.agentId;
+					card.dataset.chain = chainId;
+					card.innerHTML = `
+						<div class="agent-head">
+							<h3 class="agent-name">${escapeHtml(a.name || `Agent #${a.agentId}`)}</h3>
+							<span class="agent-id">#${escapeHtml(a.agentId)}</span>
+						</div>
+						<p class="agent-desc">${escapeHtml(a.description || '(no description)')}</p>
+						<div class="agent-meta">
+							<span><b>${shorten(a.address)}</b></span>
+							<span>★ <b>${a.averageRating == null ? '—' : Number(a.averageRating).toFixed(2)}</b> · ${a.feedbackCount ?? 0} reviews</span>
+						</div>`;
+					card.addEventListener('click', () => loadDetail(chainId, a.agentId));
+					resultsEl.appendChild(card);
+				}
+			}
+
+			async function loadDetail(chainId, agentId) {
+				detailEl.innerHTML = '<div class="detail">Loading agent…</div>';
+				detailEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
+
+				const url = new URL('/api/agents/8004/agent', location.origin);
+				url.searchParams.set('chain', chainId);
+				url.searchParams.set('id', agentId);
+
+				let res, payload;
+				try {
+					res = await fetch(url);
+					payload = await res.json();
+				} catch (err) {
+					detailEl.innerHTML = `<div class="detail">Lookup failed: ${escapeHtml(err.message)}</div>`;
+					return;
+				}
+				if (!res.ok) {
+					detailEl.innerHTML = `<div class="detail">HTTP ${res.status} · ${escapeHtml(payload.error_description || '')}</div>`;
+					return;
+				}
+				renderDetail(payload.agent, chainId);
+			}
+
+			function renderDetail(a, chainId) {
+				const explorer = chainExplorer(chainId, a.address);
+				const ownerExplorer = chainExplorer(chainId, a.owner);
+				const wallets = (a.walletAddresses || []).map((w) => {
+					const link = chainExplorer(w.chainId || chainId, w.address);
+					return link
+						? `<a href="${link}" target="_blank" rel="noopener">${escapeHtml(w.address)}</a> <span style="color:#8a8d98">(chain ${w.chainId})</span>`
+						: `${escapeHtml(w.address)} (chain ${w.chainId})`;
+				}).join('<br>') || '—';
+				const endpoints = (a.endpoints || []).map((e) =>
+					`${escapeHtml(e.kind || 'endpoint')}: <a href="${escapeHtml(e.url)}" target="_blank" rel="noopener">${escapeHtml(e.url)}</a>`).join('<br>') || '—';
+
+				detailEl.innerHTML = `
+					<div class="detail">
+						<button class="detail-close" id="closeDetail">close</button>
+						<h2>${escapeHtml(a.name || `Agent #${a.agentId}`)} <span class="agent-id" style="font-size:12px;color:#8a8d98">#${escapeHtml(a.agentId)}</span></h2>
+						<p style="color:#b6b6cf;margin:6px 0 0">${escapeHtml(a.description || '(no description on file)')}</p>
+						<dl class="detail-grid">
+							<dt>Chain</dt><dd>${chainId}</dd>
+							<dt>Address</dt><dd>${explorer ? `<a href="${explorer}" target="_blank" rel="noopener">${escapeHtml(a.address)}</a>` : (a.address || '—')}</dd>
+							<dt>Owner</dt><dd>${ownerExplorer ? `<a href="${ownerExplorer}" target="_blank" rel="noopener">${escapeHtml(a.owner)}</a>` : (a.owner || '—')}</dd>
+							<dt>Registered</dt><dd>${escapeHtml(fmtTime(a.registeredAtSeconds))}</dd>
+							<dt>Rating</dt><dd>${a.averageRating == null ? '—' : Number(a.averageRating).toFixed(2)} ★ · ${a.feedbackCount ?? 0} reviews</dd>
+							<dt>Registration URI</dt><dd>${a.registrationUri ? `<a href="${escapeHtml(a.registrationUri)}" target="_blank" rel="noopener">${escapeHtml(a.registrationUri)}</a>` : '—'}</dd>
+							<dt>Wallets</dt><dd>${wallets}</dd>
+							<dt>Endpoints</dt><dd>${endpoints}</dd>
+						</dl>
+					</div>`;
+				$('closeDetail').addEventListener('click', () => { detailEl.innerHTML = ''; });
+			}
+
+			function escapeHtml(s) {
+				return String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+			}
+
+			form.addEventListener('submit', search);
+			search();
+		</script>
+		<script src="/brand.js" defer></script>
+		<div id="footer-container"></div>
+		<script src="/footer.js"></script>
+	<!-- Runtime i18n: detects locale, swaps annotated copy, mounts <lang-switcher>. -->
+	<script type="module" src="/i18n.js"></script>
+</body>
+</html>

@@ -1,0 +1,953 @@
+// The bridge runtime: one pool of live Home Assistant connections per process.
+//
+// `packages/home-bridge` opens one WebSocket per HomeBridge and holds it. This
+// module decides who holds those sockets, for how long, and what happens when
+// the house, the credential, or the container goes away.
+//
+// The three facts about our own deployment that shape every choice here were
+// read off the running service, not assumed
+// (`gcloud run services describe three-ws-api --region us-central1`):
+//
+//   * `minScale=6`, `maxScale=100`. There are always several instances and any
+//     one of them may be recycled at any time.
+//   * `sessionAffinity=false`. Two requests from the same browser land on
+//     arbitrary instances, so a pooled socket is NEVER guaranteed to be there
+//     for the next call. It is a cache with a good hit rate inside one request
+//     and across the life of one SSE stream, and nothing more.
+//   * `cpu-throttling=true`. Outside a request an instance gets close to no CPU,
+//     so a background timer fires late or not at all and a held socket stops
+//     draining frames. Eviction therefore runs on a timer AND opportunistically
+//     on every acquire, and a pooled graph is always treated as possibly stale.
+//
+// The consequence, stated once so no caller has to rediscover it: the house is
+// the source of truth, this pool is a cache, and a cold instance reopening in a
+// few hundred milliseconds is the normal path rather than a failure.
+
+import { readFileSync } from 'node:fs';
+import { totalmem } from 'node:os';
+
+import { ERR, HomeBridge, HomeBridgeError } from '@three-ws/home-bridge';
+
+import { assertDialableHomeUrl, HomeUrlError, pinnedHomeSocketFactory } from '../home-url-guard.js';
+
+import { createAdmissionController } from './admission.js';
+import {
+	getConnection,
+	getDecryptedToken,
+	HOME_STATUS,
+	listAllowedEntities,
+	recordHandshake,
+} from './store.js';
+import { relayTransportFor } from './relay.js';
+import { safeError } from './log-safe.js';
+
+/**
+ * Codes `acquire` adds to the bridge package's `ERR` vocabulary, so the route
+ * layer in order 03 maps ONE union of codes instead of two tables.
+ */
+export const HOME_RUNTIME_ERR = Object.freeze({
+	/** No such home for this user. Maps to 404, never 403: see store.getConnection. */
+	NOT_FOUND: 'home_not_found',
+	/** The home was disconnected; its ciphertext is gone and cannot be replayed. */
+	REVOKED: 'home_revoked',
+	/** Too many consecutive connect failures. Fails fast instead of timing out. */
+	BREAKER_OPEN: 'home_breaker_open',
+	/** Rung 5. Every pooled AND unpooled slot on this instance is taken. */
+	AT_CAPACITY: 'home_at_capacity',
+	/** Rung 4. Live updates are shed so that actions keep being served. */
+	STREAM_SHED: 'home_stream_shed',
+});
+
+/** Long enough that a page navigation or a chat turn reuses the socket, short enough that an abandoned tab does not hold a stranger's house open. */
+const IDLE_MS = 90_000;
+/** A house behind a slow tunnel is common; a hang is not. */
+const CONNECT_TIMEOUT_MS = 15_000;
+/** A socket plus a state map is roughly 1 to 3 MB of heap for a large house. */
+const DEFAULT_MAX_CONNECTIONS = 200;
+/**
+ * Measured RSS per pooled connection at a 90/10 small/large house mix: 666 KB for
+ * a 123 entity house, 1.12 MB for a 624 entity one, both amortized at 400 open
+ * connections (docs/ops/home-operations.md, tasks/home/envelope-2026-09-09.json).
+ */
+const RSS_PER_CONNECTION_BYTES = Math.round(0.9 * 666 * 1024 + 0.1 * 1.12 * 1024 ** 2);
+/**
+ * What the rest of the container needs, so the pool never claims it. Cloud
+ * Monitoring `container/memory/utilizations`, 24 hours of per-minute p99 read on
+ * 2026-09-09: max 0.859 of a 4 GiB limit, or 3.44 GiB, with zero home
+ * connections held.
+ */
+const NON_HOME_WORKING_SET_BYTES = Math.round(3.44 * 1024 ** 3);
+/** Sizing the pool to fill the container leaves nothing for the spike that follows it. */
+const MEMORY_UTILIZATION_TARGET = 0.9;
+/** A container too small to back a real pool gets a small lane, never a dead one. */
+const MIN_VIABLE_CONNECTIONS = 25;
+/** Consecutive connect failures that open the breaker for one home. */
+const BREAKER_THRESHOLD = 5;
+/** How long a revoked token or an offline house stops being retried on every page load. */
+const BREAKER_COOLDOWN_MS = 5 * 60_000;
+/** The sweep cadence. Advisory only under CPU throttling, which is why acquire sweeps too. */
+const SWEEP_MS = 30_000;
+
+/**
+ * Build a runtime over injectable dependencies.
+ *
+ * Every dependency defaults to the real one. Tests construct their own runtime
+ * with a counting bridge factory instead of mutating a global, so two test files
+ * can never leak pool state into each other.
+ *
+ * @param {object} [deps]
+ * @param {(input: { baseUrl: string, token: string, allowedEntities: string[] }) => object} [deps.createBridge]
+ * @param {typeof getConnection} [deps.getConnection]
+ * @param {typeof getDecryptedToken} [deps.getDecryptedToken]
+ * @param {typeof listAllowedEntities} [deps.listAllowedEntities]
+ * @param {typeof recordHandshake} [deps.recordHandshake]
+ * @param {() => number} [deps.now]
+ * @param {number} [deps.maxConnections]
+ * @param {number} [deps.idleMs]
+ * @param {number} [deps.connectTimeoutMs]
+ * @param {(baseUrl: string) => Promise<{host: string, addresses: object[], secure: boolean}>} [deps.resolveDial]
+ *   How a base URL becomes a pinned set of addresses. The default is the SSRF
+ *   guard and production must never be given anything else; it is a seam for the
+ *   same reason `getConnection` is one, so a harness can drive this runtime
+ *   against a container on 127.0.0.1 (which the guard correctly refuses) without
+ *   the alternative of not testing the runtime at all. `defaultResolveDial` below
+ *   is exported and asserted in tests/home-security.test.js, so the default
+ *   cannot be quietly swapped.
+ */
+export function createHomeRuntime(deps = {}) {
+	const createBridge = deps.createBridge || ((input) => new HomeBridge(input));
+	const readConnection = deps.getConnection || getConnection;
+	const readCredential = deps.getDecryptedToken || getDecryptedToken;
+	const readAllowed = deps.listAllowedEntities || listAllowedEntities;
+	const writeHandshake = deps.recordHandshake || recordHandshake;
+	const now = deps.now || (() => Date.now());
+	const requestedConnections = deps.maxConnections ?? readMaxConnections();
+	const memoryCap = memoryBackedConnectionCap(
+		deps.containerMemoryLimitBytes === undefined ? containerMemoryLimitBytes() : deps.containerMemoryLimitBytes,
+	);
+	const maxConnections = Math.min(requestedConnections, memoryCap);
+	/**
+	 * Null unless this container's memory refused the cap it was asked for. It
+	 * rides in `stats()` and out through `/api/healthz`, because the whole reason
+	 * this clamp exists is that the drift it corrects was invisible for days.
+	 */
+	const pooledCapNote = maxConnections < requestedConnections
+		? `asked for ${requestedConnections}, clamped to ${maxConnections} by a ${(memoryCap === Infinity ? 0 : Math.round((memoryCap * RSS_PER_CONNECTION_BYTES + NON_HOME_WORKING_SET_BYTES) / MEMORY_UTILIZATION_TARGET / 1024 ** 3 * 10) / 10)} GiB container`
+		: null;
+	if (pooledCapNote) {
+		console.warn(`[home] pool cap ${pooledCapNote}. Raise --memory or lower HOME_MAX_CONNECTIONS; docs/ops/home-operations.md.`);
+	}
+	const idleMs = deps.idleMs ?? IDLE_MS;
+	const connectTimeoutMs = deps.connectTimeoutMs ?? CONNECT_TIMEOUT_MS;
+	const resolveDial = deps.resolveDial || defaultResolveDial;
+	/**
+	 * How a relayed home is reached, injectable so a test can drive the relay
+	 * path without a relay. Most houses only exist on a LAN, so this is not the
+	 * exotic case: it is the one the majority of installs will take.
+	 */
+	const buildRelayTransport = deps.relayTransportFor || relayTransportFor;
+
+	/**
+	 * The backpressure ladder (api/_lib/home/admission.js). The pool decides which
+	 * socket you get; this decides whether you get one at all, whether a browser
+	 * may open a live stream, and what a saturated instance says instead of
+	 * hanging. It is sized from the same pool cap so the two can never disagree
+	 * about what "full" means.
+	 */
+	const admission = deps.admission || createAdmissionController({
+		maxPooled: maxConnections,
+		// Overflow is deliberately a tenth of the pool. An unpooled connection is
+		// a full Home Assistant handshake that is thrown away on release, so it is
+		// a pressure valve, not a second pool: sizing it any larger would let an
+		// instance spend all its CPU on handshakes it is about to discard.
+		maxUnpooled: Math.max(1, Math.ceil(maxConnections / 10)),
+		...(deps.admissionLimits || {}),
+	});
+
+	/** homeId -> pool entry. Keyed by home, not by user: a home has exactly one owner. */
+	const entries = new Map();
+	/** homeId -> { failures, openedUntil } */
+	const breakers = new Map();
+	let sweepTimer = null;
+
+	/**
+	 * Check out a live bridge for one home.
+	 *
+	 * @param {string} homeId
+	 * @param {string} userId the caller, proved by the route layer. Ownership is
+	 *   re-checked in SQL here, so a runtime call can never be the place an
+	 *   ownership check was forgotten.
+	 * @returns {Promise<{ bridge: object, release: () => void, entry: object }>}
+	 */
+	async function acquire(homeId, userId) {
+		// Under CPU throttling the interval below is unreliable, so every acquire
+		// pays for one cheap sweep. It is a Map walk over at most `maxConnections`.
+		evictIdle(now());
+
+		const breaker = breakers.get(homeId);
+		if (breaker && breaker.openedUntil > now()) {
+			const seconds = Math.ceil((breaker.openedUntil - now()) / 1000);
+			throw new HomeBridgeError(
+				HOME_RUNTIME_ERR.BREAKER_OPEN,
+				`This home failed to connect ${breaker.failures} times in a row, so three.ws stopped retrying for ${seconds} more seconds. Check that it is online and that its access token is still valid, then reconnect it.`,
+			);
+		}
+
+		const existing = entries.get(homeId);
+		if (existing) {
+			existing.refs += 1;
+			try {
+				await existing.ready;
+			} catch (err) {
+				existing.refs -= 1;
+				throw err;
+			}
+			return handle(existing);
+		}
+
+		// Reserve the pool slot SYNCHRONOUSLY, before the first await. Reading the
+		// credential is a database round trip, and two callers that both cleared the
+		// `entries.get` check while it was in flight (a page load and an SSE stream
+		// starting together is exactly that) would each open a socket to the same
+		// house. The second `entries.set` would then orphan the first: never
+		// pooled, never evicted, never closed, and the user's Home Assistant holds
+		// a connection nothing on this side can still reach. Registering first
+		// makes the second caller take the `existing` path and share this open.
+		// Rungs 1, 2 and 5 of the ladder, taken synchronously for the same reason
+		// the pool registration above is: an admission decision that straddles an
+		// await can be made twice against the same free slot.
+		//
+		// Rung 1 hands back a pooled slot. Rung 2, past the cap, hands back a
+		// short-lived UNPOOLED connection: it works identically and it closes the
+		// moment its last reference is released, so the instance pays for the
+		// handshake but never for the hold. Rung 5, past that too, refuses with a
+		// retry-after rather than opening a socket this instance cannot afford.
+		const slot = admission.acquire();
+		if (!slot.admitted) {
+			const err = new HomeBridgeError(HOME_RUNTIME_ERR.AT_CAPACITY, slot.reason);
+			err.retryAfterSeconds = slot.retryAfterSeconds;
+			throw err;
+		}
+		const pooled = slot.connection === 'pooled';
+		const entry = openEntry({ homeId, userId, pooled });
+		if (pooled) entries.set(homeId, entry);
+
+		try {
+			await entry.ready;
+		} catch (err) {
+			entries.delete(homeId);
+			// openEntry's failure path closed the bridge but the ladder slot was
+			// claimed before the handshake, so give it back here. Without this, a
+			// house that is down eats one slot per failed connect until the instance
+			// reports itself full while holding nothing.
+			releaseSlot(entry);
+			throw err;
+		}
+		startSweep();
+		return handle(entry);
+	}
+
+	/**
+	 * The shape every caller should use. Releases in a `finally`, so a throwing
+	 * callback can never leak a socket.
+	 *
+	 * @template T
+	 * @param {string} homeId
+	 * @param {string} userId
+	 * @param {(bridge: object) => Promise<T>} fn
+	 * @returns {Promise<T>}
+	 */
+	async function withHome(homeId, userId, fn) {
+		const { bridge, release } = await acquire(homeId, userId);
+		try {
+			return await fn(bridge);
+		} finally {
+			release();
+		}
+	}
+
+	/**
+	 * The current room graph, without holding a reference past the call. A page
+	 * load wants this; an SSE stream wants `subscribe`.
+	 *
+	 * @param {string} homeId
+	 * @param {string} userId
+	 * @returns {Promise<{ graph: object, stale: boolean, connected: boolean, status: string }>}
+	 */
+	async function snapshot(homeId, userId) {
+		return withHome(homeId, userId, (bridge) => {
+			const entry = entries.get(homeId);
+			return {
+				graph: bridge.graph,
+				stale: entry ? entry.stale : false,
+				connected: Boolean(bridge.connected),
+				status: entry ? entry.status : HOME_STATUS.CONNECTED,
+			};
+		});
+	}
+
+	/**
+	 * A live subscription, for SSE. Holds a reference for its whole lifetime, so
+	 * the socket stays open while a browser is watching and starts its idle clock
+	 * the moment the last watcher leaves.
+	 *
+	 * The listener is called immediately with the current graph, then on every
+	 * rebuild and on every connectivity change. It is NEVER called with an empty
+	 * graph because the socket dropped: a user watching their 3D home sees it go
+	 * grey and stale, never watches their house vanish.
+	 *
+	 * @param {string} homeId
+	 * @param {string} userId
+	 * @param {(event: { graph: object, stale: boolean, connected: boolean, status: string }) => void} onGraph
+	 * @returns {Promise<() => void>} unsubscribe
+	 */
+	async function subscribe(homeId, userId, onGraph) {
+		// Rung 4, and the reason it is rung 4 rather than rung 5: a live stream is
+		// the FIRST thing this instance stops handing out under pressure, because a
+		// dashboard that stops updating is an inconvenience and a door that will
+		// not lock is not. Admission is checked before the connection is acquired,
+		// so a shed stream does not even pay for a handshake.
+		const seat = admission.admitStream();
+		if (!seat.admitted) {
+			const err = new HomeBridgeError(HOME_RUNTIME_ERR.STREAM_SHED, seat.reason);
+			err.retryAfterSeconds = seat.retryAfterSeconds;
+			throw err;
+		}
+
+		let acquired;
+		try {
+			acquired = await acquire(homeId, userId);
+		} catch (err) {
+			admission.closeStream();
+			throw err;
+		}
+		const { bridge, release, entry } = acquired;
+		entry.subscribers.add(onGraph);
+		let live = true;
+
+		try {
+			onGraph(eventFor(entry, bridge));
+		} catch (err) {
+			console.warn('[home-runtime] a subscriber threw on its first event', { homeId, ...safeError(err) });
+		}
+
+		return () => {
+			if (!live) return;
+			live = false;
+			entry.subscribers.delete(onGraph);
+			admission.closeStream();
+			release();
+		};
+	}
+
+	/**
+	 * Close every pooled connection whose last reference was released more than
+	 * the idle window ago. Exported so a test drives it deterministically rather
+	 * than waiting out a wall clock.
+	 *
+	 * @param {number} [at] the current time in ms
+	 * @returns {number} how many connections were closed
+	 */
+	function evictIdle(at = now()) {
+		let closed = 0;
+		for (const [homeId, entry] of entries) {
+			if (entry.refs > 0) continue;
+			if (entry.idleSince === null || at - entry.idleSince < idleMs) continue;
+			closeEntry(entry);
+			entries.delete(homeId);
+			closed += 1;
+		}
+		if (!entries.size) stopSweep();
+		return closed;
+	}
+
+	/**
+	 * The health probe's view of this instance. Shaped for order 13.
+	 * @returns {{ open: number, subscribers: number, pooledCap: number, pooledCapNote: string|null, breakersOpen: number, byStatus: Record<string, number>, admission: ReturnType<ReturnType<typeof createAdmissionController>['snapshot']> }}
+	 */
+	function stats() {
+		const byStatus = {};
+		let subscribers = 0;
+		for (const entry of entries.values()) {
+			byStatus[entry.status] = (byStatus[entry.status] || 0) + 1;
+			subscribers += entry.subscribers.size;
+		}
+		let breakersOpen = 0;
+		for (const breaker of breakers.values()) if (breaker.openedUntil > now()) breakersOpen += 1;
+		return { open: entries.size, subscribers, pooledCap: maxConnections, pooledCapNote, breakersOpen, byStatus, admission: admission.snapshot() };
+	}
+
+	/**
+	 * How many live stream subscribers this instance is holding for one home.
+	 *
+	 * Per-instance, and deliberately not reconciled across the fleet. A
+	 * cross-instance stream tally would need a shared counter with a lease, and a
+	 * process that dies holding sockets leaks that counter until it expires,
+	 * which shows up as a user being refused a dashboard they are not watching.
+	 * Counting locally under-states a fleet-wide total, so the per-home stream
+	 * limit built on it errs toward serving the user, which is the only direction
+	 * a quota is allowed to err.
+	 *
+	 * @param {string} homeId
+	 * @returns {number}
+	 */
+	function streamCount(homeId) {
+		return entries.get(homeId)?.subscribers.size ?? 0;
+	}
+
+	/**
+	 * Rung 4 and rung 5, for the action path.
+	 *
+	 * The route layer wraps every write in this. The two halves of the answer are
+	 * computed independently on purpose: `admitted` is a function of load, and
+	 * `requiresConfirmation` is a function of the request alone. That separation
+	 * is the safety property this whole lane is built around, so a saturated
+	 * instance can refuse an action outright and can never confirm one.
+	 *
+	 * @param {{ guarded?: boolean, confirmed?: boolean, allowed?: boolean }} [request]
+	 */
+	function admitAction(request) {
+		const verdict = admission.admitAction(request);
+		if (!verdict.admitted) {
+			const err = new HomeBridgeError(HOME_RUNTIME_ERR.AT_CAPACITY, verdict.reason);
+			err.retryAfterSeconds = verdict.retryAfterSeconds;
+			throw err;
+		}
+		return verdict;
+	}
+
+	/**
+	 * Run an action under the ladder. The slot is always given back, including on
+	 * a throw, or one failing house drains the instance's action capacity.
+	 *
+	 * @template T
+	 * @param {{ guarded?: boolean, confirmed?: boolean, allowed?: boolean }} request
+	 * @param {() => Promise<T>} fn
+	 * @returns {Promise<T>}
+	 */
+	async function withAction(request, fn) {
+		admitAction(request);
+		try {
+			return await fn();
+		} finally {
+			admission.finishAction();
+		}
+	}
+
+	/**
+	 * Rung 3. Reads fall back to the live graph this process already holds when
+	 * the database is unreachable; writes are attempted regardless, because a
+	 * write is somebody pressing a button.
+	 */
+	function readPlan() {
+		return admission.admitRead();
+	}
+
+	/**
+	 * Drop one home's connection right now, whatever is still holding it.
+	 *
+	 * Revoking a home destroys its credential, but a socket opened a minute
+	 * earlier is already authenticated and would keep delivering that house's
+	 * state to any open SSE stream until the idle window expired. That is the
+	 * difference between "disconnected" and "disconnected in ninety seconds", and
+	 * only one of those is what the button said. `acquire` cannot re-open it
+	 * afterwards: the store filters revoked rows, so the next checkout is a 404.
+	 *
+	 * @param {string} homeId
+	 * @returns {boolean} true when this instance was holding one
+	 */
+	function closeHome(homeId) {
+		const entry = entries.get(homeId);
+		if (!entry) return false;
+		entries.delete(homeId);
+		closeEntry(entry, { tell: HOME_STATUS.REVOKED });
+		if (!entries.size) stopSweep();
+		return true;
+	}
+
+	/**
+	 * Close every connection this process holds. Wired to SIGTERM: a container
+	 * that dies without closing leaves the user's Home Assistant holding dead
+	 * connections until its own timeout expires.
+	 * @returns {number} how many were closed
+	 */
+	function closeAll() {
+		const count = entries.size;
+		for (const entry of entries.values()) closeEntry(entry);
+		entries.clear();
+		stopSweep();
+		return count;
+	}
+
+	/**
+	 * Watch a store call for the one thing rung 3 needs to know.
+	 *
+	 * A store call that RESOLVES (even to null, which is an ordinary miss) proves
+	 * the database answered. A store call that REJECTS is the signal that reads
+	 * have to come from memory until it recovers. Deriving the flag from real
+	 * traffic rather than from a health-check timer means the ladder reacts on the
+	 * first failed query instead of up to one poll interval later, which under
+	 * Cloud Run CPU throttling can be a long time.
+	 */
+	async function observeStore(promise) {
+		try {
+			const value = await promise;
+			admission.setDatabaseHealthy(true);
+			return value;
+		} catch (err) {
+			admission.setDatabaseHealthy(false);
+			throw err;
+		}
+	}
+
+	async function loadCredential(homeId, userId) {
+		const row = await observeStore(readConnection(homeId, userId));
+		if (!row) {
+			throw new HomeBridgeError(
+				HOME_RUNTIME_ERR.NOT_FOUND,
+				'That home is not connected to this account.',
+			);
+		}
+
+		// A relayed home has no credential to load, and that absence is the design
+		// rather than a gap: the three.ws integration inside the house
+		// authenticates to Home Assistant locally, so there has never been a token
+		// here for us to decrypt. Everything downstream treats the transport it
+		// gets back exactly like a base URL and a token.
+		if (row.transport === 'relay') {
+			return { transport: 'relay', relayId: row.relay_id, baseUrl: row.base_url, transportFactory: buildRelayTransport(row) };
+		}
+
+		let credential;
+		try {
+			credential = await readCredential(homeId, userId);
+		} catch (cause) {
+			// A ciphertext that will not decrypt is an account problem the user can
+			// fix by reconnecting, not a 500. Say so, and mark the row so the
+			// connect screen can explain it without opening a socket of its own.
+			await writeHandshake(homeId, {
+				status: HOME_STATUS.AUTH_FAILED,
+				statusDetail: 'The stored access token could not be read. Reconnect this home to store a new one.',
+			}).catch(() => null);
+			throw new HomeBridgeError(ERR.AUTH, 'The stored access token for this home could not be read. Reconnect the home to store a new one.', cause);
+		}
+
+		if (!credential) {
+			throw new HomeBridgeError(
+				HOME_RUNTIME_ERR.REVOKED,
+				'This home was disconnected. Reconnect it to control it again.',
+			);
+		}
+		return credential;
+	}
+
+	/**
+	 * The addresses this home is allowed to be dialled at, resolved fresh.
+	 *
+	 * A refusal is reported as UNREACHABLE rather than as a fault: from the
+	 * owner's side, a house that has moved onto a LAN-only name looks exactly
+	 * like a house that is offline, and the connect screen already knows how to
+	 * explain that one.
+	 */
+	async function resolveDialPin(baseUrl) {
+		return resolveDial(baseUrl);
+	}
+
+	function openEntry({ homeId, userId, pooled }) {
+		const entry = {
+			homeId,
+			userId,
+			pooled,
+			bridge: null,
+			refs: 1,
+			idleSince: null,
+			openedAt: now(),
+			stale: false,
+			status: HOME_STATUS.PENDING,
+			/** What the database row is believed to say, so persistStatus only writes transitions. */
+			persistedStatus: null,
+			lastGraph: { floors: [], rooms: [], unassigned: [] },
+			subscribers: new Set(),
+			closed: false,
+		};
+
+		entry.ready = (async () => {
+			// Inside `ready`, not before it, so the slot above was claimed before any
+			// await. A home that is unknown, revoked, or whose ciphertext will not
+			// decrypt rejects here WITHOUT reaching the bridge or the breaker: none
+			// of those is the house failing to answer, and none of them should stop
+			// three.ws retrying a house that is merely offline.
+			const credential = await loadCredential(homeId, userId);
+			const allowedEntities = await readAllowed(homeId).catch(() => []);
+			// A direct home is re-resolved on EVERY dial, not trusted from the
+			// connect that stored it. That is the whole answer to DNS rebinding on
+			// a long-lived connection: a name that was public when the user added
+			// their house and points into our network today is refused here, and
+			// the socket that does open is pinned to what this resolved. A relayed
+			// home has no URL of ours to dial, so there is nothing to pin.
+			const dial = credential.transportFactory ? null : await resolveDialPin(credential.baseUrl);
+			const bridge = createBridge(
+				credential.transportFactory
+					? { transport: credential.transportFactory, allowedEntities }
+					: {
+							baseUrl: credential.baseUrl,
+							token: credential.token,
+							allowedEntities,
+							createSocket: pinnedHomeSocketFactory(dial),
+						},
+			);
+			entry.bridge = bridge;
+			wireEvents(entry, bridge);
+
+			try {
+				const graph = await withTimeout(
+					bridge.connect(),
+					connectTimeoutMs,
+					() => new HomeBridgeError(
+						ERR.UNREACHABLE,
+						credential.transport === 'relay'
+							? `This home did not answer through the three.ws relay within ${Math.round(connectTimeoutMs / 1000)} seconds. Its three.ws integration is offline, which usually means Home Assistant is restarting. It reconnects on its own.`
+							: `${credential.baseUrl} did not answer within ${Math.round(connectTimeoutMs / 1000)} seconds. If it is only on your home network, three.ws cannot route to it: use your remote https URL, or connect the three.ws integration.`,
+					),
+				);
+				entry.lastGraph = graph || entry.lastGraph;
+				entry.status = HOME_STATUS.CONNECTED;
+				entry.stale = false;
+				onConnectSuccess(homeId, entry, bridge);
+				return bridge;
+			} catch (err) {
+				entry.closed = true;
+				try {
+					bridge.close();
+				} catch {
+					// Closing a bridge that never opened is not an error.
+				}
+				onConnectFailure(homeId, err);
+				throw err;
+			}
+		})();
+
+		return entry;
+	}
+
+	function wireEvents(entry, bridge) {
+		bridge.on('graph', (graph) => {
+			// Never overwrite a real graph with an empty one. An empty house is
+			// legitimate, but an empty burst arriving on a dying socket is not, and
+			// the user must not watch their home vanish.
+			if (graph) entry.lastGraph = graph;
+			entry.stale = false;
+			notify(entry, bridge);
+		});
+		bridge.on('disconnected', () => {
+			entry.stale = true;
+			entry.status = HOME_STATUS.UNREACHABLE;
+			notify(entry, bridge);
+			persistStatus(entry, HOME_STATUS.UNREACHABLE, 'This home stopped answering three.ws. It reconnects on its own when it comes back.');
+		});
+		bridge.on('reconnected', () => {
+			entry.stale = false;
+			entry.status = HOME_STATUS.CONNECTED;
+			notify(entry, bridge);
+			persistStatus(entry, HOME_STATUS.CONNECTED, null);
+		});
+		bridge.on('error', (err) => {
+			// Once per socket, not once per message: a malformed burst must not be
+			// able to fill the log.
+			if (entry.loggedError) return;
+			entry.loggedError = true;
+			// A bridge error message names the house: toBridgeError builds
+			// "Could not reach https://home.example.com...", which is the most
+			// common error there is. The code is what an operator can act on; the
+			// URL is somebody's address in a log with its own retention. Fall back
+			// to the error's name, never its message.
+			console.warn('[home-runtime] bridge reported an error', { homeId: entry.homeId, ...safeError(err) });
+		});
+	}
+
+	/**
+	 * Write a mid-connection status change through to the database.
+	 *
+	 * `onConnectSuccess` and `onConnectFailure` only ever run inside the initial
+	 * `entry.ready` promise, so before this existed the ONLY way a house's stored
+	 * status changed was a fresh connect attempt. A pooled entry never takes that
+	 * path again: `acquire` finds it in `entries`, awaits an already-resolved
+	 * `ready`, and hands the bridge straight back. The liveness ping still noticed
+	 * the house was gone and still told every live subscriber, but the row kept
+	 * saying `connected` with its old `last_ok_at` and no `last_error_at`.
+	 *
+	 * That is invisible on a cold pool and permanent on a warm one, which is
+	 * exactly the shape it was found in: a stopped house read "Live, updated
+	 * moments ago" for as long as anyone watched, but only when an earlier request
+	 * had left a socket in the pool. `/api/home` and the `isDegraded` judgement in
+	 * `src/home/manage.js` both read the row, so the wall display this whole
+	 * mechanism exists to protect was the one surface still being lied to.
+	 *
+	 * Redundant writes are skipped rather than debounced: a house that flaps emits
+	 * one event per transition, and only a transition is worth a round trip.
+	 */
+	function persistStatus(entry, status, statusDetail) {
+		if (entry.persistedStatus === status) return;
+		entry.persistedStatus = status;
+		writeHandshake(entry.homeId, { status, statusDetail }).catch((err) => {
+			// Let the next transition try again rather than pinning a value the
+			// database never accepted.
+			if (entry.persistedStatus === status) entry.persistedStatus = null;
+			console.warn('[home-runtime] status change not recorded', { homeId: entry.homeId, status, ...safeError(err) });
+		});
+	}
+
+	function notify(entry, bridge) {
+		if (!entry.subscribers.size) return;
+		const event = eventFor(entry, bridge);
+		for (const listener of entry.subscribers) {
+			try {
+				listener(event);
+			} catch (err) {
+				console.warn('[home-runtime] a subscriber threw', { homeId: entry.homeId, ...safeError(err) });
+			}
+		}
+	}
+
+	function eventFor(entry, bridge) {
+		return {
+			graph: entry.lastGraph,
+			stale: entry.stale,
+			connected: Boolean(bridge?.connected),
+			status: entry.status,
+		};
+	}
+
+	function onConnectSuccess(homeId, entry, bridge) {
+		breakers.delete(homeId);
+		// Keep persistStatus's view of the row in step with what this write is
+		// about to store, so the first mid-connection transition is judged against
+		// the truth rather than against an empty field.
+		entry.persistedStatus = HOME_STATUS.CONNECTED;
+		const graph = entry.lastGraph;
+		// Measured from the socket that just opened, never inferred. The store
+		// merges capabilities, so writing the WebSocket half here cannot erase the
+		// MCP half that verify.js measured at connect time.
+		writeHandshake(homeId, {
+			status: HOME_STATUS.CONNECTED,
+			statusDetail: null,
+			capabilities: {
+				websocket: true,
+				entityCount: Object.keys(bridge.states || {}).length,
+				areaCount: graph?.rooms?.length ?? 0,
+				floorCount: graph?.floors?.length ?? 0,
+				haVersion: bridge.haVersion ?? null,
+				measuredAt: new Date().toISOString(),
+			},
+		}).catch((err) => {
+			console.warn('[home-runtime] handshake record dropped', { homeId, ...safeError(err) });
+		});
+	}
+
+	function onConnectFailure(homeId, err) {
+		const breaker = breakers.get(homeId) || { failures: 0, openedUntil: 0 };
+		breaker.failures += 1;
+		if (breaker.failures >= BREAKER_THRESHOLD) breaker.openedUntil = now() + BREAKER_COOLDOWN_MS;
+		breakers.set(homeId, breaker);
+
+		const status = err?.code === ERR.AUTH ? HOME_STATUS.AUTH_FAILED : HOME_STATUS.UNREACHABLE;
+		writeHandshake(homeId, {
+			status,
+			statusDetail: breaker.openedUntil > now()
+				? `${err?.message || 'This home did not answer.'} three.ws has paused retries for five minutes.`
+				: err?.message || 'This home did not answer.',
+		}).catch(() => null);
+	}
+
+	function handle(entry) {
+		let released = false;
+		return {
+			bridge: entry.bridge,
+			entry,
+			release() {
+				if (released) return;
+				released = true;
+				entry.refs -= 1;
+				if (entry.refs > 0) return;
+				entry.idleSince = now();
+				// A connection that was never admitted to the pool (past the cap) has
+				// nobody to evict it later, so it closes the moment it is done.
+				if (!entry.pooled) closeEntry(entry);
+			},
+		};
+	}
+
+	function releaseSlot(entry) {
+		if (entry.slotReleased) return;
+		entry.slotReleased = true;
+		admission.release(entry.pooled ? 'pooled' : 'unpooled');
+	}
+
+	/**
+	 * Close a pooled connection.
+	 *
+	 * `tell` is the status every open stream is handed on the way out, and it is
+	 * only ever passed by `closeHome`. A home the owner disconnected has to reach
+	 * the screens that are showing it: the socket goes away silently otherwise,
+	 * the stream keeps heartbeating, and a wall display sits on "Live" drawing a
+	 * house that is no longer connected to anything. Idle eviction and shutdown
+	 * pass nothing on purpose: eviction only ever closes an entry nobody is
+	 * watching, and a shutdown stream reconnects to another instance on its own,
+	 * so announcing a disconnect there would flash a button at somebody for every
+	 * deploy.
+	 */
+	function closeEntry(entry, { tell = null } = {}) {
+		releaseSlot(entry);
+		if (entry.closed) return;
+		entry.closed = true;
+		if (tell) {
+			entry.status = tell;
+			entry.stale = true;
+			// The last graph is kept deliberately: the house on screen stays on
+			// screen, greyed and dated, exactly as it does for any other drop.
+			notify(entry, entry.bridge);
+		}
+		entry.subscribers.clear();
+		try {
+			entry.bridge?.close();
+		} catch (err) {
+			console.warn('[home-runtime] close threw on an already dead socket', { homeId: entry.homeId, ...safeError(err) });
+		}
+	}
+
+	function startSweep() {
+		if (sweepTimer) return;
+		sweepTimer = setInterval(() => evictIdle(now()), SWEEP_MS);
+		// Never hold the process open for a cache.
+		sweepTimer.unref?.();
+	}
+
+	function stopSweep() {
+		if (!sweepTimer) return;
+		clearInterval(sweepTimer);
+		sweepTimer = null;
+	}
+
+	return { acquire, withHome, snapshot, subscribe, streamCount, evictIdle, stats, closeHome, closeAll, admitAction, withAction, readPlan, admission };
+}
+
+/**
+ * The only way a base URL is allowed to become an address in production.
+ *
+ * Exported so the security suite can assert that this, and nothing else, is
+ * what `createHomeRuntime` uses when no seam is supplied.
+ *
+ * A refusal is reported as UNREACHABLE rather than as a fault: from the owner's
+ * side, a house that has moved onto a LAN-only name looks exactly like a house
+ * that is offline, and the connect screen already knows how to explain that one.
+ *
+ * @param {string} baseUrl
+ */
+export async function defaultResolveDial(baseUrl) {
+	try {
+		const dial = await assertDialableHomeUrl(baseUrl);
+		return { host: dial.host, addresses: dial.addresses, secure: dial.secure };
+	} catch (cause) {
+		if (!(cause instanceof HomeUrlError)) throw cause;
+		throw new HomeBridgeError(ERR.UNREACHABLE, cause.message, cause);
+	}
+}
+
+function readMaxConnections() {
+	const raw = Number(process.env.HOME_MAX_CONNECTIONS);
+	return Number.isFinite(raw) && raw > 0 ? Math.floor(raw) : DEFAULT_MAX_CONNECTIONS;
+}
+
+/**
+ * The container's own memory limit in bytes, or `null` when it has none.
+ *
+ * cgroup v2 first, which is what Cloud Run's second generation execution
+ * environment and every modern container runtime expose, then v1 for anything
+ * older. A host with no limit reports the literal `max` on v2 and a sentinel
+ * near 2^63 on v1, and an unconstrained container reports the whole machine;
+ * all three mean the same thing here, which is that memory is not the bound.
+ */
+export function containerMemoryLimitBytes(readFile = readFileSync, hostBytes = totalmem()) {
+	for (const path of ['/sys/fs/cgroup/memory.max', '/sys/fs/cgroup/memory/memory.limit_in_bytes']) {
+		let raw;
+		try {
+			raw = String(readFile(path, 'utf8')).trim();
+		} catch {
+			continue;
+		}
+		if (raw === 'max') return null;
+		const bytes = Number(raw);
+		if (!Number.isFinite(bytes) || bytes <= 0 || bytes >= hostBytes) return null;
+		return bytes;
+	}
+	return null;
+}
+
+/**
+ * How many pooled connections this container's memory can actually back.
+ *
+ * `HOME_MAX_CONNECTIONS` and `--memory` are set in two different places and have
+ * drifted apart three times. A config-only `gcloud run services update` raised
+ * the container to 8 GiB, and the next full deploy put it back to 4 GiB because
+ * `server/cloudbuild.yaml` passes `--memory` explicitly while nothing in the
+ * deploy names the env var, which merges and survives. Production therefore ran
+ * for days sized for 600 connections on a container that could not hold them,
+ * and an OOM here kills the whole API rather than one lane.
+ *
+ * So the cap is negotiated rather than read: the env var asks, and the container
+ * decides. Every number behind this is measured, not chosen.
+ *
+ * @param {number|null} limitBytes The container limit, or null for unlimited.
+ * @returns {number} The cap, or `Infinity` when memory is not the bound.
+ */
+export function memoryBackedConnectionCap(limitBytes) {
+	if (!limitBytes) return Infinity;
+	const budget = limitBytes * MEMORY_UTILIZATION_TARGET - NON_HOME_WORKING_SET_BYTES;
+	if (budget <= 0) return MIN_VIABLE_CONNECTIONS;
+	return Math.max(MIN_VIABLE_CONNECTIONS, Math.floor(budget / RSS_PER_CONNECTION_BYTES));
+}
+
+function withTimeout(promise, ms, makeError) {
+	let timer;
+	const timeout = new Promise((_resolve, reject) => {
+		timer = setTimeout(() => reject(makeError()), ms);
+	});
+	// The loser of this race still settles. A connect that rejects AFTER its
+	// timeout already fired would otherwise be an unhandled rejection, and under
+	// Node's default --unhandled-rejections=throw an unhandled rejection
+	// terminates the process: one house that fails slowly would take every other
+	// house on the instance down with it. `Promise.race` observes the winner
+	// only, so the loser needs its own handler.
+	promise.then(undefined, () => {});
+	return Promise.race([promise, timeout]).finally(() => clearTimeout(timer));
+}
+
+/** The process-wide runtime every endpoint should use. */
+const runtime = createHomeRuntime();
+
+export const acquire = runtime.acquire;
+export const withHome = runtime.withHome;
+export const snapshot = runtime.snapshot;
+export const subscribe = runtime.subscribe;
+export const streamCount = runtime.streamCount;
+export const evictIdle = runtime.evictIdle;
+export const stats = runtime.stats;
+export const closeHome = runtime.closeHome;
+export const closeAll = runtime.closeAll;
+export const admitAction = runtime.admitAction;
+export const withAction = runtime.withAction;
+export const readPlan = runtime.readPlan;
+export const admission = runtime.admission;
+
+// Cloud Run sends SIGTERM before it recycles a container. Closing here is the
+// difference between a clean disconnect and the user's Home Assistant holding
+// dead sockets until its own timeout expires. Registered once, and never in a
+// test process, which imports createHomeRuntime directly.
+if (!process.env.VITEST) {
+	for (const signal of ['SIGTERM', 'SIGINT']) {
+		process.once(signal, () => {
+			const closed = closeAll();
+			if (closed) console.log(`[home-runtime] closed ${closed} home connections on ${signal}`);
+		});
+	}
+}

@@ -1,0 +1,357 @@
+// Optional, additive output controls for the /forge generation pipeline.
+//
+// Every field here is OFF by default: a request that omits all of them produces
+// byte-for-byte the same behavior the endpoint had before this module existed.
+// They let a caller tune an individual generation without changing the tier
+// contract:
+//   • seed             — reproducibility (same seed + prompt + params → same mesh)
+//   • output_format    — glb (default) or a compressed variant (draco / meshopt)
+//   • texture_size     — bake textures at a specific resolution
+//   • target_polycount — explicit geometry budget on poly-aware backends
+//     (target_faces is an accepted alias, same field, same validation)
+//   • bbox             : [x, y, z] in meters; the delivered mesh is uniformly
+//     scaled to fit inside this box (aspect ratio preserved), centered on X/Z
+//     and floored at Y=0. Lane-agnostic: it is a post-generation fit applied
+//     to the final GLB, so every backend honors it regardless of polyControl.
+//   • pose             : 't' | 'a' | 'none', requested rest pose for a
+//     humanoid/character subject. Only lanes without a caller-supplied
+//     reference image can honor this (BACKENDS[*].poseControl); a lane whose
+//     pose is already fixed by the caller's own photo reports pose_applied:
+//     false in the response rather than silently ignoring the field.
+//   • resolution      : TRELLIS.2 / Pixal3D voxel resolution (512, 1024 or 1536)
+//   • view_labels      : per-image front/back/left/right tag for a multi-image
+//     request (Pixal3D's "Match my photo" lane). Null entries are allowed:
+//     the worker infers the front view when every label is omitted.
+//   • fill_other_sides : ask Pixal3D to synthesize the other three sides from a
+//     single uploaded photo (MV-Adapter) instead of requiring 2-4 views.
+//   • num_parts        : PartCrafter's requested part count (2-16); absent keeps
+//     the backend's own default.
+//   • derive_pbr       : the ONE exception to "off by default": the material
+//     completion pass (glb-pbr-derive.js) runs on every delivered mesh, because
+//     an albedo-only material is a defect rather than a preference. Send
+//     `derive_pbr: false` to receive the lane's own materials untouched.
+//   • lods              : opt-IN. Build a real MSFT_lod chain (packages/glb-tools
+//     buildLodChain) alongside the base mesh and store it as a separate variant,
+//     same real-decimation work the Engine QA panel's "Build & grade LOD chain"
+//     upgrade already triggers on demand (see public/engine-qa-panel.js).
+//
+// normalizeForgeOptions() validates and clamps; an explicitly-present but invalid
+// value is reported in `errors` so the endpoint can answer 400 with an actionable
+// message rather than silently doing something the caller didn't ask for. A value
+// that is simply absent is never an error — it just keeps the current default.
+
+import { TRELLIS2_RESOLUTIONS, PIXAL3D_VIEW_LABELS, BACKENDS } from './forge-tiers.js';
+
+// glb is the universal default. The two compressed variants run a post-generation
+// pass (see glb-compress.js) that shrinks the delivered file without changing the
+// rendered result — Draco for geometry, meshopt (EXT_meshopt_compression) for
+// geometry + a faster GPU upload. Both stay valid glTF 2.0 with the right decoder.
+export const OUTPUT_FORMATS = Object.freeze(['glb', 'glb-draco', 'glb-meshopt']);
+export const TEXTURE_SIZES = Object.freeze([512, 1024, 2048, 4096]);
+
+const POLYCOUNT_MIN = 100;
+const POLYCOUNT_MAX = 500_000;
+const SEED_MAX = 4_294_967_295; // uint32 - the range every provider's RNG accepts
+const BBOX_MIN = 0.01; // meters - below this a "fit" is numerically meaningless
+const BBOX_MAX = 50; // meters - above this a caller almost certainly meant cm/mm
+export const POSE_VALUES = Object.freeze(['t', 'a', 'none']);
+
+function compressionFor(format) {
+	if (format === 'glb-draco') return 'draco';
+	if (format === 'glb-meshopt') return 'meshopt';
+	return 'none';
+}
+
+/**
+ * Parse the optional output controls from a /forge request body.
+ *
+ * @param {any} body
+ * @returns {{
+ *   seed: number | null,
+ *   outputFormat: 'glb' | 'glb-draco' | 'glb-meshopt',
+ *   compression: 'none' | 'draco' | 'meshopt',
+ *   textureSize: number | null,
+ *   targetPolycount: number | null,
+ *   resolution: 512 | 1024 | 1536 | null,   // TRELLIS.2 / Pixal3D voxel resolution
+ *   viewLabels: Array<'front'|'back'|'left'|'right'|null> | null,  // per-image tag
+ *   fillOtherSides: boolean,     // synthesize the other sides from one photo
+ *   numParts: number | null,     // PartCrafter's requested part count (2-16)
+ *   derivePbr: boolean,          // material completion pass, true unless opted out
+ *   lods: boolean,               // build and store a real MSFT_lod chain, opt-in
+ *   bbox: [number, number, number] | null,  // [x, y, z] meters, post-gen fit
+ *   pose: 't' | 'a' | null,      // requested rest pose, text-conditioned lanes only
+ *   hasOptions: boolean,         // true iff any non-default option was supplied
+ *   errors: Array<{ field: string, message: string }>,
+ * }}
+ */
+export function normalizeForgeOptions(body) {
+	const errors = [];
+	const b = body && typeof body === 'object' ? body : {};
+
+	// seed — accept any integer; clamp into the uint32 range providers accept.
+	let seed = null;
+	if (b.seed !== undefined && b.seed !== null) {
+		const n = Number(b.seed);
+		if (!Number.isFinite(n) || !Number.isInteger(n) || n < 0) {
+			errors.push({ field: 'seed', message: 'seed must be a non-negative integer.' });
+		} else {
+			seed = Math.min(n, SEED_MAX);
+		}
+	}
+
+	// output_format / format — controls the post-generation compression variant.
+	let outputFormat = 'glb';
+	const rawFormat = b.output_format ?? b.format;
+	if (rawFormat !== undefined && rawFormat !== null && rawFormat !== '') {
+		const f = String(rawFormat).toLowerCase().trim();
+		if (OUTPUT_FORMATS.includes(f)) outputFormat = f;
+		else
+			errors.push({
+				field: 'output_format',
+				message: `output_format must be one of: ${OUTPUT_FORMATS.join(', ')}.`,
+			});
+	}
+
+	// texture_size / texture_resolution — bake resolution for poly-aware backends.
+	let textureSize = null;
+	const rawTex = b.texture_size ?? b.texture_resolution;
+	if (rawTex !== undefined && rawTex !== null && rawTex !== '') {
+		const n = Number(rawTex);
+		if (TEXTURE_SIZES.includes(n)) textureSize = n;
+		else
+			errors.push({
+				field: 'texture_size',
+				message: `texture_size must be one of: ${TEXTURE_SIZES.join(', ')}.`,
+			});
+	}
+
+	// target_polycount: explicit geometry budget (poly-aware backends only).
+	// target_faces is an accepted alias for the same field (same validation,
+	// same clamp); target_polycount wins if a caller sends both. A `quality`
+	// alias maps coarse → fine for callers that prefer a word over a number.
+	let targetPolycount = null;
+	const polyField = b.target_polycount !== undefined && b.target_polycount !== null ? 'target_polycount' : 'target_faces';
+	let rawPoly = b.target_polycount ?? b.target_faces;
+	if ((rawPoly === undefined || rawPoly === null) && typeof b.quality === 'string') {
+		const map = { low: 5_000, draft: 5_000, medium: 30_000, standard: 50_000, high: 150_000, ultra: 300_000 };
+		const q = b.quality.toLowerCase().trim();
+		if (q in map) rawPoly = map[q];
+		else errors.push({ field: 'quality', message: `quality must be one of: ${Object.keys(map).join(', ')}.` });
+	}
+	if (rawPoly !== undefined && rawPoly !== null && rawPoly !== '') {
+		const n = Number(rawPoly);
+		if (!Number.isFinite(n) || !Number.isInteger(n) || n < POLYCOUNT_MIN || n > POLYCOUNT_MAX) {
+			errors.push({
+				field: polyField,
+				message: `${polyField} must be an integer between ${POLYCOUNT_MIN} and ${POLYCOUNT_MAX}.`,
+			});
+		} else {
+			targetPolycount = n;
+		}
+	}
+
+	// resolution: TRELLIS.2 voxel resolution. Absent keeps the tier's own mapping
+	// (draft 512, standard and high 1024); any other value is rejected rather than
+	// silently clamped to a different cost and quality than the caller asked for.
+	let resolution = null;
+	if (b.resolution !== undefined && b.resolution !== null && b.resolution !== '') {
+		const n = Number(b.resolution);
+		if (TRELLIS2_RESOLUTIONS.includes(n)) resolution = n;
+		else
+			errors.push({
+				field: 'resolution',
+				message: `resolution must be one of: ${TRELLIS2_RESOLUTIONS.join(', ')}.`,
+			});
+	}
+
+	// view_labels: per-image front/back/left/right tag for Pixal3D's multi-image
+	// lane. Each entry must be one of PIXAL3D_VIEW_LABELS or null (the worker
+	// infers the front view); the array's length must match the image count,
+	// but imageUrls isn't visible here, so that cross-check happens at the
+	// forge.js boundary where both are in scope.
+	let viewLabels = null;
+	if (b.view_labels !== undefined && b.view_labels !== null) {
+		if (!Array.isArray(b.view_labels)) {
+			errors.push({ field: 'view_labels', message: 'view_labels must be an array.' });
+		} else {
+			const bad = b.view_labels.some((v) => v !== null && !PIXAL3D_VIEW_LABELS.includes(v));
+			if (bad) {
+				errors.push({
+					field: 'view_labels',
+					message: `Each view_labels entry must be null or one of: ${PIXAL3D_VIEW_LABELS.join(', ')}.`,
+				});
+			} else {
+				viewLabels = b.view_labels;
+			}
+		}
+	}
+
+	// num_parts: PartCrafter's part count. Absent keeps the backend's own
+	// default (BACKENDS.partcrafter.defaultParts); an out-of-range value is
+	// rejected rather than silently clamped, same reasoning as resolution above.
+	let numParts = null;
+	if (b.num_parts !== undefined && b.num_parts !== null && b.num_parts !== '') {
+		const n = Number(b.num_parts);
+		const { minParts, maxParts } = BACKENDS.partcrafter;
+		if (!Number.isFinite(n) || !Number.isInteger(n) || n < minParts || n > maxParts) {
+			errors.push({
+				field: 'num_parts',
+				message: `num_parts must be an integer between ${minParts} and ${maxParts}.`,
+			});
+		} else {
+			numParts = n;
+		}
+	}
+
+	// fill_other_sides: opt-IN. Asks Pixal3D to synthesize the other three sides
+	// from a single uploaded photo instead of requiring 2-4 views.
+	let fillOtherSides = false;
+	if (b.fill_other_sides !== undefined && b.fill_other_sides !== null) {
+		if (typeof b.fill_other_sides !== 'boolean') {
+			errors.push({ field: 'fill_other_sides', message: 'fill_other_sides must be true or false.' });
+		} else {
+			fillOtherSides = b.fill_other_sides;
+		}
+	}
+
+	// derive_pbr: opt-OUT. Anything other than an explicit boolean false leaves
+	// the completion pass on; a non-boolean value is reported rather than
+	// silently coerced, so `derive_pbr: "no"` never reads as true.
+	let derivePbr = true;
+	if (b.derive_pbr !== undefined && b.derive_pbr !== null) {
+		if (typeof b.derive_pbr !== 'boolean') {
+			errors.push({ field: 'derive_pbr', message: 'derive_pbr must be true or false.' });
+		} else {
+			derivePbr = b.derive_pbr;
+		}
+	}
+
+	// lods: opt-IN. Builds a real LOD chain in addition to the base mesh; off by
+	// default because it is real decimation work, same reasoning as fill_other_sides.
+	let lods = false;
+	if (b.lods !== undefined && b.lods !== null) {
+		if (typeof b.lods !== 'boolean') {
+			errors.push({ field: 'lods', message: 'lods must be true or false.' });
+		} else {
+			lods = b.lods;
+		}
+	}
+
+	// bbox: [x, y, z] in meters. The delivered mesh is uniformly scaled to fit
+	// inside this box (aspect ratio preserved, never stretched per-axis), then
+	// centered on X/Z and floored at Y=0 (glb-bbox-fit.js). Lane-agnostic: it is
+	// a post-generation step on the final GLB, so unlike target_polycount/pose
+	// there is no backend that cannot honor it.
+	let bbox = null;
+	if (b.bbox !== undefined && b.bbox !== null) {
+		if (!Array.isArray(b.bbox) || b.bbox.length !== 3) {
+			errors.push({ field: 'bbox', message: 'bbox must be an array of 3 numbers [x, y, z] in meters.' });
+		} else {
+			const nums = b.bbox.map(Number);
+			const bad = nums.some((n) => !Number.isFinite(n) || n < BBOX_MIN || n > BBOX_MAX);
+			if (bad) {
+				errors.push({
+					field: 'bbox',
+					message: `Each bbox dimension must be a number between ${BBOX_MIN} and ${BBOX_MAX} meters.`,
+				});
+			} else {
+				bbox = nums;
+			}
+		}
+	}
+
+	// pose: requested rest pose for a humanoid/character subject. Only lanes
+	// without a caller-supplied reference image can honor it (poseControl in
+	// forge-tiers.js's BACKENDS); forge.js reports pose_applied so a caller
+	// knows whether the request actually reached the generator as a directive.
+	let pose = null;
+	if (b.pose !== undefined && b.pose !== null && b.pose !== '') {
+		const p = String(b.pose).toLowerCase().trim();
+		if (POSE_VALUES.includes(p)) pose = p === 'none' ? null : p;
+		else errors.push({ field: 'pose', message: `pose must be one of: ${POSE_VALUES.join(', ')}.` });
+	}
+
+	const hasOptions =
+		seed !== null ||
+		outputFormat !== 'glb' ||
+		textureSize !== null ||
+		targetPolycount !== null ||
+		resolution !== null ||
+		viewLabels !== null ||
+		fillOtherSides ||
+		numParts !== null ||
+		!derivePbr ||
+		lods ||
+		bbox !== null ||
+		pose !== null;
+
+	return {
+		seed,
+		outputFormat,
+		compression: compressionFor(outputFormat),
+		textureSize,
+		targetPolycount,
+		resolution,
+		viewLabels,
+		fillOtherSides,
+		numParts,
+		derivePbr,
+		lods,
+		bbox,
+		pose,
+		hasOptions,
+		errors,
+	};
+}
+
+// The subset of normalized options that is safe to forward to a provider's
+// reconstruct call. Only fields a model actually consumes (seed, texture size,
+// polycount) — never the post-generation compression, which we apply ourselves.
+// Returns a plain object that callers spread into their existing reconstructParams,
+// so an all-default options object contributes nothing (current behavior preserved).
+export function providerReconstructParams(opts, { polyControl = false } = {}) {
+	const out = {};
+	if (!opts) return out;
+	if (opts.seed !== null && opts.seed !== undefined) out.seed = opts.seed;
+	if (polyControl) {
+		if (opts.textureSize) out.texture_size = opts.textureSize;
+		if (opts.targetPolycount) out.target_polycount = opts.targetPolycount;
+	}
+	return out;
+}
+
+// Re-usable pose directive text, appended to a text-conditioned generation
+// prompt AFTER any art-director rewrite so it survives verbatim into the
+// reference image / text-to-3d call. Kept here (not forge.js) so the wording
+// stays next to the field's validation and the one place it is documented.
+export function poseDirective(pose) {
+	if (pose === 't') return 'standing in a neutral T-pose, arms held straight out to the sides, palms down';
+	if (pose === 'a') return 'standing in a neutral A-pose, arms relaxed at a slight angle from the body';
+	return null;
+}
+
+// Compact, response-safe echo of what the caller actually got — included in the
+// generation response so a client can confirm the seed used (for reproducibility)
+// and which format/resolution was applied.
+// `poseApplied` is resolved by forge.js (it knows the chosen backend's
+// poseControl flag; this module validates the field but has no backend
+// context), null when the caller did not request a pose at all.
+export function summarizeForgeOptions(opts, { poseApplied = null } = {}) {
+	if (!opts) return {};
+	return {
+		seed: opts.seed,
+		output_format: opts.outputFormat,
+		texture_size: opts.textureSize,
+		target_polycount: opts.targetPolycount,
+		target_faces: opts.targetPolycount,
+		resolution: opts.resolution ?? null,
+		view_labels: opts.viewLabels ?? null,
+		fill_other_sides: Boolean(opts.fillOtherSides),
+		num_parts: opts.numParts ?? null,
+		derive_pbr: opts.derivePbr !== false,
+		lods: Boolean(opts.lods),
+		bbox: opts.bbox ?? null,
+		pose: opts.pose ?? null,
+		...(opts.pose !== null ? { pose_applied: Boolean(poseApplied) } : {}),
+	};
+}

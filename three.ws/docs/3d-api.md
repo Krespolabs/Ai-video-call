@@ -1,0 +1,599 @@
+# three.ws 3D API
+
+Free, keyless 3D for AI agents. No key, no account, no wallet — an autonomous
+agent can turn a text prompt into a real textured GLB model in one call. This is
+the only text→3D lane in the x402 / agent-payments ecosystem that gives draft
+generation away for free, and it funnels into the paid quality tiers when an
+agent needs production output.
+
+Base URL: `https://three.ws`
+
+> This page documents the **free** 3D endpoints. Higher-quality generation and
+> rigging are paid: **Forge Pro** (quality tiers) at [`/api/x402/forge`](https://three.ws/api/x402/forge)
+> and **Rigged Avatars** (animation-ready skeletons) via `POST /api/forge?action=rig`.
+> The rig action is POST-only, so there is nothing to open at `/api/forge` itself;
+> for a browsable view of what the forge can do, open
+> [`/api/forge?catalog`](https://three.ws/api/forge?catalog) (the path / tier /
+> backend matrix).
+
+Prefer a browsable landing page? See [three.ws/3d](https://three.ws/3d) — hero,
+live endpoint table, a runnable inspection console, an embedded 3D viewer, and the
+free→paid ladder.
+
+---
+
+## Discovery — one URL for the whole API
+
+Point one request at `GET /api/3d` and you get the entire free API: every
+endpoint, its inputs/outputs, a live example, and the paid tiers it graduates to.
+The list is assembled from the API catalog at request time, so a new endpoint
+appears the moment it ships — nothing is hand-maintained.
+
+```bash
+curl https://three.ws/api/3d
+```
+
+```jsonc
+{
+  "name": "three.ws 3D API",
+  "free": true,
+  "keyless": true,
+  "version": "1.0.0",
+  "endpoints": [
+    { "slug": "generate", "methods": ["POST"], "path": "/api/3d/generate", "title": "Text → 3D (free draft)", "…": "…" },
+    { "slug": "inspect",  "methods": ["GET", "POST"], "path": "/api/3d/inspect", "title": "3D Model Inspect & Validate", "…": "…" },
+    { "slug": "diff",     "methods": ["GET", "POST"], "path": "/api/3d/diff", "title": "3D Model Diff", "…": "…" },
+    { "slug": "print-quote",   "methods": ["POST"], "path": "/api/print/quote", "title": "Printability Report & Print Quote", "…": "…" },
+    { "slug": "print-prepare", "methods": ["POST"], "path": "/api/print/prepare", "title": "Repair & Export for Printing (STL, 3MF, GLB)", "…": "…" }
+  ],
+  "count": 5,
+  "paidTiers": [
+    { "name": "Forge Pro", "path": "/api/x402/forge", "price": "from $0.05 USDC", "why": "…" },
+    { "name": "Rigged Avatar", "path": "/api/forge?action=rig", "price": "from $0.05 USDC", "why": "…" }
+  ],
+  "openapi": "/api/3d/openapi.json",
+  "docs": "/docs/3d-api",
+  "ts": "2026-07-07T00:00:00.000Z"
+}
+```
+
+Send `Accept: text/html` for a browsable version of the same data; anything else
+(the agent path) returns JSON.
+
+### OpenAPI 3.1
+
+`GET /api/3d/openapi.json` is a real OpenAPI 3.1 document generated from the same
+catalog — point any toolchain (LangChain's `OpenAPIToolkit`, `openapi-generator`,
+Swagger UI) at it for typed clients and callable tools. No key, no account.
+
+```bash
+curl https://three.ws/api/3d/openapi.json
+```
+
+GET endpoints expose their inputs as query/path `parameters`; POST endpoints
+expose them as a JSON `requestBody`. Because both the index and the spec derive
+from one catalog, they can never drift.
+
+---
+
+## Text → 3D generation (free)
+
+**`POST /api/3d/generate`** — turn a text prompt into a GLB model.
+**`GET /api/3d/generate?job=<id>`** — poll a queued generation.
+
+### Who uses this, and why
+
+An agent building a **game**, a **scene**, an **NFT**, or any visual needs a 3D
+model from a text prompt — instantly, with no signup and no key to manage. It
+calls `POST /api/3d/generate`, gets back a GLB (or a job token to poll), drops the
+model into its world, and keeps going. When it needs denser geometry, PBR
+textures, or a rigged, animatable character, it upgrades to Forge Pro / Rigged
+Avatars — same platform, same auth-free base.
+
+### Free-tier limits (stated honestly)
+
+The free lane is the **draft / NIM tier only**. Be realistic about what it is:
+
+- **Draft fidelity.** Geometry is a fast draft (NVIDIA NIM TRELLIS), not a
+  production, high-polygon, PBR-textured mesh. Good for prototyping, greyboxing,
+  placeholders, and single objects.
+- **One subject per prompt.** Describe a single object (`"a small ceramic robot
+  figurine"`), not a whole scene. Prompts are 3–1000 characters.
+- **GLB only.** The response is always a `.glb` model.
+- **No rigging.** The mesh has no skeleton or skin weights. Rigging is paid
+  (Rigged Avatars).
+- **Generous per-IP rate limit**, protecting a shared GPU allocation. On a limit
+  you get `429` with `Retry-After`; the paid Forge tiers have no per-IP cap.
+
+For higher quality → **Forge Pro** (`/api/x402/forge`). For animation-ready
+characters → **Rigged Avatars** (`/api/forge?action=rig`).
+
+### Request
+
+```json
+POST /api/3d/generate
+Content-Type: application/json
+
+{
+  "prompt": "a small ceramic robot figurine",
+  "format": "glb"
+}
+```
+
+| Field    | Type   | Required | Notes                                          |
+|----------|--------|----------|------------------------------------------------|
+| `prompt` | string | yes      | One subject, 3–1000 characters.                |
+| `format` | string | no       | `"glb"` (the only supported value; default).   |
+
+### Response — finished inline
+
+The free draft lane often completes inside the request window. When it does, the
+model comes straight back:
+
+```json
+{
+  "status": "done",
+  "glbUrl": "https://pub-2534e921bf9c4314addcd4d8a6e98b7b.r2.dev/forge/40659d6097b0/0a527906-a087-45b7-afd4-8d401495787b.glb",
+  "viewerUrl": "https://three.ws/viewer?src=https%3A%2F%2Fpub-2534e921bf9c4314addcd4d8a6e98b7b.r2.dev%2Fforge%2F40659d6097b0%2F0a527906-a087-45b7-afd4-8d401495787b.glb",
+  "arUrl": "https://three.ws/api/ar?src=https%3A%2F%2Fpub-2534e921bf9c4314addcd4d8a6e98b7b.r2.dev%2Fforge%2F40659d6097b0%2F0a527906-a087-45b7-afd4-8d401495787b.glb&title=a%20small%20ceramic%20robot%20figurine",
+  "format": "glb",
+  "tier": "draft",
+  "free": true,
+  "upgrade": { "forgePro": "/api/x402/forge", "riggedAvatars": "/api/forge?action=rig", "docs": "/docs/3d-api" }
+}
+```
+
+**Treat `glbUrl` as opaque.** It is a fully-qualified URL on the object store, not
+a path you can build yourself: the host comes from deployment config and the key
+is assigned per generation. Follow the URL you were handed and pass it verbatim
+into `viewerUrl` / `arUrl` style links rather than reconstructing one.
+
+Server-side and CLI downloads (`curl -O`, a worker fetching bytes) can use
+`glbUrl` directly. **Browser code on another origin should not**: the object
+store answers without CORS headers and is rate-limited for bursts. Swap the host
+for the first-party CDN instead, which serves the identical object with
+`Access-Control-Allow-Origin: *` and a long edge cache:
+
+```js
+// https://<object-store>/forge/<hash>/<id>.glb → https://three.ws/cdn/forge/<hash>/<id>.glb
+const browserUrl = 'https://three.ws/cdn/' + new URL(glbUrl).pathname.replace(/^\//, '');
+```
+
+`arUrl` is the place-in-your-room link (`/api/ar`): opened on a phone it
+launches AR directly — Scene Viewer on Android, Quick Look on iOS (GLB→USDZ
+converted in-page) — and on desktop it falls back to the interactive viewer.
+The prompt rides along as `title` so the AR page is labeled. Show it to end
+users as "place it in your room".
+
+### Response — queued (poll)
+
+Otherwise you get a job token and a poll URL (the prompt is carried as
+`title` so the finished AR page stays labeled):
+
+```json
+{
+  "status": "pending",
+  "job": "f1.eyJwIjoibnZpZGlh...",
+  "poll": "/api/3d/generate?job=f1.eyJwIjoibnZpZGlh...&title=a%20small%20ceramic%20robot%20figurine",
+  "retryAfter": 5,
+  "etaSeconds": 20,
+  "creationId": "a1b2c3d4-0000-4000-8000-000000000002",
+  "format": "glb",
+  "tier": "draft",
+  "free": true
+}
+```
+
+`retryAfter` is the recommended number of seconds to wait before the next poll
+(also sent as the standard `Retry-After` header); honor it and your poll loop
+stays under the rate limit instead of tripping a `429`, and the shared free GPU
+lane carries less traffic. `etaSeconds` is the estimated time until the model is
+ready when the lane reports one, and `creationId` is a stable handle for
+correlating logs and referencing the generation across calls. Every field is
+additive — older clients that ignore them keep working unchanged.
+
+Poll the `poll` URL until the status is terminal, waiting `retryAfter` seconds
+between polls:
+
+```json
+GET /api/3d/generate?job=f1.eyJwIjoibnZpZGlh...&title=a%20small%20ceramic%20robot%20figurine
+
+// still working
+{ "status": "pending", "job": "f1...", "poll": "/api/3d/generate?job=f1...&title=...", "retryAfter": 3 }
+
+// ready
+{ "status": "done", "job": "f1...", "glbUrl": "https://<object-store>/forge/<hash>/<id>.glb",
+  "viewerUrl": "https://three.ws/viewer?src=...", "arUrl": "https://three.ws/api/ar?src=...&title=...",
+  "format": "glb", "tier": "draft", "free": true }
+
+// upstream failed — free lane, so no charge; just retry
+{ "status": "error", "job": "f1...", "error": "3D generation hit a snag upstream — no charge; try again.", "free": true }
+```
+
+### States & errors
+
+| Situation                     | Response                                                        |
+|-------------------------------|----------------------------------------------------------------|
+| Empty / too-short / oversized prompt | `400 invalid_prompt`                                    |
+| Unsupported `format`          | `400 unsupported_format`                                       |
+| Queued                        | `200 { status: "pending", job, poll, retryAfter, etaSeconds?, creationId? }` |
+| Ready                         | `200 { status: "done", glbUrl, viewerUrl, arUrl }`            |
+| Generation failed upstream    | `200 { status: "error", error }` — free, **no charge**        |
+| GPU lane saturated / rate-limited | `429` with `Retry-After` + an upgrade pointer             |
+| Lane not configured on this deployment | `503 not_configured`                                 |
+
+A well-formed prompt never returns `500`.
+
+### curl — end to end
+
+```bash
+# 1. Submit a prompt
+curl -s -X POST https://three.ws/api/3d/generate \
+  -H 'content-type: application/json' \
+  -d '{"prompt":"a small ceramic robot figurine"}'
+
+# → { "status": "pending", "job": "f1...", "poll": "/api/3d/generate?job=f1..." }
+#   (or { "status": "done", "glbUrl": "..." } if it finished inline)
+
+# 2. Poll until done, then download the GLB at the glbUrl you were handed
+curl -s 'https://three.ws/api/3d/generate?job=f1...'
+# → { "status": "done", "glbUrl": "https://<object-store>/forge/<hash>/<id>.glb", ... }
+
+curl -sL -o model.glb '<the glbUrl from step 2>'
+```
+
+The `glbUrl` is a real, durable GLB — open `viewerUrl` in a browser to inspect it,
+or load `model.glb` in any glTF-capable engine (three.js, Babylon, Unity, Godot,
+Blender).
+
+`viewerUrl` (`https://three.ws/viewer?src=<https GLB url>&title=<label>`) is more
+than a preview. Its "Do more with this model" panel funnels the model into the
+rest of the platform: Pose Studio (`/pose?src=`, shown when the GLB carries a
+skeleton), material restyling (`/restyle?url=`), Scene Studio (`/scene?model=`),
+Parts Studio (`/compose?glb=`), AR placement (`/ar?src=`), a pump.fun coin
+launch pre-filled with a rendered snapshot of the model, and a copyable embed
+iframe. The viewer page itself is embeddable on any site: it is served with
+`frame-ancestors *`, so an `<iframe src="https://three.ws/viewer?src=...">` works
+anywhere.
+
+### Will it simulate? (free)
+
+`inspect` tells you what the mesh contains. It does not tell you whether a
+physics engine could use it, which is a different question with different
+answers: a mesh can be small, clean, and beautifully textured and still be an
+open shell that sinks through a floor.
+
+```bash
+curl "https://three.ws/api/sim-readiness?src=https://three.ws/avatars/cesium-man.glb"
+```
+
+Returns one of four verdicts (`simulation_ready`, `needs_scale`,
+`needs_repair`, `unusable`) with the measurements behind it: watertightness and
+winding, real-world extents in meters, exact volume, centroid and inertia tensor
+at unit density, and how well a single convex hull approximates the shape. Free,
+no account, cached by content hash, and available to agents as the
+`grade_sim_readiness` MCP tool. Grading by `?src=` is capped at 30 per five
+minutes per address (the `429` carries `Retry-After`); `?hash=` lookups of an
+already-graded model are not capped, so grade once and reuse hashes. Full reference: [Simulation
+readiness](/docs/sim-readiness).
+
+### Upgrade path
+
+| Need                                   | Endpoint                              |
+|----------------------------------------|---------------------------------------|
+| Free draft geometry from a prompt      | `POST /api/3d/generate` (this page)   |
+| Higher polygon budgets + PBR textures  | Forge Pro — `POST /api/x402/forge`    |
+| Animation-ready rigged character       | Rigged Avatars — `POST /api/forge?action=rig` |
+
+---
+
+### Prompt art direction (the `director` pass) and brand marks
+
+Text→3D runs text→image→mesh, so prompt quality decides mesh quality. Two
+layers improve it, both shared across every generation surface (the studio MCP
+tools, the paid REST twin, and this lane):
+
+**The art director.** On `POST /api/forge`, an IBM Granite "art director"
+pass runs **by default** on every text prompt (pass `director: false` to skip
+it) and rewrites your rough idea into one information-dense spec before
+generation: the single subject and its silhouette, its construction and part
+joins, per-part PBR material cues, one held art style, fine surface detail,
+and composition constraints tuned for clean image→mesh reconstruction
+(centered, isolated, no text, no collage). It is fail-soft: if the director
+LLM is unavailable, or its reply fails the safety check (empty, over the
+1000-character prompt ceiling, unfinished, carrying a link, or no richer than
+what you typed), the raw prompt proceeds untouched and the run receipt names
+the reason. The director is asked to stay under 90 words so a spec fits the
+ceiling. The prompt specs live in one
+module, [api/_lib/forge-director-prompts.js](../api/_lib/forge-director-prompts.js)
+(`MESH_DIRECTOR` for objects and props, `AVATAR_DIRECTOR` for rig-ready
+humanoids), so the free and paid lanes cannot drift apart.
+
+**The brand-mark lexicon.** Neither the director LLM nor the image model
+reliably knows what a niche brand mark looks like, so "pumpfun logo" used to
+reconstruct as a generic badge covered in garbled lettering. Prompts that are
+essentially "<known brand> logo" (or the bare brand name) now resolve
+deterministically
+([mcp-server/src/tools/_logo-lexicon.js](../mcp-server/src/tools/_logo-lexicon.js),
+`resolveLogoPrompt`): the lexicon returns a concrete geometric description of
+the real mark, written so the image model draws shapes and never letterforms
+(rendered text reconstructs as noise, so the emitted spec never contains the
+brand name itself). Marks with a pre-rendered reference view under
+`public/marks/` skip the text→image gamble entirely and submit image→3D
+against the reference. Anything more specific than brand-plus-mark words falls
+through to the director, whose instructions carry the same brand-mark
+directive. The lexicon currently covers pump.fun and the major-chain marks.
+
+Tests: [tests/api/forge-director.test.js](../tests/api/forge-director.test.js),
+[tests/api/logo-lexicon.test.js](../tests/api/logo-lexicon.test.js).
+
+---
+
+## Forge Pro — paid quality tiers (`/api/x402/forge`)
+
+**`POST /api/x402/forge`** — the pay-per-call twin of the free draft lane. Same
+inputs (a text prompt, or up to six reference photos of one object), but you pick
+a **quality tier**, and you pay per generation in USDC over
+[x402](https://x402.org) — no API key, no account, no signup. This is the only
+real text→3D / image→3D generation on any agent marketplace, so it's built for
+autonomous buyers: production **game assets**, **NFT collections**, **3D scenes**,
+and **product visualization**.
+
+### Who uses this, and why
+
+An agent that has already proven the concept on the free draft lane, and now needs
+a shippable asset. It calls `POST /api/x402/forge`, pays the tier price, and gets
+back a job token it polls **for free** — the same poll path the free lane uses. It
+picks us because there is no other keyless, pay-per-call 3D generator: no account
+to create, no monthly plan, no key to provision — just one USDC payment per model.
+
+### Quality tiers
+
+| Tier       | Price (USDC) | Geometry            | Textures            | Best for                          |
+|------------|--------------|---------------------|---------------------|-----------------------------------|
+| `draft`    | **$0.05**    | ~12k tris, low-poly | baked, 1K           | Blockout, iteration, previews     |
+| `standard` | **$0.15**    | ~30k tris, balanced | baked, 2K           | The default for most assets       |
+| `high`     | **$0.50**    | ~200k tris, max     | **PBR + HD**, 4K    | Hero assets, product/NFT renders  |
+
+Every tier ships a textured mesh; the ladder is bake resolution plus, at `high`,
+full PBR material channels rather than a single baked colour map.
+
+Prices are the flat per-call retail price and are the single source of truth in
+[`api/_lib/forge-tiers.js`](https://github.com/nirholas/three.ws/blob/main/api/_lib/forge-tiers.js);
+the `402` challenge quotes the exact price for the tier you request. Ops can tune a
+tier at deploy time without touching settlement.
+
+### How to call it
+
+1. **Discover the price (free, no payment).** `GET /api/x402/forge` returns the
+   per-tier USDC catalog so an agent can budget before paying:
+
+   ```bash
+   curl -s https://three.ws/api/x402/forge
+   # → { "route": "/api/x402/forge", "pricing_usdc": [
+   #      { "tier": "draft", "price_usdc": "0.05" },
+   #      { "tier": "standard", "price_usdc": "0.15" },
+   #      { "tier": "high", "price_usdc": "0.50" } ], … }
+   ```
+
+2. **Request a generation.** `POST` the prompt (or `image_urls`) and the tier. With
+   no `X-PAYMENT` header you get a `402` challenge quoting the Solana USDC price;
+   pay it with any x402 client and retry with the payment header.
+
+   ```bash
+   # text → 3D
+   curl -s -X POST https://three.ws/api/x402/forge \
+     -H 'content-type: application/json' \
+     -d '{"prompt":"a brass steampunk owl, full body","tier":"standard"}'
+
+   # image → 3D: up to six public https views of ONE object (omit prompt)
+   curl -s -X POST https://three.ws/api/x402/forge \
+     -H 'content-type: application/json' \
+     -d '{"image_urls":["https://example.com/owl-front.png","https://example.com/owl-side.png"],"tier":"high"}'
+   ```
+
+3. **Poll for free.** The paid call returns a job token; poll it on the free,
+   provider-aware endpoint until the GLB is ready:
+
+   ```json
+   { "job_id": "f1.eyJ…", "status": "queued", "poll_url": "/api/forge?job=f1.eyJ…",
+     "mode": "text_to_3d", "tier": "standard", "backend": "nvidia",
+     "eta_seconds": 22, "price_usdc": "0.15" }
+   ```
+
+   ```bash
+   curl -s 'https://three.ws/api/forge?job=f1.eyJ…'
+   # → { "status": "done", "glb_url": "https://<object-store>/forge/<hash>/<id>.glb", … }
+   ```
+
+   A draft prompt often finishes inside the submit window and comes back inline with
+   `status: "done"` and the `glb_url` already set — no polling needed.
+
+### Payment & fairness
+
+- **Solana mainnet USDC only.** Every quote on this route is a Solana `402`.
+- **Submit before settle.** The generation job is submitted after payment is
+  *verified* but before it *settles* — so if the generator can't accept the job,
+  you are never charged.
+- **Idempotent.** Retrying the same payment for the same body returns the same job
+  token instead of generating (and charging) twice.
+
+New here? Start on the **free** draft lane at
+[`POST /api/3d/generate`](#text--3d-generation-free) — same prompt, zero cost — and
+upgrade to a paid tier only when you need standard/high quality or image→3D.
+
+---
+
+## Inspect + validate + optimize (free)
+
+**`GET /api/3d/inspect?url=<glb/gltf url>`** — inspect a model by URL.
+**`POST /api/3d/inspect`** — `{ "url": "…" }` as JSON, **or** raw `.glb`/`.gltf`
+bytes as the request body.
+
+### Who uses this, and why
+
+An autonomous agent handling a 3D asset — from a marketplace, a generation API,
+or a user upload — needs to answer three questions before it commits to using
+the file:
+
+1. **Is it valid?** Is this actually a spec-compliant glTF/GLB, or a broken blob?
+2. **How heavy is it?** Vertices, triangles, materials, textures, animations,
+   extensions — the numbers that decide whether it's web/mobile-shippable.
+3. **What should it fix first?** A prioritized, severity-ranked list of the
+   fastest ways to make it smaller and faster.
+
+One free call answers all three. It runs the official **Khronos glTF-Validator**
+for the compliance verdict plus the same inspection core the platform's paid
+pipelines use. Free on purpose: a validation utility drives trust and funnels
+callers into the paid Forge Pro / Rigged Avatar / mesh-optimization tiers.
+
+### Request
+
+| Method | Input | Notes |
+|--------|-------|-------|
+| `GET`  | `?url=<https url>` | Public https URL of a `.glb`/`.gltf` model. |
+| `POST` | `{ "url": "<https url>" }` (`application/json`) | Same, as a JSON body. |
+| `POST` | raw `.glb`/`.gltf` bytes (`application/octet-stream`) | Upload a local model directly. |
+
+Max size **32 MiB** (free tier) — larger files return `413`. URL fetches are
+SSRF-hardened: only public hosts, no private/metadata addresses, redirects
+re-validated per hop.
+
+### Response
+
+```json
+{
+  "url": "https://three.ws/avatars/cesium-man.glb",
+  "valid": true,
+  "stats": {
+    "vertices": 3273,
+    "triangles": 4672,
+    "materials": 1,
+    "textures": 1,
+    "animations": 1,
+    "extensions": [],
+    "meshes": 1,
+    "nodes": 22,
+    "scenes": 1,
+    "skins": 1,
+    "joints": 19,
+    "indexedPrimitives": 1,
+    "nonIndexedPrimitives": 0,
+    "extensionsRequired": [],
+    "container": "glb",
+    "generator": "glTF-Transform v4.4.0"
+  },
+  "sizeBytes": 438044,
+  "recommendations": [
+    {
+      "severity": "info",
+      "issue": "Model looks well-optimized for web delivery — no suggestions flagged.",
+      "fix": "No action needed — the model is already well-suited for web delivery."
+    }
+  ],
+  "validation": {
+    "valid": true,
+    "validatorVersion": "2.0.0-dev.3.10",
+    "numErrors": 0,
+    "numWarnings": 1,
+    "numInfos": 0,
+    "numHints": 0,
+    "issues": [
+      {
+        "code": "NODE_SKINNED_MESH_NON_ROOT",
+        "message": "Node with a skinned mesh is not root. Parent transforms will not affect a skinned mesh.",
+        "severity": "warning",
+        "pointer": "/nodes/2"
+      }
+    ],
+    "truncated": false
+  },
+  "ts": "2026-08-15T06:37:05.768Z"
+}
+```
+
+That is the verbatim response for the URL in the curl block below, so you can
+diff your own call against it.
+
+`recommendations` is ordered **most severe first** (`critical` → `warn` →
+`info`); each item is a `{ severity, issue, fix }` triple: the problem and the
+concrete action. `valid` reflects the glTF-Validator's error count, so a model
+can be `valid: true` and still carry warnings, as this one does. `validation.issues`
+carries those individual findings (`truncated` says whether the list was cut).
+
+### curl
+
+```bash
+# Inspect a remote model by URL
+curl "https://three.ws/api/3d/inspect?url=https://three.ws/avatars/cesium-man.glb"
+
+# Same, via JSON body
+curl -X POST https://three.ws/api/3d/inspect \
+  -H 'content-type: application/json' \
+  -d '{"url":"https://three.ws/avatars/cesium-man.glb"}'
+
+# Upload a local file directly
+curl -X POST https://three.ws/api/3d/inspect \
+  -H 'content-type: application/octet-stream' \
+  --data-binary @my-model.glb
+```
+
+### States & errors
+
+Every failure maps to a specific status — never `500` on a well-formed request.
+
+| Situation | Response |
+|-----------|----------|
+| No `url` and no uploaded body | `400 missing_url` |
+| Malformed URL / private/blocked host | `400 invalid_url` |
+| Bytes are not a parseable glTF/GLB | `400 invalid_model` |
+| Empty `POST` upload | `400 empty_body` |
+| Model over the 32 MiB cap | `413 too_large` |
+| Per-IP budget exhausted | `429 rate_limited` + `Retry-After` |
+| Source URL didn't return the model | `502 fetch_failed` + retry hint |
+
+### Upgrade path
+
+When the report says "optimize," the paid pipelines do the work: **Forge Pro**
+(higher-quality generation), **Rigged Avatars** (auto-rigging), and the x402
+mesh-optimization routes. See
+[`/.well-known/x402.json`](https://three.ws/.well-known/x402.json).
+
+---
+
+## Diff two models (free)
+
+**`GET /api/3d/diff?a=<url>&b=<url>`** or **`POST /api/3d/diff`** with
+`{ "a": "<url>", "b": "<url>", "format": "json" }`. Compares a baseline and a
+candidate glTF/GLB (public https URLs, 32 MiB each) and reports what changed in
+geometry, hierarchy, materials, textures, skeletons and animation clips, with
+rename and move detection. The JSON carries a top-level `severity`
+(`none`, `cosmetic`, `minor`, `major`, `breaking`) to gate a build on;
+`format=markdown` returns a pull-request-ready report and `format=text` a
+terminal report. The engine is the `@three-ws/glb-diff` package, the same code
+the `/diff` page runs.
+
+```bash
+curl "https://three.ws/api/3d/diff?a=https://three.ws/avatars/cesium-man.glb&b=https://three.ws/avatars/cesium-man.glb&format=text"
+```
+
+## Printing (free)
+
+Two further catalog entries turn a model into a physical object.
+`POST /api/print/quote` returns a printability report (closed solid, wall
+thickness, volume, a 0-100 score) and, when you pass a `materialId`, an
+itemized quote with a signed token. `POST /api/print/prepare` repairs the mesh
+and writes an STL, a 3MF and the repaired GLB. Both are free and keyless;
+ordering is paid. See [Materialize](/docs/materialize).
+
+---
+
+## Related
+
+- [Cookbook](/cookbook) - runnable recipes built on these endpoints: a command-line client,
+  a parallel asset-pack builder, an MCP server, and a CI quality gate
+- [API Reference](/docs/api-reference) - the full three.ws HTTP API surface
+- [3D Studio MCP endpoint](/docs/mcp-studio) - the same free generation lane as MCP tools
+- [x402 Paid Endpoints](/docs/x402-endpoints) - the paid catalog Forge Pro belongs to
+- [Image to 3D](/docs/image-to-3d) - the photo-input reconstruction pipeline
+- [Simulation readiness](/docs/sim-readiness) - the free physics grade: whether a solver can consume the mesh you just made

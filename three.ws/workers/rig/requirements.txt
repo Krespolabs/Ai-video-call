@@ -1,0 +1,47 @@
+# Make-It-Animatable (jasongzy, MIT) runtime set, mirrored from its
+# requirements.txt at the commit pinned in the Dockerfile, minus training-only
+# extras (tensorboard, ipykernel, ipympl, fake-bpy-module).
+#
+# torch/torchvision install in their own Dockerfile layer BEFORE this file so
+# anything that imports torch at build time already has it. torch-cluster is
+# pinned to the exact pyg wheel build: the bare "torch-cluster" spec let pip
+# pick the PyPI sdist, whose isolated build env has no torch and fails.
+-f https://data.pyg.org/whl/torch-2.1.2+cu121.html
+torch-cluster==1.6.3+pt21cu121
+
+--extra-index-url https://miropsota.github.io/torch_packages_builder
+pytorch3d==0.7.7+pt2.1.2cu121
+
+einops
+timm
+PyMCubes
+bpy==4.3.0
+gradio>=5.25.0
+matplotlib
+numpy~=1.26.4
+plyfile
+potpourri3d
+shapely
+spaces
+tqdm
+# Held below 5 on purpose. The running revision was built on trimesh 4.x and a
+# bare >=4.4.0 now resolves to 5.0.0, so the next rebuild would quietly ship a
+# major-version jump in the loader both MIA and rig_glb parse meshes with.
+# Raising it is a deliberate change to verify on the GPU, not a side effect of
+# redeploying. The local suites pass on 4.12.2 and 5.0.0 alike.
+trimesh>=4.4.0,<5
+
+# Rig authoring + blendshape transfer (rig_glb.py / blendshapes.py)
+pygltflib==1.16.2
+scipy>=1.11.0
+
+# Server. fastapi rides gradio's requirement (a hard ==0.115.0 pin conflicts
+# with gradio>=5.25); the API surface this service uses is stable across the
+# 0.115+ line.
+fastapi>=0.115,<1
+uvicorn[standard]>=0.32,<1
+pydantic>=2.0.0
+httpx>=0.27.0
+
+# GCP
+google-cloud-storage==2.18.0

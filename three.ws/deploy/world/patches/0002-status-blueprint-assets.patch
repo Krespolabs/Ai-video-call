@@ -1,0 +1,30 @@
+diff --git a/src/server/index.js b/src/server/index.js
+index 67d7345..4d99ad5 100644
+--- a/src/server/index.js
++++ b/src/server/index.js
+@@ -199,6 +199,25 @@ fastify.get('/status', async (request, reply) => {
+       connectedUsers: [],
+       commitHash: process.env.COMMIT_HASH,
+     }
++    // Expose every content-hashed asset each blueprint references, with an
++    // absolute URL, so an external monitor can HEAD them over plain HTTP and
++    // catch a missing asset before it crashes the scene for every joiner —
++    // the exact failure mode of the 2026-06-12 void-fall (a lost $scene
++    // script asset unloaded the ground and dropped every player into the void).
++    const assetsBaseUrl = (process.env.ASSETS_BASE_URL || '').replace(/\/+$/, '')
++    status.blueprints = []
++    for (const data of world.blueprints.serialize()) {
++      const refs = new Set()
++      for (const m of JSON.stringify(data).matchAll(/asset:\/\/([a-f0-9]{64}\.\w+)/g)) {
++        refs.add(m[1])
++      }
++      for (const file of refs) {
++        status.blueprints.push({
++          id: data.id,
++          assetUrl: assetsBaseUrl ? `${assetsBaseUrl}/${file}` : `asset://${file}`,
++        })
++      }
++    }
+     for (const socket of world.network.sockets.values()) {
+       status.connectedUsers.push({
+         id: socket.player.data.userId,

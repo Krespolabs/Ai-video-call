@@ -1,0 +1,304 @@
+<!doctype html>
+<html lang="en">
+	<head>
+		<script>/* three.ws theme boot — no-flash; runtime in /theme-switcher.js */(function(){try{var m=localStorage.getItem('twx_theme');var l=m==='auto'?(window.matchMedia&&window.matchMedia('(prefers-color-scheme: light)').matches):m==='light';document.documentElement.setAttribute('data-theme',l?'light':'dark');}catch(e){document.documentElement.setAttribute('data-theme','dark');}})();</script>
+		<meta charset="utf-8" />
+		<title data-i18n="a_edit.meta_title">Edit Agent — three.ws</title>
+		<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+		<meta name="robots" content="noindex" />
+		<meta name="theme-color" content="#000000" />
+
+		<link rel="icon" href="/favicon.ico" sizes="any" />
+		<link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+		<link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png" />
+		<link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png" />
+		<link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+		<link rel="manifest" href="/manifest.webmanifest" />
+		<link rel="stylesheet" href="/style.css" />
+		<link rel="stylesheet" href="/fonts/fonts.css" />
+		<script
+			type="module"
+			src="https://cdn.jsdelivr.net/npm/@google/model-viewer@4.4.0/dist/model-viewer.min.js"
+			integrity="sha384-wjsPzEO+lXOf7d9csIDfAQpPt2OKuUU3m0K9qsdKIuzX4N8czSF6hdh23eAbZa3p"
+			crossorigin="anonymous"
+		></script>
+
+		<style>
+			body {
+				overflow: auto;
+				display: flex;
+				flex-direction: column;
+				min-height: 100vh;
+			}
+
+			.ce-page-header {
+				display: flex;
+				align-items: center;
+				gap: 1rem;
+				padding: 1rem 1.618rem;
+				border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+			}
+
+			.ce-page-header a {
+				color: rgba(255, 255, 255, 0.4);
+				text-decoration: none;
+				font-size: 0.764rem;
+			}
+
+			.ce-page-header a:hover {
+				color: rgba(255, 255, 255, 0.8);
+			}
+
+			.ce-root {
+				max-width: 520px;
+				margin: 0 auto;
+				padding: 2.5rem 1.5rem 5rem;
+				width: 100%;
+			}
+
+			/* ── Title ───────────────────────────────────────────────────────── */
+			.ce-title {
+				font-size: 1.25rem;
+				font-weight: 300;
+				color: #e5e5e5;
+				letter-spacing: -0.02em;
+				margin: 0 0 1.5rem;
+			}
+
+			.ce-chain-label {
+				font-size: 0.75rem;
+				color: rgba(255, 215, 0, 0.5);
+				font-weight: 400;
+				margin-left: 0.5rem;
+			}
+
+			/* ── Viewer preview ──────────────────────────────────────────────── */
+			.ce-viewer {
+				width: 100%;
+				height: clamp(240px, 40vh, 360px);
+				background: radial-gradient(
+					ellipse at center,
+					rgba(255, 215, 0, 0.04) 0%,
+					transparent 70%
+				);
+				border: 1px solid rgba(255, 255, 255, 0.06);
+				border-radius: 12px;
+				margin-bottom: 1.5rem;
+				--poster-color: transparent;
+			}
+
+			/* ── Status ──────────────────────────────────────────────────────── */
+			.ce-status {
+				font-size: 0.764rem;
+				color: rgba(255, 255, 255, 0.4);
+				min-height: 1.4em;
+				margin-bottom: 1.25rem;
+				line-height: 1.5;
+			}
+
+			.ce-status--error {
+				color: var(--danger);
+			}
+
+			.ce-status--success {
+				color: var(--success);
+			}
+
+			.ce-link {
+				color: rgba(255, 215, 0, 0.8);
+				text-decoration: none;
+			}
+
+			.ce-link:hover {
+				color: #ffd700;
+			}
+
+			/* ── Form ────────────────────────────────────────────────────────── */
+			#ce-form {
+				display: flex;
+				flex-direction: column;
+				gap: 1rem;
+			}
+
+			.ce-label {
+				display: block;
+				font-size: 0.618rem;
+				text-transform: uppercase;
+				letter-spacing: 0.08em;
+				color: rgba(255, 255, 255, 0.35);
+				font-weight: 500;
+				margin-bottom: 0.382rem;
+			}
+
+			.ce-optional {
+				text-transform: none;
+				letter-spacing: 0;
+				color: rgba(255, 255, 255, 0.2);
+				font-weight: 400;
+			}
+
+			.ce-input {
+				width: 100%;
+				background: rgba(255, 255, 255, 0.04);
+				border: 1px solid rgba(255, 255, 255, 0.1);
+				border-radius: 8px;
+				color: rgba(255, 255, 255, 0.85);
+				font-family: inherit;
+				font-size: 0.875rem;
+				padding: 0.618rem 0.875rem;
+				box-sizing: border-box;
+				transition: border-color var(--duration-fast);
+				outline: none;
+			}
+
+			.ce-input:focus {
+				border-color: rgba(255, 215, 0, 0.3);
+			}
+
+			.ce-textarea {
+				resize: vertical;
+				line-height: 1.5;
+				min-height: 80px;
+			}
+
+			.ce-file {
+				font-size: 0.764rem;
+				color: rgba(255, 255, 255, 0.4);
+				padding: 0.5rem 0.75rem;
+				cursor: pointer;
+			}
+
+			.ce-file::file-selector-button {
+				background: rgba(255, 255, 255, 0.06);
+				border: 1px solid rgba(255, 255, 255, 0.12);
+				border-radius: 6px;
+				color: rgba(255, 255, 255, 0.6);
+				font-family: inherit;
+				font-size: 0.764rem;
+				padding: 0.25rem 0.618rem;
+				cursor: pointer;
+				margin-right: 0.618rem;
+				transition: background var(--duration-fast);
+			}
+
+			.ce-file::file-selector-button:hover {
+				background: rgba(255, 255, 255, 0.1);
+			}
+
+			/* ── Actions ─────────────────────────────────────────────────────── */
+			.ce-actions {
+				display: flex;
+				gap: 0.618rem;
+				margin-top: 0.382rem;
+				flex-wrap: wrap;
+			}
+
+			.ce-btn {
+				display: inline-flex;
+				align-items: center;
+				gap: 0.4em;
+				padding: 0.618em 1.1em;
+				border-radius: 8px;
+				font-size: 0.875rem;
+				font-family: inherit;
+				font-weight: 500;
+				cursor: pointer;
+				border: 1px solid transparent;
+				transition:
+					background var(--duration-fast),
+					border-color var(--duration-fast),
+					color var(--duration-fast);
+			}
+
+			.ce-btn:disabled {
+				opacity: 0.4;
+				cursor: not-allowed;
+			}
+
+			.ce-btn--primary {
+				background: rgba(255, 215, 0, 0.9);
+				color: #000;
+			}
+
+			.ce-btn--primary:hover:not(:disabled) {
+				background: #ffd700;
+			}
+
+			.ce-btn--ghost {
+				background: transparent;
+				color: rgba(255, 255, 255, 0.7);
+				border-color: rgba(255, 255, 255, 0.18);
+			}
+
+			.ce-btn--ghost:hover:not(:disabled) {
+				color: #fff;
+				border-color: rgba(255, 255, 255, 0.35);
+			}
+
+			.ce-btn--connected {
+				color: var(--success);
+				border-color: rgba(74, 222, 128, 0.3);
+			}
+
+			/* ── Error ───────────────────────────────────────────────────────── */
+			.ce-error {
+				color: var(--danger);
+				font-size: 0.85rem;
+				padding: 3rem 0;
+				text-align: center;
+			}
+		</style>
+		<link rel="stylesheet" href="/nav.css" />
+		<link rel="stylesheet" href="/footer.css" />
+		<link rel="stylesheet" href="/mobile.css" />
+		<script defer src="/footer-newsletter.js"></script>
+		<script src="/model-viewer-meshopt.js"></script>
+	</head>
+	<body>
+		<header><div id="nav-container"></div></header>
+		<script src="/nav.js"></script>
+
+		<header class="ce-page-header">
+			<a id="back-link" href="/marketplace" data-i18n="a_edit.back">← Back</a>
+		</header>
+
+		<main>
+			<div class="ce-root" id="ce-root">
+				<div class="ce-status">Loading…</div>
+			</div>
+		</main>
+
+		<script type="module">
+			import { mountChainEdit } from '/src/erc8004/chain-edit.js';
+
+			// URL: /a/:chainId/:agentId/edit
+			const parts = location.pathname.split('/').filter(Boolean);
+			// parts = ['a', chainId, agentId, 'edit']
+			const chainId = Number(parts[1]);
+			const agentId = parts[2];
+
+			const root = document.getElementById('ce-root');
+			const backLink = document.getElementById('back-link');
+
+			if (!chainId || !agentId) {
+				root.innerHTML = `<div class="ce-error">Invalid URL — expected /a/:chainId/:agentId/edit</div>`;
+			} else {
+				backLink.href = `/a/${chainId}/${agentId}`;
+				document.title = `Edit Agent #${agentId} — three.ws`;
+
+				mountChainEdit(root, chainId, agentId).catch((err) => {
+					const box = document.createElement('div');
+					box.className = 'ce-error';
+					box.textContent = err.message;
+					root.replaceChildren(box);
+				});
+			}
+		</script>
+
+		<div id="footer-container"></div>
+		<script src="/footer.js"></script>
+		<script src="/brand.js" defer></script>
+		<!-- Runtime i18n: detects locale, swaps annotated copy, mounts <lang-switcher>. -->
+	<script type="module" src="/i18n.js"></script>
+</body>
+</html>

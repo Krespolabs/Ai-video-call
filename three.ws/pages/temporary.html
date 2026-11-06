@@ -1,0 +1,1586 @@
+<!doctype html>
+<html lang="en">
+	<head>
+		<script>/* three.ws theme boot — no-flash; runtime in /theme-switcher.js */(function(){try{var m=localStorage.getItem('twx_theme');var l=m==='auto'?(window.matchMedia&&window.matchMedia('(prefers-color-scheme: light)').matches):m==='light';document.documentElement.setAttribute('data-theme',l?'light':'dark');}catch(e){document.documentElement.setAttribute('data-theme','dark');}})();</script>
+		<meta charset="utf-8" />
+		<meta http-equiv="X-UA-Compatible" content="IE=edge" />
+		<title data-i18n="temporary.meta_title">Drive Your Avatar · three.ws</title>
+		<meta
+			name="viewport"
+			content="width=device-width, initial-scale=1, viewport-fit=cover"
+		/>
+		<meta name="author" content="nirholas" />
+		<meta
+			name="description"
+			content="See a 3D agent walking on your real floor through your phone camera. Joystick or WASD. One-tap AR. Built on three.ws."
+		 data-i18n-attr="content:temporary.meta_description"/>
+		<meta name="theme-color" content="#000000" />
+
+		<!--
+			Multiplayer server URL — the deployed Colyseus host. Leave the
+			content empty in a local checkout if you'd rather hit your own
+			`npm run dev:walk-all` server (the page then resolves ws://<host>:2567
+			in dev, or stays solo in prod). See multiplayer/README.md.
+		-->
+		<meta name="walk-server" content="wss://three-ws-multiplayer-93741856042.us-central1.run.app" />
+
+		<link rel="icon" href="/favicon.ico" sizes="any" />
+		<link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+		<link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png" />
+		<link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png" />
+		<link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+		<link rel="manifest" href="/manifest.webmanifest" />
+		<link rel="stylesheet" href="/style.css" />
+		<link rel="stylesheet" href="/footer.css" />
+		<link rel="stylesheet" href="/fonts/fonts.css" />
+		<link rel="stylesheet" href="/mobile.css" />
+
+		<meta property="og:type" content="website" />
+		<meta property="og:site_name" content="three.ws" />
+		<meta property="og:title" content="Drive Your Avatar · three.ws"  data-i18n-attr="content:temporary.meta_og_title"/>
+		<meta property="og:description" content="Drive a 3D avatar with a joystick or WASD — in the browser and in AR."  data-i18n-attr="content:temporary.meta_og_description"/>
+		<meta property="og:url" content="https://three.ws/temporary" />
+		<meta property="og:image" id="og-image" content="https://three.ws/api/walk-og" />
+		<meta name="twitter:card" content="summary_large_image" />
+		<meta name="twitter:title" content="Drive Your Avatar · three.ws"  data-i18n-attr="content:temporary.meta_twitter_title"/>
+		<meta name="twitter:description" content="Drive a 3D avatar with a joystick or WASD — in the browser and in AR."  data-i18n-attr="content:temporary.meta_twitter_description"/>
+		<meta name="twitter:image" id="twitter-image" content="https://three.ws/api/walk-og" />
+		<script>
+			// Patch OG image to include avatar + handle from URL params so
+			// shared links unfurl with the correct avatar thumbnail.
+			(function() {
+				var p = new URLSearchParams(location.search);
+				var av = p.get('avatar') || '';
+				var handle = p.get('handle') || '';
+				if (av) {
+					var q = new URLSearchParams();
+					if (av) q.set('avatar', av);
+					if (handle) q.set('handle', handle);
+					var src = 'https://three.ws/api/walk-og?' + q;
+					document.getElementById('og-image').content = src;
+					document.getElementById('twitter-image').content = src;
+				}
+			})();
+		</script>
+
+		<style>
+			:root {
+				--bg: var(--bg-0);
+				--panel: rgba(17, 17, 17, 0.72);
+				--border: rgba(255, 255, 255, 0.08);
+				--text: #fafafa;
+				--text-2: #a1a1aa;
+				--accent: #ffffff;
+			}
+
+			html, body {
+				margin: 0;
+				padding: 0;
+				width: 100%;
+				height: 100%;
+				overflow: hidden;
+				background: #000;
+				color: var(--text);
+				font-family: 'Inter', system-ui, -apple-system, sans-serif;
+				-webkit-font-smoothing: antialiased;
+				touch-action: none;
+				overscroll-behavior: none;
+			}
+
+			#walk-stage {
+				position: fixed;
+				inset: 0;
+				background:
+					radial-gradient(80% 60% at 50% 30%, var(--stage-glow) 0%, var(--stage) 70%) var(--stage);
+			}
+
+			#walk-camera-feed {
+				position: fixed;
+				inset: 0;
+				width: 100vw;
+				height: 100vh;
+				object-fit: cover;
+				z-index: 1;
+				display: none;
+				background: #000;
+			}
+			#walk-stage.is-ar #walk-camera-feed { display: block; }
+			#walk-stage.is-ar {
+				background: transparent;
+			}
+
+			#walk-canvas {
+				position: fixed;
+				inset: 0;
+				width: 100vw;
+				height: 100vh;
+				z-index: 2;
+				display: block;
+				/* Own every touch: orbit/pinch are handled in JS, so suppress the
+				   browser's native pan + double-tap/pinch page zoom. touch-action
+				   doesn't inherit, so the body rule above doesn't cover the canvas.
+				   Joystick / buttons sit on the UI layer above this. */
+				touch-action: none;
+			}
+
+			#walk-hud {
+				position: fixed;
+				top: calc(env(safe-area-inset-top, 0) + 56px);
+				left: 0;
+				right: 0;
+				z-index: 4;
+				display: flex;
+				gap: 8px;
+				align-items: flex-start;
+				justify-content: space-between;
+				padding: 14px 16px;
+				pointer-events: none;
+			}
+			#walk-hud > * { pointer-events: auto; }
+
+			.walk-card {
+				background: var(--panel);
+				border: 1px solid var(--border);
+				border-radius: 12px;
+				padding: 10px 12px;
+				backdrop-filter: blur(10px);
+				-webkit-backdrop-filter: blur(10px);
+				font-size: 13px;
+				line-height: 1.35;
+				max-width: min(60vw, 320px);
+			}
+			.walk-card h1 {
+				margin: 0 0 2px 0;
+				font-size: 14px;
+				font-weight: 600;
+				letter-spacing: 0.01em;
+			}
+			.walk-card p {
+				margin: 0;
+				color: var(--text-2);
+				font-size: 12px;
+			}
+			.walk-card a {
+				color: var(--accent);
+				text-decoration: none;
+			}
+
+			.walk-actions {
+				display: flex;
+				flex-direction: column;
+				gap: 8px;
+				align-items: flex-end;
+			}
+
+			.walk-btn {
+				appearance: none;
+				border: 1px solid var(--border);
+				background: var(--panel);
+				color: var(--text);
+				font: inherit;
+				font-size: 13px;
+				font-weight: 500;
+				padding: 8px 12px;
+				border-radius: 999px;
+				cursor: pointer;
+				backdrop-filter: blur(10px);
+				-webkit-backdrop-filter: blur(10px);
+				display: inline-flex;
+				align-items: center;
+				gap: 6px;
+				transition: transform var(--duration-fast) var(--ease-standard), background var(--duration-fast) var(--ease-standard);
+			}
+			.walk-btn:hover { background: rgba(34, 34, 34, 0.85); }
+			.walk-btn:active { transform: scale(0.97); }
+			.walk-btn[aria-pressed="true"] {
+				background: rgba(255, 255, 255, 0.18);
+				border-color: rgba(255, 255, 255, 0.45);
+				color: #e0f2fe;
+			}
+			.walk-btn[disabled] { opacity: 0.5; cursor: not-allowed; }
+			.walk-btn .dot {
+				width: 6px;
+				height: 6px;
+				border-radius: 50%;
+				background: var(--text-2);
+			}
+			.walk-btn[aria-pressed="true"] .dot {
+				background: var(--accent);
+				box-shadow: 0 0 8px var(--accent);
+			}
+
+			#walk-joystick,
+			#walk-look-joystick {
+				position: fixed;
+				/* Above the bottom HUD (chat z8, status/record z6, emote z5) so a
+				   touch inside a stick's 140px square always reaches nipplejs
+				   instead of the chat input or status pill stacked over it. Stays
+				   below real modals (avatar picker z10, zen z11, palettes z9998+). */
+				z-index: 9;
+				bottom: calc(28px + env(safe-area-inset-bottom, 0));
+				width: 140px;
+				height: 140px;
+				touch-action: none;
+				pointer-events: auto;
+			}
+			#walk-joystick { left: 24px; }
+			/* Right-hand look stick — only on touch / narrow viewports, where the
+			   desktop WASD + mouse-look hints (#walk-help) are hidden, so the two
+			   never fight for the bottom-right corner. */
+			#walk-look-joystick { right: 24px; display: none; }
+			@media (hover: none), (max-width: 640px) {
+				#walk-look-joystick { display: block; }
+				/* Floating movement stick — the zone spans the lower-left so the
+				   thumb summons the pad wherever it lands (nipplejs dynamic mode).
+				   Sits BELOW the chat (z8) so the centre chat input stays tappable
+				   where the two overlap; still above the canvas + emote bar. */
+				#walk-joystick {
+					left: 0;
+					bottom: 0;
+					width: min(50vw, 240px);
+					height: min(55vh, 380px);
+					z-index: 7;
+				}
+			}
+
+			/* On-screen action cluster — stacked on the right edge above the look
+			   stick. Touch only; on desktop these actions live on keys + the HUD. */
+			#walk-touch-actions {
+				position: fixed;
+				z-index: 9;
+				right: calc(20px + env(safe-area-inset-right, 0));
+				bottom: calc(184px + env(safe-area-inset-bottom, 0));
+				display: none;
+				flex-direction: column;
+				gap: 12px;
+				align-items: center;
+				pointer-events: auto;
+			}
+			@media (hover: none), (max-width: 640px) {
+				#walk-touch-actions { display: flex; }
+			}
+			.walk-touch-btn {
+				appearance: none;
+				border: 1px solid var(--border);
+				background: var(--panel);
+				color: var(--text);
+				border-radius: 50%;
+				width: 52px;
+				height: 52px;
+				display: flex;
+				align-items: center;
+				justify-content: center;
+				backdrop-filter: blur(10px);
+				-webkit-backdrop-filter: blur(10px);
+				touch-action: manipulation;
+				-webkit-tap-highlight-color: transparent;
+				transition: transform var(--duration-instant) var(--ease-standard), background var(--duration-fast) var(--ease-standard), border-color var(--duration-fast) var(--ease-standard);
+			}
+			.walk-touch-btn:active { transform: scale(0.92); background: rgba(255,255,255,0.12); }
+			.walk-touch-btn.is-jump {
+				width: 72px;
+				height: 72px;
+				border-color: var(--accent);
+				background: color-mix(in srgb, var(--accent) 22%, var(--panel));
+				color: #fff;
+			}
+			.walk-touch-btn.is-jump:active { background: color-mix(in srgb, var(--accent) 38%, var(--panel)); }
+
+			#walk-status {
+				position: fixed;
+				z-index: 6;
+				left: 50%;
+				bottom: calc(24px + env(safe-area-inset-bottom, 0));
+				transform: translateX(-50%);
+				background: var(--panel);
+				border: 1px solid var(--border);
+				border-radius: 999px;
+				padding: 8px 14px;
+				font-size: 12px;
+				color: var(--text-2);
+				backdrop-filter: blur(10px);
+				-webkit-backdrop-filter: blur(10px);
+				pointer-events: none;
+				transition: opacity var(--duration-base) var(--ease-standard);
+			}
+			#walk-status.is-error { color: var(--danger); border-color: rgba(248, 113, 113, 0.5); }
+			#walk-status.is-hidden { opacity: 0; }
+			/* The pill is pointer-transparent so it never eats an orbit drag, but
+			   the avatar-load failure writes a recovery link into it. A descendant
+			   can opt back in, so the link stays clickable without the pill
+			   blocking the canvas underneath it. */
+			#walk-status a {
+				pointer-events: auto;
+				color: var(--text);
+				text-decoration: underline;
+				text-underline-offset: 2px;
+				border-radius: 4px;
+			}
+			#walk-status a:hover { color: var(--accent); }
+			#walk-status a:focus-visible {
+				outline: 2px solid var(--accent);
+				outline-offset: 2px;
+			}
+			/* A faded-out pill is still hit-testable, so drop the link with it. */
+			#walk-status.is-hidden a { pointer-events: none; }
+
+			#walk-help {
+				position: fixed;
+				z-index: 5;
+				right: 16px;
+				bottom: calc(28px + env(safe-area-inset-bottom, 0));
+				display: flex;
+				flex-direction: column;
+				gap: 6px;
+				align-items: flex-end;
+				color: var(--text-2);
+				font-size: 11px;
+				pointer-events: none;
+			}
+			.walk-key {
+				display: inline-flex;
+				align-items: center;
+				gap: 4px;
+				background: var(--panel);
+				border: 1px solid var(--border);
+				border-radius: 8px;
+				padding: 4px 8px;
+				backdrop-filter: blur(10px);
+				-webkit-backdrop-filter: blur(10px);
+			}
+			.walk-key kbd {
+				font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+				font-size: 10.5px;
+				padding: 1px 5px;
+				border-radius: 4px;
+				background: rgba(255, 255, 255, 0.08);
+				border: 1px solid var(--border);
+				color: var(--text);
+			}
+
+			/* Hide help text on small/touch screens — joystick is enough.
+			   Joystick stays visible on all devices: mouse-drag works on
+			   desktop the same way touch does on mobile, and keeping the
+			   element laid out from page load ensures nipplejs measures
+			   its 140×140 zone correctly. */
+			@media (hover: none), (max-width: 640px) {
+				#walk-help { display: none; }
+			}
+
+			/* ── Multiplayer HUD ────────────────────────────────────────────── */
+			#walk-online {
+				appearance: none;
+				border: 1px solid var(--border);
+				background: var(--panel);
+				color: var(--text);
+				font: inherit;
+				font-size: 12px;
+				font-weight: 500;
+				padding: 6px 10px;
+				border-radius: 999px;
+				cursor: default;
+				backdrop-filter: blur(10px);
+				-webkit-backdrop-filter: blur(10px);
+				display: inline-flex;
+				align-items: center;
+				gap: 6px;
+				transition: background var(--duration-fast) var(--ease-standard);
+			}
+			#walk-online .dot {
+				width: 7px;
+				height: 7px;
+				border-radius: 50%;
+				background: var(--text-2);
+			}
+			#walk-online[data-status="online"] .dot {
+				background: var(--ink);
+				box-shadow: 0 0 8px rgba(255, 255, 255, 0.5);
+			}
+			#walk-online[data-status="connecting"] .dot,
+			#walk-online[data-status="offline"] .dot {
+				background: var(--warn);
+			}
+			#walk-online[data-status="unavailable"] {
+				cursor: default;
+			}
+			#walk-online[data-status="unavailable"] .dot {
+				background: var(--text-2);
+			}
+			#walk-online[data-status="failed"] {
+				cursor: pointer;
+				border-color: rgba(248, 113, 113, 0.5);
+			}
+			#walk-online[data-status="failed"] .dot {
+				background: var(--danger);
+			}
+			#walk-online .count {
+				color: var(--text-2);
+				font-variant-numeric: tabular-nums;
+				min-width: 1ch;
+				text-align: right;
+			}
+			#walk-online[data-status="online"] .count { color: var(--text); }
+
+			/* Floating name tag for remote players — positioned by walk.js
+			   from world-space → screen-space each frame. Pointer-events
+			   off so it never blocks the orbit drag. */
+			.walk-remote-label {
+				position: fixed;
+				top: 0; left: 0;
+				z-index: 3;
+				background: rgba(10, 10, 10, 0.72);
+				border: 1px solid var(--border);
+				border-radius: 999px;
+				padding: 3px 9px;
+				font-size: 11px;
+				font-weight: 500;
+				color: var(--text);
+				white-space: nowrap;
+				pointer-events: none;
+				transform: translate(-50%, -100%);
+				backdrop-filter: blur(6px);
+				-webkit-backdrop-filter: blur(6px);
+				will-change: transform;
+			}
+
+			/* ── IRL AR mobile CTA ─────────────────────────────────────────
+			   Hidden until walk.js detects a touch device with camera
+			   support and the avatar has finished loading. Sells the
+			   project's IRL-not-metaverse positioning: "your agent on
+			   your real floor" instead of "explore a virtual world".
+			*/
+			#walk-ar-cta {
+				position: fixed;
+				z-index: 7;
+				left: 50%;
+				top: calc(env(safe-area-inset-top, 0) + 76px);
+				transform: translateX(-50%) translateY(-6px);
+				display: none;
+				align-items: center;
+				gap: 10px;
+				padding: 10px 14px 10px 12px;
+				background: linear-gradient(135deg, rgba(255, 255, 255, 0.92), rgba(255, 255, 255, 0.92));
+				color: #101010;
+				border: 1px solid rgba(255, 255, 255, 0.35);
+				border-radius: 999px;
+				font-size: 13px;
+				font-weight: 600;
+				cursor: pointer;
+				box-shadow: 0 8px 28px rgba(0, 0, 0, 0.4);
+				backdrop-filter: blur(10px);
+				-webkit-backdrop-filter: blur(10px);
+				opacity: 0;
+				transition: opacity var(--duration-base) var(--ease-standard), transform var(--duration-base) var(--ease-standard);
+				white-space: nowrap;
+				max-width: calc(100vw - 32px);
+			}
+			#walk-ar-cta.is-visible {
+				display: inline-flex;
+				opacity: 1;
+				transform: translateX(-50%) translateY(0);
+			}
+			#walk-ar-cta .pulse {
+				width: 8px;
+				height: 8px;
+				border-radius: 50%;
+				background: var(--danger);
+				box-shadow: 0 0 0 0 rgba(248, 113, 113, 0.6);
+				animation: walk-cta-pulse 1.6s infinite;
+			}
+			@keyframes walk-cta-pulse {
+				0%   { box-shadow: 0 0 0 0 rgba(248, 113, 113, 0.55); }
+				70%  { box-shadow: 0 0 0 10px rgba(248, 113, 113, 0); }
+				100% { box-shadow: 0 0 0 0 rgba(248, 113, 113, 0); }
+			}
+			#walk-ar-cta .dismiss {
+				margin-left: 4px;
+				padding: 2px 6px;
+				font-size: 14px;
+				line-height: 1;
+				background: rgba(7, 17, 28, 0.18);
+				border-radius: 999px;
+				color: #101010;
+				font-weight: 700;
+			}
+
+			/* ── Site header (glass overlay) ───────────────────────────── */
+			/* The header is the shared site nav (public/nav.html + nav.css),
+			   which styles and positions itself. This wrapper only carries the
+			   class so zen mode can hide it (see body.is-zen rules below). */
+			.walk-site-header { display: block; }
+
+			/* ── Loading overlay ───────────────────────────────────────── */
+			.walk-loading {
+				position: fixed;
+				inset: 0;
+				z-index: 9;
+				background: var(--bg);
+				display: flex;
+				align-items: center;
+				justify-content: center;
+				transition: opacity var(--duration-slow) var(--ease-standard);
+			}
+			.walk-loading.is-done {
+				opacity: 0;
+				pointer-events: none;
+			}
+			.walk-loading-inner {
+				display: flex;
+				flex-direction: column;
+				align-items: center;
+				gap: 20px;
+			}
+			.walk-loading-spinner {
+				width: 40px;
+				height: 40px;
+				border: 2.5px solid rgba(255, 255, 255, 0.08);
+				border-top-color: var(--accent);
+				border-radius: 50%;
+				animation: walk-spin 0.8s linear infinite;
+			}
+			@keyframes walk-spin { to { transform: rotate(360deg); } }
+			.walk-loading-text {
+				margin: 0;
+				color: var(--text-2);
+				font-size: 14px;
+				font-weight: 500;
+				letter-spacing: 0.02em;
+			}
+
+			/* ── Name input ────────────────────────────────────────────── */
+			.walk-identity-row {
+				margin-bottom: 4px;
+			}
+			.walk-name-input {
+				background: transparent;
+				border: none;
+				border-bottom: 1.5px solid rgba(255, 255, 255, 0.12);
+				color: var(--text);
+				font: 600 15px/1.3 inherit;
+				padding: 2px 0 4px;
+				width: 100%;
+				max-width: 180px;
+				outline: none;
+				transition: border-color var(--duration-fast);
+			}
+			.walk-name-input:focus {
+				border-color: var(--accent);
+			}
+			.walk-name-input::placeholder {
+				color: var(--text-2);
+				font-weight: 400;
+			}
+
+			/* ── Players panel ─────────────────────────────────────────── */
+			.walk-players-panel {
+				position: fixed;
+				z-index: 6;
+				top: calc(env(safe-area-inset-top, 0) + 68px);
+				right: 16px;
+				width: 220px;
+				max-height: 60vh;
+				background: var(--panel);
+				border: 1px solid var(--border);
+				border-radius: 12px;
+				backdrop-filter: blur(12px);
+				-webkit-backdrop-filter: blur(12px);
+				overflow: hidden;
+				animation: walk-panel-in 0.18s ease;
+			}
+			@keyframes walk-panel-in {
+				from { opacity: 0; transform: translateY(-8px); }
+				to { opacity: 1; transform: none; }
+			}
+			.walk-players-header {
+				display: flex;
+				align-items: center;
+				justify-content: space-between;
+				padding: 10px 14px;
+				font-size: 12px;
+				font-weight: 600;
+				letter-spacing: 0.06em;
+				text-transform: uppercase;
+				color: var(--text-2);
+				border-bottom: 1px solid var(--border);
+			}
+			.walk-players-header button {
+				background: none;
+				border: none;
+				color: var(--text-2);
+				cursor: pointer;
+				font-size: 18px;
+				line-height: 1;
+				padding: 0 2px;
+			}
+			.walk-players-header button:hover { color: var(--text); }
+			.walk-players-list {
+				list-style: none;
+				margin: 0;
+				padding: 6px 0;
+				overflow-y: auto;
+				max-height: calc(60vh - 44px);
+			}
+			.walk-players-list li {
+				display: flex;
+				align-items: center;
+				gap: 8px;
+				padding: 7px 14px;
+				font-size: 13px;
+				color: var(--text);
+			}
+			.walk-players-list .player-dot {
+				width: 8px;
+				height: 8px;
+				border-radius: 50%;
+				flex-shrink: 0;
+			}
+			.walk-players-list .player-motion {
+				margin-left: auto;
+				font-size: 11px;
+				color: var(--text-2);
+			}
+			.walk-players-list li.is-you {
+				color: var(--accent);
+			}
+
+			/* ── Emote tray ────────────────────────────────────────────── */
+			.walk-emote-tray {
+				position: fixed;
+				z-index: 5;
+				right: 16px;
+				bottom: calc(28px + env(safe-area-inset-bottom, 0));
+				display: flex;
+				flex-direction: column;
+				gap: 6px;
+				align-items: flex-end;
+				/* The HUD action column owns the same right rail and paints below
+				   this tray, so a tray taller than the gap grew straight up
+				   through it and swallowed the clicks for Photo, Record, Map and
+				   the help button. Two rules keep both reachable: the tray is
+				   capped to the band left under the HUD column (which needs
+				   ~580px from the top of the viewport), and anything past that
+				   wraps into a second column growing leftward into open scene
+				   rather than upward into the HUD. The floor keeps a usable two
+				   rows of gestures on a short window. */
+				max-height: max(132px, calc(100vh - 612px));
+				flex-wrap: wrap-reverse;
+				align-content: flex-end;
+				overflow-y: auto;
+				overscroll-behavior: contain;
+				-ms-overflow-style: none;
+				scrollbar-width: none;
+			}
+			.walk-emote-tray::-webkit-scrollbar { display: none; }
+			.walk-emote-btn {
+				appearance: none;
+				width: 44px;
+				height: 44px;
+				border-radius: 50%;
+				border: 1px solid var(--border);
+				background: var(--panel);
+				backdrop-filter: blur(10px);
+				-webkit-backdrop-filter: blur(10px);
+				cursor: pointer;
+				font-size: 20px;
+				display: flex;
+				align-items: center;
+				justify-content: center;
+				transition: transform var(--duration-instant), border-color var(--duration-instant), background var(--duration-instant);
+				position: relative;
+			}
+			.walk-emote-btn:hover {
+				border-color: rgba(255, 255, 255, 0.2);
+				background: rgba(34, 34, 34, 0.85);
+				transform: scale(1.08);
+			}
+			.walk-emote-btn:active { transform: scale(0.95); }
+			.walk-emote-btn[aria-pressed="true"] {
+				border-color: var(--accent);
+				background: rgba(255, 255, 255, 0.18);
+			}
+			.walk-emote-btn .emote-label {
+				position: absolute;
+				right: calc(100% + 8px);
+				top: 50%;
+				transform: translateY(-50%);
+				font-size: 11px;
+				color: var(--text-2);
+				white-space: nowrap;
+				pointer-events: none;
+				opacity: 0;
+				transition: opacity var(--duration-fast);
+			}
+			.walk-emote-btn:hover .emote-label { opacity: 1; }
+
+			@media (hover: none), (max-width: 640px) {
+				.walk-emote-tray {
+					right: auto;
+					left: 50%;
+					transform: translateX(-50%);
+					bottom: calc(180px + env(safe-area-inset-bottom, 0));
+					flex-direction: row;
+					/* Every gesture is a tap target, so the row must never run past
+					   the screen edge. Capped to the viewport it wraps upward
+					   instead of stranding the first and last emotes off-screen.
+					   Plain wrap keeps the visual order equal to the DOM order. */
+					flex-wrap: wrap;
+					justify-content: center;
+					align-items: center;
+					max-width: calc(100vw - 24px);
+					gap: 8px;
+					/* The row wraps across the screen instead of stacking up the
+					   right rail, so the desktop band cap does not apply. */
+					max-height: none;
+					align-content: center;
+					overflow: visible;
+				}
+				.walk-emote-btn { width: 40px; height: 40px; font-size: 18px; }
+				.walk-emote-btn .emote-label { display: none; }
+
+				/* On a phone the bottom band is already carrying the joysticks,
+				   the touch action cluster, the chat composer and the gesture
+				   row, and the radar's own corner was the one that lost: it sat
+				   on top of the chat input and the first three gestures. Moving
+				   it to the free left edge below the identity card gives it the
+				   corner of its own the desktop layout assumes. walk.js positions
+				   the element with an inline style attribute, so this override
+				   has to outrank it. */
+				#walk-minimap {
+					top: calc(env(safe-area-inset-top, 0) + 180px) !important;
+					bottom: auto !important;
+				}
+			}
+
+			/* ── Gesture wheel (radial picker — hold G / long-press) ────── */
+			.walk-gesture-wheel {
+				position: fixed;
+				z-index: 9998;
+				left: 50%;
+				top: 50%;
+				width: 260px;
+				height: 260px;
+				transform: translate(-50%, -50%) scale(0.85);
+				opacity: 0;
+				pointer-events: none;
+				transition: opacity var(--duration-fast) var(--ease-standard), transform var(--duration-fast) var(--ease-standard);
+			}
+			.walk-gesture-wheel.is-open {
+				opacity: 1;
+				transform: translate(-50%, -50%) scale(1);
+				pointer-events: auto;
+			}
+			.walk-gesture-wheel .wheel-ring {
+				position: absolute;
+				inset: 0;
+				border-radius: 50%;
+				background: rgba(10, 10, 10, 0.78);
+				border: 1px solid rgba(255, 255, 255, 0.1);
+				backdrop-filter: blur(16px);
+				-webkit-backdrop-filter: blur(16px);
+				box-shadow: 0 12px 48px rgba(0, 0, 0, 0.45);
+			}
+			.walk-gesture-wheel .wheel-seg {
+				position: absolute;
+				left: 50%;
+				top: 50%;
+				width: 52px;
+				height: 52px;
+				margin: -26px 0 0 -26px;
+				transform: translate(var(--x, 0), var(--y, 0));
+				border-radius: 50%;
+				border: 1px solid rgba(255, 255, 255, 0.14);
+				background: rgba(255, 255, 255, 0.07);
+				color: #fff;
+				cursor: pointer;
+				display: flex;
+				flex-direction: column;
+				align-items: center;
+				justify-content: center;
+				gap: 1px;
+				transition: transform var(--duration-instant) var(--ease-standard), background var(--duration-instant) var(--ease-standard), border-color var(--duration-instant) var(--ease-standard);
+			}
+			.walk-gesture-wheel .wheel-seg .wheel-ico { font-size: 22px; line-height: 1; }
+			.walk-gesture-wheel .wheel-seg .wheel-lbl {
+				font-size: 8px;
+				letter-spacing: 0.02em;
+				text-transform: uppercase;
+				color: rgba(255, 255, 255, 0.55);
+			}
+			.walk-gesture-wheel .wheel-seg:hover,
+			.walk-gesture-wheel .wheel-seg.is-active {
+				transform: translate(var(--x, 0), var(--y, 0)) scale(1.16);
+				background: var(--accent, #7c5cff);
+				border-color: rgba(255, 255, 255, 0.45);
+			}
+			.walk-gesture-wheel .wheel-seg.is-active .wheel-lbl { color: #fff; }
+			.walk-gesture-wheel .wheel-seg:focus-visible {
+				outline: 2px solid var(--accent, #7c5cff);
+				outline-offset: 2px;
+			}
+			.walk-gesture-wheel .wheel-hub {
+				position: absolute;
+				left: 50%;
+				top: 50%;
+				transform: translate(-50%, -50%);
+				font-size: 12px;
+				font-weight: 600;
+				color: rgba(255, 255, 255, 0.75);
+				text-align: center;
+				pointer-events: none;
+				min-width: 80px;
+			}
+
+			/* ── Recording UI ──────────────────────────────────────────── */
+			#walk-record-btn .dot { transition: background var(--duration-fast) var(--ease-standard), box-shadow var(--duration-fast) var(--ease-standard); }
+			#walk-record-btn[data-recording="true"] .dot {
+				background: var(--danger);
+				box-shadow: 0 0 8px rgba(248, 113, 113, 0.8);
+				animation: walk-rec-pulse 0.9s infinite;
+			}
+			@keyframes walk-rec-pulse {
+				0%, 100% { opacity: 1; }
+				50%      { opacity: 0.45; }
+			}
+			#walk-record-status {
+				position: fixed;
+				z-index: 6;
+				left: 50%;
+				top: calc(env(safe-area-inset-top, 0) + 12px);
+				transform: translateX(-50%);
+				background: rgba(248, 113, 113, 0.92);
+				color: #fff;
+				border: 1px solid rgba(255, 255, 255, 0.25);
+				border-radius: 999px;
+				padding: 6px 12px;
+				font-size: 12px;
+				font-weight: 600;
+				letter-spacing: 0.02em;
+				display: none;
+				align-items: center;
+				gap: 8px;
+				pointer-events: none;
+				backdrop-filter: blur(6px);
+				-webkit-backdrop-filter: blur(6px);
+			}
+			#walk-record-status.is-visible { display: inline-flex; }
+			#walk-record-status .rec-dot {
+				width: 8px;
+				height: 8px;
+				border-radius: 50%;
+				background: #fff;
+				animation: walk-rec-pulse 0.9s infinite;
+			}
+			/* ── Avatar picker ──────────────────────────────────────────── */
+			.walk-avatar-picker {
+				position: fixed;
+				top: calc(env(safe-area-inset-top, 0) + 56px + 60px);
+				right: 16px;
+				z-index: 10;
+				width: 280px;
+				max-height: 360px;
+				background: var(--panel);
+				border: 1px solid var(--border);
+				border-radius: 14px;
+				backdrop-filter: blur(14px);
+				-webkit-backdrop-filter: blur(14px);
+				overflow: hidden;
+				display: flex;
+				flex-direction: column;
+			}
+			.walk-avatar-picker-header {
+				display: flex;
+				justify-content: space-between;
+				align-items: center;
+				padding: 10px 14px;
+				font-size: 13px;
+				font-weight: 600;
+				border-bottom: 1px solid var(--border);
+			}
+			.walk-avatar-picker-header button {
+				background: none;
+				border: none;
+				color: var(--text-2);
+				font-size: 18px;
+				cursor: pointer;
+				padding: 0 4px;
+			}
+			.walk-avatar-picker-list {
+				overflow-y: auto;
+				padding: 8px;
+				display: flex;
+				flex-direction: column;
+				gap: 4px;
+			}
+			.walk-avatar-picker-loading {
+				text-align: center;
+				padding: 20px;
+				color: var(--text-2);
+				font-size: 12px;
+			}
+			/* Retry affordance inside the picker's error notice. Styled as an
+			   inline control so it reads as part of the sentence, not a form. */
+			.walk-avatar-picker-retry {
+				display: inline-block;
+				margin-top: 8px;
+				padding: 5px 12px;
+				border: 1px solid var(--border);
+				border-radius: 999px;
+				background: var(--panel);
+				color: var(--text);
+				font: inherit;
+				font-size: 12px;
+				cursor: pointer;
+				transition: background var(--duration-fast), border-color var(--duration-fast);
+			}
+			.walk-avatar-picker-retry:hover { background: rgba(255,255,255,0.12); }
+			.walk-avatar-picker-retry:active { background: rgba(255,255,255,0.18); }
+			.walk-avatar-opt {
+				display: flex;
+				align-items: center;
+				gap: 10px;
+				padding: 8px 10px;
+				border-radius: 8px;
+				cursor: pointer;
+				border: none;
+				background: none;
+				color: var(--text);
+				font: inherit;
+				font-size: 13px;
+				text-align: left;
+				transition: background var(--duration-fast);
+				width: 100%;
+			}
+			.walk-avatar-opt:hover { background: rgba(255,255,255,0.06); }
+			.walk-avatar-opt.is-active { background: rgba(255,255,255,0.1); }
+			.walk-avatar-opt-thumb {
+				width: 36px;
+				height: 36px;
+				border-radius: 8px;
+				object-fit: cover;
+				background: rgba(255,255,255,0.05);
+				flex-shrink: 0;
+			}
+			.walk-avatar-opt-name {
+				flex: 1;
+				min-width: 0;
+				overflow: hidden;
+				text-overflow: ellipsis;
+				white-space: nowrap;
+			}
+
+			/* ── Chat ──────────────────────────────────────────────────────── */
+			.walk-chat {
+				position: fixed;
+				bottom: calc(24px + env(safe-area-inset-bottom, 0));
+				left: 50%;
+				transform: translateX(-50%);
+				z-index: 8;
+				/* Never let the 200px side-gutter reserve collapse the chat below a
+				   usable width: under ~460px of viewport the subtraction wins and the
+				   form's send button lands off-screen. The 260px floor keeps it on. */
+				width: min(420px, max(260px, calc(100vw - 200px)));
+				display: flex;
+				flex-direction: column;
+				gap: 6px;
+				pointer-events: none;
+			}
+			.walk-chat-messages {
+				display: flex;
+				flex-direction: column;
+				gap: 4px;
+				max-height: 180px;
+				overflow: hidden;
+				pointer-events: none;
+			}
+			.walk-chat-msg {
+				padding: 5px 10px;
+				background: var(--panel);
+				border: 1px solid var(--border);
+				border-radius: 10px;
+				backdrop-filter: blur(8px);
+				-webkit-backdrop-filter: blur(8px);
+				font-size: 12px;
+				line-height: 1.4;
+				color: var(--text);
+				animation: walk-chat-in 0.2s ease;
+				align-self: flex-start;
+				max-width: 90%;
+				word-break: break-word;
+			}
+			.walk-chat-msg-name {
+				font-weight: 600;
+				margin-right: 6px;
+			}
+			.walk-chat-msg.is-system {
+				color: var(--text-2);
+				font-style: italic;
+				border-color: transparent;
+				background: rgba(17,17,17,0.5);
+			}
+			@keyframes walk-chat-in { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+			.walk-chat-form {
+				display: flex;
+				gap: 6px;
+				pointer-events: auto;
+			}
+			.walk-chat-input {
+				flex: 1;
+				/* A flex item's automatic minimum size is its intrinsic width, which
+				   for a text input is ~20 characters. Without this the input refuses
+				   to shrink and pushes the send button past the viewport edge. */
+				min-width: 0;
+				padding: 8px 12px;
+				border: 1px solid var(--border);
+				border-radius: 999px;
+				background: var(--panel);
+				color: var(--text);
+				font: inherit;
+				font-size: 13px;
+				outline: none;
+				backdrop-filter: blur(10px);
+				-webkit-backdrop-filter: blur(10px);
+				transition: border-color var(--duration-fast);
+			}
+			.walk-chat-input:focus { border-color: rgba(255,255,255,0.25); }
+			.walk-chat-input::placeholder { color: var(--text-2); }
+			.walk-chat-send {
+				width: 34px;
+				height: 34px;
+				border-radius: 50%;
+				border: 1px solid var(--border);
+				background: var(--panel);
+				color: var(--text);
+				cursor: pointer;
+				display: flex;
+				align-items: center;
+				justify-content: center;
+				backdrop-filter: blur(10px);
+				-webkit-backdrop-filter: blur(10px);
+				transition: background var(--duration-fast);
+				flex-shrink: 0;
+			}
+			.walk-chat-send:hover { background: rgba(255,255,255,0.12); }
+			@media (hover: none) {
+				/* Lift the chat clear of the move/look sticks, which now own both
+				   bottom corners up to ~168px. Sitting it above that band keeps the
+				   input tappable instead of buried under a joystick. */
+				.walk-chat { width: min(340px, calc(100vw - 32px)); bottom: calc(184px + env(safe-area-inset-bottom, 0)); }
+				.walk-chat-messages { max-height: 120px; }
+			}
+
+			/* ── Voice chat: push-to-talk mic ───────────────────────────────
+			   Bottom-center column so it clears the chat box (left) and the
+			   look joystick / action buttons (right). The mic is the anchor; the
+			   waveform, status, and any error stack above it. */
+			.walk-voice {
+				position: fixed;
+				left: 50%;
+				bottom: calc(28px + env(safe-area-inset-bottom, 0));
+				transform: translateX(-50%);
+				z-index: 4;
+				display: flex;
+				flex-direction: column;
+				align-items: center;
+				gap: 8px;
+				pointer-events: none;
+			}
+			.walk-voice > * { pointer-events: auto; }
+			.walk-voice-status {
+				font-size: 12px;
+				color: var(--text-2);
+				background: var(--panel);
+				border: 1px solid var(--border);
+				border-radius: 999px;
+				padding: 3px 12px;
+				backdrop-filter: blur(8px);
+				-webkit-backdrop-filter: blur(8px);
+				transition: color var(--duration-base) var(--ease-standard), opacity var(--duration-base) var(--ease-standard);
+			}
+			.walk-voice[data-state="listening"] .walk-voice-status { color: var(--text); }
+			.walk-voice[data-state="thinking"] .walk-voice-status,
+			.walk-voice[data-state="transcribing"] .walk-voice-status,
+			.walk-voice[data-state="speaking"] .walk-voice-status { color: var(--accent); }
+			.walk-voice-wave {
+				width: 120px;
+				height: 28px;
+				opacity: 0;
+				transform: scaleY(0.6);
+				transition: opacity var(--duration-base) var(--ease-standard), transform var(--duration-base) var(--ease-standard);
+			}
+			.walk-voice[data-state="listening"] .walk-voice-wave {
+				opacity: 1;
+				transform: scaleY(1);
+			}
+			.walk-voice-mic {
+				position: relative;
+				width: 64px;
+				height: 64px;
+				border-radius: 50%;
+				border: 1px solid var(--border);
+				background: var(--panel);
+				color: var(--text);
+				display: grid;
+				place-items: center;
+				cursor: pointer;
+				backdrop-filter: blur(8px);
+				-webkit-backdrop-filter: blur(8px);
+				touch-action: none;
+				-webkit-user-select: none;
+				user-select: none;
+				transition: transform var(--duration-fast) var(--ease-standard), background var(--duration-base) var(--ease-standard), border-color var(--duration-base) var(--ease-standard), color var(--duration-base) var(--ease-standard);
+			}
+			.walk-voice-mic:hover { background: color-mix(in srgb, var(--accent) 12%, var(--panel)); }
+			.walk-voice-mic:active { transform: scale(0.94); }
+			.walk-voice-mic.is-recording {
+				background: var(--danger);
+				border-color: var(--danger);
+				color: #fff;
+			}
+			.walk-voice-mic.is-busy {
+				color: var(--accent);
+				cursor: progress;
+			}
+			.walk-voice-mic:disabled {
+				opacity: 0.45;
+				cursor: not-allowed;
+			}
+			/* Pulsing ring while recording. */
+			.walk-voice-ring {
+				position: absolute;
+				inset: -4px;
+				border-radius: 50%;
+				border: 2px solid var(--danger);
+				opacity: 0;
+				pointer-events: none;
+			}
+			.walk-voice-mic.is-recording .walk-voice-ring {
+				animation: walk-voice-pulse 1.4s ease-out infinite;
+			}
+			@keyframes walk-voice-pulse {
+				0%   { opacity: 0.7; transform: scale(1); }
+				100% { opacity: 0; transform: scale(1.45); }
+			}
+			.walk-voice-key {
+				font-size: 11px;
+				color: var(--text-2);
+				display: inline-flex;
+				align-items: center;
+				gap: 4px;
+			}
+			.walk-voice-key kbd {
+				font: inherit;
+				background: rgba(255,255,255,0.08);
+				border: 1px solid var(--border);
+				border-radius: 4px;
+				padding: 0 5px;
+				color: var(--text);
+			}
+			.walk-voice-error {
+				max-width: min(320px, calc(100vw - 32px));
+				font-size: 12px;
+				line-height: 1.4;
+				color: var(--text);
+				background: var(--panel);
+				border: 1px solid rgba(248, 113, 113, 0.5);
+				border-radius: 12px;
+				padding: 8px 12px;
+				display: flex;
+				flex-direction: column;
+				gap: 8px;
+				backdrop-filter: blur(8px);
+				-webkit-backdrop-filter: blur(8px);
+				text-align: center;
+			}
+			.walk-voice-retry {
+				align-self: center;
+				font: inherit;
+				font-size: 11px;
+				color: var(--text);
+				background: rgba(255,255,255,0.08);
+				border: 1px solid var(--border);
+				border-radius: 8px;
+				padding: 4px 14px;
+				cursor: pointer;
+				transition: background var(--duration-base) var(--ease-standard);
+			}
+			.walk-voice-retry:hover { background: rgba(255,255,255,0.14); }
+			/* Touch devices have no T key — promote the key hint to hidden and
+			   rely on the large mic button, which is already touch-sized. */
+			@media (hover: none) {
+				.walk-voice-key { display: none; }
+				.walk-voice { bottom: calc(96px + env(safe-area-inset-bottom, 0)); }
+			}
+			@media (prefers-reduced-motion: reduce) {
+				.walk-voice-mic.is-recording .walk-voice-ring { animation: none; opacity: 0.5; }
+			}
+
+			/* ── Chat bubble above remote players ───────────────────────────── */
+			.walk-remote-bubble {
+				position: fixed;
+				z-index: 3;
+				pointer-events: none;
+				background: var(--panel);
+				border: 1px solid var(--border);
+				border-radius: 10px;
+				backdrop-filter: blur(6px);
+				-webkit-backdrop-filter: blur(6px);
+				padding: 4px 10px;
+				font-size: 11px;
+				color: var(--text);
+				max-width: 200px;
+				word-break: break-word;
+				white-space: pre-wrap;
+				animation: walk-chat-in 0.2s ease;
+				transition: opacity var(--duration-base);
+			}
+
+			/* ── Walk HUD overflow scroll on small screens ──────────────── */
+			.walk-actions {
+				/* Reserves the bottom band for the emote tray and the bottom-right
+				   page chrome, which paint above this column: without the reserve
+				   the last buttons landed under them and stopped taking clicks.
+				   At a normal window height the full column still fits inside the
+				   ceiling, so nothing scrolls; a short window scrolls the tail. */
+				max-height: calc(100vh - 240px);
+				overflow-y: auto;
+				overscroll-behavior: contain;
+				-ms-overflow-style: none;
+				scrollbar-width: none;
+			}
+			.walk-actions::-webkit-scrollbar { display: none; }
+
+			@media (max-height: 560px) {
+				.walk-actions .walk-btn { padding: 6px 10px; font-size: 12px; }
+				.walk-actions { gap: 5px; }
+			}
+
+			/* ── Focus styles ───────────────────────────────────────────────
+			   Keyboard-navigable interactive elements need a visible ring that
+			   passes contrast against the dark panels. :focus-visible avoids
+			   showing the ring on mouse clicks. */
+			.walk-btn:focus-visible,
+			.walk-touch-btn:focus-visible,
+			.walk-emote-btn:focus-visible,
+			.walk-avatar-opt:focus-visible,
+			.walk-avatar-picker-retry:focus-visible,
+			.walk-chat-send:focus-visible,
+			.walk-voice-mic:focus-visible,
+			.walk-voice-retry:focus-visible,
+			#walk-online:focus-visible,
+			#walk-zen-exit:focus-visible,
+			.walk-players-header button:focus-visible,
+			.walk-avatar-picker-header button:focus-visible {
+				outline: 2px solid rgba(255, 255, 255, 0.55);
+				outline-offset: 2px;
+			}
+
+			/* ── Help hint fade ─────────────────────────────────────────────
+			   The hint bar auto-hides via JS; opacity lets it fade before the
+			   display:none removes it from layout. */
+			#walk-help {
+				transition: opacity var(--duration-slow) var(--ease-standard);
+			}
+
+			/* ── Prefers-reduced-motion ─────────────────────────────────────
+			   Users who opt out of animation get static indicators instead of
+			   spinning/pulsing elements, and all CSS transitions are cut to
+			   instant so no content ever appears to move on its own. */
+			@media (prefers-reduced-motion: reduce) {
+				.walk-loading-spinner {
+					animation: none;
+					border: 2.5px solid var(--text-2);
+					border-top-color: var(--accent);
+				}
+				.walk-loading { transition: none; }
+				.walk-btn,
+				.walk-touch-btn,
+				.walk-emote-btn,
+				.walk-avatar-opt { transition: none; }
+				#walk-ar-cta { transition: none; }
+				#walk-ar-cta .pulse { animation: none; background: var(--danger); box-shadow: none; }
+				.walk-players-panel { animation: none; }
+				.walk-chat-msg { animation: none; }
+				#walk-record-btn .dot { animation: none !important; }
+				#walk-record-status .rec-dot { animation: none; }
+				#walk-help { transition: none; }
+				#walk-zen-exit { transition: none; }
+			}
+
+			/* ── Zen mode (hide all UI) ─────────────────────────────────────
+			   Strips every overlay — controls, animated cards, chat — so the
+			   scene is just the 3D background and the movement joystick. A
+			   single subtle pill remains to restore the chrome. The joystick
+			   stays interactive; keyboard/touch movement is unaffected. */
+			body.is-zen .walk-site-header,
+			body.is-zen #walk-hud,
+			body.is-zen #walk-help,
+			body.is-zen #walk-status,
+			body.is-zen #walk-chat,
+			body.is-zen #walk-voice,
+			body.is-zen #walk-emote-tray,
+			body.is-zen #walk-players-panel,
+			body.is-zen #walk-avatar-picker,
+			body.is-zen #walk-ar-cta,
+			body.is-zen #walk-record-status,
+			body.is-zen #walk-help-overlay,
+			body.is-zen #walk-gesture-palette,
+			body.is-zen #walk-env-indicator,
+			body.is-zen #walk-camera-mode,
+			body.is-zen #walk-minimap,
+			body.is-zen .walk-remote-label,
+			body.is-zen .walk-remote-bubble,
+			body.is-zen .walk-speech-bubble {
+				display: none !important;
+			}
+
+			#walk-zen-exit {
+				position: fixed;
+				z-index: 11;
+				top: calc(env(safe-area-inset-top, 0) + 14px);
+				right: 16px;
+				display: none;
+				align-items: center;
+				gap: 7px;
+				appearance: none;
+				border: 1px solid var(--border);
+				background: rgba(10, 10, 10, 0.5);
+				color: var(--text-2);
+				font: inherit;
+				font-size: 12px;
+				font-weight: 500;
+				padding: 7px 12px;
+				border-radius: 999px;
+				cursor: pointer;
+				backdrop-filter: blur(10px);
+				-webkit-backdrop-filter: blur(10px);
+				opacity: 0;
+				transition: opacity var(--duration-base) var(--ease-standard), color var(--duration-fast) var(--ease-standard), background var(--duration-fast) var(--ease-standard);
+			}
+			body.is-zen #walk-zen-exit { display: inline-flex; }
+			body.is-zen.zen-revealed #walk-zen-exit { opacity: 0.85; }
+			#walk-zen-exit:hover { color: var(--text); background: rgba(34, 34, 34, 0.7); }
+			#walk-zen-exit svg { display: block; }
+		</style>
+		<link rel="stylesheet" href="/nav.css" />
+	
+	<link rel="canonical" href="https://three.ws/temporary">
+	<script type="application/ld+json">{"@context":"https://schema.org","@type":"WebPage","name":"Drive Your Avatar","description":"Drive a 3D avatar around with a joystick or WASD, then toggle the back camera for AR-style passthrough on your phone.","url":"https://three.ws/temporary","isPartOf":{"@type":"WebSite","name":"three.ws","url":"https://three.ws"}}</script>
+
+	<meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1">
+	<meta property="og:locale" content="en_US">
+	<meta property="og:image:alt" content="Drive Your Avatar — three.ws">
+	<meta name="twitter:site" content="@trythreews">
+</head>
+	<body>
+		<header class="walk-site-header" id="walk-header"><div id="nav-container"></div></header>
+		<script src="/nav.js"></script>
+
+		<!--
+			The document heading. The whole page is a full-bleed 3D stage whose HUD
+			is deliberately chrome-free, so the heading is exposed to assistive tech
+			with the canonical .sr-only clip (tokens.css) rather than drawn over the
+			scene. Without it this route had no h1 at all once the coin lobby was
+			dismissed, and screen-reader users landed on an unnamed page.
+		-->
+		<h1 class="sr-only" data-i18n="temporary.page_heading">Drive your avatar</h1>
+
+		<!-- Loading overlay -->
+		<div id="walk-loading" class="walk-loading">
+			<div class="walk-loading-inner">
+				<div class="walk-loading-spinner"></div>
+				<p class="walk-loading-text" id="walk-loading-text" data-i18n="temporary.loading_avatar">Loading avatar...</p>
+			</div>
+		</div>
+
+		<div id="walk-stage">
+			<video id="walk-camera-feed" autoplay playsinline muted></video>
+			<canvas id="walk-canvas"></canvas>
+
+			<div id="walk-hud">
+				<div class="walk-card" id="walk-identity-card">
+					<div class="walk-identity-row">
+						<input type="text" id="walk-name-input" class="walk-name-input"
+							placeholder="your name" maxlength="24" autocomplete="off" spellcheck="false"
+							aria-label="Your display name" />
+					</div>
+					<p data-i18n-html="temporary.drag_to_orbit_joystick_or_wasd_to">Drag to orbit. Joystick or <kbd>WASD</kbd> to move.</p>
+				</div>
+				<div class="walk-actions">
+					<button type="button" class="walk-btn" id="walk-avatar-btn" title="Change avatar" data-i18n-attr="title:temporary.change_avatar_title">
+						<svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><circle cx="8" cy="5.5" r="3"/><path d="M3 14c0-2.8 2.2-5 5-5s5 2.2 5 5"/></svg>
+						<span data-label>Avatar</span>
+					</button>
+					<button type="button" id="walk-online" data-status="idle" title="Players online" data-i18n-html="temporary.solo_1" data-i18n-attr="title:temporary.players_online_title">
+						<span class="dot"></span>
+						<span data-label>solo</span>
+						<span class="count" id="walk-online-count">1</span>
+					</button>
+					<button type="button" class="walk-btn" id="walk-camera-mode-btn" title="Camera mode (C)" data-i18n-attr="title:temporary.camera_mode_c_title">
+						<svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><circle cx="8" cy="8" r="5"/><path d="M8 3v2M8 11v2M3 8h2M11 8h2"/></svg>
+						<span data-label>Camera</span>
+					</button>
+					<button type="button" class="walk-btn" id="walk-env-btn" title="Environment (V)" data-i18n-attr="title:temporary.environment_v_title">
+						<svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M1 14l4-6 3 4 2-3 5 5"/><circle cx="11" cy="4" r="2"/></svg>
+						<span data-label>Scene</span>
+					</button>
+					<button type="button" class="walk-btn" id="walk-ar-toggle"
+						aria-pressed="false" title="Put your avatar on your real floor" data-i18n-html="temporary.ar" data-i18n-attr="title:temporary.put_your_avatar_on_your_real_title">
+						<span class="dot"></span>
+						<span data-label>AR</span>
+					</button>
+					<button type="button" class="walk-btn" id="walk-screenshot-btn" title="Screenshot (P)" data-i18n-attr="title:temporary.screenshot_p_title">
+						<svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="4" width="12" height="9" rx="2"/><circle cx="8" cy="9" r="2.5"/><path d="M5.5 4L6.5 2h3l1 2"/></svg>
+						<span data-label>Photo</span>
+					</button>
+					<button type="button" class="walk-btn" id="walk-record-btn"
+						data-recording="false" title="Record a 6-second clip to share" data-i18n-html="temporary.record" data-i18n-attr="title:temporary.record_a_6_second_clip_to_sh_title">
+						<span class="dot"></span>
+						<span data-label>Record</span>
+					</button>
+					<button type="button" class="walk-btn" id="walk-minimap-btn" title="Minimap (M)" data-i18n-attr="title:temporary.minimap_m_title">
+						<svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="1" y="1" width="14" height="14" rx="2"/><circle cx="8" cy="8" r="2"/><path d="M8 1v3M8 12v3M1 8h3M12 8h3"/></svg>
+						<span data-label>Map</span>
+					</button>
+					<button type="button" class="walk-btn" id="walk-zen-btn" title="Hide all controls — just the scene and joystick (Z)" data-i18n-attr="title:temporary.hide_all_controls_just_the_s_title">
+						<svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M1.5 8S3.8 3.5 8 3.5 14.5 8 14.5 8 12.2 12.5 8 12.5 1.5 8 1.5 8z"/><circle cx="8" cy="8" r="2"/><path d="M2 14L14 2"/></svg>
+						<span data-label>Hide UI</span>
+					</button>
+					<button type="button" class="walk-btn walk-friends-btn" id="walk-friends-btn" title="Friends (F)" aria-label="Friends" aria-haspopup="dialog" data-i18n-attr="aria-label:temporary.friends_arialabel;title:temporary.friends_f_title">
+						<svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="5.5" cy="5" r="2.5"/><path d="M1 13c0-2.5 2-4.5 4.5-4.5S10 10.5 10 13"/><circle cx="12" cy="5.5" r="2"/><path d="M10.5 13c0-1.7.9-3.2 2.4-3.9"/></svg>
+						<span data-label>Friends</span>
+						<span class="walk-friends-badge" id="walk-friends-badge" hidden aria-label="unread messages"></span>
+					</button>
+					<button type="button" class="walk-btn" id="walk-help-toggle" title="Show controls (H)" data-i18n-attr="title:temporary.show_controls_h_title">
+						<span>?</span>
+					</button>
+				</div>
+			</div>
+
+			<!-- Restore-chrome pill (only shown in zen mode) -->
+			<button type="button" id="walk-zen-exit" title="Show controls (Z)" aria-label="Show controls" data-i18n-attr="aria-label:temporary.show_controls_arialabel;title:temporary.show_controls_z_title">
+				<svg viewBox="0 0 16 16" width="13" height="13" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M1.5 8S3.8 3.5 8 3.5 14.5 8 14.5 8 12.2 12.5 8 12.5 1.5 8 1.5 8z"/><circle cx="8" cy="8" r="2"/></svg>
+				<span>Show UI</span>
+			</button>
+
+			<!-- Avatar picker panel -->
+			<div id="walk-avatar-picker" class="walk-avatar-picker" hidden>
+				<div class="walk-avatar-picker-header">
+					<span data-i18n="temporary.choose_avatar">Choose Avatar</span>
+					<button type="button" id="walk-avatar-picker-close" aria-label="Close" data-i18n-attr="aria-label:temporary.close_arialabel">&times;</button>
+				</div>
+				<div id="walk-avatar-picker-list" class="walk-avatar-picker-list">
+					<div class="walk-avatar-picker-loading">Loading your avatars...</div>
+				</div>
+			</div>
+
+			<!-- Chat overlay -->
+			<div id="walk-chat" class="walk-chat">
+				<div id="walk-chat-messages" class="walk-chat-messages" aria-live="polite" role="log"></div>
+				<form id="walk-chat-form" class="walk-chat-form" autocomplete="off">
+					<input type="text" id="walk-chat-input" class="walk-chat-input"
+						placeholder="Press Enter to chat..." maxlength="200" autocomplete="off" spellcheck="false"
+						aria-label="Chat message" />
+					<button type="submit" class="walk-chat-send" aria-label="Send" data-i18n-attr="aria-label:temporary.send_arialabel">
+						<svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2L7 9"/><path d="M14 2l-5 12-2-5-5-2z"/></svg>
+					</button>
+				</form>
+			</div>
+
+			<!-- Voice chat: push-to-talk with the avatar (mic → STT → LLM → TTS) -->
+			<div id="walk-voice" class="walk-voice" data-state="idle">
+				<div class="walk-voice-error" data-voice-error hidden role="alert"></div>
+				<div class="walk-voice-status" data-voice-status aria-live="polite">Hold to talk</div>
+				<canvas class="walk-voice-wave" data-voice-wave width="120" height="28" aria-hidden="true"></canvas>
+				<button type="button" class="walk-voice-mic" data-voice-mic
+					aria-pressed="false" aria-label="Hold to talk to your avatar (T)" title="Hold to talk (T)" data-i18n-attr="aria-label:temporary.hold_to_talk_to_your_avatar_arialabel;title:temporary.hold_to_talk_t_title">
+					<span class="walk-voice-ring" aria-hidden="true"></span>
+					<svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+						<rect x="9" y="2" width="6" height="11" rx="3"/>
+						<path d="M5 10v1a7 7 0 0 0 14 0v-1"/>
+						<path d="M12 18v3"/>
+					</svg>
+				</button>
+				<span class="walk-voice-key" aria-hidden="true" data-i18n-html="temporary.hold_t">Hold <kbd>T</kbd></span>
+			</div>
+
+			<!-- Friends panel (Task 15) -->
+			<div id="walk-friends-overlay" class="wf-friends-overlay" hidden aria-label="Friends">
+				<div class="wf-friends-card" role="dialog" aria-modal="true" aria-labelledby="walk-friends-title">
+					<div class="wf-friends-head">
+						<h2 class="wf-friends-title" id="walk-friends-title" data-i18n="temporary.friends">Friends</h2>
+						<button type="button" class="wf-friends-close" id="walk-friends-close" aria-label="Close friends panel" data-i18n-attr="aria-label:temporary.close_friends_panel_arialabel">&times;</button>
+					</div>
+					<div class="wf-friends-body" id="walk-friends-body"></div>
+				</div>
+			</div>
+
+			<!-- Player list panel -->
+			<div id="walk-players-panel" class="walk-players-panel" hidden>
+				<div class="walk-players-header">
+					<span data-i18n="temporary.players">Players</span>
+					<button type="button" id="walk-players-close" aria-label="Close" data-i18n-attr="aria-label:temporary.close_arialabel_2">&times;</button>
+				</div>
+				<ul id="walk-players-list" class="walk-players-list"></ul>
+			</div>
+
+			<!-- Emote tray -->
+			<div id="walk-emote-tray" class="walk-emote-tray" hidden></div>
+
+			<button type="button" id="walk-ar-cta" aria-hidden="true" data-i18n-html="temporary.see_your_avatar_on_your_floor_tap">
+				<span class="pulse"></span>
+				<span>See your avatar on your floor — tap for AR</span>
+				<span class="dismiss" aria-label="Dismiss">×</span>
+			</button>
+
+			<div id="walk-record-status" role="status" aria-live="polite">
+				<span class="rec-dot"></span>
+				<span data-label data-i18n="temporary.rec_6s">REC 6s</span>
+			</div>
+
+			<div id="walk-joystick" aria-label="Movement joystick"></div>
+			<div id="walk-look-joystick" aria-label="Look joystick"></div>
+
+			<div id="walk-touch-actions" aria-label="Action buttons">
+				<button type="button" class="walk-touch-btn" id="walk-touch-camera" aria-label="Switch camera" data-i18n-attr="aria-label:temporary.switch_camera_arialabel">
+					<svg viewBox="0 0 16 16" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="8" cy="8" r="3"/><path d="M5 3.5h6l1 1.5h1.5a1 1 0 0 1 1 1V12a1 1 0 0 1-1 1H1.5a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1H3z"/></svg>
+				</button>
+				<button type="button" class="walk-touch-btn" id="walk-touch-gesture" aria-label="Gestures" data-i18n-attr="aria-label:temporary.gestures_arialabel">
+					<svg viewBox="0 0 16 16" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M5 8V3.2a1.2 1.2 0 0 1 2.4 0V7m0-.5a1.2 1.2 0 0 1 2.4 0V8m0-.8a1.2 1.2 0 0 1 2.4 0v3.2c0 2-1.6 3.6-3.6 3.6H8.4c-1.2 0-2-.5-2.7-1.4L3.3 11a1.2 1.2 0 0 1 1.8-1.5L6 10.4"/></svg>
+				</button>
+				<button type="button" class="walk-touch-btn is-jump" id="walk-touch-jump" aria-label="Jump" data-i18n-attr="aria-label:temporary.jump_arialabel">
+					<svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4l5 6h-3v6h-4v-6H7z"/></svg>
+				</button>
+			</div>
+
+			<div id="walk-help" aria-hidden="true">
+				<span class="walk-key" data-i18n-html="temporary.wasd_move"><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> move</span>
+				<span class="walk-key" data-i18n-html="temporary.shift_run"><kbd>shift</kbd> run</span>
+				<span class="walk-key" data-i18n-html="temporary.space_jump"><kbd>space</kbd> jump</span>
+				<span class="walk-key" data-i18n-html="temporary.c_camera"><kbd>C</kbd> camera</span>
+				<span class="walk-key" data-i18n-html="temporary.g_gestures"><kbd>G</kbd> gestures</span>
+				<span class="walk-key" data-i18n-html="temporary.t_hold_to_talk"><kbd>T</kbd> hold to talk</span>
+				<span class="walk-key" data-i18n-html="temporary.v_scene"><kbd>V</kbd> scene</span>
+				<span class="walk-key" data-i18n-html="temporary.m_map"><kbd>M</kbd> map</span>
+				<span class="walk-key" data-i18n-html="temporary.i_inspect_avatar"><kbd>I</kbd> inspect avatar</span>
+				<span class="walk-key" data-i18n-html="temporary.z_hide_ui"><kbd>Z</kbd> hide UI</span>
+				<span class="walk-key" data-i18n-html="temporary.h_help"><kbd>H</kbd> help</span>
+			</div>
+
+			<div id="walk-status">loading avatar…</div>
+		</div>
+
+		<script type="module" src="/src/walk.js"></script>
+		<!-- x402 payment widget — powers the in-world "Feature your content"
+		     billboard publish flow (window.X402.pay). Loaded as a module (x402.js
+		     uses import.meta.url); module scripts defer by default, so walk.js polls
+		     for window.X402 before letting the pay button run. -->
+		<script type="module" src="/x402.js"></script>
+		<!-- Coin-world social layer: lobby (no ?coin=) or Town (live community
+		     feed + realtime bubbles) bound to the current coin. Self-contained;
+		     the 3D scene above is walk.js's, the multiplayer join is walk-net's. -->
+		<script type="module" src="/src/community/coin-world-boot.js"></script>
+		<script src="/brand.js" defer></script>
+	<!-- Runtime i18n: detects locale, swaps annotated copy, mounts <lang-switcher>. -->
+	<script type="module" src="/i18n.js"></script>
+</body>
+</html>

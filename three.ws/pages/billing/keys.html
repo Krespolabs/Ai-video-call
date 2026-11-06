@@ -1,0 +1,153 @@
+<!doctype html>
+<html lang="en">
+<head>
+	<style>/* three.ws hidden-guard — make the `hidden` attribute authoritative; see scripts/lib/hidden-guard.mjs */[hidden]{display:none!important}</style>
+	<meta charset="utf-8" />
+	<meta name="viewport" content="width=device-width,initial-scale=1" />
+	<title data-i18n="billing_keys.meta_title">API keys &amp; usage · three.ws</title>
+	<meta name="robots" content="noindex" />
+	<link rel="icon" href="/favicon.ico" />
+	<style>
+		:root { color-scheme: dark; --accent:#ffffff; --border:#222222; --bg:#000000; --panel:#141414; --panel2:#0a0a0a; --text:#e8e8f0; --muted:#888888; --green:#22c55e; --yellow:#f59e0b; --red:#ef4444; --aws:#FF9900; }
+		* { box-sizing: border-box; margin: 0; padding: 0; }
+		body { font: 15px/1.6 -apple-system, system-ui, "Segoe UI", Roboto, sans-serif; color: var(--text); background: var(--bg); min-height: 100vh; display: flex; flex-direction: column; }
+		header { padding: 18px 24px; border-bottom: 1px solid var(--border); display: flex; align-items: center; gap: 16px; }
+		header a.back { color: #aaa; text-decoration: none; font-size: 14px; }
+		header a.back:hover { color: var(--text); }
+		.wrap { max-width: 760px; margin: 0 auto; padding: 48px 24px 96px; width: 100%; }
+
+		h1 { font-size: clamp(24px, 4vw, 32px); letter-spacing: -0.025em; line-height: 1.1; font-weight: 600; margin-bottom: 10px; }
+		.lead { color: var(--muted); font-size: 15px; margin-bottom: 36px; max-width: 560px; }
+		.lead a { color: var(--text); }
+
+		.state { display: none; }
+		.state.active { display: block; }
+
+		/* loading */
+		#state-loading { text-align: center; padding-top: 56px; }
+		.spinner { width: 34px; height: 34px; border: 3px solid var(--border); border-top-color: var(--accent); border-radius: 50%; animation: spin 0.7s linear infinite; margin: 0 auto 18px; }
+		@keyframes spin { to { transform: rotate(360deg); } }
+		#state-loading p { color: var(--muted); font-size: 14px; }
+
+		.skeleton { background: var(--panel); border: 1px solid var(--border); border-radius: 16px; height: 132px; margin-bottom: 16px; position: relative; overflow: hidden; }
+		.skeleton::after { content: ""; position: absolute; inset: 0; background: linear-gradient(90deg, transparent, rgba(255,255,255,0.04), transparent); transform: translateX(-100%); animation: shimmer 1.4s infinite; }
+		@keyframes shimmer { to { transform: translateX(100%); } }
+
+		/* card */
+		.card { background: var(--panel); border: 1px solid var(--border); border-radius: 16px; padding: 20px 22px; margin-bottom: 16px; transition: border-color 0.15s; }
+		.card:hover { border-color: #2e2e2e; }
+		.card-top { display: flex; align-items: flex-start; justify-content: space-between; gap: 14px; margin-bottom: 16px; }
+		.card-name { font-size: 16px; font-weight: 600; letter-spacing: -0.01em; display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+		.badges { display: flex; gap: 7px; flex-wrap: wrap; align-items: center; }
+
+		.badge { display: inline-flex; align-items: center; gap: 6px; border-radius: 99px; padding: 3px 10px; font-size: 11px; font-weight: 600; letter-spacing: 0.02em; border: 1px solid var(--border); color: var(--muted); }
+		.badge.aws { color: var(--aws); border-color: rgba(255,153,0,0.35); background: rgba(255,153,0,0.06); }
+		.badge.native { color: #c9c9d6; }
+		.badge.trial { color: var(--yellow); border-color: rgba(245,158,11,0.35); background: rgba(245,158,11,0.06); }
+
+		.pill { display: inline-flex; align-items: center; gap: 6px; border-radius: 99px; padding: 4px 11px; font-size: 12px; font-weight: 600; }
+		.pill .dot { width: 7px; height: 7px; border-radius: 50%; }
+		.pill.active { color: var(--green); background: rgba(34,197,94,0.1); } .pill.active .dot { background: var(--green); }
+		.pill.revoked { color: var(--muted); background: rgba(136,136,136,0.12); } .pill.revoked .dot { background: var(--muted); }
+		.pill.expired { color: var(--yellow); background: rgba(245,158,11,0.1); } .pill.expired .dot { background: var(--yellow); }
+
+		.meta-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 14px 20px; padding: 16px 0; border-top: 1px solid #1c1c1c; }
+		.meta-grid .label { font-size: 11px; text-transform: uppercase; letter-spacing: 0.05em; color: var(--muted); margin-bottom: 3px; }
+		.meta-grid .value { font-size: 14px; color: var(--text); font-variant-numeric: tabular-nums; }
+		.key-prefix { font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, monospace; font-size: 13px; color: #cfcfdc; }
+
+		.card-actions { display: flex; gap: 8px; padding-top: 16px; border-top: 1px solid #1c1c1c; flex-wrap: wrap; }
+		.btn { border-radius: 9px; border: 1px solid var(--border); background: var(--panel2); color: var(--text); font-size: 13px; font-weight: 500; padding: 8px 14px; cursor: pointer; transition: background 0.15s, border-color 0.15s, opacity 0.15s; }
+		.btn:hover:not(:disabled) { background: rgba(255,255,255,0.04); border-color: #333; }
+		.btn:disabled { opacity: 0.45; cursor: not-allowed; }
+		.btn.primary { background: var(--accent); color: #000; border-color: var(--accent); font-weight: 600; }
+		.btn.primary:hover:not(:disabled) { filter: brightness(0.92); background: var(--accent); }
+		.btn.danger { color: var(--red); border-color: rgba(239,68,68,0.3); }
+		.btn.danger:hover:not(:disabled) { background: rgba(239,68,68,0.1); }
+		.btn.ghost { background: transparent; }
+
+		/* freshly minted key reveal */
+		.reveal { margin-top: 16px; border: 1px solid rgba(34,197,94,0.4); background: rgba(34,197,94,0.06); border-radius: 12px; padding: 14px 16px; }
+		.reveal-label { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 9px; }
+		.reveal-label span { font-size: 12px; font-weight: 600; letter-spacing: 0.04em; text-transform: uppercase; color: var(--green); }
+		.reveal-value { font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, monospace; font-size: 13px; color: var(--text); background: #050505; border: 1px solid #1c1c1c; border-radius: 8px; padding: 11px 13px; word-break: break-all; user-select: all; }
+		.reveal-note { font-size: 12px; color: var(--yellow); margin-top: 9px; line-height: 1.5; }
+		.copy { background: transparent; border: 1px solid var(--border); border-radius: 8px; color: var(--text); font-size: 12px; padding: 5px 11px; cursor: pointer; transition: background 0.15s, border-color 0.15s, color 0.15s; }
+		.copy:hover { background: rgba(255,255,255,0.05); }
+		.copy.copied { color: var(--green); border-color: rgba(34,197,94,0.5); }
+
+		/* usage docs */
+		.usage-doc { background: var(--panel); border: 1px solid var(--border); border-radius: 16px; padding: 20px 22px; margin-top: 28px; }
+		.usage-doc h3 { font-size: 13px; font-weight: 600; color: var(--muted); margin-bottom: 12px; letter-spacing: 0.04em; text-transform: uppercase; }
+		.usage-doc pre { font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, monospace; font-size: 12.5px; color: #cfcfdc; background: var(--panel2); border: 1px solid #1c1c1c; border-radius: 9px; padding: 13px 15px; overflow-x: auto; line-height: 1.6; }
+		.usage-doc a { color: var(--text); }
+
+		/* empty / error */
+		.placeholder { text-align: center; padding: 56px 24px; border: 1px dashed var(--border); border-radius: 16px; }
+		.placeholder .icon { font-size: 34px; margin-bottom: 14px; opacity: 0.8; }
+		.placeholder h2 { font-size: 18px; font-weight: 600; margin-bottom: 8px; }
+		.placeholder p { color: var(--muted); font-size: 14px; max-width: 380px; margin: 0 auto 22px; }
+		.placeholder .btn { display: inline-block; text-decoration: none; }
+
+		.toast { position: fixed; left: 50%; bottom: 28px; transform: translateX(-50%) translateY(20px); background: var(--panel); border: 1px solid var(--border); border-radius: 11px; padding: 12px 18px; font-size: 13px; color: var(--text); opacity: 0; pointer-events: none; transition: opacity 0.2s, transform 0.2s; z-index: 50; box-shadow: 0 12px 40px rgba(0,0,0,0.6); }
+		.toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+		.toast.err { border-color: rgba(239,68,68,0.4); color: #fca5a5; }
+
+		@media (max-width: 540px) { .wrap { padding: 32px 16px 72px; } .card-actions { flex-direction: column; } .card-actions .btn { width: 100%; } }
+	</style>
+</head>
+<body>
+	<header>
+		<a href="/dashboard" class="back" data-i18n="billing_keys.dashboard">← Dashboard</a>
+	</header>
+
+	<div class="wrap">
+		<h1 data-i18n="billing_keys.api_keys_usage">API keys &amp; usage</h1>
+		<p class="lead" data-i18n-html="billing_keys.your_x402_subscription_keys_for_calling_paid">Your x402 subscription keys for calling paid three.ws endpoints. Keys issued through <a href="/aws">AWS Marketplace</a> bill to your AWS account; native keys settle on-chain. The secret is shown once at issue — rotate any time to get a fresh one.</p>
+
+		<!-- loading -->
+		<div id="state-loading" class="state active">
+			<div class="skeleton"></div>
+			<div class="skeleton"></div>
+		</div>
+
+		<!-- list -->
+		<div id="state-list" class="state">
+			<div id="cards"></div>
+			<div class="usage-doc">
+				<h3 data-i18n="billing_keys.calling_a_paid_endpoint">Calling a paid endpoint</h3>
+<pre>curl https://three.ws/api/x402/agent-reputation?agent_id=&lt;uuid&gt; \
+  -H "x-api-key: <span id="example-prefix">x402_live_…</span>"</pre>
+				<p style="color:var(--muted);font-size:13px;margin-top:12px" data-i18n-html="billing_keys.browse_paid_services_in_the_x402_bazaar">Browse paid services in the <a href="/bazaar">x402 Bazaar</a>, or read the <a href="/docs/x402.md">x402 docs</a>.</p>
+			</div>
+		</div>
+
+		<!-- empty -->
+		<div id="state-empty" class="state">
+			<div class="placeholder">
+				<div class="icon">🔑</div>
+				<h2 data-i18n="billing_keys.no_subscription_keys_yet">No subscription keys yet</h2>
+				<p data-i18n="billing_keys.subscribe_through_aws_marketplace_to_bill_pa">Subscribe through AWS Marketplace to bill paid endpoints to your AWS account, or generate a key from the x402 console.</p>
+				<a href="/aws" class="btn primary" data-i18n="billing_keys.view_aws_marketplace">View AWS Marketplace</a>
+			</div>
+		</div>
+
+		<!-- error -->
+		<div id="state-error" class="state">
+			<div class="placeholder">
+				<div class="icon">⚠</div>
+				<h2 id="error-title" data-i18n="billing_keys.couldn_t_load_your_keys">Couldn't load your keys</h2>
+				<p id="error-body" data-i18n="billing_keys.we_had_trouble_reaching_the_server_check">We had trouble reaching the server. Check your connection and try again.</p>
+				<button class="btn primary" id="btn-retry" type="button" data-i18n="billing_keys.retry">Retry</button>
+			</div>
+		</div>
+	</div>
+
+	<div id="toast" class="toast"></div>
+
+	<script type="module" src="/src/billing-x402.js"></script>
+	<script src="/brand.js" defer></script>
+	<!-- Runtime i18n: detects locale, swaps annotated copy, mounts <lang-switcher>. -->
+	<script type="module" src="/i18n.js"></script>
+</body>
+</html>

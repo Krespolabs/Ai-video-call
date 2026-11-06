@@ -1,0 +1,399 @@
+/**
+ * Pure helpers for the /receipts page (buyer-side x402 receipt vault).
+ *
+ * Kept free of DOM and wallet dependencies so the signing-message contract,
+ * explorer routing, and CSV export are unit-testable. The message built here
+ * MUST stay byte-identical to buildExpectedMessage() in
+ * api/x402/my-receipts.js or signatures stop verifying.
+ */
+
+import { shortAddress as shortenAddress } from './shared/address.js';
+
+/**
+ * Build the personal-sign message the API expects.
+ * EVM addresses are lowercased (matching the server's normalization);
+ * Solana base58 is case-sensitive and stays verbatim.
+ *
+ * @param {string} address
+ * @param {string} issuedAt ISO timestamp
+ * @param {'evm'|'solana'} network
+ * @returns {string}
+ */
+export function buildReceiptsMessage(address, issuedAt, network) {
+	const normalized = network === 'solana' ? address : address.toLowerCase();
+	return `three.ws x402 receipts read\nNetwork: ${network}\nAddress: ${normalized}\nIssued At: ${issuedAt}`;
+}
+
+/** Seconds a signature stays fresh server-side (mirrors MAX_AGE_SECONDS). */
+export const SIGNATURE_TTL_SECONDS = 300;
+
+/**
+ * True when a previously issued signature is still inside the server's
+ * freshness window, with a safety margin so an in-flight request can't
+ * expire mid-round-trip.
+ *
+ * @param {string} issuedAt ISO timestamp the signature was issued at
+ * @param {number} [nowMs] injection point for tests
+ */
+export function signatureStillFresh(issuedAt, nowMs = Date.now()) {
+	const ts = Date.parse(issuedAt);
+	if (!Number.isFinite(ts)) return false;
+	const ageSec = (nowMs - ts) / 1000;
+	return ageSec >= 0 && ageSec <= SIGNATURE_TTL_SECONDS - 30;
+}
+
+// Stored receipt networks arrive either as CAIP-2 ("eip155:8453",
+// "solana:5eykt4UsFv8P8NJdTREpY1vzqKqZKvdp") or as the plain x402 network
+// string ("base", "solana"). Both forms route here.
+const EXPLORER_BY_CHAIN = {
+	solana: { label: 'Solana', tx: 'https://solscan.io/tx/' },
+	'solana-devnet': { label: 'Solana Devnet', tx: 'https://solscan.io/tx/' },
+	'eip155:1': { label: 'Ethereum', tx: 'https://etherscan.io/tx/' },
+	'eip155:8453': { label: 'Base', tx: 'https://basescan.org/tx/' },
+	'eip155:84532': { label: 'Base Sepolia', tx: 'https://sepolia.basescan.org/tx/' },
+	'eip155:56': { label: 'BNB Chain', tx: 'https://bscscan.com/tx/' },
+	'eip155:137': { label: 'Polygon', tx: 'https://polygonscan.com/tx/' },
+	'eip155:42161': { label: 'Arbitrum', tx: 'https://arbiscan.io/tx/' },
+};
+
+const PLAIN_ALIASES = {
+	ethereum: 'eip155:1',
+	base: 'eip155:8453',
+	'base-sepolia': 'eip155:84532',
+	bsc: 'eip155:56',
+	polygon: 'eip155:137',
+	arbitrum: 'eip155:42161',
+};
+
+/** @param {string|null|undefined} network */
+function chainKey(network) {
+	const raw = String(network || '').trim().toLowerCase();
+	if (!raw) return null;
+	if (raw.startsWith('solana')) return raw.includes('devnet') ? 'solana-devnet' : 'solana';
+	if (EXPLORER_BY_CHAIN[raw]) return raw;
+	if (PLAIN_ALIASES[raw]) return PLAIN_ALIASES[raw];
+	if (raw.startsWith('eip155:')) return raw;
+	return null;
+}
+
+/**
+ * Human label for a stored receipt network. Unknown networks fall back to the
+ * raw string so nothing renders blank.
+ * @param {string|null|undefined} network
+ */
+export function networkLabel(network) {
+	const key = chainKey(network);
+	if (key && EXPLORER_BY_CHAIN[key]) return EXPLORER_BY_CHAIN[key].label;
+	return String(network || 'unknown');
+}
+
+/**
+ * Explorer URL for a settlement transaction, or null when the chain has no
+ * mapped explorer (callers then render the raw hash, copyable).
+ * @param {string|null|undefined} network
+ * @param {string|null|undefined} transaction
+ */
+export function explorerTxUrl(network, transaction) {
+	if (!transaction) return null;
+	const key = chainKey(network);
+	const entry = key ? EXPLORER_BY_CHAIN[key] : null;
+	if (!entry) return null;
+	const suffix = key === 'solana-devnet' ? '?cluster=devnet' : '';
+	return `${entry.tx}${encodeURIComponent(transaction)}${suffix}`;
+}
+
+/** @param {string} addr */
+export function shortAddress(addr) { return shortenAddress(addr, 6, 4); }
+
+/**
+ * Compact display path for a receipt's resource URL: strips the origin when
+ * it is a three.ws URL, otherwise shows host + path.
+ * @param {string} resourceUrl
+ */
+export function resourceDisplay(resourceUrl) {
+	const s = String(resourceUrl || '');
+	try {
+		const u = new URL(s);
+		const host = u.host.replace(/^www\./, '');
+		const path = u.pathname + (u.search || '');
+		return host === 'three.ws' ? path : `${host}${path}`;
+	} catch {
+		return s;
+	}
+}
+
+/**
+ * Settlement assets whose atomic amounts denominate a US dollar, so a bare
+ * "$" prefix is an honest label. Everything else (the platform coin included)
+ * renders as a quantity plus its ticker: printing 22,000 THREE as "$22000.00"
+ * claims a dollar value nobody quoted.
+ */
+const USD_PEGGED_SYMBOLS = new Set(['USDC', 'USDC.E', 'USDT', 'USD\u20AE0', 'USD', 'PYUSD', 'DAI']);
+
+/** @param {string|null|undefined} symbol */
+export function isUsdPegged(symbol) {
+	if (symbol == null || symbol === '') return true; // legacy rows: dollars
+	return USD_PEGGED_SYMBOLS.has(String(symbol).toUpperCase());
+}
+
+/** Thousands-separated integer, so a 60,559-receipt vault reads as one. */
+export function formatCount(n) {
+	const v = Number(n);
+	if (!Number.isFinite(v)) return '\u00B7';
+	return v.toLocaleString('en-US');
+}
+
+/**
+ * Render a decimal quantity at the precision the number deserves: sub-cent
+ * micropayments are the norm on this rail, so a $0.001 call must not collapse
+ * to $0.00, while a 22,000-token payment must not carry four decimals.
+ * @param {number} value
+ */
+function quantityLabel(value) {
+	if (value > 0 && value < 0.01) {
+		return value.toFixed(4).replace(/0+$/, '').replace(/\.$/, '');
+	}
+	return value.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+
+/**
+ * Compose the human label for an amount already scaled out of atomics.
+ * @param {number} value
+ * @param {string|null|undefined} symbol
+ */
+export function amountLabel(value, symbol) {
+	const q = quantityLabel(value);
+	return isUsdPegged(symbol) ? `$${q}` : `${q} ${symbol}`;
+}
+
+/**
+ * Human amount for a settled receipt, or null when we can't render it safely.
+ *
+ * The scale comes from the API's `assetDecimals` field and the ticker from its
+ * `assetSymbol`, both resolved server-side from the same env config that builds
+ * the 402 accepts. The client deliberately keeps NO copy of our asset
+ * addresses: a local registry would silently drift the day an asset is
+ * repointed, and rendering an amount at the wrong scale (or under the wrong
+ * ticker) is worse than not rendering it. An unrecognised asset arrives with
+ * `assetDecimals: null` and stays unformatted.
+ *
+ * @param {string|number|null|undefined} amountAtomics
+ * @param {number|null|undefined} assetDecimals
+ * @param {string|null|undefined} [assetSymbol]
+ * @returns {{ value: number, label: string, symbol: string|null, usd: boolean }|null}
+ */
+export function formatReceiptAmount(amountAtomics, assetDecimals, assetSymbol) {
+	if (amountAtomics == null || amountAtomics === '') return null;
+	const atomic = Number(amountAtomics);
+	if (!Number.isFinite(atomic)) return null;
+	// Guard the null/undefined case BEFORE coercing: Number(null) is 0, which
+	// would pass an integer check and render a $0.01 payment as $10000.00.
+	if (assetDecimals == null) return null;
+	const decimals = Number(assetDecimals);
+	if (!Number.isInteger(decimals) || decimals < 0 || decimals > 18) return null;
+	const value = atomic / 10 ** decimals;
+	const symbol = assetSymbol == null || assetSymbol === '' ? null : String(assetSymbol);
+	return { value, label: amountLabel(value, symbol), symbol, usd: isUsdPegged(symbol) };
+}
+
+/**
+ * Spend across rows, kept per-asset because different settlement assets have
+ * different scales and different units. USD-pegged assets fold into one dollar
+ * figure (the headline a buyer wants); everything else is reported under its
+ * own ticker rather than converted at a rate we have no business inventing.
+ *
+ * `total`/`label` stay the dollar figure so the headline KPI has one number.
+ *
+ * @param {Array<{amountAtomics?: string|null, assetDecimals?: number|null,
+ *   assetSymbol?: string|null}>} rows
+ */
+export function totalSpend(rows) {
+	let total = 0;
+	let priced = 0;
+	let unpriced = 0;
+	const others = new Map();
+	for (const r of rows || []) {
+		const amt = formatReceiptAmount(r.amountAtomics, r.assetDecimals, r.assetSymbol);
+		if (!amt) {
+			unpriced++;
+			continue;
+		}
+		priced++;
+		if (amt.usd) {
+			total += amt.value;
+		} else {
+			others.set(amt.symbol, (others.get(amt.symbol) || 0) + amt.value);
+		}
+	}
+	return {
+		total,
+		label: amountLabel(total, null),
+		priced,
+		unpriced,
+		others: [...others.entries()]
+			.sort((a, b) => b[1] - a[1])
+			.map(([symbol, value]) => ({ symbol, value, label: amountLabel(value, symbol) })),
+	};
+}
+
+/**
+ * Same shape as totalSpend(), built from the API's account-wide `summary.spend`
+ * aggregate instead of the loaded page. A wallet with 60k receipts must be
+ * shown what it actually spent, not the spend of the newest page it happens to
+ * be holding, so the KPI strip prefers this whenever the API supplies it.
+ *
+ * @param {Array<{asset?: string, count?: number, atomics?: string,
+ *   decimals?: number|null, symbol?: string|null}>} spend
+ * @param {number} [unpriced] account-wide count of receipts with no amount
+ */
+export function formatSpendEntries(spend, unpriced = 0) {
+	let total = 0;
+	let priced = 0;
+	const others = new Map();
+	for (const s of spend || []) {
+		const amt = formatReceiptAmount(s.atomics, s.decimals, s.symbol);
+		if (!amt) continue;
+		priced += Number(s.count) || 0;
+		if (amt.usd) total += amt.value;
+		else others.set(amt.symbol, (others.get(amt.symbol) || 0) + amt.value);
+	}
+	return {
+		total,
+		label: amountLabel(total, null),
+		priced,
+		unpriced: Number(unpriced) || 0,
+		others: [...others.entries()]
+			.sort((a, b) => b[1] - a[1])
+			.map(([symbol, value]) => ({ symbol, value, label: amountLabel(value, symbol) })),
+	};
+}
+
+export function csvCell(value) {
+	const s = value == null ? '' : String(value);
+	return /[",\n\r]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+}
+
+/**
+ * CSV export of the loaded receipt rows. Columns are stable and documented in
+ * docs/x402-receipts.md; the signed receipt itself is excluded (use the
+ * per-row JSON download for the full artifact).
+ *
+ * @param {Array<{id: string|number, issuedAt: string, network: string,
+ *   resourceUrl: string, transaction: string|null, format: string,
+ *   payer: string}>} rows
+ * @returns {string}
+ */
+export function receiptsToCsv(rows) {
+	const header =
+		'id,issued_at,network,resource_url,amount_atomics,asset,transaction,format,payer';
+	const lines = (rows || []).map((r) =>
+		[
+			r.id,
+			r.issuedAt,
+			r.network,
+			r.resourceUrl,
+			r.amountAtomics,
+			r.asset,
+			r.transaction,
+			r.format,
+			r.payer,
+		]
+			.map(csvCell)
+			.join(','),
+	);
+	return [header, ...lines].join('\n');
+}
+
+// Mints the Outbound tab can name without a lookup, mirroring
+// api/_lib/x402/solana-settlement.js's KNOWN_MINT_SYMBOLS. A resolved
+// settlement in any other mint still renders (amount + short mint address),
+// just without a ticker.
+const SOLANA_USDC_MINT = 'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v';
+const THREE_MINT = 'FeMbDoX7R1Psc4GEcvJdsbNbZA3bfztcyDCatJVJpump';
+const OUTBOUND_MINT_SYMBOLS = { [SOLANA_USDC_MINT]: 'USDC', [THREE_MINT]: 'THREE' };
+
+/** @param {string|null|undefined} mint */
+export function outboundMintSymbol(mint) {
+	return OUTBOUND_MINT_SYMBOLS[mint] || null;
+}
+
+/**
+ * Human amount for one outbound receipt: the chain-resolved settlement when
+ * one exists (ground truth), otherwise the amount the settlement response
+ * reported when the execution was recorded.
+ * @param {{ resolved?: { amountAtomics: string, decimals: number, mint: string }|null,
+ *   reportedAmountUsd: number }} receipt
+ */
+export function formatOutboundAmount(receipt) {
+	if (receipt?.resolved) {
+		const amt = formatReceiptAmount(
+			receipt.resolved.amountAtomics,
+			receipt.resolved.decimals,
+			outboundMintSymbol(receipt.resolved.mint),
+		);
+		if (amt) return amt;
+	}
+	const value = Number(receipt?.reportedAmountUsd) || 0;
+	return { value, label: amountLabel(value, null), symbol: null, usd: true };
+}
+
+/**
+ * CSV export of the loaded outbound-receipt rows. Columns are documented in
+ * docs/x402-receipts.md alongside the inbound export.
+ * @param {Array<object>} rows
+ */
+export function outboundReceiptsToCsv(rows) {
+	const header =
+		'id,created_at,network,endpoint_host,endpoint_url,reported_amount_usd,tx_hash,resolved_payer,resolved_payee,resolved_mint,resolved_amount_atomics,resolved_decimals,resolved_fee_lamports,resolved_slot,resolved_block_time,resolve_error';
+	const lines = (rows || []).map((r) =>
+		[
+			r.id,
+			r.createdAt,
+			r.network,
+			r.endpointHost,
+			r.endpointUrl,
+			r.reportedAmountUsd,
+			r.txHash,
+			r.resolved?.payer ?? '',
+			r.resolved?.payee ?? '',
+			r.resolved?.mint ?? '',
+			r.resolved?.amountAtomics ?? '',
+			r.resolved?.decimals ?? '',
+			r.resolved?.feeLamports ?? '',
+			r.resolved?.slot ?? '',
+			r.resolved?.blockTime ?? '',
+			r.resolveError ?? '',
+		]
+			.map(csvCell)
+			.join(','),
+	);
+	return [header, ...lines].join('\n');
+}
+
+/**
+ * Aggregate stats for the KPI strip.
+ * @param {Array<{resourceUrl: string, issuedAt: string, network: string}>} rows
+ */
+export function summarizeReceipts(rows) {
+	const list = rows || [];
+	const endpoints = new Set();
+	const networks = new Set();
+	let first = null;
+	let last = null;
+	for (const r of list) {
+		if (r.resourceUrl) endpoints.add(resourceDisplay(r.resourceUrl));
+		if (r.network) networks.add(networkLabel(r.network));
+		const ts = Date.parse(r.issuedAt);
+		if (Number.isFinite(ts)) {
+			if (first === null || ts < first) first = ts;
+			if (last === null || ts > last) last = ts;
+		}
+	}
+	return {
+		total: list.length,
+		endpoints: endpoints.size,
+		networks: [...networks],
+		firstAt: first === null ? null : new Date(first).toISOString(),
+		lastAt: last === null ? null : new Date(last).toISOString(),
+	};
+}

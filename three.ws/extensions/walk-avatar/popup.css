@@ -1,0 +1,222 @@
+/* popup.css — Walk Avatar popup styles.
+ * Tokens mirror the three.ws site palette (var(--accent) = sky-300) so the
+ * popup reads as part of the product. 360×480 fixed popup. */
+
+*, *::before, *::after { box-sizing: border-box; }
+
+:root {
+	--bg: #0a0a0a;
+	--surface: #141414;
+	--surface-2: #1c1c1c;
+	--border: rgba(255, 255, 255, 0.08);
+	--text: #fafafa;
+	--text-2: #a1a1aa;
+	--accent: #7dd3fc;
+	--accent-soft: rgba(125, 211, 252, 0.12);
+	--danger: #f87171;
+	--success: #34d399;
+}
+
+html, body {
+	margin: 0;
+	padding: 0;
+	width: 360px;
+	min-height: 480px;
+	background: var(--bg);
+	color: var(--text);
+	font-family: 'Inter', system-ui, -apple-system, sans-serif;
+	font-size: 13px;
+	-webkit-font-smoothing: antialiased;
+}
+
+/* ── Header ─────────────────────────────────────────────────────────────── */
+.header {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	padding: 12px 16px;
+	border-bottom: 1px solid var(--border);
+}
+.header-logo { font-size: 14px; font-weight: 600; color: var(--text); }
+.header-logo span { color: var(--accent); }
+.auth-pill { display: flex; align-items: center; gap: 6px; font-size: 11px; color: var(--text-2); }
+.auth-pill .dot { width: 6px; height: 6px; border-radius: 50%; background: var(--text-2); transition: background 0.2s; }
+.auth-pill.signed-in .dot { background: var(--success); }
+.auth-pill .avatar-chip {
+	width: 18px; height: 18px; border-radius: 50%; object-fit: cover;
+	border: 1px solid var(--border); display: none;
+}
+.auth-pill.signed-in .avatar-chip { display: inline-block; }
+#auth-label { max-width: 120px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.sign-in-btn {
+	background: transparent;
+	border: 1px solid var(--border);
+	color: var(--accent);
+	font-size: 11px;
+	padding: 3px 8px;
+	border-radius: 6px;
+	cursor: pointer;
+	transition: background 0.15s, border-color 0.15s;
+}
+.sign-in-btn:hover { background: var(--accent-soft); border-color: var(--accent); }
+.sign-in-btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+
+/* ── Tabs ───────────────────────────────────────────────────────────────── */
+.tabs { display: flex; border-bottom: 1px solid var(--border); }
+.tab-btn {
+	flex: 1;
+	padding: 9px 8px;
+	background: transparent;
+	border: 0;
+	border-bottom: 2px solid transparent;
+	color: var(--text-2);
+	font-size: 12px;
+	cursor: pointer;
+	transition: color 0.15s, border-color 0.15s;
+}
+.tab-btn:hover { color: var(--text); }
+.tab-btn.active { color: var(--text); border-bottom-color: var(--accent); }
+.tab-btn:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+
+.tab-panel { display: none; }
+.tab-panel.active { display: block; }
+
+.scroll-area { height: 248px; overflow-y: auto; }
+.scroll-area::-webkit-scrollbar { width: 8px; }
+.scroll-area::-webkit-scrollbar-thumb { background: var(--border); border-radius: 8px; }
+
+/* ── Avatar grid ────────────────────────────────────────────────────────── */
+.avatar-grid {
+	display: grid;
+	grid-template-columns: repeat(3, 1fr);
+	gap: 8px;
+	padding: 12px;
+}
+.avatar-thumb {
+	position: relative;
+	aspect-ratio: 1;
+	width: 96px;
+	max-width: 100%;
+	border-radius: 10px;
+	overflow: hidden;
+	cursor: pointer;
+	border: 2px solid transparent;
+	transition: border-color 0.15s, transform 0.12s, box-shadow 0.15s;
+	background: var(--surface);
+	padding: 0;
+}
+.avatar-thumb:hover { transform: translateY(-2px); box-shadow: 0 6px 18px rgba(0, 0, 0, 0.4); }
+.avatar-thumb:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.avatar-thumb.selected { border-color: var(--accent); box-shadow: 0 0 0 2px var(--accent-soft); }
+.avatar-thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.avatar-thumb.no-thumb { display: flex; align-items: center; justify-content: center; background: linear-gradient(135deg, var(--surface-2), var(--surface)); }
+.thumb-glyph { font-size: 28px; font-weight: 600; color: var(--accent); }
+.thumb-badge {
+	position: absolute; top: 4px; left: 4px;
+	padding: 1px 5px; border-radius: 5px; font-size: 9px; font-weight: 600;
+	background: rgba(0, 0, 0, 0.55); color: var(--accent);
+	text-transform: uppercase; letter-spacing: 0.03em;
+}
+
+.skeleton {
+	background: linear-gradient(90deg, var(--surface) 25%, rgba(255, 255, 255, 0.06) 50%, var(--surface) 75%);
+	background-size: 200% 100%;
+	animation: shimmer 1.4s infinite;
+	cursor: default;
+}
+@keyframes shimmer { 0% { background-position: -200% 0; } 100% { background-position: 200% 0; } }
+
+/* ── Empty / error states ───────────────────────────────────────────────── */
+.empty-state { grid-column: 1 / -1; padding: 28px 16px; text-align: center; color: var(--text-2); }
+.empty-emoji { font-size: 30px; margin-bottom: 8px; }
+.empty-title { font-size: 13px; font-weight: 600; color: var(--text); margin-bottom: 4px; }
+.empty-sub { font-size: 11.5px; line-height: 1.5; margin: 0 0 14px; }
+.cta-btn {
+	background: var(--accent);
+	color: #001018;
+	border: 0;
+	padding: 8px 16px;
+	border-radius: 8px;
+	font-size: 12px;
+	font-weight: 600;
+	cursor: pointer;
+	transition: opacity 0.15s, transform 0.1s;
+}
+.cta-btn:hover { opacity: 0.9; }
+.cta-btn:active { transform: scale(0.98); }
+.cta-btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.cta-btn.ghost { background: transparent; color: var(--accent); border: 1px solid var(--border); }
+.cta-btn.ghost:hover { background: var(--accent-soft); border-color: var(--accent); }
+
+.error-msg {
+	margin: 0 12px 12px;
+	padding: 10px 12px;
+	font-size: 11.5px;
+	color: var(--danger);
+	background: rgba(248, 113, 113, 0.08);
+	border: 1px solid rgba(248, 113, 113, 0.3);
+	border-radius: 8px;
+	display: none;
+	align-items: center;
+	justify-content: space-between;
+	gap: 10px;
+}
+.err-text { flex: 1; }
+.retry-btn {
+	background: transparent;
+	border: 1px solid var(--danger);
+	color: var(--danger);
+	padding: 3px 10px;
+	border-radius: 6px;
+	font-size: 11px;
+	cursor: pointer;
+	flex-shrink: 0;
+}
+.retry-btn:hover { background: rgba(248, 113, 113, 0.12); }
+
+/* ── Speed + footer ─────────────────────────────────────────────────────── */
+.speed-row {
+	padding: 10px 16px 0;
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	font-size: 11px;
+	color: var(--text-2);
+}
+.speed-row input[type=range] { flex: 1; accent-color: var(--accent); }
+#speed-val { width: 36px; text-align: right; font-variant-numeric: tabular-nums; color: var(--text); }
+
+.footer {
+	padding: 12px 16px;
+	border-top: 1px solid var(--border);
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 12px;
+}
+.footer.disabled { opacity: 0.5; }
+.toggle-label { font-size: 12px; font-weight: 500; color: var(--text); }
+.toggle-sub { font-size: 11px; color: var(--text-2); margin-top: 2px; max-width: 220px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.filtered-tag {
+	display: inline-block;
+	margin-left: 4px;
+	padding: 1px 6px;
+	border-radius: 999px;
+	font-size: 9.5px;
+	text-transform: uppercase;
+	letter-spacing: 0.04em;
+	background: rgba(248, 113, 113, 0.14);
+	color: var(--danger);
+}
+.toggle-switch { position: relative; width: 44px; height: 24px; flex-shrink: 0; }
+.toggle-switch input { opacity: 0; width: 0; height: 0; }
+.toggle-track { position: absolute; inset: 0; border-radius: 24px; background: var(--border); cursor: pointer; transition: background 0.2s; }
+.toggle-switch input:checked + .toggle-track { background: var(--accent); }
+.toggle-switch input:focus-visible + .toggle-track { outline: 2px solid var(--accent); outline-offset: 2px; }
+.toggle-switch input:disabled + .toggle-track { cursor: not-allowed; }
+.toggle-track::after { content: ''; position: absolute; top: 3px; left: 3px; width: 18px; height: 18px; border-radius: 50%; background: white; transition: transform 0.2s; }
+.toggle-switch input:checked + .toggle-track::after { transform: translateX(20px); }
+
+.subnav { display: flex; justify-content: flex-end; padding: 6px 16px 8px; }
+.settings-link { font-size: 11px; color: var(--text-2); text-decoration: none; display: inline-flex; align-items: center; gap: 4px; }
+.settings-link:hover { color: var(--accent); }

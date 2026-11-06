@@ -1,0 +1,287 @@
+/**
+ * /api/agents/:id                 — agent CRUD
+ * /api/agents/:id/wallet          — link / update EVM wallet
+ * /api/agents/:id/solana          — agent's Solana wallet (address + balance, provision)
+ * /api/agents/:id/solana/activity — recent on-chain signatures for the wallet
+ * /api/agents/:id/solana/airdrop  — devnet airdrop (1 SOL)
+ * /api/agents/:id/trade           — owner-only: buy/sell a pump.fun token from the agent's custodial wallet
+ * /api/agents/:id/trade/quote     — owner-only: preview expected out, price impact, fees, guard verdict
+ * /api/agents/:id/trade/limits    — owner-only: read/update the per-agent discretionary trade limits
+ * /api/agents/:id/sns             — list owned .sol domains and attach one as the agent's SNS id
+ * /api/agents/:id/actions         — paginated signed action log
+ * /api/agents/:id/animations      — owner-only: replace meta.animations
+ * /api/agents/:id/embed-policy    — read/write embed policy
+ * /api/agents/:id/manifest        — public canonical manifest JSON
+ * /api/agents/:id/manifest/signed — public signed + IPFS-pinned manifest envelope
+ * /api/agents/:id/manifest/publish — owner-only: re-sign and re-pin the manifest
+ * /api/agents/:id/manifest/history — public: every manifest CID this agent published
+ * /api/agents/:id/registration    — public EIP-8004 registry document (Metaplex Agent Registry URI)
+ * /api/agents/:id/sign            — owner-only: sign message with server wallet
+ * /api/agents/:id/usage           — owner-only: LLM usage stats
+ * /api/agents/:id/credits         : owner-only: credits, inference budget, wallet-funded top-ups (credits/topup/preview, credits/topup, credits/auto-fund)
+ * /api/agents/:id/achievements    — public: earned + locked achievements from real platform data
+ * /api/agents/:id/reserves        : public proof-of-reserves (alias of /solana/reserves)
+ *
+ * /api/agents/:id/livekit-token     — GET short-lived LiveKit room JWT
+ * /api/agents/:id/embed             — POST text → 1024-dim embedding vector
+ * /api/agents/:id/voice             — GET/DELETE voice status; POST /voice/clone to clone
+ * /api/agents/:id/pumpfun/* is routed directly to api/agents/pumpfun/[action].js
+ * by vercel.json — see the rewrite for that path family.
+ */
+import { handleGetOne, handleWallet } from '../agents.js';
+import { cors, error, wrap } from '../_lib/http.js';
+import { isUuid } from '../_lib/validate.js';
+
+const CID_RE = /^[a-zA-Z0-9]+$/;
+export default wrap(async function handler(req, res) {
+	const url = new URL(req.url, 'http://x');
+	const parts = url.pathname.split('/').filter(Boolean);
+	const id = parts[2];
+	const sub = parts[3];
+	const action = parts[4];
+
+	if (!id) {
+		if (cors(req, res)) return;
+		return error(res, 400, 'bad_request', 'missing agent id');
+	}
+
+	// Every sub-resource under /api/agents/:id queries `WHERE id = $1` against
+	// a uuid column. A malformed id otherwise leaks Postgres error 22P02 to
+	// the caller as a 500. Return a clean 404 instead.
+	if (!isUuid(id)) {
+		if (cors(req, res)) return;
+		return error(res, 404, 'not_found', 'agent not found');
+	}
+
+	// /wallet/withdraw is the documented sweep route; it acts on the custodial
+	// Solana wallet, so it shares the solana-wallet handler (also reachable at
+	// /solana/withdraw). The EVM wallet link handler owns every other /wallet/*.
+	if (sub === 'wallet' && action === 'withdraw') {
+		const mod = await import('./solana-wallet.js');
+		return mod.default(req, res, id, 'withdraw');
+	}
+
+	if (sub === 'wallet') return handleWallet(req, res, id, action);
+
+	if (sub === 'solana') {
+		const mod = await import('./solana-wallet.js');
+		return mod.default(req, res, id, action);
+	}
+
+	if (sub === 'activate') {
+		const mod = await import('./_id/activate.js');
+		return mod.default(req, res, id, action);
+	}
+
+	if (sub === 'recovery') {
+		const mod = await import('./recovery.js');
+		return mod.default(req, res, id, action, parts);
+	}
+
+	if (sub === 'capabilities') {
+		const mod = await import('./capabilities.js');
+		return mod.default(req, res, id, action, parts);
+	}
+
+	if (sub === 'trade') {
+		const mod = await import('./agent-trade.js');
+		return mod.default(req, res, id, action);
+	}
+
+	if (sub === 'copilot') {
+		const mod = await import('./copilot.js');
+		return mod.default(req, res, id, action);
+	}
+
+	if (sub === 'alpha') {
+		const mod = await import('./alpha.js');
+		return mod.default(req, res, id, action);
+	}
+
+	if (sub === 'portfolio') {
+		const mod = await import('./portfolio.js');
+		return mod.default(req, res, id, action);
+	}
+
+	if (sub === 'autopilot') {
+		const mod = await import('./autopilot.js');
+		return mod.default(req, res, id, action);
+	}
+
+	if (sub === 'intents') {
+		const mod = await import('./wallet-intents.js');
+		return mod.default(req, res, id, action);
+	}
+
+	if (sub === 'mirror') {
+		const mod = await import('./agent-mirror.js');
+		return mod.default(req, res, id, action);
+	}
+
+	if (sub === 'strategies') {
+		const mod = await import('./agent-strategy-objects.js');
+		return mod.default(req, res, id, action);
+	}
+
+	if (sub === 'orders') {
+		const mod = await import('./orders.js');
+		return mod.default(req, res, id, action);
+	}
+
+	if (sub === 'eth-vanity') {
+		const mod = await import('./eth-vanity.js');
+		return mod.default(req, res, id, action);
+	}
+
+	if (sub === 'sns') {
+		const mod = await import('./sns.js');
+		return mod.default(req, res, id, action);
+	}
+
+	if (sub === 'actions') {
+		const mod = await import('./_id/_sub.js');
+		return mod.handleActions(req, res, id);
+	}
+
+	if (sub === 'animations') {
+		const mod = await import('./_id/_sub.js');
+		return mod.handleAnimations(req, res, id);
+	}
+
+	if (sub === 'embed-policy') {
+		const mod = await import('./_id/_sub.js');
+		return mod.handleEmbedPolicy(req, res, id);
+	}
+
+	if (sub === 'manifest') {
+		// /manifest is the live, unsigned public document. The sub-actions below
+		// are the signed, IPFS-pinned envelope built on top of it.
+		if (action === 'signed' || action === 'publish' || action === 'history') {
+			const mod = await import('./_id/manifest-signed.js');
+			return mod.handleSignedManifest(req, res, id, action);
+		}
+		const mod = await import('./_id/_sub.js');
+		return mod.handleManifest(req, res, id);
+	}
+
+	if (sub === 'registration') {
+		const mod = await import('./_id/_sub.js');
+		return mod.handleRegistration(req, res, id);
+	}
+
+	if (sub === 'sign') {
+		const mod = await import('./_id/_sub.js');
+		return mod.handleSign(req, res, id);
+	}
+
+	if (sub === 'credits') {
+		const mod = await import('./_id/credits.js');
+		return mod.handleCredits(req, res, id, action, parts[5]);
+	}
+
+	if (sub === 'usage') {
+		const mod = await import('./_id/_sub.js');
+		return mod.handleUsage(req, res, id);
+	}
+
+	if (sub === 'token-budget') {
+		const mod = await import('./_id/token-budget.js');
+		return mod.handleTokenBudget(req, res, id, action);
+	}
+
+	if (sub === 'memories') {
+		const mod = await import('./_id/_sub.js');
+		return mod.handleMemories(req, res, id, action);
+	}
+
+	if (sub === 'memory') {
+		if (action === 'pin') {
+			const mod = await import('./_id/memory/pin.js');
+			return mod.default(req, res);
+		}
+		// /memory/seed/* has its own rewrite per provider (memory-seed-x,
+		// memory-seed-github, memory-seed-farcaster), so it never lands here.
+		if (action === 'seed') {
+			return error(res, 404, 'not_found', 'unknown memory seed provider');
+		}
+		if (action && CID_RE.test(action)) {
+			const mod = await import('./_id/memory/[cid].js');
+			return mod.default(req, res);
+		}
+		return error(res, 404, 'not_found', 'unknown memory sub-resource');
+	}
+
+	if (sub === 'livekit-token') {
+		const mod = await import('./_id/livekit-token.js');
+		return mod.handleLiveKitToken(req, res, id);
+	}
+
+	if (sub === 'embed') {
+		const mod = await import('./_id/embed.js');
+		return mod.handleEmbed(req, res, id);
+	}
+
+	if (sub === 'voice') {
+		const mod = await import('./_id/voice.js');
+		return mod.handleVoice(req, res, id, action);
+	}
+
+	if (sub === 'persona') {
+		const mod = await import('./_id/persona.js');
+		return mod.handlePersona(req, res, id, action);
+	}
+
+	if (sub === 'brain') {
+		const mod = await import('./_id/brain.js');
+		return mod.handleBrain(req, res, id, action);
+	}
+
+	if (sub === 'mood') {
+		const mod = await import('./_id/mood.js');
+		return mod.handleMood(req, res, id, action);
+	}
+
+	if (sub === 'payments') {
+		const mod = await import('./_id/payments.js');
+		return mod.handlePayments(req, res, id);
+	}
+
+	if (sub === 'pricing') {
+		if (action) {
+			const mod = await import('./_id/pricing/[skill].js');
+			return mod.default(req, res);
+		}
+		const mod = await import('./_id/pricing/index.js');
+		return mod.default(req, res);
+	}
+
+	if (sub === 'reputation') {
+		const mod = await import('./_id/reputation.js');
+		return mod.handleReputation(req, res, id);
+	}
+
+	// Proof-of-reserves is documented at both /reserves and /solana/reserves (the
+	// latter dispatches from solana-wallet.js). Without this branch the short path
+	// fell through to handleGetOne and quietly answered with the agent record.
+	if (sub === 'reserves') {
+		const mod = await import('./_id/reserves.js');
+		return mod.handleReserves(req, res, id);
+	}
+
+	if (sub === 'achievements') {
+		const mod = await import('./_id/achievements.js');
+		return mod.handleAchievements(req, res, id);
+	}
+
+	if (sub === 'unlocks') {
+		const mod = await import('./_id/unlocks.js');
+		return mod.handleUnlocks(req, res, id, action);
+	}
+
+	if (sub === 'memory-seed') {
+		const mod = await import('./_id/memory-seed.js');
+		return mod.default(req, res, id);
+	}
+
+	return handleGetOne(req, res, id);
+});

@@ -1,0 +1,26 @@
+[project]
+name = "comfyui-three-ws"
+description = "Text to 3D and image to 3D nodes for ComfyUI powered by three.ws Forge. Each node submits a real generation job, waits for it, and writes a GLB into the ComfyUI output directory for any 3D node downstream."
+version = "1.0.0"
+license = { file = "LICENSE" }
+requires-python = ">=3.9"
+dependencies = [
+    "numpy",
+    "Pillow",
+]
+classifiers = [
+    "Operating System :: OS Independent",
+]
+
+[project.urls]
+Homepage = "https://three.ws/forge"
+Repository = "https://github.com/nirholas/three.ws"
+Documentation = "https://github.com/nirholas/three.ws/tree/main/integrations/comfyui"
+"Bug Tracker" = "https://github.com/nirholas/three.ws/issues"
+# comfy-cli uploads the issue link from the `Issues` key; `Bug Tracker` is the key the spec documents.
+Issues = "https://github.com/nirholas/three.ws/issues"
+
+[tool.comfy]
+PublisherId = "threews"
+DisplayName = "three.ws Forge"
+Icon = "https://three.ws/apple-touch-icon.png"

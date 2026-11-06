@@ -1,0 +1,5 @@
+Freshly generated, never-funded wallet: Gn1pRYJ1jGSrGzzKtaRvSc8R5ct7EYUDqqgsbDF6zRbh
+Gate mint ($THREE): FeMbDoX7R1Psc4GEcvJdsbNbZA3bfztcyDCatJVJpump
+Real Solana mainnet RPC balance read took 185 ms
+Balance: 0
+meetsGateThreshold(balance, 1): false (expected: false — LOCKED state)

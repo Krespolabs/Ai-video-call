@@ -1,0 +1,65 @@
+<!doctype html>
+<html lang="en">
+<head>
+	<meta charset="utf-8" />
+	<title>three.ws Walk Avatar</title>
+	<link rel="stylesheet" href="popup.css" />
+</head>
+<body>
+	<div class="header">
+		<div class="header-logo">three<span>.ws</span> walk</div>
+		<div class="auth-pill" id="auth-pill">
+			<img class="avatar-chip" id="auth-avatar" alt="" />
+			<div class="dot"></div>
+			<span id="auth-label">not signed in</span>
+			<button class="sign-in-btn" id="sign-in-btn">Sign in</button>
+		</div>
+	</div>
+
+	<div class="tabs" role="tablist">
+		<button class="tab-btn active" data-tab="mine" role="tab" aria-selected="true">My Avatars</button>
+		<button class="tab-btn" data-tab="featured" role="tab" aria-selected="false">Featured</button>
+		<button class="tab-btn" data-tab="recent" role="tab" aria-selected="false">Recent</button>
+	</div>
+
+	<div class="scroll-area">
+		<div class="tab-panel active" id="tab-mine" role="tabpanel">
+			<div class="avatar-grid" id="grid-mine"></div>
+			<div class="error-msg" id="error-mine"></div>
+		</div>
+
+		<div class="tab-panel" id="tab-featured" role="tabpanel">
+			<div class="avatar-grid" id="grid-featured"></div>
+			<div class="error-msg" id="error-featured"></div>
+		</div>
+
+		<div class="tab-panel" id="tab-recent" role="tabpanel">
+			<div class="avatar-grid" id="grid-recent"></div>
+			<div class="error-msg" id="error-recent"></div>
+		</div>
+	</div>
+
+	<div class="speed-row">
+		<span>Walk speed</span>
+		<input type="range" id="speed-slider" min="0.5" max="2" step="0.1" value="1" aria-label="Walk speed" />
+		<span id="speed-val">1.0×</span>
+	</div>
+
+	<div class="footer">
+		<div>
+			<div class="toggle-label">Enable on this site</div>
+			<div class="toggle-sub" id="current-site">–</div>
+		</div>
+		<label class="toggle-switch">
+			<input type="checkbox" id="enable-toggle" aria-label="Enable avatar on this site" />
+			<div class="toggle-track"></div>
+		</label>
+	</div>
+
+	<div class="subnav">
+		<a href="#" class="settings-link" id="settings-link">All settings →</a>
+	</div>
+
+	<script src="popup.js"></script>
+</body>
+</html>

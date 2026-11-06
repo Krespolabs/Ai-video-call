@@ -1,0 +1,356 @@
+<!doctype html>
+<html lang="en">
+	<head>
+		<meta charset="utf-8" />
+		<meta name="viewport" content="width=device-width, initial-scale=1" />
+		<title data-i18n="demos_lipsync_mic.meta_title">Audio-driven lipsync · three.ws</title>
+		<meta name="description" content="Real-time mic → viseme analyser → avatar morph targets. The exact pipeline that drives ElevenLabs-streamed TTS in three.ws chat, sourced from your microphone."  data-i18n-attr="content:demos_lipsync_mic.meta_description"/>
+		<link rel="canonical" href="https://three.ws/lipsync/mic" />
+		<meta property="og:title" content="Audio-driven lipsync · three.ws"  data-i18n-attr="content:demos_lipsync_mic.meta_og_title"/>
+		<meta property="og:description" content="Speak into your mic and watch the avatar's mouth track your voice in real time."  data-i18n-attr="content:demos_lipsync_mic.meta_og_description"/>
+		<meta property="og:url" content="https://three.ws/lipsync/mic" />
+		<meta name="twitter:card" content="summary_large_image" />
+		<link rel="stylesheet" href="/style.css" />
+		<link rel="stylesheet" href="/nav.css" />
+		<style>
+			:root { color-scheme: dark; }
+			body { background: #060606; color: #eee; font: 15px/1.5 -apple-system, system-ui, sans-serif; margin: 0; }
+			.stage { max-width: 1000px; margin: 0 auto; padding: 48px 24px 80px; }
+			.crumb a { color: #8a8d98; text-decoration: none; }
+			.crumb a:hover { color: #3dc1ff; }
+			h1 { font-size: 28px; font-weight: 600; letter-spacing: -0.015em; margin: 14px 0 8px; }
+			.sub { color: #8a8d98; max-width: 64ch; margin: 0 0 30px; }
+			.row { display: grid; grid-template-columns: 1fr 320px; gap: 24px; }
+			@media (max-width: 800px) { .row { grid-template-columns: 1fr; } }
+			.viewer-host {
+				background: #101010; border: 1.5px solid #202020; border-radius: 14px;
+				min-height: 460px; position: relative; overflow: hidden;
+			}
+			.viewer-host canvas { width: 100%; height: 100%; display: block; }
+			.panel {
+				background: #101010; border: 1.5px solid #202020; border-radius: 14px;
+				padding: 20px; display: flex; flex-direction: column; gap: 12px;
+			}
+			button {
+				background: #3dc1ff; color: #0a0a0a; border: 0; border-radius: 9px;
+				padding: 10px 14px; font-weight: 600; cursor: pointer; font: inherit;
+			}
+			button.secondary { background: rgba(255,255,255,0.06); color: #eee; }
+			button:disabled { opacity: 0.4; cursor: not-allowed; }
+			.meter {
+				display: flex; gap: 4px; height: 16px; align-items: end;
+			}
+			.meter .bar {
+				flex: 1; height: 0%; background: linear-gradient(180deg, #3dc1ff, #5a7a1a);
+				border-radius: 2px; transition: height var(--duration-instant) var(--ease-standard);
+			}
+			.viseme-row { display: flex; justify-content: space-between; font-size: 12px; color: #8a8d98; }
+			.viseme-row code { color: #3dc1ff; font-weight: 600; }
+			.log {
+				background: #080808; border: 1px solid #202020; border-radius: 9px;
+				padding: 12px; font-family: ui-monospace, monospace; font-size: 12px;
+				color: #8a8d98; line-height: 1.6;
+			}
+			.mic-status {
+				border-radius: 9px; padding: 12px 14px; font-size: 13px; line-height: 1.55;
+				display: flex; flex-direction: column; gap: 8px;
+			}
+			.mic-status[hidden] { display: none; }
+			.mic-status.error {
+				background: rgba(255, 86, 86, 0.08);
+				border: 1px solid rgba(255, 86, 86, 0.3);
+				color: #ffb4b4;
+			}
+			.mic-status.info {
+				background: rgba(61, 193, 255, 0.07);
+				border: 1px solid rgba(61, 193, 255, 0.25);
+				color: #aee3ff;
+			}
+			.mic-status strong { color: #fff; font-weight: 600; }
+			.mic-status .retry {
+				align-self: flex-start; cursor: pointer; font: inherit; font-weight: 600;
+				color: #fff; background: rgba(255, 255, 255, 0.08);
+				border: 1px solid rgba(255, 255, 255, 0.18); border-radius: 7px;
+				padding: 6px 12px; transition: background var(--duration-fast) var(--ease-standard), transform var(--duration-fast) var(--ease-standard);
+			}
+			.mic-status .retry:hover { background: rgba(255, 255, 255, 0.16); }
+			.mic-status .retry:active { transform: translateY(1px); }
+			.mic-status .retry:focus-visible { outline: 2px solid #3dc1ff; outline-offset: 2px; }
+		</style>
+	
+	<meta property="og:type" content="website">
+	<meta property="og:site_name" content="three.ws">
+	<meta property="og:image" content="https://three.ws/api/page-og?s=labs&amp;t=Lipsync+%28Mic%29&amp;d=Feed+live+mic+audio+through+the+viseme+analyser+and+watch+the+avatar%27s+mouth+track+your+voice+in+real+time.&amp;p=%2Flipsync%2Fmic">
+	<meta property="og:image:width" content="1200">
+	<meta property="og:image:height" content="630">
+	<meta name="twitter:title" content="Lipsync (Mic) · three.ws" data-i18n-attr="content:demos_lipsync_mic.meta_twitter_title">
+	<meta name="twitter:description" content="Feed live mic audio through the viseme analyser and watch the avatar's mouth track your voice in real time." data-i18n-attr="content:demos_lipsync_mic.meta_twitter_description">
+	<meta name="twitter:image" content="https://three.ws/api/page-og?s=labs&amp;t=Lipsync+%28Mic%29&amp;d=Feed+live+mic+audio+through+the+viseme+analyser+and+watch+the+avatar%27s+mouth+track+your+voice+in+real+time.&amp;p=%2Flipsync%2Fmic">
+	<script type="application/ld+json">{"@context":"https://schema.org","@type":"WebPage","name":"Lipsync (Mic)","description":"Feed live mic audio through the viseme analyser and watch the avatar's mouth track your voice in real time.","url":"https://three.ws/lipsync/mic","isPartOf":{"@type":"WebSite","name":"three.ws","url":"https://three.ws"}}</script>
+
+	<meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1">
+	<meta property="og:locale" content="en_US">
+	<meta property="og:image:alt" content="Lipsync (Mic) — three.ws">
+	<meta name="twitter:site" content="@trythreews">
+</head>
+	<body>
+		<header><div id="nav-container"></div></header>
+
+		<main class="stage">
+			<p class="crumb" data-i18n-html="demos_lipsync_mic.three_ws_lipsync_mic"><a href="/">three.ws</a> · <a href="/lipsync">lipsync</a> · mic</p>
+			<h1 data-i18n="demos_lipsync_mic.audio_driven_lipsync">Audio-driven lipsync</h1>
+			<p class="sub" data-i18n-html="demos_lipsync_mic.real_time_test_of_the_three_ws">
+				Real-time test of the three.ws viseme analyser
+				(<code>src/lip-sync-analyser.js</code>). Hit <strong>Start</strong>,
+				allow mic access, and speak — the analyser hands per-viseme weights
+				to the avatar's morph targets every frame. This is the exact pipeline
+				that drives ElevenLabs-streamed TTS in the live chat, just sourced
+				from your mic so you can verify the mouth shapes against your speech.
+			</p>
+
+			<div class="row">
+				<div class="viewer-host" id="viewer-host"></div>
+				<div class="panel">
+					<button id="start" data-i18n="demos_lipsync_mic.start_mic">Start mic</button>
+					<button id="stop" class="secondary" disabled data-i18n="demos_lipsync_mic.stop">Stop</button>
+
+					<div id="mic-status" class="mic-status" role="status" aria-live="polite" hidden></div>
+
+					<div class="meter" id="meter">
+						<div class="bar"></div><div class="bar"></div><div class="bar"></div>
+						<div class="bar"></div><div class="bar"></div><div class="bar"></div>
+						<div class="bar"></div><div class="bar"></div><div class="bar"></div>
+					</div>
+
+					<div id="visemes" style="display:flex;flex-direction:column;gap:4px;margin-top:6px"></div>
+
+					<div class="log">
+						The avatar's <code>viseme_aa / E / O / SS / PP …</code> morph
+						targets are driven by frequency-band energy from the mic. Your
+						audio never leaves the browser — analysis is all
+						<code>AnalyserNode</code> + <code>requestAnimationFrame</code>.
+					</div>
+				</div>
+			</div>
+		</main>
+
+		<script src="/nav.js" defer></script>
+		<script type="module">
+			import * as THREE from 'three';
+			import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+			import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+			import { LipSyncAnalyser } from '/src/lip-sync-analyser.js';
+
+			const $ = (id) => document.getElementById(id);
+			const host = $('viewer-host');
+
+			// ── three.js scene ─────────────────────────────────────────────
+			const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+			renderer.setPixelRatio(window.devicePixelRatio);
+			renderer.setSize(host.clientWidth, host.clientHeight);
+			renderer.outputColorSpace = THREE.SRGBColorSpace;
+			host.appendChild(renderer.domElement);
+
+			const scene = new THREE.Scene();
+			const camera = new THREE.PerspectiveCamera(28, host.clientWidth / host.clientHeight, 0.01, 100);
+			camera.position.set(0, 1.55, 0.85);
+			const controls = new OrbitControls(camera, renderer.domElement);
+			controls.target.set(0, 1.55, 0);
+			controls.enableDamping = true;
+
+			scene.add(new THREE.HemisphereLight(0xffffff, 0x404060, 1.1));
+			const dir = new THREE.DirectionalLight(0xffffff, 1.4);
+			dir.position.set(2, 4, 3);
+			scene.add(dir);
+
+			window.addEventListener('resize', () => {
+				const w = host.clientWidth, h = host.clientHeight;
+				renderer.setSize(w, h);
+				camera.aspect = w / h;
+				camera.updateProjectionMatrix();
+			});
+
+			// ── Load the default avatar ────────────────────────────────────
+			let visemeMorphs = new Map(); // viseme_name -> [{ mesh, index }]
+			const VISEMES = [
+				'viseme_aa', 'viseme_O', 'viseme_E', 'viseme_I', 'viseme_nn',
+				'viseme_SS', 'viseme_FF', 'viseme_CH', 'viseme_PP',
+			];
+
+			const loader = new GLTFLoader();
+
+			function onAvatarLoaded(gltf) {
+				scene.add(gltf.scene);
+				gltf.scene.traverse((node) => {
+					if (!node.isMesh || !node.morphTargetDictionary || !node.morphTargetInfluences) return;
+					for (const v of VISEMES) {
+						const idx = node.morphTargetDictionary[v];
+						if (idx === undefined) continue;
+						if (!visemeMorphs.has(v)) visemeMorphs.set(v, []);
+						visemeMorphs.get(v).push({ mesh: node, index: idx });
+					}
+				});
+
+				const row = $('visemes');
+				for (const v of VISEMES) {
+					const found = visemeMorphs.has(v);
+					const el = document.createElement('div');
+					el.className = 'viseme-row';
+					el.innerHTML = `<span>${v}</span><code data-v="${v}">${found ? '0.00' : 'n/a'}</code>`;
+					row.appendChild(el);
+				}
+			}
+
+			// Server-baked avatars (the /api/avatars/<id>/glb lane) and Forge output emit
+			// EXT_meshopt_compression; GLTFLoader throws "setMeshoptDecoder must be called
+			// before loading compressed files" unless the decoder is registered before the
+			// load starts. Wire ONLY the meshopt decoder — this page loads no Draco/KTX2
+			// GLBs — the same lazy way walk-sdk/src/internal/meshopt.js does. Uncompressed
+			// rigs ignore it harmlessly. Not top-level await: the default vite build target
+			// includes Safari 14, which can't parse TLA.
+			import('three/addons/libs/meshopt_decoder.module.js')
+				.then(({ MeshoptDecoder }) => {
+					loader.setMeshoptDecoder(MeshoptDecoder);
+					loader.load('/avatars/default.glb', onAvatarLoaded);
+				})
+				.catch((err) => console.error('[lipsync] avatar load failed', err));
+
+			// ── Animation loop ─────────────────────────────────────────────
+			let analyser = null;
+			let stream = null;
+			const bars = document.querySelectorAll('#meter .bar');
+
+			function tick() {
+				requestAnimationFrame(tick);
+				controls.update();
+
+				if (analyser) {
+					const visemes = analyser.sample();
+					if (visemes) {
+						let i = 0;
+						for (const [name, targets] of visemeMorphs.entries()) {
+							const w = visemes[name] ?? 0;
+							for (const { mesh, index } of targets) {
+								mesh.morphTargetInfluences[index] = w;
+							}
+							const code = document.querySelector(`code[data-v="${name}"]`);
+							if (code) code.textContent = w.toFixed(2);
+							if (bars[i]) bars[i].style.height = `${Math.min(100, w * 100)}%`;
+							i++;
+						}
+					}
+				}
+
+				renderer.render(scene, camera);
+			}
+			tick();
+
+			// ── Mic status (designed permission / device states) ───────────
+			const micStatus = $('mic-status');
+			function clearMicStatus() {
+				micStatus.hidden = true;
+				micStatus.className = 'mic-status';
+				micStatus.innerHTML = '';
+			}
+			function showMicStatus(kind, title, body, retry) {
+				micStatus.className = `mic-status ${kind}`;
+				micStatus.innerHTML = `<span><strong>${title}</strong> ${body}</span>`;
+				if (retry) {
+					const btn = document.createElement('button');
+					btn.type = 'button';
+					btn.className = 'retry';
+					btn.textContent = 'Try again';
+					btn.addEventListener('click', () => $('start').click());
+					micStatus.appendChild(btn);
+				}
+				micStatus.hidden = false;
+			}
+
+			// ── Mic wiring ─────────────────────────────────────────────────
+			$('start').addEventListener('click', async () => {
+				clearMicStatus();
+				// No mic API at all (insecure origin / unsupported browser).
+				if (!navigator.mediaDevices?.getUserMedia) {
+					showMicStatus(
+						'error',
+						'Microphone not available.',
+						'Your browser blocks mic capture here — this demo needs a secure (https) context and a browser with Web Audio support.',
+						false,
+					);
+					return;
+				}
+				$('start').disabled = true;
+				try {
+					stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+					const ctx = new (window.AudioContext || window.webkitAudioContext)();
+					const src = ctx.createMediaStreamSource(stream);
+					const an = ctx.createAnalyser();
+					an.fftSize = 256;
+					an.smoothingTimeConstant = 0.7;
+					src.connect(an);
+					// We deliberately do NOT connect an → ctx.destination — keeps mic from
+					// echoing back through the speakers.
+					analyser = new LipSyncAnalyser();
+					analyser.connect(an);
+
+					$('stop').disabled = false;
+				} catch (err) {
+					$('start').disabled = false;
+					// Map the DOMException to a designed, actionable state.
+					switch (err?.name) {
+						case 'NotAllowedError':
+						case 'SecurityError':
+							showMicStatus(
+								'error',
+								'Microphone blocked.',
+								'Access was denied. Click the mic icon in your browser’s address bar, allow access for three.ws, then try again.',
+								true,
+							);
+							break;
+						case 'NotFoundError':
+						case 'OverconstrainedError':
+							showMicStatus(
+								'error',
+								'No microphone found.',
+								'Connect a microphone or check your system input settings, then try again.',
+								true,
+							);
+							break;
+						case 'NotReadableError':
+							showMicStatus(
+								'error',
+								'Microphone is busy.',
+								'Another app is using your mic. Close it (e.g. a call or recorder) and try again.',
+								true,
+							);
+							break;
+						default:
+							showMicStatus(
+								'error',
+								'Couldn’t start the microphone.',
+								err?.message || 'An unexpected error occurred. Try again.',
+								true,
+							);
+					}
+				}
+			});
+
+			$('stop').addEventListener('click', () => {
+				clearMicStatus();
+				if (analyser) { analyser.disconnect(); analyser = null; }
+				if (stream) { stream.getTracks().forEach((t) => t.stop()); stream = null; }
+				$('start').disabled = false;
+				$('stop').disabled = true;
+				// Reset morph values to zero.
+				for (const targets of visemeMorphs.values()) {
+					for (const { mesh, index } of targets) mesh.morphTargetInfluences[index] = 0;
+				}
+			});
+		</script>
+		<script src="/brand.js" defer></script>
+		<div id="footer-container"></div>
+		<script src="/footer.js"></script>
+	<!-- Runtime i18n: detects locale, swaps annotated copy, mounts <lang-switcher>. -->
+	<script type="module" src="/i18n.js"></script>
+</body>
+</html>

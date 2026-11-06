@@ -1,0 +1,355 @@
+// SSRF guard for fetches that follow a user- or DB-supplied URL.
+//
+// Two fetch variants:
+//   fetchSafePublicUrl        — validates DNS then fetches normally. Tiny TOCTOU
+//                               window (DNS could rebind between check and connect),
+//                               acceptable for image/GLB rendering where the
+//                               response is only displayed, never executed.
+//   fetchSafePublicUrlPinned  — validates AND pins the resolved IP via a custom
+//                               lookup callback so the TCP connection always goes
+//                               to the address we checked. Use for any fetch whose
+//                               response is forwarded to another service or executed
+//                               (proxy, webhook, script fetch).
+//
+// Both re-validate every redirect hop before following it.
+
+import { promises as dns } from 'node:dns';
+import net from 'node:net';
+import https from 'node:https';
+import http from 'node:http';
+import zlib from 'node:zlib';
+import { isPrivateIPv6 as isPrivateIPv6Shared } from './ip-classify.js';
+
+// Cloud metadata services we never want a server-side fetch to reach.
+const METADATA_IPS = new Set([
+	'169.254.169.254', // AWS / Azure / GCP / Oracle / Alibaba IMDS
+	'fd00:ec2::254',   // AWS IMDSv2 IPv6
+	'100.100.100.200', // Alibaba
+]);
+
+function isPrivateIPv4(ip) {
+	const o = ip.split('.').map(Number);
+	if (o.length !== 4 || o.some((n) => Number.isNaN(n) || n < 0 || n > 255)) return true;
+	if (o[0] === 10) return true;                                   // 10.0.0.0/8
+	if (o[0] === 172 && o[1] >= 16 && o[1] <= 31) return true;      // 172.16.0.0/12
+	if (o[0] === 192 && o[1] === 168) return true;                  // 192.168.0.0/16
+	if (o[0] === 127) return true;                                  // loopback
+	if (o[0] === 169 && o[1] === 254) return true;                  // link-local + metadata
+	if (o[0] === 0) return true;                                    // 0.0.0.0/8
+	if (o[0] >= 224) return true;                                   // multicast 224/4 + reserved 240/4
+	if (o[0] === 100 && o[1] >= 64 && o[1] <= 127) return true;     // CGNAT 100.64/10
+	if (o[0] === 198 && (o[1] === 18 || o[1] === 19)) return true;  // benchmarking 198.18/15
+	return false;
+}
+
+// IPv6 classification is shared with api/_lib/ssrf.js via api/_lib/ip-classify.js,
+// which parses the address into numeric groups so every spelling of an
+// IPv4-mapped, NAT64, 6to4 or IPv4-compatible address is judged by the IPv4 it
+// actually reaches.
+function isPrivateIPv6(ip) {
+	return isPrivateIPv6Shared(ip);
+}
+
+function isBlockedAddress(ip) {
+	if (METADATA_IPS.has(ip.toLowerCase())) return true;
+	const fam = net.isIP(ip);
+	if (fam === 4) return isPrivateIPv4(ip);
+	if (fam === 6) return isPrivateIPv6(ip);
+	return true; // unparseable → reject
+}
+
+export class SsrfBlockedError extends Error {
+	constructor(reason) {
+		super(reason);
+		this.code = 'ssrf_blocked';
+		this.status = 400;
+	}
+}
+
+// Thrown when a pinned fetch's response exceeds opts.maxBytes — either from the
+// advertised content-length or from the actual streamed bytes. Distinct from an
+// SSRF block: the host was allowed, the payload was simply too large. Carries the
+// observed/limit sizes so callers can log specifics.
+export class MaxBytesExceededError extends Error {
+	constructor(observed, limit) {
+		super(`response exceeds max bytes: ${observed} > ${limit}`);
+		this.code = 'max_bytes_exceeded';
+		this.status = 413;
+		this.observed = observed;
+		this.limit = limit;
+	}
+}
+
+// Resolve a hostname, validate all returned addresses, and return the first
+// safe address (preferring IPv4 for socket compatibility). Throws SsrfBlockedError
+// when any address in the answer is blocked — the entire record set must be clean.
+async function resolveAndValidate(host) {
+	const literal = net.isIP(host);
+	if (literal) {
+		if (isBlockedAddress(host)) throw new SsrfBlockedError(`host ${host} is a blocked address`);
+		return host;
+	}
+	let records;
+	try {
+		records = await dns.lookup(host, { all: true, verbatim: true });
+	} catch (err) {
+		throw new SsrfBlockedError(`dns lookup failed for ${host}: ${err.code || err.message}`);
+	}
+	if (!records?.length) throw new SsrfBlockedError(`no addresses for ${host}`);
+	for (const r of records) {
+		if (isBlockedAddress(r.address)) {
+			throw new SsrfBlockedError(`host ${host} resolves to a blocked range`);
+		}
+	}
+	// Prefer IPv4 so the pinned socket address is unambiguous for net.createConnection.
+	const ipv4 = records.find((r) => net.isIPv4(r.address));
+	return (ipv4 || records[0]).address;
+}
+
+// Parse + protocol-check + DNS-resolve + per-address allowlist check. Throws
+// `SsrfBlockedError` on any failure. Returns the parsed URL on success.
+export async function assertSafePublicUrl(input, { allowHttp = false } = {}) {
+	if (!input || typeof input !== 'string') throw new SsrfBlockedError('url must be a string');
+	let url;
+	try {
+		url = new URL(input);
+	} catch {
+		throw new SsrfBlockedError('url is not a valid URL');
+	}
+	if (url.protocol === 'http:' && !allowHttp) {
+		throw new SsrfBlockedError('http:// not allowed, use https://');
+	}
+	if (url.protocol !== 'https:' && url.protocol !== 'http:') {
+		throw new SsrfBlockedError(`unsupported protocol ${url.protocol}`);
+	}
+	const host = url.hostname;
+	if (!host) throw new SsrfBlockedError('url missing hostname');
+	await resolveAndValidate(host);
+	return url;
+}
+
+// Build the custom `lookup` an IP-pinned Agent installs so every socket connects
+// to exactly the pre-validated address (closing the DNS-rebinding window). It
+// MUST serve both lookup contracts: Node enables autoSelectFamily (Happy
+// Eyeballs) by default and, for a dual-stack host, calls the custom lookup with
+// `{ all: true }`, expecting the array form `cb(null, [{ address, family }])`.
+// Returning the legacy positional form under `all:true` makes Node read
+// `undefined` as the address and throw `Invalid IP address: undefined` before
+// any socket opens — which silently broke every pinned fetch to a dual-stack
+// host (e.g. storage.googleapis.com) on Node 24. Exported for direct testing.
+export function makePinnedLookup(pinnedIp) {
+	const family = net.isIPv6(pinnedIp) ? 6 : 4;
+	return function lookup(_hostname, options, cb) {
+		if (options && options.all) {
+			cb(null, [{ address: pinnedIp, family }]);
+		} else {
+			cb(null, pinnedIp, family);
+		}
+	};
+}
+
+// Buffer a Node response stream into a single Buffer, enforcing an optional byte
+// ceiling BOTH up front (advertised content-length) and continuously (actual
+// streamed bytes). On breach it destroys the response + request sockets so no
+// memory is buffered past the cap, then rejects with MaxBytesExceededError.
+// maxBytes === null disables the cap (unbounded, the prior behavior). Extracted
+// and exported so the streaming-cap contract is unit-testable without a socket.
+export function collectCappedBody(nodeRes, req, maxBytes) {
+	return new Promise((resolve, reject) => {
+		const abort = (observed) => {
+			try { nodeRes.destroy(); } catch { /* already torn down */ }
+			try { req?.destroy(); } catch { /* already torn down */ }
+			reject(new MaxBytesExceededError(observed, maxBytes));
+		};
+		if (maxBytes != null) {
+			const advertised = Number(nodeRes.headers?.['content-length'] || 0);
+			if (advertised > maxBytes) return abort(advertised);
+		}
+		const chunks = [];
+		let received = 0;
+		nodeRes.on('data', (c) => {
+			received += c.length;
+			if (maxBytes != null && received > maxBytes) return abort(received);
+			chunks.push(c);
+		});
+		nodeRes.on('end', () => resolve(Buffer.concat(chunks)));
+		nodeRes.on('error', reject);
+	});
+}
+
+// Decode a response body per its content-encoding. A host can send a
+// compressed body without being asked (the Wayback Machine replays an archived
+// page's original gzip), and `new Response(buffer, { headers })` does not decode
+// it, so callers would read compressed bytes as text. The inflated size is held
+// to the same ceiling as the wire size, so a decompression bomb aborts instead
+// of exhausting memory. Unknown encodings pass through untouched.
+const DEFAULT_DECODED_CEILING = 50 * 1024 * 1024;
+
+export function decodeContentEncoding(body, encoding, maxBytes) {
+	const limit = Number.isFinite(maxBytes) ? maxBytes : DEFAULT_DECODED_CEILING;
+	const enc = String(encoding || '').trim().toLowerCase();
+	const inflate = { gzip: zlib.gunzipSync, 'x-gzip': zlib.gunzipSync, deflate: zlib.inflateSync, br: zlib.brotliDecompressSync }[enc];
+	if (!inflate) return body;
+	try {
+		return inflate(body, { maxOutputLength: limit });
+	} catch (err) {
+		if (err?.code === 'ERR_BUFFER_TOO_LARGE') throw new MaxBytesExceededError(limit + 1, limit);
+		throw err;
+	}
+}
+
+const MAX_REDIRECTS = 5;
+
+// Convenience: assert + fetch. Uses the global fetch. Same options as fetch,
+// minus that the URL must pass `assertSafePublicUrl`.
+//
+// Redirects are followed MANUALLY so each Location hop is re-validated with
+// `assertSafePublicUrl` before we connect to it. The default global fetch
+// (`redirect: 'follow'`) would only check the first URL, letting an attacker
+// host a public endpoint that 302s to 169.254.169.254 / RFC1918 and slip past
+// the guard. Hops are bounded by `MAX_REDIRECTS`.
+//
+// Use this for render-only responses (images, GLBs). For executed/forwarded
+// responses use `fetchSafePublicUrlPinned` which closes the DNS rebinding window.
+//
+// `opts.maxBytes` caps the body: an advertised content-length over the cap throws
+// MaxBytesExceededError immediately, and the returned Response's body is metered
+// so a chunked or lying-content-length stream errors with MaxBytesExceededError
+// once it passes the cap (the read, e.g. arrayBuffer(), rejects and the stream is
+// cancelled). When a cap is set and the caller gave no `signal`, the fetch is also
+// bounded by `opts.timeoutMs` (default 60s).
+const DEFAULT_CAPPED_TIMEOUT_MS = 60_000;
+
+function capResponseBody(res, maxBytes) {
+	const declared = Number(res.headers.get('content-length') || 0);
+	if (declared > maxBytes) {
+		res.body?.cancel().catch(() => {});
+		throw new MaxBytesExceededError(declared, maxBytes);
+	}
+	if (!res.body) return res;
+	let seen = 0;
+	const metered = res.body.pipeThrough(
+		new TransformStream({
+			transform(chunk, controller) {
+				seen += chunk.byteLength;
+				if (seen > maxBytes) {
+					controller.error(new MaxBytesExceededError(seen, maxBytes));
+					return;
+				}
+				controller.enqueue(chunk);
+			},
+		}),
+	);
+	return new Response(metered, { status: res.status, statusText: res.statusText, headers: res.headers });
+}
+
+export async function fetchSafePublicUrl(input, init = {}, opts = {}) {
+	let url = await assertSafePublicUrl(input, opts);
+	const maxBytes = Number.isFinite(opts.maxBytes) && opts.maxBytes > 0 ? opts.maxBytes : 0;
+	if (maxBytes && !init.signal) {
+		init = { ...init, signal: AbortSignal.timeout(opts.timeoutMs ?? DEFAULT_CAPPED_TIMEOUT_MS) };
+	}
+	let redirects = 0;
+	while (true) {
+		const res = await fetch(url.toString(), { ...init, redirect: 'manual' });
+		if (res.status >= 300 && res.status < 400 && res.headers.get('location')) {
+			if (++redirects > MAX_REDIRECTS) {
+				throw new SsrfBlockedError('too many redirects');
+			}
+			const next = new URL(res.headers.get('location'), url);
+			url = await assertSafePublicUrl(next.toString(), opts);
+			continue;
+		}
+		return maxBytes ? capResponseBody(res, maxBytes) : res;
+	}
+}
+
+// IP-pinned fetch: resolves DNS, validates every address, then makes the TCP
+// connection directly to the resolved IP via a custom http/https Agent `lookup`
+// callback — so a hostile DNS server cannot swap the address between our check
+// and the actual connect (DNS rebinding). Use for any fetch whose response is
+// forwarded to another service or executed (proxy endpoints, webhook delivery,
+// script/wasm fetches). Returns a standard Response.
+//
+// Limits: only supports http/https; does not follow redirects across protocols.
+export async function fetchSafePublicUrlPinned(input, init = {}, opts = {}) {
+	let url = await assertSafePublicUrl(input, opts);
+	let redirects = 0;
+
+	// Optional streaming byte ceiling. Without it, the response is buffered in
+	// full before any caller can measure it — so a hostile or misbehaving host can
+	// stream gigabytes and OOM the (memory-capped) instance BEFORE a post-hoc
+	// size check runs. When set, we reject on an over-limit content-length header
+	// up front AND abort mid-stream the instant cumulative bytes exceed the cap,
+	// so peak memory stays bounded regardless of what the host sends or lies about
+	// in its headers. Opt-in via opts.maxBytes so existing callers are unchanged.
+	const maxBytes = Number.isFinite(opts.maxBytes) ? opts.maxBytes : null;
+
+	while (true) {
+		const pinnedIp = await resolveAndValidate(url.hostname);
+
+		// Build a one-shot Agent whose `lookup` always returns the pre-validated IP.
+		// This closes the TOCTOU window: the TCP socket connects to exactly the address
+		// we checked, regardless of any subsequent DNS change. makePinnedLookup honors
+		// both the legacy and autoSelectFamily (`all:true`) lookup contracts.
+		const AgentClass = url.protocol === 'https:' ? https.Agent : http.Agent;
+		const agent = new AgentClass({ lookup: makePinnedLookup(pinnedIp) });
+
+		const res = await new Promise((resolve, reject) => {
+			const mod = url.protocol === 'https:' ? https : http;
+			const reqOpts = {
+				hostname: url.hostname,
+				port: url.port || (url.protocol === 'https:' ? 443 : 80),
+				path: url.pathname + url.search,
+				method: (init.method || 'GET').toUpperCase(),
+				headers: { host: url.hostname, ...(init.headers || {}) },
+				agent,
+			};
+			const req = mod.request(reqOpts, (nodeRes) => {
+				collectCappedBody(nodeRes, req, maxBytes)
+					.then((raw) => {
+						const encoded = nodeRes.headers['content-encoding'];
+						const body = decodeContentEncoding(raw, encoded, maxBytes);
+						const headers = { ...nodeRes.headers };
+						if (body !== raw) {
+							delete headers['content-encoding'];
+							delete headers['content-length'];
+						}
+						// Wrap in a fetch-compatible Response so callers use the same API.
+						resolve(new Response(body, { status: nodeRes.statusCode, headers }));
+					})
+					.catch(reject);
+			});
+			req.on('error', reject);
+			// Honor an optional AbortSignal (e.g. AbortSignal.timeout) from init so a
+			// caller can bound a hung host instead of holding the socket — and the
+			// serverless invocation — open for the function's full duration. Purely
+			// additive: callers that pass no signal are unaffected.
+			const signal = init.signal;
+			if (signal) {
+				if (signal.aborted) {
+					req.destroy(signal.reason instanceof Error ? signal.reason : new Error('aborted'));
+				} else {
+					const onAbort = () =>
+						req.destroy(signal.reason instanceof Error ? signal.reason : new Error('aborted'));
+					signal.addEventListener('abort', onAbort, { once: true });
+					req.on('close', () => signal.removeEventListener('abort', onAbort));
+				}
+			}
+			if (init.body) req.write(init.body);
+			req.end();
+		});
+
+		if (res.status >= 300 && res.status < 400 && res.headers.get('location')) {
+			if (++redirects > MAX_REDIRECTS) throw new SsrfBlockedError('too many redirects');
+			const next = new URL(res.headers.get('location'), url);
+			// A caller that restricts WHICH public hosts it may reach (not just
+			// that they are public) re-checks every hop, or a redirect walks it
+			// off its allowlist.
+			if (opts.onRedirect) await opts.onRedirect(next);
+			url = await assertSafePublicUrl(next.toString(), opts);
+			continue;
+		}
+		return res;
+	}
+}

@@ -1,0 +1,109 @@
+{
+  "mode": "discover",
+  "serverInfo": {
+    "name": "3d-agent-mcp",
+    "version": "1.2.1"
+  },
+  "discover": {
+    "ok": true,
+    "task": "help me run a pump.fun token launch and agent dance routine",
+    "skill": null,
+    "minReputation": null,
+    "quotedHirePriceUsd": "$0.05",
+    "count": 5,
+    "candidates": [
+      {
+        "agentId": "d9fceb60-f0d9-4028-a037-f3873fad6b58",
+        "name": "Vega #22",
+        "description": "A growth strategist that turns a rough idea into a launch plan, landing copy, and a week of posts.",
+        "skills": [],
+        "homeUrl": "/agent/d9fceb60-f0d9-4028-a037-f3873fad6b58",
+        "avatarThumbnail": null,
+        "isRegistered": false,
+        "reputation": null,
+        "capabilityMatch": 0.2,
+        "engagement": {
+          "chatCount": 4,
+          "score": 0.17
+        },
+        "score": 0.3,
+        "evidence": "no on-chain reputation record · task fit 20% · 4 chats served",
+        "quotedPriceUsd": "$0.05"
+      },
+      {
+        "agentId": "0a7ccf23-2155-402c-b91a-4281ab0661ab",
+        "name": "My First Agent",
+        "description": "A friendly starter agent. Edit the personality and attach a 3D avatar — it goes live immediately.",
+        "skills": [],
+        "homeUrl": "/agent/0a7ccf23-2155-402c-b91a-4281ab0661ab",
+        "avatarThumbnail": null,
+        "isRegistered": false,
+        "reputation": null,
+        "capabilityMatch": 0.2,
+        "engagement": {
+          "chatCount": 4,
+          "score": 0.17
+        },
+        "score": 0.3,
+        "evidence": "no on-chain reputation record · task fit 20% · 4 chats served",
+        "quotedPriceUsd": "$0.05"
+      },
+      {
+        "agentId": "abf0b49e-e980-4492-ad03-b019aa2e2909",
+        "name": "My First Agent",
+        "description": "A friendly starter agent. Edit the personality and attach a 3D avatar — it goes live immediately.",
+        "skills": [],
+        "homeUrl": "/agent/abf0b49e-e980-4492-ad03-b019aa2e2909",
+        "avatarThumbnail": null,
+        "isRegistered": false,
+        "reputation": null,
+        "capabilityMatch": 0.2,
+        "engagement": {
+          "chatCount": 3,
+          "score": 0.15
+        },
+        "score": 0.295,
+        "evidence": "no on-chain reputation record · task fit 20% · 3 chats served",
+        "quotedPriceUsd": "$0.05"
+      },
+      {
+        "agentId": "28c832a8-7c14-47fa-b6e0-78c50f339725",
+        "name": "My First Agent",
+        "description": "A friendly starter agent. Edit the personality and attach a 3D avatar — it goes live immediately.",
+        "skills": [],
+        "homeUrl": "/agent/28c832a8-7c14-47fa-b6e0-78c50f339725",
+        "avatarThumbnail": "https://pub-2534e921bf9c4314addcd4d8a6e98b7b.r2.dev/thumb/8b4e13e7-c101-4485-bfe8-45d8bd0104ff.png",
+        "isRegistered": false,
+        "reputation": null,
+        "capabilityMatch": 0.2,
+        "engagement": {
+          "chatCount": 3,
+          "score": 0.15
+        },
+        "score": 0.295,
+        "evidence": "no on-chain reputation record · task fit 20% · 3 chats served",
+        "quotedPriceUsd": "$0.05"
+      },
+      {
+        "agentId": "9507e401-b4dd-42e6-a1eb-806ee0ac28d4",
+        "name": "Glyph #21",
+        "description": "A translator that keeps tone and idiom intact across languages.",
+        "skills": [],
+        "homeUrl": "/agent/9507e401-b4dd-42e6-a1eb-806ee0ac28d4",
+        "avatarThumbnail": "https://pub-2534e921bf9c4314addcd4d8a6e98b7b.r2.dev/u/5c9adcb9-7107-4b52-bf2c-f6e4f5b0455f/draft-k4ic1g/moh21n5k_og.png",
+        "isRegistered": false,
+        "reputation": null,
+        "capabilityMatch": 0.1,
+        "engagement": {
+          "chatCount": 27,
+          "score": 0.36
+        },
+        "score": 0.292,
+        "evidence": "no on-chain reputation record · task fit 10% · 27 chats served",
+        "quotedPriceUsd": "$0.05"
+      }
+    ],
+    "note": "Hire any candidate with agent_hire — it will settle $0.05 USDC and return a provenance receipt.",
+    "fetchedAt": "2026-07-07T11:46:35.911Z"
+  }
+}

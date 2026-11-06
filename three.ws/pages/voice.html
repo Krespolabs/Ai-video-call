@@ -1,0 +1,1157 @@
+<!doctype html>
+<html lang="en">
+	<head>
+		<script>/* three.ws theme boot — no-flash; runtime in /theme-switcher.js */(function(){try{var m=localStorage.getItem('twx_theme');var l=m==='auto'?(window.matchMedia&&window.matchMedia('(prefers-color-scheme: light)').matches):m==='light';document.documentElement.setAttribute('data-theme',l?'light':'dark');}catch(e){document.documentElement.setAttribute('data-theme','dark');}})();</script>
+		<meta charset="utf-8" />
+		<link rel="icon" href="/favicon.ico" sizes="any" />
+		<link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+		<link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png" />
+		<link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png" />
+		<link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+		<link rel="manifest" href="/manifest.webmanifest" />
+		<meta name="viewport" content="width=device-width, initial-scale=1" />
+		<title data-i18n="voice.meta_title">Voice Lab · three.ws</title>
+		<meta name="description" content="Browse hundreds of voices across Microsoft Edge, Gemini, NVIDIA, OpenAI and ElevenLabs, preview any of them, or clone your own, then use it across three.ws avatars and agents."  data-i18n-attr="content:voice.meta_description"/>
+		<link rel="canonical" href="https://three.ws/voice" />
+		<meta property="og:title" content="Voice Lab · three.ws"  data-i18n-attr="content:voice.meta_og_title"/>
+		<meta property="og:description" content="Pick your agent's voice from hundreds across five providers, free lanes included, or clone your own from a 20-30 second recording."  data-i18n-attr="content:voice.meta_og_description"/>
+		<meta property="og:url" content="https://three.ws/voice" />
+		<meta name="twitter:card" content="summary_large_image" />
+		<link rel="stylesheet" href="/style.css" />
+		<link rel="stylesheet" href="/tokens.css" />
+		<link rel="stylesheet" href="/nav.css" />
+		<link rel="stylesheet" href="/fonts/fonts.css" />
+		<style>
+			:root { color-scheme: dark; }
+			*, *::before, *::after { box-sizing: border-box; }
+			body {
+				background: #000000;
+				color: var(--ink);
+				font: 14px/1.5 -apple-system, system-ui, 'Segoe UI', Roboto, sans-serif;
+				margin: 0;
+				min-height: 100vh;
+			}
+
+			/* ── Layout ─────────────────────────────────── */
+			.vl-root {
+				max-width: 920px;
+				margin: 0 auto;
+				padding: 32px 24px 80px;
+			}
+			.vl-header {
+				margin-bottom: 36px;
+			}
+			.vl-header h1 {
+				font-family: var(--font-display);
+				font-size: 32px;
+				font-weight: 700;
+				letter-spacing: -0.02em;
+				margin: 0 0 8px;
+				color: #ffffff;
+			}
+			.vl-header p {
+				color: var(--ink-dim);
+				font-size: 15px;
+				margin: 0;
+				max-width: 56ch;
+				line-height: 1.6;
+			}
+
+			/* ── Card base ──────────────────────────────── */
+			.vl-card {
+				background: var(--bg-0);
+				border: 1px solid var(--stroke);
+				border-radius: 16px;
+				overflow: hidden;
+			}
+			.vl-card-head {
+				display: flex;
+				align-items: center;
+				justify-content: space-between;
+				padding: 16px 20px 14px;
+				border-bottom: 1px solid var(--stroke);
+			}
+			.vl-card-title {
+				font-family: var(--font-display);
+				font-size: 14px;
+				font-weight: 600;
+				letter-spacing: 0.04em;
+				text-transform: uppercase;
+				color: var(--ink-dim);
+			}
+			.vl-card-body {
+				padding: 20px;
+			}
+
+			/* ── Recorder ───────────────────────────────── */
+			.vl-recorder {
+				margin-bottom: 28px;
+			}
+			.vl-wave-wrap {
+				position: relative;
+				height: 200px;
+				background: #070707;
+				border-bottom: 1px solid var(--stroke);
+				overflow: hidden;
+			}
+			.vl-wave-wrap canvas {
+				display: block;
+				width: 100%;
+				height: 100%;
+			}
+			.vl-wave-overlay {
+				position: absolute;
+				inset: 0;
+				display: flex;
+				flex-direction: column;
+				align-items: center;
+				justify-content: center;
+				pointer-events: none;
+				z-index: 1;
+			}
+			.vl-timer {
+				font: 700 28px/1 'Space Grotesk', ui-monospace, monospace;
+				color: var(--ink);
+				letter-spacing: 0.02em;
+				opacity: 0;
+				transition: opacity var(--duration-base);
+			}
+			.vl-recorder[data-state="recording"] .vl-timer { opacity: 1; }
+			.vl-timer-sub {
+				font-size: 12px;
+				color: #808080;
+				margin-top: 4px;
+				opacity: 0;
+				transition: opacity var(--duration-base);
+			}
+			.vl-recorder[data-state="recording"] .vl-timer-sub { opacity: 1; }
+
+			/* Progress bar along bottom of waveform */
+			.vl-progress {
+				position: absolute;
+				bottom: 0;
+				left: 0;
+				height: 3px;
+				background: linear-gradient(90deg, #ffffff, #cccccc);
+				width: 0%;
+				transition: width var(--duration-base) var(--ease-standard);
+				z-index: 2;
+			}
+
+			/* Recording indicator dot */
+			.vl-rec-dot {
+				position: absolute;
+				top: 14px;
+				left: 16px;
+				display: flex;
+				align-items: center;
+				gap: 8px;
+				opacity: 0;
+				transition: opacity var(--duration-fast);
+				z-index: 2;
+			}
+			.vl-rec-dot-circle {
+				width: 10px;
+				height: 10px;
+				background: #ef4444;
+				border-radius: 50%;
+			}
+			.vl-rec-dot-label {
+				font-size: 11px;
+				font-weight: 600;
+				text-transform: uppercase;
+				letter-spacing: 0.08em;
+				color: #ef4444;
+			}
+			.vl-recorder[data-state="recording"] .vl-rec-dot {
+				opacity: 1;
+			}
+			.vl-recorder[data-state="recording"] .vl-rec-dot-circle {
+				animation: vl-pulse 1.2s ease-in-out infinite;
+			}
+			@keyframes vl-pulse {
+				0%, 100% { opacity: 1; transform: scale(1); }
+				50% { opacity: 0.4; transform: scale(0.85); }
+			}
+
+			/* Level meter */
+			.vl-level {
+				position: absolute;
+				top: 14px;
+				right: 16px;
+				display: flex;
+				gap: 2px;
+				align-items: flex-end;
+				height: 20px;
+				opacity: 0;
+				transition: opacity var(--duration-fast);
+				z-index: 2;
+			}
+			.vl-recorder[data-state="recording"] .vl-level { opacity: 1; }
+			.vl-level-bar {
+				width: 3px;
+				border-radius: 1.5px;
+				background: #ffffff;
+				transition: height var(--duration-instant) var(--ease-out);
+				min-height: 3px;
+			}
+
+			/* ── Controls row ───────────────────────────── */
+			.vl-controls {
+				display: flex;
+				align-items: center;
+				justify-content: center;
+				gap: 12px;
+				padding: 20px;
+				border-bottom: 1px solid var(--stroke);
+			}
+			.vl-btn {
+				display: inline-flex;
+				align-items: center;
+				justify-content: center;
+				gap: 8px;
+				border: 0;
+				border-radius: 12px;
+				font: 600 14px/1 system-ui, sans-serif;
+				cursor: pointer;
+				text-decoration: none;
+				transition: opacity var(--duration-fast), transform var(--duration-instant), background var(--duration-fast), box-shadow var(--duration-fast);
+				white-space: nowrap;
+			}
+			.vl-btn:disabled { opacity: 0.35; cursor: not-allowed; transform: none !important; }
+			.vl-btn:not(:disabled):hover { transform: translateY(-1px); }
+			.vl-btn:not(:disabled):active { transform: translateY(0); }
+
+			.vl-btn-record {
+				background: var(--ink);
+				color: var(--bg-0);
+				padding: 14px 28px;
+				font-size: 15px;
+				border-radius: 999px;
+			}
+			.vl-btn-record:not(:disabled):hover {
+				box-shadow: 0 0 0 4px rgba(232,234,240,0.12);
+			}
+			.vl-recorder[data-state="recording"] .vl-btn-record { display: none; }
+
+			.vl-btn-stop {
+				background: #ef4444;
+				color: #fff;
+				padding: 14px 28px;
+				font-size: 15px;
+				border-radius: 999px;
+				display: none;
+			}
+			.vl-recorder[data-state="recording"] .vl-btn-stop { display: inline-flex; }
+			.vl-btn-stop:not(:disabled):hover {
+				box-shadow: 0 0 0 4px rgba(239,68,68,0.18);
+			}
+
+			.vl-btn-ghost {
+				background: rgba(255,255,255,0.06);
+				border: 1px solid rgba(255,255,255,0.12);
+				color: #c8cadf;
+				padding: 10px 18px;
+			}
+			.vl-btn-ghost:not(:disabled):hover {
+				background: rgba(255,255,255,0.10);
+				border-color: rgba(255,255,255,0.20);
+			}
+
+			.vl-btn-primary {
+				background: #ffffff;
+				color: #000000;
+				padding: 12px 22px;
+			}
+			.vl-btn-primary:not(:disabled):hover {
+				background: #5dccff;
+				box-shadow: 0 0 0 4px rgba(255,255,255,0.15);
+			}
+
+			.vl-btn-danger {
+				background: rgba(239,68,68,0.12);
+				border: 1px solid rgba(239,68,68,0.3);
+				color: var(--danger);
+				padding: 8px 14px;
+				font-size: 12px;
+			}
+
+			.vl-btn-sm {
+				padding: 8px 14px;
+				font-size: 12px;
+				border-radius: 8px;
+			}
+
+			.vl-rec-dot-icon {
+				width: 10px;
+				height: 10px;
+				background: #ef4444;
+				border-radius: 50%;
+				flex-shrink: 0;
+			}
+
+			/* ── Script prompts ─────────────────────────── */
+			.vl-scripts {
+				padding: 16px 20px;
+				border-bottom: 1px solid var(--stroke);
+				display: none;
+			}
+			.vl-recorder[data-state="recording"] .vl-scripts,
+			.vl-recorder[data-state="idle"] .vl-scripts { display: block; }
+			.vl-scripts-label {
+				font-size: 11px;
+				font-weight: 600;
+				text-transform: uppercase;
+				letter-spacing: 0.08em;
+				color: #808080;
+				margin-bottom: 8px;
+			}
+			.vl-script-text {
+				font-size: 15px;
+				line-height: 1.65;
+				color: #c8cadf;
+				font-style: italic;
+				min-height: 52px;
+			}
+			.vl-script-nav {
+				display: flex;
+				align-items: center;
+				justify-content: space-between;
+				margin-top: 10px;
+			}
+			.vl-script-dots {
+				display: flex;
+				gap: 6px;
+			}
+			.vl-script-dot {
+				width: 6px;
+				height: 6px;
+				border-radius: 50%;
+				background: #212121;
+				transition: background var(--duration-base);
+			}
+			.vl-script-dot.active {
+				background: #ffffff;
+			}
+			.vl-script-next {
+				background: none;
+				border: none;
+				color: #808080;
+				font: 600 12px system-ui, sans-serif;
+				cursor: pointer;
+				padding: 4px 8px;
+				border-radius: 6px;
+				transition: color var(--duration-fast), background var(--duration-fast);
+			}
+			.vl-script-next:hover { color: #c8cadf; background: rgba(255,255,255,0.05); }
+
+			/* ── Review panel (after recording) ─────────── */
+			.vl-review {
+				padding: 20px;
+				display: none;
+			}
+			.vl-recorder[data-state="review"] .vl-review,
+			.vl-recorder[data-state="cloning"] .vl-review,
+			.vl-recorder[data-state="done"] .vl-review { display: block; }
+
+			.vl-review audio {
+				width: 100%;
+				height: 40px;
+				margin-bottom: 16px;
+				border-radius: 8px;
+			}
+			.vl-review-row {
+				display: flex;
+				gap: 10px;
+				align-items: flex-end;
+				flex-wrap: wrap;
+			}
+			.vl-review-field {
+				flex: 1;
+				min-width: 200px;
+			}
+			.vl-review-field label {
+				display: block;
+				font-size: 11px;
+				font-weight: 600;
+				text-transform: uppercase;
+				letter-spacing: 0.06em;
+				color: #808080;
+				margin-bottom: 6px;
+			}
+			.vl-review-field input {
+				width: 100%;
+				padding: 10px 12px;
+				background: #070707;
+				border: 1px solid #212121;
+				border-radius: 9px;
+				color: var(--ink);
+				font: inherit;
+				font-size: 14px;
+				outline: none;
+				transition: border-color var(--duration-fast);
+			}
+			.vl-review-field input:focus { border-color: #ffffff; }
+			.vl-review-actions {
+				display: flex;
+				gap: 8px;
+				margin-top: 14px;
+			}
+
+			/* Cloning state overlay */
+			.vl-cloning-overlay {
+				display: none;
+				align-items: center;
+				gap: 10px;
+				padding: 14px 0;
+			}
+			.vl-recorder[data-state="cloning"] .vl-cloning-overlay { display: flex; }
+			.vl-recorder[data-state="cloning"] .vl-review-row,
+			.vl-recorder[data-state="cloning"] .vl-review-actions { display: none; }
+			.vl-recorder[data-state="done"] .vl-review-row,
+			.vl-recorder[data-state="done"] .vl-review-actions { display: none; }
+
+			.vl-spinner {
+				width: 18px;
+				height: 18px;
+				border-radius: 50%;
+				border: 2.5px solid rgba(255,255,255,0.2);
+				border-top-color: #ffffff;
+				animation: vl-spin 0.8s linear infinite;
+				flex-shrink: 0;
+			}
+			@keyframes vl-spin { to { transform: rotate(360deg); } }
+			.vl-cloning-text {
+				font-size: 14px;
+				color: var(--ink-dim);
+			}
+
+			/* Done state */
+			.vl-done-msg {
+				display: none;
+				padding: 14px 0;
+			}
+			.vl-recorder[data-state="done"] .vl-done-msg { display: block; }
+			.vl-done-success {
+				display: flex;
+				align-items: center;
+				gap: 10px;
+				padding: 14px 16px;
+				background: rgba(255,255,255,0.08);
+				border: 1px solid rgba(255,255,255,0.25);
+				border-radius: 10px;
+				margin-bottom: 14px;
+			}
+			.vl-done-check {
+				width: 22px;
+				height: 22px;
+				background: #ffffff;
+				border-radius: 50%;
+				display: flex;
+				align-items: center;
+				justify-content: center;
+				flex-shrink: 0;
+				color: #000000;
+				font-size: 13px;
+				font-weight: 700;
+			}
+			.vl-done-text {
+				font-size: 14px;
+				color: #ffffff;
+				font-weight: 500;
+			}
+			.vl-done-actions {
+				display: flex;
+				gap: 8px;
+				flex-wrap: wrap;
+			}
+
+			/* ── Status bar ─────────────────────────────── */
+			.vl-status {
+				padding: 10px 20px;
+				font-size: 12px;
+				color: #808080;
+				display: flex;
+				align-items: center;
+				gap: 8px;
+				min-height: 38px;
+			}
+			.vl-status.ok { color: #ffffff; }
+			.vl-status.err { color: var(--danger); }
+			.vl-status.warn { color: var(--warn); }
+
+			/* ── Section spacing ─────────────────────────── */
+			.vl-section {
+				margin-bottom: 28px;
+			}
+			/* The site nav is position:fixed and 70px tall, so anything scrolled
+			   into view (a section jump, a focused control, a browser card the
+			   grid pages to) lands underneath it without this. */
+			.vl-section,
+			.vb-pills,
+			.vb-card,
+			.vl-pg-field,
+			.vb-filters {
+				scroll-margin-top: 90px;
+			}
+			.vl-section-head {
+				display: flex;
+				align-items: center;
+				justify-content: space-between;
+				margin-bottom: 14px;
+			}
+			.vl-section-title {
+				font-family: var(--font-display);
+				font-size: 18px;
+				font-weight: 600;
+				color: var(--ink);
+			}
+
+			/* ── Voice library grid ─────────────────────── */
+			.vl-voices {
+				display: grid;
+				grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+				gap: 12px;
+			}
+			.vl-voice-card {
+				background: var(--bg-0);
+				border: 1px solid var(--stroke);
+				border-radius: 12px;
+				padding: 16px;
+				display: flex;
+				flex-direction: column;
+				gap: 10px;
+				transition: border-color var(--duration-fast);
+			}
+			.vl-voice-card:hover { border-color: #252525; }
+			.vl-voice-name {
+				font-weight: 600;
+				font-size: 14px;
+				color: var(--ink);
+			}
+			.vl-voice-meta {
+				font-size: 11.5px;
+				color: #808080;
+				display: flex;
+				align-items: center;
+				gap: 8px;
+			}
+			.vl-voice-id {
+				font-family: ui-monospace, monospace;
+				font-size: 11px;
+				color: #ffffff;
+				background: rgba(255,255,255,0.08);
+				padding: 2px 8px;
+				border-radius: 4px;
+				word-break: break-all;
+			}
+			.vl-voice-actions {
+				display: flex;
+				gap: 6px;
+				margin-top: auto;
+			}
+			.vl-empty {
+				text-align: center;
+				padding: 32px 20px;
+				color: #808080;
+				font-size: 14px;
+				border: 1px dashed var(--stroke);
+				border-radius: 12px;
+			}
+			.vl-empty-title {
+				font-weight: 600;
+				color: var(--ink-dim);
+				margin-bottom: 4px;
+			}
+			.vl-empty-actions {
+				margin-top: 14px;
+				display: flex;
+				gap: 8px;
+				justify-content: center;
+			}
+
+			/* ── Playground ─────────────────────────────── */
+			.vl-pg-row {
+				display: flex;
+				gap: 12px;
+				align-items: flex-end;
+				margin-bottom: 14px;
+				flex-wrap: wrap;
+			}
+			.vl-pg-field {
+				flex: 1;
+				min-width: 200px;
+			}
+			.vl-pg-field label {
+				display: block;
+				font-size: 11px;
+				font-weight: 600;
+				text-transform: uppercase;
+				letter-spacing: 0.06em;
+				color: #808080;
+				margin-bottom: 6px;
+			}
+			.vl-pg-field select {
+				width: 100%;
+				padding: 10px 12px;
+				background: #070707;
+				border: 1px solid #212121;
+				border-radius: 9px;
+				color: var(--ink);
+				font: inherit;
+				font-size: 14px;
+				cursor: pointer;
+				outline: none;
+			}
+			.vl-pg-field select:focus { border-color: #ffffff; }
+			.vl-pg-textarea {
+				width: 100%;
+				min-height: 100px;
+				padding: 12px 14px;
+				background: #070707;
+				border: 1px solid #212121;
+				border-radius: 10px;
+				color: var(--ink);
+				font: inherit;
+				font-size: 14px;
+				line-height: 1.55;
+				resize: vertical;
+				outline: none;
+				transition: border-color var(--duration-fast);
+			}
+			.vl-pg-textarea:focus { border-color: #ffffff; }
+			.vl-pg-samples {
+				display: flex;
+				gap: 6px;
+				flex-wrap: wrap;
+				margin-bottom: 14px;
+			}
+			.vl-pg-sample {
+				background: rgba(255,255,255,0.04);
+				border: 1px solid var(--stroke);
+				color: var(--ink-dim);
+				padding: 6px 12px;
+				border-radius: 999px;
+				font: 500 12px system-ui, sans-serif;
+				cursor: pointer;
+				transition: background var(--duration-fast), color var(--duration-fast), border-color var(--duration-fast);
+			}
+			.vl-pg-sample:hover {
+				background: rgba(255,255,255,0.08);
+				border-color: rgba(255,255,255,0.3);
+				color: #ffffff;
+			}
+			.vl-pg-output {
+				margin-top: 16px;
+				display: none;
+			}
+			.vl-pg-output.visible { display: block; }
+			.vl-pg-output audio {
+				width: 100%;
+				height: 40px;
+				border-radius: 8px;
+			}
+			.vl-pg-actions {
+				display: flex;
+				gap: 10px;
+				align-items: center;
+			}
+
+			/* ── BYOK: your own ElevenLabs key ───────────── */
+			.vl-byok-copy {
+				margin: 0 0 14px;
+				font-size: 13px;
+				line-height: 1.6;
+				color: #999999;
+			}
+			.vl-byok-copy a { color: var(--ink); text-decoration: underline; text-underline-offset: 2px; }
+			.vl-byok-copy a:hover { color: #ffffff; }
+			.vl-byok-row {
+				display: flex;
+				gap: 10px;
+				flex-wrap: wrap;
+				align-items: center;
+				margin-bottom: 8px;
+			}
+			.vl-byok-row input {
+				flex: 1;
+				min-width: 220px;
+				padding: 10px 12px;
+				background: #070707;
+				border: 1px solid #212121;
+				border-radius: 9px;
+				color: var(--ink);
+				font: inherit;
+				font-size: 14px;
+				outline: none;
+				transition: border-color var(--duration-fast);
+			}
+			.vl-byok-row input:focus { border-color: #ffffff; }
+
+			/* ── Voice browser ──────────────────────────── */
+			.sr-only {
+				position: absolute;
+				width: 1px;
+				height: 1px;
+				padding: 0;
+				margin: -1px;
+				overflow: hidden;
+				clip: rect(0, 0, 0, 0);
+				white-space: nowrap;
+				border: 0;
+			}
+			.vb-filters {
+				display: flex;
+				gap: 10px;
+				flex-wrap: wrap;
+				margin-bottom: 12px;
+			}
+			.vb-filters input[type="search"] {
+				flex: 1;
+				min-width: 200px;
+				padding: 10px 12px;
+				background: #070707;
+				border: 1px solid #212121;
+				border-radius: 9px;
+				color: var(--ink);
+				font: inherit;
+				font-size: 14px;
+				outline: none;
+				transition: border-color var(--duration-fast);
+			}
+			.vb-filters input[type="search"]:focus { border-color: #ffffff; }
+			.vb-filters select {
+				padding: 10px 12px;
+				background: #070707;
+				border: 1px solid #212121;
+				border-radius: 9px;
+				color: var(--ink);
+				font: inherit;
+				font-size: 14px;
+				cursor: pointer;
+				outline: none;
+			}
+			.vb-filters select:focus { border-color: #ffffff; }
+			.vb-pills {
+				display: flex;
+				gap: 6px;
+				flex-wrap: wrap;
+				margin-bottom: 16px;
+			}
+			.vb-pill {
+				display: inline-flex;
+				align-items: center;
+				gap: 6px;
+				background: rgba(255,255,255,0.04);
+				border: 1px solid var(--stroke);
+				color: #999999;
+				padding: 7px 12px;
+				border-radius: 999px;
+				font: 500 12.5px system-ui, sans-serif;
+				cursor: pointer;
+				transition: background var(--duration-fast), color var(--duration-fast), border-color var(--duration-fast);
+			}
+			.vb-pill:hover:not(.disabled) {
+				background: rgba(255,255,255,0.08);
+				border-color: rgba(255,255,255,0.3);
+				color: #ffffff;
+			}
+			.vb-pill:focus-visible { outline: 2px solid var(--focus-ring-color); outline-offset: 2px; }
+			.vb-pill.active {
+				background: #ffffff;
+				border-color: #ffffff;
+				color: #000000;
+			}
+			/* An unavailable lane still has to be readable: it is the row that
+			   explains WHY it is unavailable. Fading it to 40% dropped its label to
+			   1.95:1, so the state is carried by colour and cursor instead. */
+			.vb-pill.disabled {
+				/* tokens.css fades anything aria-disabled to 40%, which drops this
+				   label to 1.95:1. This pill is the one place the reason a lane is
+				   unavailable is written, so it stays legible and says "not
+				   clickable" through colour and cursor instead. */
+				opacity: 1;
+				cursor: not-allowed;
+				color: #8a8a8a;
+				background: rgba(255,255,255,0.02);
+				border-color: #171717;
+			}
+			.vb-pill.disabled:hover { transform: none; }
+			/* The billing badge is the loudest thing on a pill, so a coloured one on
+			   an unavailable lane reads as "ready to use". Grey it instead: the
+			   difference between a live lane and a dead one stays obvious without
+			   fading either of them out of legibility. */
+			.vb-pill.disabled .vb-pill-billing {
+				background: rgba(255,255,255,0.06);
+				color: #8a8a8a;
+			}
+			.vb-pill-billing {
+				font-size: 10px;
+				font-weight: 600;
+				letter-spacing: 0.04em;
+				text-transform: uppercase;
+				padding: 2px 6px;
+				border-radius: 4px;
+				background: rgba(61,193,255,0.14);
+				color: #3dc1ff;
+			}
+			.vb-pill-billing[data-billing="credits"] {
+				background: rgba(255,193,61,0.14);
+				color: #ffc13d;
+			}
+			.vb-pill.active .vb-pill-billing { background: rgba(0,0,0,0.1); color: #000000; }
+			.vb-grid {
+				display: grid;
+				grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+				gap: 10px;
+			}
+			.vb-card {
+				background: #070707;
+				border: 1px solid var(--stroke);
+				border-radius: 12px;
+				padding: 14px;
+				display: flex;
+				flex-direction: column;
+				gap: 8px;
+				cursor: pointer;
+				transition: border-color var(--duration-fast), transform var(--duration-fast), background var(--duration-fast);
+			}
+			.vb-card:hover { border-color: #303030; background: #0b0b0b; transform: translateY(-1px); }
+			.vb-card.selected { border-color: #ffffff; background: #0d0d0d; }
+			.vb-card-top {
+				display: flex;
+				align-items: flex-start;
+				justify-content: space-between;
+				gap: 8px;
+			}
+			.vb-card-name {
+				margin: 0;
+				font-size: 14px;
+				font-weight: 600;
+				color: var(--ink);
+				line-height: 1.3;
+				word-break: break-word;
+			}
+			.vb-badge {
+				flex: none;
+				font-size: 10px;
+				font-weight: 600;
+				letter-spacing: 0.03em;
+				text-transform: uppercase;
+				color: var(--ink-dim);
+				border: 1px solid #222222;
+				border-radius: 5px;
+				padding: 2px 6px;
+				white-space: nowrap;
+			}
+			.vb-tags { display: flex; gap: 5px; flex-wrap: wrap; }
+			.vb-tag {
+				font-size: 11px;
+				color: #8a8a8a;
+				background: rgba(255,255,255,0.05);
+				border-radius: 4px;
+				padding: 2px 7px;
+			}
+			.vb-card-desc {
+				margin: 0;
+				font-size: 12px;
+				line-height: 1.5;
+				color: #8a8a8a;
+				display: -webkit-box;
+				-webkit-line-clamp: 2;
+				-webkit-box-orient: vertical;
+				overflow: hidden;
+			}
+			.vb-card-actions { display: flex; gap: 6px; margin-top: auto; padding-top: 4px; }
+			.vb-skeleton {
+				height: 132px;
+				cursor: default;
+				background: linear-gradient(90deg, var(--skeleton-base) 25%, var(--skeleton-sheen) 50%, var(--skeleton-base) 75%);
+				background-size: 200% 100%;
+				animation: vb-shimmer 1.4s ease-in-out infinite;
+			}
+			@keyframes vb-shimmer {
+				0% { background-position: 200% 0; }
+				100% { background-position: -200% 0; }
+			}
+			@media (prefers-reduced-motion: reduce) {
+				.vb-skeleton { animation: none; }
+				.vb-card:hover { transform: none; }
+			}
+			.vb-more { margin-top: 14px; width: 100%; justify-content: center; }
+			#vbStatus[data-tone="err"] { color: var(--err, #ff6b6b); }
+			#vbStatus[data-tone="ok"] { color: var(--success); }
+			#vbStatus[data-tone="warn"] { color: var(--warn, #ffc13d); }
+
+			/* Playground extras: direction + speed */
+			.vl-pg-field input[type="text"] {
+				width: 100%;
+				padding: 10px 12px;
+				background: #070707;
+				border: 1px solid #212121;
+				border-radius: 9px;
+				color: var(--ink);
+				font: inherit;
+				font-size: 14px;
+				outline: none;
+				transition: border-color var(--duration-fast);
+			}
+			.vl-pg-field input[type="text"]:focus { border-color: #ffffff; }
+			.vl-pg-field input[type="range"] { width: 100%; accent-color: #ffffff; }
+			.vl-pg-billing {
+				font-size: 12px;
+				color: #8a8a8a;
+				margin-top: 10px;
+			}
+
+			/* ── Focus ──────────────────────────────────── */
+			/* Keyboard users get the same "you are here" signal a mouse user gets
+			   from :hover. Several controls above clear the UA ring to style their
+			   own border, so the ring is restored here, last, where it wins. */
+			.vl-btn:focus-visible,
+			.vl-pg-sample:focus-visible,
+			.vl-script-next:focus-visible,
+			.vl-empty-actions .vl-btn:focus-visible,
+			.vl-voice-card .vl-btn:focus-visible,
+			.vb-card .vl-btn:focus-visible,
+			.vl-review-field input:focus-visible,
+			.vl-pg-field select:focus-visible,
+			.vl-pg-field input:focus-visible,
+			.vl-pg-textarea:focus-visible,
+			.vl-byok-row input:focus-visible,
+			.vb-filters input[type="search"]:focus-visible,
+			.vb-filters select:focus-visible {
+				outline: 2px solid var(--focus-ring-color);
+				outline-offset: 2px;
+			}
+
+			/* ── Responsive ─────────────────────────────── */
+			@media (max-width: 640px) {
+				.vb-grid { grid-template-columns: 1fr; }
+				.vl-root { padding: 20px 16px 60px; }
+				.vl-header h1 { font-size: 26px; }
+				.vl-wave-wrap { height: 160px; }
+				.vl-controls { padding: 16px; }
+				.vl-card-body { padding: 16px; }
+				.vl-voices { grid-template-columns: 1fr; }
+				.vl-review-row { flex-direction: column; }
+			}
+		</style>
+	
+	<meta property="og:type" content="website">
+	<meta property="og:site_name" content="three.ws">
+	<meta property="og:image" content="https://three.ws/api/page-og?s=build&amp;t=Voice+Lab&amp;d=Browse+hundreds+of+voices+across+Microsoft+Edge%2C+Gemini%2C+NVIDIA%2C+OpenAI+and+ElevenLabs%2C+preview+any+of+them%2C+or+clone+your+own+from+a+short+recording%2C+then&amp;p=%2Fvoice">
+	<meta property="og:image:width" content="1200">
+	<meta property="og:image:height" content="630">
+	<meta name="twitter:title" content="Voice Lab · three.ws" data-i18n-attr="content:voice.meta_twitter_title">
+	<meta name="twitter:description" content="Clone your voice from a short recording, then use it for TTS or give it to your agent. Side-by-side comparison of voice models." data-i18n-attr="content:voice.meta_twitter_description">
+	<meta name="twitter:image" content="https://three.ws/api/page-og?s=build&amp;t=Voice+Lab&amp;d=Browse+hundreds+of+voices+across+Microsoft+Edge%2C+Gemini%2C+NVIDIA%2C+OpenAI+and+ElevenLabs%2C+preview+any+of+them%2C+or+clone+your+own+from+a+short+recording%2C+then&amp;p=%2Fvoice">
+	<script type="application/ld+json">{"@context":"https://schema.org","@type":"WebPage","name":"Voice Lab","description":"Clone your voice from a short recording, then use it for TTS or give it to your agent. Side-by-side comparison of voice models.","url":"https://three.ws/voice","isPartOf":{"@type":"WebSite","name":"three.ws","url":"https://three.ws"}}</script>
+
+	<meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1">
+	<meta property="og:locale" content="en_US">
+	<meta property="og:image:alt" content="Voice Lab — three.ws">
+	<meta name="twitter:site" content="@trythreews">
+</head>
+	<body>
+		<header><div id="nav-container"></div></header>
+
+		<main class="vl-root">
+			<div class="vl-header">
+				<h1 data-i18n="voice.voice_lab">Voice Lab</h1>
+				<p data-i18n="voice.pick_a_voice_or_clone_your_own">Pick a voice from hundreds across Microsoft Edge, Google Gemini, NVIDIA, OpenAI and ElevenLabs, or record 20-30 seconds of clear speech and clone your own. Either way it works across your avatars and agents.</p>
+			</div>
+
+			<!-- ── Recorder ─────────────────────────────── -->
+			<div class="vl-section">
+				<div class="vl-card vl-recorder" data-state="idle" id="recorder">
+					<div class="vl-wave-wrap">
+						<canvas id="waveCanvas"></canvas>
+						<div class="vl-rec-dot">
+							<div class="vl-rec-dot-circle"></div>
+							<div class="vl-rec-dot-label">Recording</div>
+						</div>
+						<div class="vl-level" id="levelMeter"></div>
+						<div class="vl-wave-overlay">
+							<div class="vl-timer" id="timer">0:00</div>
+							<div class="vl-timer-sub" id="timerSub">Recommended: 20-30 seconds</div>
+						</div>
+						<div class="vl-progress" id="progress"></div>
+					</div>
+
+					<div class="vl-scripts" id="scripts">
+						<div class="vl-scripts-label">Read aloud for best results</div>
+						<div class="vl-script-text" id="scriptText"></div>
+						<div class="vl-script-nav">
+							<div class="vl-script-dots" id="scriptDots"></div>
+							<button class="vl-script-next" id="scriptNext" data-i18n="voice.next_prompt">Next prompt</button>
+						</div>
+					</div>
+
+					<div class="vl-controls" id="controls">
+						<button class="vl-btn vl-btn-record" id="btnRecord" data-i18n-html="voice.start_recording">
+							<span class="vl-rec-dot-icon"></span>
+							Start recording
+						</button>
+						<button class="vl-btn vl-btn-stop" id="btnStop" data-i18n="voice.stop_recording">
+							Stop recording
+						</button>
+					</div>
+
+					<div class="vl-review" id="review">
+						<audio id="reviewAudio" controls></audio>
+						<div class="vl-review-row">
+							<div class="vl-review-field">
+								<label for="voiceName" data-i18n="voice.voice_name">Voice name</label>
+								<input type="text" id="voiceName" placeholder="e.g. My Voice" maxlength="64" />
+							</div>
+						</div>
+						<div class="vl-review-actions">
+							<button class="vl-btn vl-btn-primary" id="btnClone" data-i18n="voice.clone_voice">Clone voice</button>
+							<button class="vl-btn vl-btn-ghost vl-btn-sm" id="btnRerecord" data-i18n="voice.re_record">Re-record</button>
+						</div>
+						<div class="vl-cloning-overlay">
+							<div class="vl-spinner"></div>
+							<div class="vl-cloning-text">Cloning your voice...</div>
+						</div>
+						<div class="vl-done-msg" id="doneMsg">
+							<div class="vl-done-success">
+								<div class="vl-done-check">&#10003;</div>
+								<div class="vl-done-text" id="doneText">Voice cloned successfully</div>
+							</div>
+							<div class="vl-done-actions">
+								<button class="vl-btn vl-btn-primary vl-btn-sm" id="btnTryPlayground" data-i18n="voice.try_in_playground">Try in playground</button>
+									<a class="vl-btn vl-btn-ghost vl-btn-sm" id="btnAttachAgent" href="/dashboard" data-i18n="voice.add_to_an_agent">Add to an agent</a>
+								<button class="vl-btn vl-btn-ghost vl-btn-sm" id="btnRecordAnother" data-i18n="voice.record_another">Record another</button>
+							</div>
+						</div>
+					</div>
+
+					<div class="vl-status" id="status">Ready to record</div>
+				</div>
+			</div>
+
+			<!-- ── Voice Library ─────────────────────────── -->
+			<div class="vl-section" id="browserSection">
+				<div class="vl-section-head">
+					<h2 class="vl-section-title" data-i18n="voice.browse_voices">Browse voices</h2>
+					<span class="vl-pg-hint" id="vbStatus" role="status" aria-live="polite" style="font-size:12px;color:#8a8a8a;"></span>
+				</div>
+				<div class="vl-card">
+					<div class="vl-card-body">
+						<div class="vb-filters">
+							<label class="sr-only" for="vbSearch">Search voices</label>
+							<input type="search" id="vbSearch" placeholder="Search by name, accent, or use case..." autocomplete="off" spellcheck="false" />
+							<label class="sr-only" for="vbLanguage">Language</label>
+							<select id="vbLanguage">
+								<option value="">All languages</option>
+							</select>
+						</div>
+						<div class="vb-pills" id="vbProviders" role="group" aria-label="Voice providers"></div>
+						<div class="vb-grid" id="vbGrid"></div>
+						<button class="vl-btn vl-btn-ghost vl-btn-sm vb-more" id="vbMore" type="button" hidden>Show more</button>
+					</div>
+				</div>
+			</div>
+
+			<div class="vl-section" id="librarySection">
+				<div class="vl-section-head">
+					<h2 class="vl-section-title" data-i18n="voice.my_voices">My Voices</h2>
+				</div>
+				<div id="voiceLibrary">
+					<div class="vl-empty">
+						<div class="vl-empty-title">No cloned voices yet</div>
+						Record a voice sample above to get started.
+					</div>
+				</div>
+			</div>
+
+			<!-- ── TTS Playground ────────────────────────── -->
+			<div class="vl-section" id="playgroundSection">
+				<div class="vl-section-head">
+					<h2 class="vl-section-title" data-i18n="voice.text_to_speech_playground">Text-to-Speech Playground</h2>
+				</div>
+				<div class="vl-card">
+					<div class="vl-card-body">
+						<div class="vl-pg-row">
+							<div class="vl-pg-field">
+								<label for="pgVoice" data-i18n="voice.voice">Voice</label>
+								<select id="pgVoice">
+									<option value="" disabled selected data-i18n="voice.pick_a_voice_first">Pick a voice above</option>
+								</select>
+							</div>
+							<div class="vl-pg-field" id="pgModelField" hidden>
+								<label for="pgModel" data-i18n="voice.model">Model</label>
+								<select id="pgModel"></select>
+							</div>
+						</div>
+						<div class="vl-pg-row" id="pgDirectionRow" hidden>
+							<div class="vl-pg-field">
+								<label for="pgDirection" data-i18n="voice.direction">Direction (how it should be said)</label>
+								<input type="text" id="pgDirection" maxlength="200" placeholder="Warm and unhurried, like you're telling a friend a secret" />
+							</div>
+						</div>
+						<div class="vl-pg-row">
+							<div class="vl-pg-field">
+								<label for="pgSpeed">Speed <span id="pgSpeedVal">1.00&times;</span></label>
+								<input type="range" id="pgSpeed" min="0.5" max="2" step="0.05" value="1" aria-describedby="pgSpeedVal" />
+							</div>
+						</div>
+						<label class="sr-only" for="pgText">Text to speak</label>
+						<textarea class="vl-pg-textarea" id="pgText" placeholder="Type something to hear it spoken..." maxlength="500">Hello, I'm a three.ws agent. Nice to meet you.</textarea>
+						<div class="vl-pg-samples" id="pgSamples">
+							<button class="vl-pg-sample" data-text="Welcome to three.ws, the home of agentic 3D characters." data-i18n="voice.welcome">Welcome</button>
+							<button class="vl-pg-sample" data-text="Numbers test: one, two, three, four, five, six, seven, eight, nine, ten." data-i18n="voice.numbers">Numbers</button>
+							<button class="vl-pg-sample" data-text="The quick brown fox jumps over the lazy dog. She sells seashells by the seashore." data-i18n="voice.diction">Diction</button>
+							<button class="vl-pg-sample" data-text="I believe technology should serve people. The future of interaction lies in natural, conversational interfaces that feel like talking to a friend." data-i18n="voice.natural_speech">Natural speech</button>
+						</div>
+						<div class="vl-pg-actions">
+							<button class="vl-btn vl-btn-primary" id="pgSpeak" disabled data-i18n="voice.speak">Speak</button>
+							<span class="vl-pg-hint" id="pgHint" style="font-size:12px;color:#808080;"></span>
+						</div>
+						<div class="vl-pg-output" id="pgOutput">
+							<audio id="pgAudio" controls></audio>
+						</div>
+					</div>
+				</div>
+			</div>
+
+			<!-- ── BYOK: your own ElevenLabs key ─────────── -->
+			<div class="vl-section" id="byokSection">
+				<div class="vl-section-head">
+					<h2 class="vl-section-title">Use Your Own ElevenLabs Key</h2>
+				</div>
+				<div class="vl-card">
+					<div class="vl-card-body">
+						<p class="vl-byok-copy">
+							The Microsoft Edge, Google Gemini and NVIDIA lanes above are free and always
+							will be. Only ElevenLabs and OpenAI cost anything: on the three.ws account
+							they are metered to your <a href="/credits">credit balance</a> (top up with
+							$THREE or SOL) at $0.50 per voice clone, $0.30 per 1,000 spoken characters on
+							ElevenLabs and $0.03 on OpenAI, with repeated clips served from cache free.
+							Prefer to use your own account? Paste your
+							<a href="https://elevenlabs.io/app/settings/api-keys" target="_blank" rel="noopener">ElevenLabs API key</a>
+							and every ElevenLabs call runs on it instead: your voices, the full public
+							Voice Library, your quota, no platform charges. The key is stored only in this
+							browser and sent only with your own voice requests; the server never keeps it.
+						</p>
+						<div class="vl-byok-row">
+							<input type="password" id="byokKey" placeholder="sk_..." autocomplete="off" spellcheck="false" aria-label="ElevenLabs API key" />
+							<button class="vl-btn vl-btn-primary" id="byokSave" type="button">Save key</button>
+							<button class="vl-btn vl-btn-ghost" id="byokClear" type="button" hidden>Remove</button>
+						</div>
+						<span class="vl-pg-hint" id="byokStatus" role="status" style="font-size:12px;color:#808080;"></span>
+					</div>
+				</div>
+			</div>
+		</main>
+
+		<script src="/nav.js" defer></script>
+		<script type="module" src="/src/voice-lab.js"></script>
+		<script src="/brand.js" defer></script>
+		<div id="footer-container"></div>
+		<script src="/footer.js"></script>
+	<!-- Runtime i18n: detects locale, swaps annotated copy, mounts <lang-switcher>. -->
+	<script type="module" src="/i18n.js"></script>
+</body>
+</html>

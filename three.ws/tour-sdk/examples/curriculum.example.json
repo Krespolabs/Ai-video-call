@@ -1,0 +1,63 @@
+{
+	"version": 2,
+	"title": "Acme Guided Tour",
+	"tagline": "A 3D guide walks you through every feature, live, on the real site.",
+	"estimatedMinutes": 4,
+	"stopCount": 5,
+	"tracks": [
+		{ "id": "full", "title": "Full tour", "description": "Every feature, chapter by chapter.", "stopCount": 5, "estimatedMinutes": 4 },
+		{ "id": "quick", "title": "Quick highlights", "description": "The best of every chapter, in a few minutes.", "stopCount": 3, "estimatedMinutes": 2 }
+	],
+	"sections": [
+		{ "id": "main", "title": "Overview", "intro": "Welcome — I'm your guide. Let me show you around, starting at the front door." },
+		{ "id": "build", "title": "Build", "intro": "Now the fun part — let's look at what you can make here." }
+	],
+	"stops": [
+		{
+			"id": "home",
+			"path": "/",
+			"section": "main",
+			"title": "Home",
+			"narration": "Here we have the home page — the front door to everything Acme does. Start a new project right from here.",
+			"highlight": true,
+			"sectionIntro": "Welcome — I'm your guide. Let me show you around, starting at the front door.",
+			"targets": ["a.cta", ".hero a.button"]
+		},
+		{
+			"id": "pricing",
+			"path": "/pricing",
+			"section": "main",
+			"title": "Pricing",
+			"narration": "Next up, pricing. Simple, transparent plans that scale with your team.",
+			"highlight": true,
+			"targets": ["[data-tour-target]", ".pricing-table"]
+		},
+		{
+			"id": "docs",
+			"path": "/docs",
+			"section": "main",
+			"title": "Docs",
+			"narration": "This is the documentation — guides, references, and tutorials whenever you want to go deeper.",
+			"highlight": false
+		},
+		{
+			"id": "studio",
+			"path": "/studio",
+			"section": "build",
+			"title": "Studio",
+			"narration": "Meet the Studio — where you actually build. Everything you create starts on this canvas.",
+			"highlight": true,
+			"sectionIntro": "Now the fun part — let's look at what you can make here.",
+			"targets": ["canvas", ".editor"]
+		},
+		{
+			"id": "deploy",
+			"path": "/deploy",
+			"section": "build",
+			"title": "Deploy",
+			"narration": "And this — deploy. One click ships what you built to the world.",
+			"highlight": false,
+			"targets": ["button[type=\"submit\"]", ".deploy-btn"]
+		}
+	]
+}

@@ -1,0 +1,416 @@
+<!doctype html>
+<html lang="en">
+<head>
+	<script>/* three.ws theme boot, no-flash; runtime in /theme-switcher.js */(function(){try{var m=localStorage.getItem('twx_theme');var l=m==='auto'?(window.matchMedia&&window.matchMedia('(prefers-color-scheme: light)').matches):m==='light';document.documentElement.setAttribute('data-theme',l?'light':'dark');}catch(e){document.documentElement.setAttribute('data-theme','dark');}})();</script>
+	<meta charset="utf-8" />
+	<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
+	<title data-i18n="agent_exchange.meta_title">Agent Exchange: 3D AI agents paying each other in real time · three.ws</title>
+	<meta name="description" content="Two AI agents with 3D bodies negotiate and pay each other for live crypto intel using x402 micropayments on Solana. Every transaction is real and confirmed on-chain."  data-i18n-attr="content:agent_exchange.meta_description"/>
+	<link rel="canonical" href="https://three.ws/agent-exchange" />
+	<meta property="og:type"        content="website" />
+	<meta property="og:title"       content="Agent Exchange: AI agents paying each other in real time"  data-i18n-attr="content:agent_exchange.meta_og_title"/>
+	<meta property="og:description" content="Two 3D AI agents buy and sell crypto intel for real USDC on Solana. Watch every transaction confirm on-chain."  data-i18n-attr="content:agent_exchange.meta_og_description"/>
+	<meta property="og:url"         content="https://three.ws/agent-exchange" />
+	<meta property="og:image"       content="https://three.ws/api/page-og?s=crypto&amp;t=Agent+Exchange&amp;d=Two+AI+agents+with+3D+bodies+negotiate+and+pay+each+other+for+live+crypto+intel+using+x402+micropayments+on+Solana.+Every+transaction+is+real+and+confirmed&amp;p=%2Fagent-exchange" />
+	<meta name="twitter:card"        content="summary_large_image" />
+	<meta name="twitter:title"       content="Agent Exchange: AI agents paying each other in real time"  data-i18n-attr="content:agent_exchange.meta_twitter_title"/>
+	<meta name="twitter:description" content="Two 3D AI agents paying each other for real crypto intel. USDC on Solana. On-chain."  data-i18n-attr="content:agent_exchange.meta_twitter_description"/>
+	<meta name="twitter:image"       content="https://three.ws/api/page-og?s=crypto&amp;t=Agent+Exchange&amp;d=Two+AI+agents+with+3D+bodies+negotiate+and+pay+each+other+for+live+crypto+intel+using+x402+micropayments+on+Solana.+Every+transaction+is+real+and+confirmed&amp;p=%2Fagent-exchange" />
+		<link rel="icon" href="/favicon.ico" sizes="any" />
+		<link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+		<link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png" />
+		<link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png" />
+		<link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+		<link rel="manifest" href="/manifest.webmanifest" />
+	<style>
+		/* Hover lives here, not in an onmouseover attribute: the site CSP allows
+		   inline script blocks by hash and never inline handlers. */
+		.ax-x402-link { color: var(--usdc-lt); text-decoration: underline; }
+		.ax-x402-link:hover { color: var(--text); }
+		:root {
+			color-scheme: dark;
+			--bg:       #080808;
+			--bg2:      #0f0f0f;
+			--panel:    rgba(16,19,34,0.88);
+			--border:   rgba(255,255,255,0.08);
+			--border-hi:rgba(255,255,255,0.16);
+			--text:     #eceef8;
+			--muted:    #7c85a2;
+			/* The quietest text tone still has to clear WCAG AA. #484f64 on this
+			   background is 2.45:1, and it carries real copy: the empty-state
+			   explainer, the stage strip, and the receipt field labels. This value
+			   clears 4.5:1 on both the page and the green-tinted receipt panel, and
+			   stays below --muted so the three-step hierarchy survives. */
+			--faint:    #767fa0;
+			--sol:      #9945ff;
+			--sol-lt:   #c284ff;
+			--usdc:     #2775ca;
+			--usdc-lt:  #6db0f7;
+			--green:    #22d77a;
+			--amber:    #f5a623;
+			--red:      #ff4f6a;
+			--mono:     ui-monospace,"SF Mono",Menlo,Consolas,monospace;
+			--shadow:   0 24px 64px rgba(0,0,0,0.7);
+			--r:        14px;
+		}
+		*,*::before,*::after { box-sizing:border-box; margin:0; padding:0; }
+		html,body { height:100%; background:var(--bg); color:var(--text); -webkit-font-smoothing:antialiased; }
+		body { font:15px/1.6 -apple-system,system-ui,"Segoe UI",sans-serif; overflow:hidden; }
+		:focus-visible { outline:2px solid var(--sol-lt); outline-offset:3px; }
+
+		/* ── Layout ──────────────────────────────────────────── */
+		#app {
+			display:grid;
+			grid-template-rows: 52px 1fr auto;
+			height:100%;
+		}
+		/* Grid and flex children default to min-width:auto, which refuses to shrink
+		   below their content. The body never scrolls, so on a 320px screen that
+		   silently clips the top bar and the stage strip off the right edge instead
+		   of wrapping or scrolling them. Opting out lets each row shrink and hand
+		   overflow to the scroller that owns it (.stages). */
+		#app > * { min-width:0; }
+		.topbar > *, .topic-row, .stages, #exchange > * { min-width:0; }
+
+		/* ── Top bar ─────────────────────────────────────────── */
+		.topbar {
+			display:flex; align-items:center; justify-content:space-between; gap:12px;
+			padding:0 20px; border-bottom:1px solid var(--border);
+			background:rgba(7,8,15,0.95); backdrop-filter:blur(12px);
+			position:relative; z-index:20;
+		}
+		.brand { display:flex; align-items:center; gap:12px; }
+		.brand a { color:var(--text); text-decoration:none; font-weight:700; font-size:15px; letter-spacing:-0.01em; }
+		.brand .sep { color:var(--faint); }
+		.badge {
+			display:inline-flex; align-items:center; gap:7px;
+			background:rgba(153,69,255,0.12); border:1px solid rgba(153,69,255,0.3);
+			border-radius:99px; padding:4px 11px; font-size:12px; color:var(--sol-lt); font-weight:600;
+		}
+		.badge .dot { width:6px; height:6px; border-radius:50%; background:var(--sol); box-shadow:0 0 8px var(--sol); }
+		.tb-right { display:flex; align-items:center; gap:10px; }
+		.tx-ticker {
+			display:inline-flex; align-items:center; gap:8px; font-size:12px;
+			color:var(--muted); font-variant-numeric:tabular-nums;
+		}
+		.tx-ticker .tv { font-weight:650; color:var(--usdc-lt); font-size:13px; transition:color .3s; }
+		.tx-ticker .tv.flash { color:var(--green); }
+		.tb-btn {
+			display:inline-flex; align-items:center; gap:6px; padding:6px 12px; border-radius:9px;
+			background:rgba(255,255,255,0.05); border:1px solid var(--border); color:var(--muted);
+			font:13px/1 inherit; font-weight:500; cursor:pointer; text-decoration:none;
+			transition:background .15s, color .15s, border-color .15s;
+		}
+		.tb-btn:hover { background:rgba(255,255,255,0.09); color:var(--text); border-color:var(--border-hi); }
+		.tb-btn svg { width:14px; height:14px; }
+
+		/* ── Arena ───────────────────────────────────────────── */
+		#arena {
+			position:relative; overflow:hidden;
+			background:
+				radial-gradient(ellipse 80% 60% at 50% 100%, rgba(153,69,255,0.08), transparent 70%),
+				radial-gradient(ellipse 60% 40% at 20% 40%, rgba(39,117,202,0.06), transparent 60%),
+				radial-gradient(ellipse 60% 40% at 80% 40%, rgba(39,117,202,0.06), transparent 60%),
+				var(--bg2);
+		}
+		/* Subtle floor grid */
+		#arena::before {
+			content:''; position:absolute; inset:0; z-index:0;
+			background-image:
+				linear-gradient(rgba(255,255,255,0.025) 1px, transparent 1px),
+				linear-gradient(90deg, rgba(255,255,255,0.025) 1px, transparent 1px);
+			background-size:48px 48px;
+			mask-image:radial-gradient(ellipse 90% 80% at 50% 80%, black 30%, transparent 80%);
+		}
+
+		/* Two avatar iframes side by side */
+		.agents {
+			position:relative; z-index:1;
+			display:grid; grid-template-columns:1fr 1fr; height:100%; gap:0;
+		}
+		.agent-slot { position:relative; overflow:hidden; }
+		/* An iframe is a tab stop, and these two had no focus indicator at all,
+		   so a keyboard user passing through the arena saw nothing move. The
+		   ring is inset because the frame fills its slot edge to edge. */
+		.agent-slot iframe:focus-visible { outline:2px solid var(--sol-lt); outline-offset:-3px; }
+		.agent-slot iframe {
+			position:absolute; inset:0; width:100%; height:100%;
+			border:0; background:transparent;
+		}
+		/* Vertical divider glow between the two agents */
+		.agents::after {
+			content:''; position:absolute; top:0; bottom:0; left:50%;
+			width:1px; background:linear-gradient(180deg, transparent 5%, rgba(153,69,255,0.4) 40%, rgba(39,117,202,0.4) 60%, transparent 95%);
+			transform:translateX(-50%); z-index:5;
+		}
+
+		/* Agent name + role badges */
+		.agent-label {
+			position:absolute; top:16px; z-index:10;
+			display:flex; align-items:center; gap:8px;
+			background:rgba(7,8,15,0.72); backdrop-filter:blur(12px);
+			border:1px solid var(--border); border-radius:99px; padding:5px 13px;
+			font-size:12px; font-weight:600; white-space:nowrap;
+		}
+		.agent-label.left  { left:14px; }
+		.agent-label.right { right:14px; }
+		.agent-label .role {
+			font-size:10px; font-weight:700; letter-spacing:0.06em; text-transform:uppercase;
+			padding:2px 7px; border-radius:99px;
+		}
+		.role.seller { background:rgba(39,117,202,0.18); color:var(--usdc-lt); border:1px solid rgba(39,117,202,0.3); }
+		.role.buyer  { background:rgba(153,69,255,0.18); color:var(--sol-lt);  border:1px solid rgba(153,69,255,0.3); }
+
+		/* Speech bubbles */
+		.bubble {
+			position:absolute; bottom:22%; z-index:10; max-width:240px;
+			background:rgba(7,8,15,0.82); backdrop-filter:blur(12px);
+			border:1px solid var(--border); border-radius:var(--r); padding:10px 13px;
+			font-size:13px; line-height:1.45; opacity:0;
+			transition:opacity .3s, transform .3s;
+			transform:translateY(6px);
+		}
+		.bubble.show { opacity:1; transform:translateY(0); }
+		.bubble.left  { left:14px;  border-bottom-left-radius:4px; }
+		.bubble.right { right:14px; border-bottom-right-radius:4px; }
+		.bubble .bname { font-size:10px; font-weight:700; letter-spacing:0.05em; text-transform:uppercase; color:var(--muted); margin-bottom:5px; }
+		.bubble.left  .bname { color:var(--usdc-lt); }
+		.bubble.right .bname { color:var(--sol-lt); }
+
+		/* ── Exchange panel (bottom) ─────────────────────────── */
+		#exchange {
+			border-top:1px solid var(--border); background:rgba(7,8,15,0.96);
+			backdrop-filter:blur(20px); padding:14px 20px 20px;
+			display:flex; flex-direction:column; gap:12px;
+		}
+
+		/* Topic selector */
+		.topic-row { display:flex; align-items:center; gap:10px; flex-wrap:wrap; }
+		.topic-row .label { font-size:12px; font-weight:650; color:var(--muted); white-space:nowrap; }
+		.topics { display:flex; gap:7px; flex-wrap:wrap; }
+		.t-chip {
+			font-size:12px; font-weight:600; padding:5px 13px; border-radius:99px; cursor:pointer;
+			border:1px solid var(--border); background:rgba(255,255,255,0.04); color:var(--muted);
+			transition:all .15s;
+		}
+		.t-chip:hover { border-color:var(--border-hi); color:var(--text); }
+		.t-chip.active { background:rgba(153,69,255,0.16); border-color:rgba(153,69,255,0.45); color:var(--sol-lt); }
+
+		/* Pay button */
+		.pay-btn {
+			align-self:flex-end; display:inline-flex; align-items:center; gap:9px;
+			background:linear-gradient(135deg, var(--sol) 0%, #6e2adf 100%);
+			color:#fff; border:0; border-radius:11px; padding:11px 22px;
+			font:14px/1 inherit; font-weight:700; cursor:pointer; letter-spacing:0.01em;
+			transition:filter .15s, transform .1s, box-shadow .15s;
+			box-shadow:0 0 0 0 rgba(153,69,255,0);
+		}
+		.pay-btn:hover:not(:disabled) { filter:brightness(1.12); box-shadow:0 0 28px rgba(153,69,255,0.4); }
+		.pay-btn:active:not(:disabled) { transform:translateY(1px); }
+		.pay-btn:disabled { opacity:.55; cursor:default; box-shadow:none; filter:none; }
+		.pay-btn .spin { width:14px; height:14px; border:2px solid rgba(255,255,255,0.35); border-top-color:#fff; border-radius:50%; animation:spin .65s linear infinite; display:none; }
+		.pay-btn.busy .spin { display:inline-block; }
+		@keyframes spin { to { transform:rotate(360deg); } }
+
+		/* Payment stages */
+		.stages { display:flex; gap:0; flex-wrap:nowrap; overflow-x:auto; scrollbar-width:none; }
+		.stage {
+			display:flex; align-items:center; gap:6px; padding:5px 12px;
+			font-size:12px; font-weight:500; color:var(--faint); white-space:nowrap;
+			border-right:1px solid var(--border);
+		}
+		.stage:last-child { border-right:0; }
+		.stage .si { width:16px; height:16px; border-radius:50%; border:2px solid var(--faint); flex:none; transition:all .3s; display:flex; align-items:center; justify-content:center; }
+		.stage.active { color:var(--text); }
+		.stage.active .si { border-color:var(--sol-lt); box-shadow:0 0 8px var(--sol-lt); animation:pulse .9s ease-in-out infinite; }
+		.stage.done { color:var(--green); }
+		.stage.done .si { background:var(--green); border-color:var(--green); box-shadow:0 0 8px var(--green); }
+		.stage.done .si::after { content:"✓"; font-size:9px; color:#000; font-weight:900; }
+		.stage.error { color:var(--red); }
+		.stage.error .si { border-color:var(--red); }
+		.stage[hidden] { display:none; }
+		.stage.stage-terminal.error .si { background:var(--red); border-color:var(--red); box-shadow:0 0 8px var(--red); }
+		.stage.stage-terminal.error .si::after { content:"!"; font-size:10px; color:#fff; font-weight:900; line-height:1; }
+		.stage.stage-terminal.error .sval { color:var(--red); }
+		.stage .sval { font-size:10.5px; color:var(--faint); font-variant-numeric:tabular-nums; }
+		.stage.done .sval { color:var(--green); }
+		@keyframes pulse { 0%,100% { opacity:1; } 50% { opacity:.5; } }
+
+		/* Receipt card */
+		.receipt {
+			background:rgba(34,215,122,0.06); border:1px solid rgba(34,215,122,0.22);
+			border-radius:var(--r); padding:13px 15px; display:none;
+			animation:rise .3s ease;
+		}
+		.receipt.show { display:block; }
+		.receipt:focus { outline:none; }
+		.receipt:focus-visible { outline:2px solid var(--sol-lt); outline-offset:3px; }
+		@keyframes rise { from { opacity:0; transform:translateY(6px); } to { opacity:1; transform:none; } }
+		.receipt .r-head { display:flex; align-items:center; justify-content:space-between; margin-bottom:9px; }
+		.receipt .r-badge { font-size:12px; font-weight:700; color:var(--green); display:flex; align-items:center; gap:6px; }
+		.receipt .r-time { font-size:11px; color:var(--faint); }
+		.receipt .r-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(180px,1fr)); gap:8px 20px; }
+		.receipt .rf { display:flex; flex-direction:column; gap:1px; }
+		.receipt .rf .k { font-size:10px; text-transform:uppercase; letter-spacing:0.09em; color:var(--faint); font-weight:650; }
+		.receipt .rf .v { font-size:13px; font-weight:600; font-variant-numeric:tabular-nums; }
+		.receipt .rf .v a { color:var(--usdc-lt); text-decoration:none; }
+		.receipt .rf .v a:hover { text-decoration:underline; }
+		.receipt .r-headline { margin-top:10px; padding-top:10px; border-top:1px solid rgba(34,215,122,0.12); font-size:13.5px; line-height:1.5; }
+		.receipt .r-signal { display:inline-flex; align-items:center; gap:6px; font-size:11px; font-weight:700; padding:2px 9px; border-radius:99px; margin-right:6px; }
+		.signal-bullish { background:rgba(34,215,122,0.15); color:var(--green); border:1px solid rgba(34,215,122,0.3); }
+		.signal-bearish  { background:rgba(255,79,106,0.13); color:var(--red);   border:1px solid rgba(255,79,106,0.3); }
+		.signal-neutral  { background:rgba(245,166,35,0.13); color:var(--amber); border:1px solid rgba(245,166,35,0.3); }
+		.receipt .r-rationale { margin-top:6px; font-size:12.5px; color:var(--muted); line-height:1.5; }
+
+		/* The arena IS the content, so the document heading exists for assistive
+		   tech and search engines rather than for sighted layout. */
+		.sr-only {
+			position:absolute; width:1px; height:1px; padding:0; margin:-1px;
+			overflow:hidden; clip:rect(0 0 0 0); white-space:nowrap; border:0;
+		}
+
+		/* ── Mobile ──────────────────────────────────────────── */
+		/* The top bar wraps instead of clipping: the body never scrolls, so a
+		   fixed-height bar would silently cut the session total off at 320px.
+		   Every topic chip stays reachable at every width; hiding the tail of the
+		   list would make a selectable topic unselectable on a phone. */
+		@media (max-width:640px) {
+			#app { grid-template-rows: auto 1fr auto; }
+			.topbar { flex-wrap:wrap; gap:8px 10px; padding:8px 14px; }
+			/* The ticker lives inside .tb-right, so it is that row that has to wrap
+			   for the session total to get its own line rather than run off the edge. */
+			.tb-right { flex-wrap:wrap; justify-content:flex-end; row-gap:8px; }
+			.tx-ticker { order:3; flex-basis:100%; justify-content:flex-end; font-size:11px; }
+			.bubble { display:none; }
+			#exchange { padding:10px 14px 16px; }
+			.pay-btn { align-self:stretch; justify-content:center; }
+		}
+		@media (prefers-reduced-motion:reduce) { .pay-btn.busy .spin,.stage.active .si,.nr-dot { animation:none; } }
+
+		/* ── Narration / empty-state ─────────────────────────────────── */
+		#narration {
+			padding:4px 0; min-height:34px;
+			display:flex; align-items:flex-start;
+		}
+		.nr-pre { display:flex; align-items:center; gap:5px; flex-wrap:wrap; font-size:12px; color:var(--faint); }
+		.nr-kicker { font-weight:600; color:var(--muted); white-space:nowrap; }
+		.nr-arrow { font-size:10px; color:var(--faint); }
+		.nr-live { display:flex; align-items:center; gap:9px; }
+		.nr-dot {
+			width:7px; height:7px; border-radius:50%; flex:none;
+			background:var(--sol-lt); box-shadow:0 0 8px rgba(194,132,255,.55);
+			animation:pulse .9s ease-in-out infinite;
+		}
+		.nr-text { font-size:13px; color:var(--text); }
+		.nr-done { display:flex; align-items:center; gap:8px; font-size:13px; font-weight:600; color:var(--green); }
+		.nr-done a { color:var(--usdc-lt); font-weight:500; text-decoration:none; }
+		.nr-done a:hover { text-decoration:underline; }
+		.nr-done a:focus-visible { outline:2px solid var(--sol-lt); outline-offset:2px; border-radius:3px; }
+
+		/* ── Wallet state panel ───────────────────────────────────────── */
+		#walletState { display:none; border-radius:var(--r); padding:10px 14px; font-size:12.5px; }
+		#walletState.show { display:block; }
+		#walletState.ws-unconfigured { background:rgba(255,79,106,.06); border:1px solid rgba(255,79,106,.22); }
+		#walletState.ws-low { background:rgba(245,166,35,.07); border:1px solid rgba(245,166,35,.22); }
+		.ws-head { display:flex; align-items:center; gap:6px; font-weight:700; margin-bottom:5px; }
+		#walletState.ws-unconfigured .ws-head { color:var(--red); }
+		#walletState.ws-low .ws-head { color:var(--amber); }
+		.ws-body { color:var(--muted); line-height:1.55; }
+		.ws-mono { font-family:var(--mono); font-size:10.5px; }
+		/* Re-probe the balance in place: a wallet funded while the page is open
+		   recovers without a reload, so the state is actionable, not a dead end. */
+		.ws-recheck {
+			display:inline-flex; align-items:center; margin-left:2px; padding:3px 10px;
+			border-radius:8px; border:1px solid var(--border-hi); background:rgba(255,255,255,0.05);
+			color:var(--text); font:12px/1 inherit; font-weight:600; cursor:pointer;
+			transition:background .15s, border-color .15s;
+		}
+		.ws-recheck:hover:not(:disabled) { background:rgba(255,255,255,0.1); border-color:var(--sol-lt); }
+		.ws-recheck:active:not(:disabled) { transform:translateY(1px); }
+		.ws-recheck:disabled { opacity:.55; cursor:default; }
+	</style>
+
+	<meta property="og:site_name" content="three.ws">
+	<script type="application/ld+json">{"@context":"https://schema.org","@type":"WebPage","name":"Agent Exchange","description":"Two AI agents with 3D bodies negotiate and pay each other for live crypto intel using x402 micropayments on Solana. Every transaction is real and confirmed on-chain.","url":"https://three.ws/agent-exchange","isPartOf":{"@type":"WebSite","name":"three.ws","url":"https://three.ws"}}</script>
+
+	<meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1">
+	<meta property="og:locale" content="en_US">
+	<meta property="og:image:alt" content="Agent Exchange · three.ws">
+	<meta name="twitter:site" content="@trythreews">
+</head>
+<body>
+<div id="app">
+
+	<!-- ── Top bar ────────────────────────────────────────── -->
+	<header class="topbar">
+		<div class="brand">
+			<a href="/" data-i18n="agent_exchange.three_ws">three.ws</a>
+			<span class="sep">/</span>
+			<span class="badge" data-i18n-html="agent_exchange.agent_exchange"><span class="dot"></span>Agent Exchange</span>
+		</div>
+		<div class="tb-right">
+			<span class="tx-ticker" id="txTicker" data-i18n-html="agent_exchange.session_total_0_00_usdc_settled_on">
+				Session total: <span class="tv" id="totalUsdc">$0.00</span> USDC settled on-chain
+			</span>
+			<a class="tb-btn" href="/pay" title="x402 pay-per-call demo" data-i18n-attr="title:agent_exchange.x402_pay_per_call_demo_title">
+				<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 8v4l3 3"/></svg>
+				x402 demo
+			</a>
+			<a class="tb-btn" href="/x402" title="x402: the payment trust layer behind these settlements" data-i18n-attr="title:agent_exchange.x402_the_payment_trust_layer_title">
+				<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+				Trust Layer
+			</a>
+		</div>
+	</header>
+
+	<h1 class="sr-only" data-i18n="agent_exchange.page_heading">
+		Agent Exchange: two 3D AI agents buying and selling live crypto intel for real USDC on Solana
+	</h1>
+
+	<!-- ── Arena: two agents face each other ─────────────── -->
+	<section id="arena" aria-label="Two AI agents">
+		<div class="agents">
+			<!-- Agent A: Seller (left, faces right) -->
+			<div class="agent-slot" id="slotA">
+				<iframe id="frameA" title="Intel agent" allow="autoplay" aria-label="Selling agent"></iframe>
+			</div>
+			<!-- Agent B: Buyer (right, faces left) -->
+			<div class="agent-slot" id="slotB">
+				<iframe id="frameB" title="Buyer agent" allow="autoplay" aria-label="Buying agent"></iframe>
+			</div>
+		</div>
+
+		<div class="agent-label left"  id="labelA"><span id="nameA" data-i18n="agent_exchange.intel_agent">Intel Agent</span> <span class="role seller" data-i18n="agent_exchange.seller">SELLER</span></div>
+		<div class="agent-label right" id="labelB"><span id="nameB" data-i18n="agent_exchange.buyer_agent">Buyer Agent</span> <span class="role buyer" data-i18n="agent_exchange.buyer">BUYER</span></div>
+		<div class="bubble left"  id="bubbleA"><div class="bname">Intel Agent</div><div id="bubbleAText"></div></div>
+		<div class="bubble right" id="bubbleB"><div class="bname">Buyer Agent</div><div id="bubbleBText"></div></div>
+	</section>
+
+	<!-- ── Exchange controls ─────────────────────────────── -->
+	<section id="exchange" aria-label="Exchange controls">
+		<div style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;">
+			<div class="topic-row">
+				<span class="label" data-i18n="agent_exchange.buy_intel_on">Buy intel on:</span>
+				<div class="topics" id="topics" role="group" aria-label="Topic selection"></div>
+			</div>
+			<button class="pay-btn" id="payBtn" type="button" data-i18n-html="agent_exchange.buy_intel_0_01_usdc">
+				<span class="spin" aria-hidden="true"></span>
+				<span class="lbl">Buy intel · $0.01 USDC</span>
+			</button>
+		</div>
+
+		<div id="narration" role="status" aria-live="polite" aria-atomic="false"></div>
+		<div id="walletState" role="status" aria-live="polite" aria-atomic="true"></div>
+
+		<div class="stages" id="stages" aria-label="Payment stages" aria-live="polite"></div>
+
+		<div class="receipt" id="receipt" aria-live="polite" tabindex="-1" aria-label="Payment receipt"></div>
+	</section>
+
+</div>
+<script type="module" src="/src/agent-exchange.js"></script>
+<script src="/brand.js" defer></script>
+	<!-- Runtime i18n: detects locale, swaps annotated copy, mounts <lang-switcher>. -->
+	<script type="module" src="/i18n.js"></script>
+</body>
+</html>

@@ -1,0 +1,600 @@
+<!doctype html>
+<html lang="en">
+	<head>
+		<style>/* three.ws hidden-guard — make the `hidden` attribute authoritative; see scripts/lib/hidden-guard.mjs */[hidden]{display:none!important}</style>
+		<script>/* three.ws theme boot — no-flash; runtime in /theme-switcher.js */(function(){try{var m=localStorage.getItem('twx_theme');var l=m==='auto'?(window.matchMedia&&window.matchMedia('(prefers-color-scheme: light)').matches):m==='light';document.documentElement.setAttribute('data-theme',l?'light':'dark');}catch(e){document.documentElement.setAttribute('data-theme','dark');}})();</script>
+		<meta charset="utf-8" />
+		<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+		<meta name="theme-color" content="#000000" />
+		<title data-i18n="ar.meta_title">Avatar in AR · three.ws</title>
+		<link rel="icon" href="/favicon.ico" sizes="any" />
+		<link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+		<link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png" />
+		<link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png" />
+		<link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+		<link rel="manifest" href="/manifest.webmanifest" />
+		<link rel="stylesheet" href="/tokens.css" />
+		<link rel="stylesheet" href="/fonts/fonts.css" />
+		<meta name="description" content="Type a prompt, get a real 3D model, and place it in your room: free text-to-3D with one-tap AR on any phone (WebXR, Scene Viewer, Quick Look) and a QR handoff from desktop." data-i18n-attr="content:ar.meta_description" />
+		<meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1" />
+		<link rel="canonical" href="https://three.ws/ar" />
+		<meta property="og:type" content="website" />
+		<meta property="og:site_name" content="three.ws" />
+		<meta property="og:url" content="https://three.ws/ar" />
+		<meta property="og:title" content="AR Forge · three.ws" data-i18n-attr="content:ar.meta_og_title" />
+		<meta property="og:description" content="Type a prompt, get a real 3D model, and place it in your room: free text-to-3D with one-tap AR on any phone." data-i18n-attr="content:ar.meta_og_description" />
+		<meta property="og:image" content="https://three.ws/api/page-og?s=labs&amp;t=AR+Forge&amp;d=Type+a+prompt%2C+get+a+real+3D+model%2C+and+place+it+in+your+room%3A+free+text-to-3D+with+one-tap+AR+on+any+phone+%28WebXR%2C+Scene+Viewer%2C+Quick+Look%29+and+a+QR+handoff.&amp;p=%2Far" />
+		<meta property="og:image:width" content="1200" />
+		<meta property="og:image:height" content="630" />
+		<meta name="twitter:card" content="summary_large_image" />
+		<meta name="twitter:site" content="@trythreews" />
+		<meta name="twitter:title" content="AR Forge · three.ws" data-i18n-attr="content:ar.meta_twitter_title" />
+		<meta name="twitter:description" content="Type a prompt, get a real 3D model, and place it in your room: free text-to-3D with one-tap AR on any phone." data-i18n-attr="content:ar.meta_twitter_description" />
+		<meta name="twitter:image" content="https://three.ws/api/page-og?s=labs&amp;t=AR+Forge&amp;d=Type+a+prompt%2C+get+a+real+3D+model%2C+and+place+it+in+your+room%3A+free+text-to-3D+with+one-tap+AR+on+any+phone+%28WebXR%2C+Scene+Viewer%2C+Quick+Look%29+and+a+QR+handoff.&amp;p=%2Far" />
+
+		<!-- Absolute, and it has to stay absolute: dist/agent-3d/ is written by
+		     `npm run publish:lib` after the frontend build, so a root-relative
+		     module src fails the build (see pages/home.html for the same note). -->
+		<script type="module" src="https://three.ws/agent-3d/latest/agent-3d.js"></script>
+		<script type="module" src="/src/ar-page.js"></script>
+
+		<style>
+			/* Dark-only theme layer (QB-07). An AR page renders a model against a
+			   dark studio ground in either theme, so it pins the canonical
+			   primitives to their dark values and aliases its local names to
+			   them rather than forking a second palette. The doubled :root is a
+			   specificity bump over the token sheet's own light block. */
+			:root,
+			:root:root[data-theme='light'] {
+				color-scheme: dark;
+				--bg-0: #0a0a0a;
+				--ink: #e8e8e8;
+				--ink-dim: #888888;
+				--accent: #ffffff;
+				--danger: #f87171;
+
+				--bg: #000000;
+				--bg2: var(--bg-0);
+				--text: var(--ink);
+				--text-2: var(--ink-dim);
+				--text-3: #555555;
+				--accent-2: var(--accent);
+				--panel: var(--surface-1);
+				--border: var(--stroke);
+				--radius: var(--radius-lg);
+			}
+
+			*,
+			*::before,
+			*::after {
+				box-sizing: border-box;
+			}
+
+			html,
+			body {
+				margin: 0;
+				padding: 0;
+				width: 100%;
+				height: 100%;
+				overflow: hidden;
+				background: var(--bg);
+				color: var(--text);
+				font-family: 'Inter', system-ui, sans-serif;
+				-webkit-font-smoothing: antialiased;
+			}
+
+			/* ── Background glow ─────────────────────────── */
+			.ar-bg {
+				position: fixed;
+				inset: 0;
+				pointer-events: none;
+				z-index: 0;
+			}
+			.ar-bg::before {
+				content: '';
+				position: absolute;
+				inset: 0;
+				background:
+					radial-gradient(
+						ellipse 80% 60% at 50% 0%,
+						rgba(255, 255, 255, 0.03) 0%,
+						transparent 65%
+					),
+					radial-gradient(
+						ellipse 60% 50% at 80% 80%,
+						rgba(255, 255, 255, 0.02) 0%,
+						transparent 60%
+					),
+					radial-gradient(
+						ellipse 50% 40% at 20% 70%,
+						rgba(255, 255, 255, 0.02) 0%,
+						transparent 55%
+					);
+			}
+
+			/* ── Layout shell ────────────────────────────── */
+			#ar-shell {
+				position: relative;
+				width: 100%;
+				height: 100%;
+				z-index: 1;
+				display: flex;
+				flex-direction: column;
+			}
+
+			/* ── Top bar ─────────────────────────────────── */
+			.ar-topbar {
+				position: absolute;
+				top: 0;
+				left: 0;
+				right: 0;
+				z-index: 10;
+				display: flex;
+				align-items: center;
+				justify-content: space-between;
+				padding: env(safe-area-inset-top, 0) 0 0;
+				padding-left: 16px;
+				padding-right: 16px;
+				padding-top: calc(env(safe-area-inset-top, 0px) + 14px);
+				padding-bottom: 14px;
+				background: linear-gradient(to bottom, rgba(0, 0, 0, 0.85) 0%, transparent 100%);
+				backdrop-filter: blur(0px);
+			}
+			.ar-back {
+				display: inline-flex;
+				align-items: center;
+				gap: 6px;
+				color: var(--text-2);
+				text-decoration: none;
+				font-size: 14px;
+				font-weight: 500;
+				transition: color var(--duration-fast);
+				padding: 6px 0;
+			}
+			.ar-back:hover {
+				color: var(--text);
+			}
+			.ar-back svg {
+				flex-shrink: 0;
+			}
+
+			.ar-topbar-center {
+				position: absolute;
+				left: 50%;
+				transform: translateX(-50%);
+				text-align: center;
+				pointer-events: none;
+			}
+			.ar-badge {
+				display: inline-flex;
+				align-items: center;
+				gap: 5px;
+				font-size: 11px;
+				font-weight: 600;
+				letter-spacing: 0.08em;
+				text-transform: uppercase;
+				color: var(--accent);
+				background: rgba(255, 255, 255, 0.08);
+				border: 1px solid rgba(255, 255, 255, 0.2);
+				border-radius: 999px;
+				padding: 4px 10px;
+			}
+			.ar-badge-dot {
+				width: 5px;
+				height: 5px;
+				border-radius: 50%;
+				background: var(--accent);
+				animation: ar-pulse 2s ease-in-out infinite;
+			}
+			@keyframes ar-pulse {
+				0%,
+				100% {
+					opacity: 1;
+					transform: scale(1);
+				}
+				50% {
+					opacity: 0.5;
+					transform: scale(0.75);
+				}
+			}
+
+			.ar-share-btn {
+				background: transparent;
+				border: 1px solid var(--border);
+				border-radius: 999px;
+				color: var(--text-2);
+				font-size: 13px;
+				font-weight: 500;
+				font-family: inherit;
+				cursor: pointer;
+				padding: 6px 14px;
+				transition:
+					border-color var(--duration-fast),
+					color var(--duration-fast);
+			}
+			.ar-share-btn:hover {
+				border-color: var(--text-3);
+				color: var(--text);
+			}
+
+			/* ── Model viewer ────────────────────────────── */
+			agent-3d#ar-viewer {
+				position: absolute;
+				inset: 0;
+				width: 100%;
+				height: 100%;
+				background: transparent;
+			}
+			agent-3d#ar-viewer::part(ar-button) {
+				display: none; /* we use our own button */
+			}
+
+			/* ── Bottom panel ────────────────────────────── */
+			.ar-bottom {
+				position: absolute;
+				bottom: 0;
+				left: 0;
+				right: 0;
+				z-index: 10;
+				padding: 0 20px;
+				padding-bottom: calc(env(safe-area-inset-bottom, 0px) + 28px);
+				background: linear-gradient(
+					to top,
+					rgba(0, 0, 0, 0.92) 0%,
+					rgba(0, 0, 0, 0.6) 60%,
+					transparent 100%
+				);
+				display: flex;
+				flex-direction: column;
+				align-items: center;
+				gap: 10px;
+				pointer-events: none;
+			}
+			.ar-bottom > * {
+				pointer-events: auto;
+			}
+
+			.ar-avatar-name {
+				font-size: 22px;
+				font-weight: 700;
+				letter-spacing: -0.02em;
+				color: var(--text);
+				text-align: center;
+				margin: 0;
+				line-height: 1.2;
+				font-family: 'Space Grotesk', system-ui, sans-serif;
+			}
+
+			.ar-subtitle {
+				font-size: 13px;
+				color: var(--text-2);
+				text-align: center;
+				margin: 0;
+			}
+
+			.ar-status {
+				font-size: 12.5px;
+				color: var(--accent-2);
+				text-align: center;
+				height: 18px;
+				display: flex;
+				align-items: center;
+				gap: 6px;
+			}
+			.ar-status.is-error {
+				color: var(--danger, #f87171);
+			}
+			.ar-status-spinner {
+				width: 13px;
+				height: 13px;
+				border-radius: 50%;
+				border: 2px solid rgba(255, 255, 255, 0.25);
+				border-top-color: var(--accent-2);
+				animation: ar-spin 0.7s linear infinite;
+				flex-shrink: 0;
+			}
+			@keyframes ar-spin {
+				to {
+					transform: rotate(360deg);
+				}
+			}
+
+			.ar-launch-btn {
+				width: 100%;
+				max-width: 380px;
+				height: 60px;
+				background: #ffffff;
+				color: #000000;
+				border: 0;
+				border-radius: 18px;
+				font-family: 'Space Grotesk', system-ui, sans-serif;
+				font-size: 17px;
+				font-weight: 700;
+				letter-spacing: -0.01em;
+				cursor: pointer;
+				display: flex;
+				align-items: center;
+				justify-content: center;
+				gap: 10px;
+				transition:
+					transform var(--duration-fast),
+					box-shadow var(--duration-base),
+					opacity var(--duration-fast);
+				box-shadow:
+					0 8px 32px -8px rgba(255, 255, 255, 0.2),
+					0 0 0 1px rgba(255, 255, 255, 0.08) inset;
+				position: relative;
+				overflow: hidden;
+			}
+			.ar-launch-btn::after {
+				content: '';
+				position: absolute;
+				inset: 0;
+				background: linear-gradient(
+					to bottom,
+					rgba(255, 255, 255, 0.12) 0%,
+					transparent 50%
+				);
+				pointer-events: none;
+			}
+			.ar-launch-btn:hover:not(:disabled) {
+				transform: translateY(-2px);
+				box-shadow:
+					0 14px 40px -8px rgba(255, 255, 255, 0.25),
+					0 0 0 1px rgba(255, 255, 255, 0.1) inset;
+			}
+			.ar-launch-btn:active:not(:disabled) {
+				transform: translateY(0);
+			}
+			.ar-launch-btn:disabled {
+				opacity: 0.45;
+				cursor: not-allowed;
+			}
+			.ar-launch-btn svg {
+				flex-shrink: 0;
+			}
+
+			/* Living-agent handoff: the avatar walks and talks in your room on /irl. */
+			.ar-live-btn {
+				width: 100%;
+				max-width: 380px;
+				height: 52px;
+				margin-top: 10px;
+				background: rgba(255, 255, 255, 0.08);
+				color: #ffffff;
+				border: 1px solid rgba(255, 255, 255, 0.22);
+				border-radius: 16px;
+				font-family: 'Space Grotesk', system-ui, sans-serif;
+				font-size: 15.5px;
+				font-weight: 700;
+				letter-spacing: -0.01em;
+				cursor: pointer;
+				display: flex;
+				align-items: center;
+				justify-content: center;
+				gap: 9px;
+				text-decoration: none;
+				transition:
+					transform var(--duration-fast),
+					background var(--duration-base),
+					border-color var(--duration-base);
+			}
+			.ar-live-btn:hover {
+				transform: translateY(-2px);
+				background: rgba(255, 255, 255, 0.14);
+				border-color: rgba(255, 255, 255, 0.34);
+			}
+			.ar-live-btn:active {
+				transform: translateY(0);
+			}
+			.ar-live-btn:focus-visible {
+				outline: 2px solid #ffffff;
+				outline-offset: 2px;
+			}
+			.ar-live-btn[hidden] {
+				display: none;
+			}
+			.ar-live-btn svg {
+				flex-shrink: 0;
+			}
+
+			/* ── Footer links ─────────────────────────────── */
+			.ar-footer-links {
+				display: flex;
+				align-items: center;
+				gap: 8px;
+				margin-top: 12px;
+				justify-content: center;
+				flex-wrap: wrap;
+			}
+			.ar-footer-link {
+				font-size: 12px;
+				color: var(--text-3);
+				text-decoration: none;
+				transition: color var(--duration-fast);
+			}
+			.ar-footer-link:hover { color: var(--text-2); }
+			.ar-footer-sep { font-size: 12px; color: var(--text-3); }
+
+			/* ── Error state ──────────────────────────────────
+			   The only thing a visitor sees when a link is stale, an agent has
+			   no body yet, or a fetch fails. It used to be one line of grey
+			   text on a black page with nowhere to go, which is a dead end
+			   dressed as a message. It is a panel now: what happened, in plain
+			   language, and at least one action that always works. */
+			.ar-error {
+				display: flex;
+				flex-direction: column;
+				align-items: center;
+				justify-content: center;
+				gap: var(--space-sm);
+				height: 100%;
+				padding: var(--space-xl) var(--space-md);
+				text-align: center;
+				outline: none;
+			}
+			.ar-error__title {
+				margin: 0;
+				font-size: clamp(18px, 4.5vw, 22px);
+				font-weight: 600;
+				letter-spacing: -0.01em;
+				color: var(--text);
+			}
+			.ar-error__body {
+				margin: 0;
+				max-width: 42ch;
+				font-size: 15px;
+				line-height: var(--leading-normal);
+				color: var(--text-2);
+			}
+			.ar-error__actions {
+				display: flex;
+				flex-wrap: wrap;
+				justify-content: center;
+				gap: var(--space-xs);
+				margin-top: var(--space-xs);
+			}
+			.ar-error__btn {
+				display: inline-flex;
+				align-items: center;
+				justify-content: center;
+				min-height: 44px;
+				padding: 0 var(--space-lg);
+				border-radius: var(--radius-pill);
+				border: 1px solid var(--border);
+				background: var(--panel);
+				color: var(--text);
+				font: inherit;
+				font-size: 14px;
+				font-weight: 600;
+				text-decoration: none;
+				cursor: pointer;
+				transition:
+					background var(--duration-fast) var(--ease-standard),
+					border-color var(--duration-fast) var(--ease-standard),
+					color var(--duration-fast) var(--ease-standard),
+					transform var(--duration-fast) var(--ease-standard);
+			}
+			.ar-error__btn:hover {
+				border-color: var(--accent);
+				background: var(--surface-2);
+				color: var(--ink-bright);
+			}
+			.ar-error__btn:active {
+				transform: translateY(1px);
+			}
+			.ar-error__btn--primary {
+				background: var(--accent);
+				border-color: transparent;
+				color: var(--on-accent);
+			}
+			.ar-error__btn--primary:hover {
+				background: var(--btn-primary-bg-hover, #ffffff);
+				color: var(--on-accent);
+			}
+		</style>
+	</head>
+	<body>
+		<div class="ar-bg" aria-hidden="true"></div>
+
+		<div id="ar-shell">
+			<agent-3d id="ar-viewer" eager ar ar-modes="webxr scene-viewer quick-look" ar-placement="floor"></agent-3d>
+
+			<header class="ar-topbar">
+				<a class="ar-back" id="ar-back-link" href="/marketplace">
+					<svg
+						width="18"
+						height="18"
+						viewBox="0 0 24 24"
+						fill="none"
+						stroke="currentColor"
+						stroke-width="2.2"
+						stroke-linecap="round"
+						stroke-linejoin="round"
+						aria-hidden="true"
+					>
+						<polyline points="15 18 9 12 15 6" />
+					</svg>
+					Back
+				</a>
+				<div class="ar-topbar-center" id="view-switch-slot">
+					<span class="ar-badge" data-i18n-html="ar.ar_ready">
+						<span class="ar-badge-dot"></span>
+						AR Ready
+					</span>
+				</div>
+				<button class="ar-share-btn" id="ar-share-btn" type="button" aria-label="Share" data-i18n="ar.share" data-i18n-attr="aria-label:ar.share_arialabel">
+					Share
+				</button>
+			</header>
+
+			<footer class="ar-bottom">
+				<h1 class="ar-avatar-name" id="ar-avatar-name" data-i18n="ar.loading">Loading…</h1>
+				<p class="ar-subtitle" data-i18n="ar.point_your_device_at_a_flat_surface">Point your device at a flat surface to place</p>
+				<p class="ar-status" id="ar-status" hidden>
+					<span class="ar-status-spinner" aria-hidden="true"></span>
+					<span id="ar-status-text"></span>
+				</p>
+				<button
+					class="ar-launch-btn"
+					id="ar-launch-btn"
+					type="button"
+					disabled
+					aria-busy="true"
+				>
+					<svg
+						width="20"
+						height="20"
+						viewBox="0 0 24 24"
+						fill="none"
+						stroke="currentColor"
+						stroke-width="2"
+						stroke-linecap="round"
+						stroke-linejoin="round"
+						aria-hidden="true"
+					>
+						<path
+							d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"
+						/>
+					</svg>
+					Place in your space
+				</button>
+				<a
+					class="ar-live-btn"
+					id="ar-live-link"
+					href="/irl"
+					aria-label="Bring this avatar to life: it walks and talks with you through your camera"
+					hidden
+				 data-i18n-attr="aria-label:ar.bring_this_avatar_to_life_it_arialabel">
+					<svg
+						width="19"
+						height="19"
+						viewBox="0 0 24 24"
+						fill="none"
+						stroke="currentColor"
+						stroke-width="2"
+						stroke-linecap="round"
+						stroke-linejoin="round"
+						aria-hidden="true"
+					>
+						<circle cx="12" cy="5" r="3" />
+						<path d="M12 8v6" />
+						<path d="M9 22l3-8 3 8" />
+						<path d="M8 12h8" />
+					</svg>
+					Bring it to life
+				</a>
+				<div class="ar-footer-links">
+					<a href="/features/ar" class="ar-footer-link" data-i18n="ar.ar_feature_overview">AR feature overview</a>
+					<span class="ar-footer-sep" aria-hidden="true">·</span>
+					<a href="/docs/ar" class="ar-footer-link" data-i18n="ar.how_it_works">How it works</a>
+					<span class="ar-footer-sep" aria-hidden="true">·</span>
+					<a href="/forge" class="ar-footer-link" data-i18n="ar.make_your_own">Make your own</a>
+				</div>
+			</footer>
+		</div>
+		<script src="/brand.js" defer></script>
+		<!-- Runtime i18n: detects locale, swaps annotated copy, mounts <lang-switcher>. -->
+	<script type="module" src="/i18n.js"></script>
+</body>
+</html>

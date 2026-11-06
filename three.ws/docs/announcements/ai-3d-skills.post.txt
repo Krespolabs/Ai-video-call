@@ -1,0 +1,9 @@
+Your AI can make 3D now.
+
+Install our free 3D skills for Claude, then ask it for a chair.
+
+It checks 3,500+ free 3D assets first. If nothing fits, it makes a new model from your words.
+
+No account. No API key.
+
+three.ws/docs/agent-skills

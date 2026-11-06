@@ -1,0 +1,433 @@
+<!doctype html>
+<!-- data-walk-auto="off": this page runs its own bottom-right avatar widget as
+     a live demo, so suppress the site's auto-summoned walk companion to avoid
+     two mascots stacking in the same corner (nav.js honors this attribute). -->
+<html lang="en" data-walk-auto="off">
+	<head>
+		<script>/* three.ws theme boot — no-flash; runtime in /theme-switcher.js */(function(){try{var m=localStorage.getItem('twx_theme');var l=m==='auto'?(window.matchMedia&&window.matchMedia('(prefers-color-scheme: light)').matches):m==='light';document.documentElement.setAttribute('data-theme',l?'light':'dark');}catch(e){document.documentElement.setAttribute('data-theme','dark');}})();</script>
+		<style>/* three.ws hidden-guard — make the `hidden` attribute authoritative; see scripts/lib/hidden-guard.mjs */[hidden]{display:none!important}</style>
+		<meta charset="utf-8" />
+		<link rel="icon" href="/favicon.ico" sizes="any" />
+		<link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+		<link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png" />
+		<link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png" />
+		<link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+		<link rel="manifest" href="/manifest.webmanifest" />
+		<meta name="viewport" content="width=device-width, initial-scale=1" />
+		<title data-i18n="assistant.meta_title">Assistant widget — three.ws</title>
+		<meta name="description" content="Put a 3D avatar assistant on any website with one script tag. Chatbot mode (free models or your own Groq/OpenRouter key) and speak mode — the avatar says whatever you type, out loud, with a speech bubble."  data-i18n-attr="content:assistant.meta_description"/>
+	<meta property="og:type" content="website" />
+	<meta property="og:site_name" content="three.ws" />
+	<meta property="og:url" content="https://three.ws/assistant" />
+	<meta property="og:title" content="Assistant widget — three.ws"  data-i18n-attr="content:assistant.meta_og_title"/>
+	<meta property="og:description" content="Put a 3D avatar assistant on any website with one script tag. Chat mode and speak mode, transparent or gradient backgrounds, free models or bring your own key."  data-i18n-attr="content:assistant.meta_og_description"/>
+	<meta property="og:image" content="https://three.ws/api/page-og?s=build&amp;t=Assistant+widget&amp;d=Put+a+3D+avatar+assistant+on+any+website+with+one+script+tag.+A+floating+launcher+opens+a+real+animated+avatar%2C+against+your+page%2C+a+color%2C+or+a+gradient%2C+with&amp;p=%2Fassistant" />
+	<meta property="og:image:width" content="1200" />
+	<meta property="og:image:height" content="630" />
+	<meta name="twitter:card" content="summary_large_image" />
+	<meta name="twitter:site" content="@trythreews" />
+	<meta name="twitter:title" content="Assistant widget — three.ws"  data-i18n-attr="content:assistant.meta_twitter_title"/>
+	<meta name="twitter:description" content="Put a 3D avatar assistant on any website with one script tag. Chat mode and speak mode, transparent or gradient backgrounds, free models or bring your own key."  data-i18n-attr="content:assistant.meta_twitter_description"/>
+	<meta name="twitter:image" content="https://three.ws/api/page-og?s=build&amp;t=Assistant+widget&amp;d=Put+a+3D+avatar+assistant+on+any+website+with+one+script+tag.+A+floating+launcher+opens+a+real+animated+avatar%2C+against+your+page%2C+a+color%2C+or+a+gradient%2C+with&amp;p=%2Fassistant" />
+		<style>
+			:root {
+				--bg: #09090b;
+				--panel: #111114;
+				--border: rgba(255, 255, 255, 0.09);
+				--ink: #fafafa;
+				--dim: #a1a1aa;
+				--accent: #f97316;
+			}
+			* { box-sizing: border-box; }
+			html, body {
+				margin: 0;
+				padding: 0;
+				background: var(--bg);
+				color: var(--ink);
+				font-family: 'Inter', system-ui, -apple-system, sans-serif;
+				-webkit-font-smoothing: antialiased;
+			}
+			main {
+				max-width: 1080px;
+				margin: 0 auto;
+				padding: 56px 20px 120px;
+			}
+			.hero h1 {
+				margin: 0 0 12px;
+				font-size: clamp(30px, 5vw, 44px);
+				letter-spacing: -0.02em;
+				line-height: 1.1;
+			}
+			.hero h1 .accent { color: var(--accent); }
+			.hero p.lede {
+				margin: 0 0 8px;
+				max-width: 640px;
+				color: var(--dim);
+				font-size: 16px;
+				line-height: 1.6;
+			}
+			.hero .hint {
+				font-size: 13px;
+				color: var(--dim);
+				background: rgba(249, 115, 22, 0.08);
+				border: 1px solid rgba(249, 115, 22, 0.25);
+				border-radius: 10px;
+				padding: 9px 12px;
+				display: inline-flex;
+				align-items: center;
+				gap: 8px;
+				margin-top: 14px;
+			}
+
+			.builder {
+				display: grid;
+				grid-template-columns: 1fr;
+				gap: 24px;
+				margin-top: 44px;
+			}
+			@media (min-width: 860px) {
+				.builder { grid-template-columns: 420px 1fr; align-items: start; }
+			}
+
+			.card {
+				background: var(--panel);
+				border: 1px solid var(--border);
+				border-radius: 16px;
+				padding: 20px;
+			}
+			.card h2 {
+				margin: 0 0 16px;
+				font-size: 13px;
+				font-weight: 700;
+				letter-spacing: 0.07em;
+				text-transform: uppercase;
+				color: var(--dim);
+			}
+			.field { margin-bottom: 16px; }
+			.field > label {
+				display: block;
+				font-size: 12.5px;
+				font-weight: 600;
+				color: var(--dim);
+				margin-bottom: 6px;
+			}
+			.field input[type='text'],
+			.field select,
+			.field textarea {
+				width: 100%;
+				background: rgba(255, 255, 255, 0.04);
+				border: 1px solid var(--border);
+				border-radius: 10px;
+				color: var(--ink);
+				font: 400 13.5px/1.4 'Inter', system-ui, sans-serif;
+				padding: 9px 11px;
+				outline: 0;
+				transition: border-color 0.15s ease;
+			}
+			.field textarea { resize: vertical; min-height: 56px; }
+			.field input:focus, .field select:focus, .field textarea:focus { border-color: var(--accent); }
+			.field .row { display: flex; gap: 8px; }
+			.field .row > * { flex: 1; }
+			.seg {
+				display: inline-flex;
+				gap: 2px;
+				padding: 2px;
+				border-radius: 10px;
+				background: rgba(255, 255, 255, 0.05);
+				border: 1px solid var(--border);
+			}
+			.seg button {
+				appearance: none;
+				border: 0;
+				background: transparent;
+				color: var(--dim);
+				font: 600 12px/1 'Inter', system-ui, sans-serif;
+				padding: 7px 13px;
+				border-radius: 8px;
+				cursor: pointer;
+				transition: background 0.15s ease, color 0.15s ease;
+			}
+			.seg button:hover { color: var(--ink); }
+			.seg button:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+			.seg button[aria-pressed='true'] { background: rgba(255, 255, 255, 0.12); color: var(--ink); }
+			input[type='color'] {
+				width: 42px;
+				height: 34px;
+				padding: 2px;
+				border: 1px solid var(--border);
+				border-radius: 8px;
+				background: rgba(255, 255, 255, 0.04);
+				cursor: pointer;
+			}
+			.swatches { display: flex; gap: 6px; flex-wrap: wrap; }
+			.swatch {
+				width: 34px;
+				height: 34px;
+				border-radius: 9px;
+				border: 2px solid transparent;
+				cursor: pointer;
+				padding: 0;
+				transition: transform 0.12s ease, border-color 0.15s ease;
+			}
+			.swatch:hover { transform: translateY(-1px); }
+			.swatch:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+			.swatch[aria-pressed='true'] { border-color: #fff; }
+			.swatch.transparent {
+				background:
+					linear-gradient(45deg, #2a2a2e 25%, transparent 25%, transparent 75%, #2a2a2e 75%),
+					linear-gradient(45deg, #2a2a2e 25%, #18181b 25%, #18181b 75%, #2a2a2e 75%);
+				background-size: 10px 10px;
+				background-position: 0 0, 5px 5px;
+			}
+
+			.snippet-card { position: sticky; top: 20px; }
+			.snippet {
+				position: relative;
+				background: #0a0a0c;
+				border: 1px solid var(--border);
+				border-radius: 12px;
+				padding: 16px;
+				font: 400 12.5px/1.65 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+				color: #d4d4d8;
+				overflow-x: auto;
+				white-space: pre;
+			}
+			.snippet .tag { color: #7dd3fc; }
+			.snippet .attr { color: var(--warn, #fbbf24); }
+			.snippet .val { color: #86efac; }
+			.copy-btn {
+				margin-top: 12px;
+				appearance: none;
+				border: 0;
+				border-radius: 10px;
+				background: var(--accent);
+				color: #fff;
+				font: 700 13.5px/1 'Inter', system-ui, sans-serif;
+				padding: 11px 18px;
+				cursor: pointer;
+				transition: filter 0.15s ease, transform 0.1s ease;
+			}
+			.copy-btn:hover { filter: brightness(1.1); }
+			.copy-btn:active { transform: scale(0.97); }
+			.copy-btn:focus-visible { outline: 2px solid #fff; outline-offset: 2px; }
+			.snippet-note { font-size: 12px; color: var(--dim); line-height: 1.6; margin-top: 12px; }
+			.snippet-note a { color: var(--ink); }
+
+			/* Live-preview state line: the page mounts the real widget, so it says
+			   whether that mount is starting, running, or broken (and offers a
+			   retry) instead of leaving a silent empty corner. */
+			.preview-status {
+				display: flex;
+				align-items: center;
+				gap: 8px;
+				flex-wrap: wrap;
+				margin-top: 12px;
+				padding: 9px 11px;
+				border-radius: 10px;
+				border: 1px solid var(--border);
+				background: rgba(255, 255, 255, 0.03);
+				font-size: 12px;
+				line-height: 1.5;
+				color: var(--dim);
+			}
+			.preview-status .dot {
+				width: 7px;
+				height: 7px;
+				border-radius: 50%;
+				flex: 0 0 auto;
+				background: var(--dim);
+			}
+			.preview-status[data-state='loading'] .dot { background: var(--warn, #fbbf24); }
+			.preview-status[data-state='ready'] .dot { background: var(--success, #4ade80); }
+			.preview-status[data-state='error'] {
+				border-color: rgba(248, 113, 113, 0.45);
+				background: rgba(248, 113, 113, 0.08);
+				color: #fecaca;
+			}
+			.preview-status[data-state='error'] .dot { background: var(--danger, #f87171); }
+			.preview-status[data-state='degraded'] { border-color: rgba(251, 191, 36, 0.4); }
+			.preview-status[data-state='degraded'] .dot { background: var(--warn, #fbbf24); }
+			.preview-status button {
+				margin-left: auto;
+				appearance: none;
+				border: 1px solid var(--border);
+				border-radius: 8px;
+				background: rgba(255, 255, 255, 0.06);
+				color: var(--ink);
+				font: 600 12px/1 'Inter', system-ui, sans-serif;
+				padding: 6px 11px;
+				cursor: pointer;
+				transition: background 0.15s ease, border-color 0.15s ease, transform 0.1s ease;
+			}
+			.preview-status button:hover { background: rgba(255, 255, 255, 0.12); }
+			.preview-status button:active { transform: scale(0.97); }
+			.preview-status button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+			@media (prefers-reduced-motion: reduce) {
+				.preview-status button { transition: none; }
+			}
+
+			.features {
+				display: grid;
+				grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+				gap: 16px;
+				margin-top: 56px;
+			}
+			.feature h3 { margin: 0 0 6px; font-size: 15px; }
+			.feature p { margin: 0; color: var(--dim); font-size: 13.5px; line-height: 1.6; }
+
+			.docs-link { margin-top: 40px; font-size: 14px; color: var(--dim); }
+			.docs-link a { color: var(--ink); }
+		</style>
+	
+	<link rel="canonical" href="https://three.ws/assistant">
+	<meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1">
+	<meta property="og:locale" content="en_US">
+	<meta property="og:image:alt" content="Assistant widget — three.ws">
+	<script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"WebPage","name":"Assistant widget","description":"Put a 3D avatar assistant on any website with one script tag. A floating launcher opens a real animated avatar, against your page, a color, or a gradient, with a chatbot mode (free models or your own Groq/OpenRouter key) and a speak mode where the avatar says whatever you type out loud in a speech bubble.","url":"https://three.ws/assistant","isPartOf":{"@type":"WebSite","name":"three.ws","url":"https://three.ws"},"primaryImageOfPage":"https://three.ws/api/page-og?s=build&t=Assistant+widget&d=Put+a+3D+avatar+assistant+on+any+website+with+one+script+tag.+A+floating+launcher+opens+a+real+animated+avatar%2C+against+your+page%2C+a+color%2C+or+a+gradient%2C+with+&p=%2Fassistant"}]}</script>
+</head>
+	<body>
+		<main>
+			<section class="hero">
+				<h1 data-i18n-html="assistant.a_3d_avatar_assistant_on_any_website">A 3D avatar assistant <br /><span class="accent">on any website.</span></h1>
+				<p class="lede" data-i18n="assistant.one_script_tag_adds_a_floating_launcher">
+					One script tag adds a floating launcher to your site. Click it and a real,
+					animated 3D avatar pops up — against your page, a color, or a gradient — with
+					two modes: a chatbot that answers questions (free models, or bring your own
+					Groq / OpenRouter key), and a speak mode where the avatar says exactly what you
+					type, out loud, in a speech bubble.
+				</p>
+				<span class="hint">
+					<svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 2l1.9 6.1L20 10l-6.1 1.9L12 18l-1.9-6.1L4 10l6.1-1.9L12 2z" /></svg>
+					This page runs the real widget — try the launcher in the corner. Your builder choices update it live.
+				</span>
+			</section>
+
+			<div class="builder">
+				<div class="card" id="builder-controls">
+					<h2 data-i18n="assistant.configure">Configure</h2>
+
+					<div class="field">
+						<label for="cfg-avatar" data-i18n="assistant.avatar">Avatar</label>
+						<select id="cfg-avatar">
+							<option value="" data-i18n="assistant.default_mannequin">Default mannequin</option>
+							<option value="/avatars/selfie-girl.glb" data-i18n="assistant.selfie_girl">Selfie girl</option>
+							<option value="/avatars/realistic-male.glb" data-i18n="assistant.realistic_male">Realistic male</option>
+							<option value="/avatars/realistic-female.glb" data-i18n="assistant.realistic_female">Realistic female</option>
+							<option value="/avatars/michelle.glb" data-i18n="assistant.michelle">Michelle</option>
+							<option value="/avatars/xbot.glb" data-i18n="assistant.x_bot">X Bot</option>
+							<option value="custom" data-i18n="assistant.custom_glb_url">Custom GLB URL…</option>
+						</select>
+						<input type="text" id="cfg-avatar-url" placeholder="https://… .glb (or a three.ws avatar id)" hidden style="margin-top: 8px" aria-label="Custom avatar GLB URL or three.ws avatar id" data-i18n-attr="aria-label:assistant.custom_avatar_glb_url_arialabel" />
+					</div>
+
+					<div class="field">
+						<label id="cfg-bg-label" data-i18n="assistant.background">Background</label>
+						<div class="swatches" role="group" aria-labelledby="cfg-bg-label">
+							<button type="button" class="swatch transparent" data-bg="" aria-pressed="true" title="Transparent — avatar floats on your page" aria-label="Transparent background" data-i18n-attr="aria-label:assistant.transparent_background_arialabel;title:assistant.transparent_avatar_floats_on_title"></button>
+							<button type="button" class="swatch" data-bg="#0a0a0c" style="background:#0a0a0c" title="Solid dark" aria-label="Solid dark background" data-i18n-attr="aria-label:assistant.solid_dark_background_arialabel;title:assistant.solid_dark_title"></button>
+							<button type="button" class="swatch" data-bg="ember" style="background:linear-gradient(160deg,#1a0b05,#7c2d12)" title="Ember gradient" aria-label="Ember gradient background" data-i18n-attr="aria-label:assistant.ember_gradient_background_arialabel;title:assistant.ember_gradient_title"></button>
+							<button type="button" class="swatch" data-bg="ocean" style="background:linear-gradient(160deg,#020617,#0c4a6e)" title="Ocean gradient" aria-label="Ocean gradient background" data-i18n-attr="aria-label:assistant.ocean_gradient_background_arialabel;title:assistant.ocean_gradient_title"></button>
+							<button type="button" class="swatch" data-bg="violet" style="background:linear-gradient(160deg,#0f0518,#5b21b6)" title="Violet gradient" aria-label="Violet gradient background" data-i18n-attr="aria-label:assistant.violet_gradient_background_arialabel;title:assistant.violet_gradient_title"></button>
+							<button type="button" class="swatch" data-bg="dusk" style="background:linear-gradient(200deg,#0b0714,#9d174d)" title="Dusk gradient" aria-label="Dusk gradient background" data-i18n-attr="aria-label:assistant.dusk_gradient_background_arialabel;title:assistant.dusk_gradient_title"></button>
+							<button type="button" class="swatch" data-bg="custom-color" id="cfg-bg-custom" title="Pick a solid color" aria-label="Custom solid color" style="background:conic-gradient(red,yellow,lime,cyan,blue,magenta,red)" data-i18n-attr="aria-label:assistant.custom_solid_color_arialabel;title:assistant.pick_a_solid_color_title"></button>
+						</div>
+						<input type="color" id="cfg-bg-color" value="#101820" hidden style="margin-top: 8px" aria-label="Custom background color" />
+					</div>
+
+					<div class="field">
+						<label id="cfg-mode-label" data-i18n="assistant.mode">Mode</label>
+						<div class="seg" role="group" aria-labelledby="cfg-mode-label">
+							<button type="button" data-mode="both" aria-pressed="true" data-i18n="assistant.chat_speak">Chat + Speak</button>
+							<button type="button" data-mode="chat" aria-pressed="false" data-i18n="assistant.chat_only">Chat only</button>
+							<button type="button" data-mode="speak" aria-pressed="false" data-i18n="assistant.speak_only">Speak only</button>
+						</div>
+					</div>
+
+					<div class="field">
+						<label for="cfg-name" data-i18n="assistant.assistant_name">Assistant name</label>
+						<input type="text" id="cfg-name" placeholder="Atelier AI" maxlength="60" />
+					</div>
+
+					<div class="field">
+						<label for="cfg-greeting" data-i18n="assistant.greeting">Greeting</label>
+						<input type="text" id="cfg-greeting" placeholder="Ask anything about Atelier." maxlength="200" />
+					</div>
+
+					<div class="field">
+						<label for="cfg-context" data-i18n="assistant.what_should_the_chatbot_know_about_your">What should the chatbot know about your site?</label>
+						<textarea id="cfg-context" placeholder="Atelier is a design studio that…" maxlength="500"></textarea>
+					</div>
+
+					<div class="field">
+						<label for="cfg-accent" data-i18n="assistant.accent_color">Accent color</label>
+						<div class="row" style="align-items: center">
+							<input type="color" id="cfg-accent" value="#f97316" style="flex: 0 0 auto" />
+							<span style="font-size: 12px; color: var(--dim)" data-i18n="assistant.launcher_button_send_button_focus_rings">Launcher button, send button, focus rings.</span>
+						</div>
+					</div>
+
+					<div class="field">
+						<label id="cfg-pos-label" data-i18n="assistant.position">Position</label>
+						<div class="seg" role="group" aria-labelledby="cfg-pos-label">
+							<button type="button" data-pos="right" aria-pressed="true" data-i18n="assistant.bottom_right">Bottom right</button>
+							<button type="button" data-pos="left" aria-pressed="false" data-i18n="assistant.bottom_left">Bottom left</button>
+						</div>
+					</div>
+				</div>
+
+				<div class="card snippet-card">
+					<h2 data-i18n="assistant.your_snippet">Your snippet</h2>
+					<div class="snippet" id="snippet" tabindex="0" aria-label="Embed code"></div>
+					<button type="button" class="copy-btn" id="copy-btn" data-i18n="assistant.copy_snippet">Copy snippet</button>
+					<p class="preview-status" id="preview-status" data-state="loading" role="status" aria-live="polite">
+						<span class="dot" aria-hidden="true"></span>
+						<!-- One span per state, toggled by src/assistant-page.js. The copy stays
+						     in the markup (rather than in JS strings) so the i18n catalog pass
+						     translates every state and can never revert a live one. -->
+						<span class="preview-msg" data-preview-state="loading" data-i18n="assistant.starting_the_live_preview">Starting the live preview...</span>
+						<span class="preview-msg" data-preview-state="ready" hidden data-i18n="assistant.live_preview_running_in_the_corner_every">Live preview running in the corner. Every change above re-mounts it.</span>
+						<span class="preview-msg" data-preview-state="degraded" hidden data-i18n="assistant.the_preview_mounted_but_its_3d_avatar">The preview mounted, but its 3D avatar did not load. Your snippet above is still correct.</span>
+						<span class="preview-msg" data-preview-state="error" hidden data-i18n="assistant.the_live_preview_could_not_start_the">The live preview could not start (the widget script did not load). Your snippet above is still correct, and the widget works on your own site.</span>
+						<button type="button" id="preview-retry" hidden data-i18n="assistant.retry">Retry</button>
+					</p>
+					<p class="snippet-note" data-i18n-html="assistant.paste_it_before_on_any_site_chat">
+						Paste it before <code>&lt;/body&gt;</code> on any site. Chat answers come from the
+						free model chain (Groq → OpenRouter → NVIDIA) by default; visitors can switch to
+						their own Groq or OpenRouter key in the widget's settings — keys stay in their
+						browser. Speak mode uses the browser's built-in voices. Full docs:
+						<a href="/docs">/docs</a>.
+					</p>
+				</div>
+			</div>
+
+			<section class="features">
+				<div class="card feature">
+					<h3 data-i18n="assistant.not_a_render_not_a_video">Not a render. Not a video.</h3>
+					<p data-i18n="assistant.a_real_animated_3d_character_with_idle">A real animated 3D character with idle, wave, and talking animations — standing directly on your page when the background is transparent.</p>
+				</div>
+				<div class="card feature">
+					<h3 data-i18n="assistant.chatbot_with_real_brains">Chatbot with real brains</h3>
+					<p data-i18n="assistant.free_lane_needs_no_key_and_no">Free lane needs no key and no account. Or visitors bring their own Groq / OpenRouter key — it never leaves their browser and never touches your site's code.</p>
+				</div>
+				<div class="card feature">
+					<h3 data-i18n="assistant.speak_mode">Speak mode</h3>
+					<p data-i18n="assistant.type_anything_and_the_avatar_says_it">Type anything and the avatar says it out loud with a speech bubble — browser text-to-speech, pickable voices, zero cost.</p>
+				</div>
+				<div class="card feature">
+					<h3 data-i18n="assistant.any_avatar">Any avatar</h3>
+					<p data-i18n-html="assistant.use_a_built_in_body_any_three">Use a built-in body, any three.ws avatar id (make one in <a href="/forge" style="color: var(--ink)">Forge</a>), a GLB URL, or an agent's body via <code>data-agent</code>.</p>
+				</div>
+			</section>
+
+			<p class="docs-link" data-i18n-html="assistant.docs_developer_docs_related_3d_embeds_walkin">
+				Docs: <a href="/docs">developer docs</a> · Related: <a href="/studio">3D embeds</a> ·
+				<a href="/walk-embed">walking avatar embed</a> · <a href="/widget">creator widgets</a>
+			</p>
+		</main>
+
+		<script type="module" src="/src/assistant-page.js"></script>
+		<script src="/nav.js"></script>
+		<!-- Runtime i18n: detects locale, swaps annotated copy, mounts <lang-switcher>. -->
+	<script type="module" src="/i18n.js"></script>
+</body>
+</html>

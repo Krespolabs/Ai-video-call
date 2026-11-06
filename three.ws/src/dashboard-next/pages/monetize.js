@@ -1,0 +1,2211 @@
+// dashboard-next — Monetize page.
+//
+// Agent monetization hub: skill pricing controls, payout wallet config,
+// withdrawable balance, withdrawal interface, subscription plans, and token earnings.
+// All data from real /api/* endpoints.
+
+import { mountShell } from '../shell.js';
+import { requireUser, get, post, put, del, esc, relTime, formatUsdc, ApiError } from '../api.js';
+import { errorStateHTML, ensureStateKitStyles } from '../../shared/state-kit.js';
+import { withPayoutStepUp, cooldownNotice } from '../../payout-step-up.js';
+
+const USDC_MINTS = {
+	solana: 'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v',
+	base: '0x833589fcd6edb6e08f4c7c32d4f71b54bda02913',
+};
+const MIN_WITHDRAWAL_USDC_ATOMICS = 1_000_000;
+
+const SOLANA_ADDR_RE = /^[1-9A-HJ-NP-Za-km-z]{32,44}$/;
+const EVM_ADDR_RE = /^0x[a-fA-F0-9]{40}$/;
+
+const PAYMENT_FILTERS = [
+	{ key: 'all',           label: 'All' },
+	{ key: 'subscriptions', label: 'Subscriptions' },
+	{ key: 'api',           label: 'API' },
+	{ key: 'skills',        label: 'Skills' },
+	{ key: 'tips',          label: 'Tips' },
+];
+
+let selectedAgentId = null;
+
+(async function boot() {
+	try {
+		const main = await mountShell();
+		const me = await requireUser();
+
+		main.innerHTML = `
+			<div style="display:flex;align-items:flex-start;justify-content:space-between;gap:16px;flex-wrap:wrap;margin-bottom:6px">
+				<div>
+					<h1 class="dn-h1">Monetize Your Agents</h1>
+					<p class="dn-h1-sub">Set skill prices, configure payouts, and track your earnings in USDC.</p>
+				</div>
+				<div data-slot="agent-selector"></div>
+			</div>
+			<div data-slot="content" style="display:flex;flex-direction:column;gap:18px"></div>
+		`;
+
+		injectStyles();
+		const host = main.querySelector('[data-slot="content"]');
+		const selectorHost = main.querySelector('[data-slot="agent-selector"]');
+		renderSkeleton(host);
+
+		const agentsResp = await safe(() => get('/api/agents'));
+		const agents = agentsResp?.agents || [];
+		renderAgentSelector(selectorHost, agents, host, me);
+
+		if (agents.length > 0) {
+			selectedAgentId = agents[0].id;
+		}
+
+		await loadAndRender(host, me, agents);
+	} catch (err) {
+		if (err instanceof ApiError && err.status === 401) {
+			const ret = encodeURIComponent(location.pathname + location.search);
+			location.href = `/login?return=${ret}`;
+			return;
+		}
+		throw err;
+	}
+})();
+
+// -- Agent selector dropdown --
+
+function renderAgentSelector(host, agents, contentHost, me) {
+	if (!agents.length) {
+		host.innerHTML = `<a class="dn-btn primary" href="/dashboard/agents">Create an Agent</a>`;
+		return;
+	}
+
+	host.innerHTML = `
+		<select data-slot="agent-select" class="mon-select" aria-label="Select agent">
+			${agents.map(a => `<option value="${esc(a.id)}">${esc(a.name || a.slug || 'Unnamed Agent')}</option>`).join('')}
+		</select>
+	`;
+
+	host.querySelector('[data-slot="agent-select"]').addEventListener('change', async (e) => {
+		selectedAgentId = e.target.value;
+		renderSkeleton(contentHost);
+		await loadAndRender(contentHost, me, agents);
+	});
+}
+
+// -- Data loading --
+
+async function loadAndRender(host, me, agents) {
+	const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+	const creatorParam = me.id && UUID_RE.test(me.id) ? encodeURIComponent(me.id) : null;
+
+	const agentParam = selectedAgentId ? `agent_id=${encodeURIComponent(selectedAgentId)}` : '';
+
+	const [
+		balanceResp, withdrawalsResp, walletsResp, summary, plans,
+		earningsResp, pricesResp, monWalletResp, feeInfo,
+	] = await Promise.all([
+		safe(() => get('/api/monetization/withdrawals?limit=1')),
+		safe(() => get('/api/billing/withdrawals?limit=50')),
+		safe(() => get('/api/billing/payout-wallets')),
+		safe(() => get('/api/billing/summary')),
+		creatorParam
+			? safe(() => get(`/api/subscriptions/plans?creator_id=${creatorParam}`))
+			: Promise.resolve(null),
+		safe(() => get('/api/users/me/earnings')),
+		selectedAgentId ? safe(() => get(`/api/monetization/prices?${agentParam}`)) : Promise.resolve(null),
+		selectedAgentId ? safe(() => get(`/api/monetization/wallet?${agentParam}`)) : Promise.resolve(null),
+		safe(() => get('/api/billing/fee-info')),
+	]);
+
+	// Platform fee, used to show agent owners their net per-payment take when
+	// pricing skills. Fall back to the documented 2.5% default if the rate
+	// endpoint is unreachable so the UI never renders a misleading "0% fee".
+	const feeBps = Number.isFinite(Number(feeInfo?.fee_bps)) ? Number(feeInfo.fee_bps) : 250;
+
+	// If every primary earnings surface failed to load, the page would otherwise
+	// render an all-zero hero and empty panels with no signal that the data is
+	// simply unreachable. Surface a single retryable error instead.
+	const allPrimaryFailed = balanceResp === null && withdrawalsResp === null
+		&& walletsResp === null && summary === null;
+	if (allPrimaryFailed) {
+		ensureStateKitStyles();
+		host.innerHTML = errorStateHTML({
+			title: "Couldn't load your earnings",
+			body: 'We had trouble reaching the billing service. Check your connection and try again.',
+		});
+		host.querySelector('[data-sk-retry]')?.addEventListener('click', () => {
+			renderSkeleton(host);
+			loadAndRender(host, me, agents);
+		});
+		return;
+	}
+
+	const withdrawals = withdrawalsResp?.withdrawals || [];
+	const wallets = walletsResp?.wallets || [];
+	const creatorPlans = plans?.plans || [];
+
+	// The withdrawal endpoint reports the same ledger it draws on (lifetime net
+	// earnings minus completed and in-flight withdrawals), so the balance shown
+	// here is exactly what a withdrawal request will be checked against.
+	const balance = balanceResp?.balance || {};
+	const toAtomics = (usd) => Math.round(Number(usd || 0) * 1_000_000);
+	const earnedAtomics = toAtomics(balance.earned_usdc);
+	const withdrawnAtomics = toAtomics(balance.withdrawn_usdc);
+	const inflightAtomics = toAtomics(balance.pending_usdc);
+	const pendingRoyaltyUsd = Number(earningsResp?.pending_usd ?? 0);
+	const pendingRoyaltyAtomics = Math.round(pendingRoyaltyUsd * 1_000_000);
+	const available = Math.max(0, toAtomics(balance.available_usdc) + pendingRoyaltyAtomics);
+
+	const skillPrices = pricesResp?.prices || pricesResp?.data?.prices || [];
+	const monWallet = monWalletResp?.wallet || monWalletResp?.data?.wallet || monWalletResp;
+
+	const payments = await fetchRecentPayments(agents);
+
+	host.innerHTML = '';
+	host.appendChild(renderHero({ available, earnedAtomics, withdrawnAtomics, inflightAtomics, pendingRoyaltyAtomics }));
+
+	if (selectedAgentId) {
+		host.appendChild(renderSkillPricing(skillPrices, selectedAgentId, host, me, agents, feeBps));
+		host.appendChild(renderPayoutWalletPanel(monWallet, selectedAgentId, host, me, agents, wallets));
+	}
+
+	host.appendChild(renderPaymentsPanel(payments));
+	host.appendChild(renderSubscriptionPlans({ creatorPlans, me }));
+	host.appendChild(renderWithdrawals({ withdrawals, wallets, available, host, me, agents }));
+	host.appendChild(renderLegacyPayoutWallets({ wallets, host, me, agents }));
+	host.appendChild(renderCosmeticEarnings({ wallets }));
+	host.appendChild(renderCosmeticSplit({ agents }));
+	host.appendChild(renderPlanUsage(summary));
+	host.appendChild(renderTokensPanel(agents));
+}
+
+async function safe(fn) {
+	try {
+		return await fn();
+	} catch (err) {
+		if (err instanceof ApiError && err.status === 401) throw err;
+		return null;
+	}
+}
+
+// -- Hero metrics --
+
+function renderHero({ available, earnedAtomics, withdrawnAtomics, inflightAtomics, pendingRoyaltyAtomics }) {
+	const wrap = document.createElement('div');
+	wrap.style.cssText = 'display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:14px';
+
+	wrap.appendChild(
+		heroCard({
+			title: 'Available to withdraw',
+			value: formatUsdc(available),
+			sub: pendingRoyaltyAtomics > 0
+				? `Net earnings + ${formatUsdc(pendingRoyaltyAtomics)} pending royalties, minus withdrawals.`
+				: 'Net earnings, minus completed and in-flight withdrawals.',
+			color: 'var(--nxt-success)',
+			button: { label: 'Withdraw', primary: true, action: 'open-withdraw' },
+		}),
+	);
+
+	wrap.appendChild(
+		heroCard({
+			title: 'Total earned',
+			value: formatUsdc(earnedAtomics),
+			sub: 'Lifetime net earnings across all skills, after platform fees.',
+			color: 'var(--nxt-success)',
+		}),
+	);
+
+	wrap.appendChild(
+		heroCard({
+			title: 'Withdrawn',
+			value: formatUsdc(withdrawnAtomics),
+			sub: 'Paid out to your payout wallets.',
+			color: 'var(--nxt-accent)',
+		}),
+	);
+
+	wrap.appendChild(
+		heroCard({
+			title: 'In flight',
+			value: formatUsdc(inflightAtomics),
+			sub: inflightAtomics > 0
+				? 'Withdrawals queued or processing on-chain.'
+				: 'No withdrawals in progress.',
+			color: 'var(--nxt-warn)',
+		}),
+	);
+
+	return wrap;
+}
+
+function heroCard({ title, value, sub, color, button }) {
+	const el = document.createElement('div');
+	el.className = 'dn-panel';
+	el.innerHTML = `
+		<div class="dn-panel-title">${esc(title)}</div>
+		<div style="font-size:28px;font-weight:700;color:${color || 'var(--nxt-ink)'};margin:6px 0 8px;letter-spacing:-0.02em;font-variant-numeric:tabular-nums">
+			${esc(value)}
+		</div>
+		<div class="dn-panel-sub" style="margin-bottom:${button ? '14px' : '0'}">${esc(sub)}</div>
+		${button ? `<button class="dn-btn${button.primary ? ' primary' : ''}" data-action="${esc(button.action)}">${esc(button.label)}</button>` : ''}
+	`;
+	if (button) {
+		el.querySelector(`[data-action="${button.action}"]`)?.addEventListener('click', () => {
+			document.dispatchEvent(new CustomEvent('dn:monetize:open-withdraw'));
+		});
+	}
+	return el;
+}
+
+// -- Skill Pricing Panel --
+
+function renderSkillPricing(prices, agentId, host, me, agents, feeBps = 250) {
+	const panel = document.createElement('div');
+	panel.className = 'dn-panel';
+	let skillPrices = [...prices];
+
+	const feePercent = (feeBps / 100).toFixed(feeBps % 100 === 0 ? 0 : 1);
+	const netOf = (price) => Math.max(0, price * (1 - feeBps / 10_000));
+
+	function paint() {
+		panel.innerHTML = `
+			<div style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:14px">
+				<div>
+					<div class="dn-panel-title">Skill Pricing &amp; Access</div>
+					<div class="dn-panel-sub" style="margin:2px 0 0">Charge USDC per call (platform takes ${esc(feePercent)}%) or gate a skill to holders of an NFT collection.</div>
+				</div>
+				<button class="dn-btn primary" data-action="add-price">+ Add Skill</button>
+			</div>
+			<div data-slot="prices-list"></div>
+		`;
+
+		const listHost = panel.querySelector('[data-slot="prices-list"]');
+
+		if (!skillPrices.length) {
+			listHost.innerHTML = `
+				<div class="dn-empty">
+					<h3>No skills gated yet</h3>
+					<p>Charge USDC per call or restrict a skill to NFT holders to start monetizing your agent.</p>
+				</div>`;
+		} else {
+			listHost.innerHTML = `
+				<div style="overflow-x:auto">
+					<table class="mon-table">
+						<thead>
+							<tr>
+								<th scope="col">Skill</th>
+								<th scope="col" style="text-align:right">Price (USDC)</th>
+								<th scope="col" style="text-align:center">Active</th>
+								<th scope="col" style="text-align:right">Actions</th>
+							</tr>
+						</thead>
+						<tbody>
+							${skillPrices.map((p, idx) => {
+								const active = p.active !== false;
+								const isNft = p.gate_type === 'nft';
+								const skillName = esc(p.skill_name || p.skill || p.name || 'Unnamed');
+								if (isNft) {
+									const mint = String(p.nft_collection_mint || '');
+									const shortMint = mint.length > 14 ? `${mint.slice(0, 6)}…${mint.slice(-6)}` : mint;
+									return `
+										<tr data-idx="${idx}">
+											<td style="font-weight:500">${skillName}
+												<span class="dn-tag" style="margin-left:6px;font-size:10px;vertical-align:middle">🔒 NFT gated</span>
+											</td>
+											<td style="text-align:right">
+												<span class="mon-mono" style="font-size:12px" title="${esc(mint)}">${esc(shortMint)}</span>
+												<div class="mon-fee-note">Holders of this collection only</div>
+											</td>
+											<td style="text-align:center">
+												<label class="mon-toggle" title="${active ? 'Active' : 'Inactive'}">
+													<input type="checkbox" ${active ? 'checked' : ''} data-field="active" data-idx="${idx}" disabled aria-label="${skillName} access is ${active ? 'active' : 'inactive'} (NFT-gated)" />
+													<span class="mon-toggle-track"></span>
+												</label>
+											</td>
+											<td style="text-align:right">
+												<div style="display:flex;gap:6px;justify-content:flex-end">
+													<button class="dn-btn danger" data-action="delete-price" data-idx="${idx}" style="padding:5px 10px;font-size:12px">Delete</button>
+												</div>
+											</td>
+										</tr>`;
+								}
+								return `
+									<tr data-idx="${idx}">
+										<td style="font-weight:500">${skillName}</td>
+										<td style="text-align:right">
+											<input type="number" min="0" step="0.000001" class="mon-input mon-input-sm"
+												value="${esc(String(p.price_usdc ?? p.price ?? 0))}"
+												data-field="price" data-idx="${idx}" aria-label="Price" />
+											<div class="mon-fee-note" data-slot="fee-note" data-idx="${idx}">
+												You receive ${esc(formatNetUsdc(netOf(Number(p.price_usdc ?? p.price ?? 0))))} after ${esc(feePercent)}% fee
+											</div>
+										</td>
+										<td style="text-align:center">
+											<label class="mon-toggle" title="${active ? 'Active' : 'Inactive'}">
+												<input type="checkbox" ${active ? 'checked' : ''} data-field="active" data-idx="${idx}" aria-label="Toggle ${skillName} active" />
+												<span class="mon-toggle-track"></span>
+											</label>
+										</td>
+										<td style="text-align:right">
+											<div style="display:flex;gap:6px;justify-content:flex-end">
+												<button class="dn-btn" data-action="save-price" data-idx="${idx}" style="padding:5px 10px;font-size:12px">Save</button>
+												<button class="dn-btn danger" data-action="delete-price" data-idx="${idx}" style="padding:5px 10px;font-size:12px">Delete</button>
+											</div>
+										</td>
+									</tr>`;
+							}).join('')}
+						</tbody>
+					</table>
+				</div>
+			`;
+		}
+
+		panel.querySelector('[data-action="add-price"]').addEventListener('click', () => {
+			openAddPriceModal(agentId, feeBps, (saved) => {
+				skillPrices.push(saved);
+				paint();
+				toastMonetize(saved?.gate_type === 'nft' ? 'NFT-gated skill added' : 'Skill price added');
+			});
+		});
+
+		// Live-update the "you receive" note as the owner edits a price so the
+		// net take is always in sync with what they're typing.
+		panel.querySelectorAll('input[data-field="price"]').forEach((input) => {
+			input.addEventListener('input', () => {
+				const idx = input.dataset.idx;
+				const note = panel.querySelector(`[data-slot="fee-note"][data-idx="${idx}"]`);
+				if (!note) return;
+				const val = parseFloat(input.value);
+				note.textContent = Number.isFinite(val) && val >= 0
+					? `You receive ${formatNetUsdc(netOf(val))} after ${feePercent}% fee`
+					: `Enter a valid price`;
+			});
+		});
+
+		panel.querySelectorAll('[data-action="save-price"]').forEach(btn => {
+			btn.addEventListener('click', async () => {
+				const idx = Number(btn.dataset.idx);
+				const row = panel.querySelector(`tr[data-idx="${idx}"]`);
+				const priceInput = row.querySelector('input[data-field="price"]');
+				const activeInput = row.querySelector('input[data-field="active"]');
+				const priceVal = parseFloat(priceInput.value);
+				if (!Number.isFinite(priceVal) || priceVal < 0) {
+					toastMonetize('Enter a valid price', true);
+					return;
+				}
+				btn.disabled = true;
+				btn.textContent = 'Saving...';
+				try {
+					await put('/api/monetization/prices', {
+						agent_id: agentId,
+						skill_name: skillPrices[idx].skill_name || skillPrices[idx].skill || skillPrices[idx].name,
+						price_usdc: priceVal,
+						active: activeInput.checked,
+					});
+					skillPrices[idx].price_usdc = priceVal;
+					skillPrices[idx].price = priceVal;
+					skillPrices[idx].active = activeInput.checked;
+					toastMonetize('Price updated');
+				} catch (err) {
+					toastMonetize(err?.message || 'Save failed', true);
+				}
+				btn.disabled = false;
+				btn.textContent = 'Save';
+			});
+		});
+
+		panel.querySelectorAll('[data-action="delete-price"]').forEach(btn => {
+			btn.addEventListener('click', async () => {
+				const idx = Number(btn.dataset.idx);
+				const skillName = skillPrices[idx].skill_name || skillPrices[idx].skill || skillPrices[idx].name;
+				btn.disabled = true;
+				btn.textContent = 'Deleting...';
+				try {
+					await del(`/api/monetization/prices?agent_id=${encodeURIComponent(agentId)}&skill_name=${encodeURIComponent(skillName)}`);
+					skillPrices.splice(idx, 1);
+					paint();
+					toastMonetize('Skill price removed');
+				} catch (err) {
+					toastMonetize(err?.message || 'Delete failed', true);
+					btn.disabled = false;
+					btn.textContent = 'Delete';
+				}
+			});
+		});
+	}
+
+	paint();
+	return panel;
+}
+
+function openAddPriceModal(agentId, feeBps, onSaved) {
+	const feePercent = (feeBps / 100).toFixed(feeBps % 100 === 0 ? 0 : 1);
+	const netOf = (price) => Math.max(0, price * (1 - feeBps / 10_000));
+	const overlay = document.createElement('div');
+	overlay.className = 'mon-overlay';
+	overlay.innerHTML = `
+		<div role="dialog" aria-modal="true" aria-label="Add skill price" class="mon-modal">
+			<div style="font-size:16px;font-weight:600;margin-bottom:18px">Add Skill Access</div>
+
+			<label class="mon-field">
+				<span class="mon-label">Skill name</span>
+				<input data-slot="skill" type="text" maxlength="120" placeholder="e.g. generate_report, analyze_data" class="mon-input" />
+			</label>
+
+			<label class="mon-field">
+				<span class="mon-label">How is it unlocked?</span>
+				<select data-slot="gate" class="mon-select">
+					<option value="price">Pay per call (USDC)</option>
+					<option value="nft">NFT gate — holders only</option>
+				</select>
+			</label>
+
+			<label class="mon-field" data-slot="price-field">
+				<span class="mon-label">Price per call (USDC)</span>
+				<input data-slot="price" type="number" min="0" step="0.000001" placeholder="0.001" class="mon-input" />
+				<span data-slot="fee-note" class="mon-fee-note">Platform fee: ${esc(feePercent)}% — set a price to see your net take.</span>
+			</label>
+
+			<label class="mon-field" data-slot="nft-field" hidden>
+				<span class="mon-label">NFT collection mint</span>
+				<input data-slot="collection" type="text" maxlength="44" placeholder="Collection mint address (base58)" class="mon-input mon-mono" />
+				<span class="mon-fee-note">Only wallets holding an NFT from this collection can use the skill — verified on-chain on every call.</span>
+			</label>
+
+			<label style="display:flex;align-items:center;gap:10px;margin-bottom:18px;cursor:pointer">
+				<input data-slot="active" type="checkbox" checked style="width:16px;height:16px;cursor:pointer;accent-color:var(--nxt-accent)" />
+				<span style="font-size:13px;color:var(--nxt-ink)">Active (visible to callers)</span>
+			</label>
+
+			<div data-slot="error" class="mon-error"></div>
+
+			<div style="display:flex;gap:8px;justify-content:flex-end">
+				<button class="dn-btn ghost" data-action="cancel">Cancel</button>
+				<button class="dn-btn primary" data-action="submit">Add</button>
+			</div>
+		</div>
+	`;
+
+	document.body.appendChild(overlay);
+	const skillEl = overlay.querySelector('[data-slot="skill"]');
+	const gateEl = overlay.querySelector('[data-slot="gate"]');
+	const priceFieldEl = overlay.querySelector('[data-slot="price-field"]');
+	const nftFieldEl = overlay.querySelector('[data-slot="nft-field"]');
+	const priceEl = overlay.querySelector('[data-slot="price"]');
+	const collectionEl = overlay.querySelector('[data-slot="collection"]');
+	const activeEl = overlay.querySelector('[data-slot="active"]');
+	const errorEl = overlay.querySelector('[data-slot="error"]');
+	const feeNoteEl = overlay.querySelector('[data-slot="fee-note"]');
+	const submitBtn = overlay.querySelector('[data-action="submit"]');
+	skillEl.focus();
+
+	gateEl.addEventListener('change', () => {
+		const isNft = gateEl.value === 'nft';
+		priceFieldEl.hidden = isNft;
+		nftFieldEl.hidden = !isNft;
+		errorEl.textContent = '';
+	});
+
+	priceEl.addEventListener('input', () => {
+		const val = parseFloat(priceEl.value);
+		feeNoteEl.textContent = Number.isFinite(val) && val > 0
+			? `Platform fee: ${feePercent}% — you receive ${formatNetUsdc(netOf(val))} per call.`
+			: `Platform fee: ${feePercent}% — set a price to see your net take.`;
+	});
+
+	const close = () => { overlay.remove(); document.removeEventListener('keydown', onKey); };
+	const onKey = (e) => { if (e.key === 'Escape') close(); };
+	document.addEventListener('keydown', onKey);
+	overlay.querySelector('[data-action="cancel"]').addEventListener('click', close);
+	overlay.addEventListener('click', (e) => { if (e.target === overlay) close(); });
+
+	submitBtn.addEventListener('click', async () => {
+		const name = skillEl.value.trim();
+		const isNft = gateEl.value === 'nft';
+		if (!name) { errorEl.textContent = 'Skill name is required.'; return; }
+
+		let payload;
+		let saved;
+		if (isNft) {
+			const collection = collectionEl.value.trim();
+			if (!SOLANA_ADDR_RE.test(collection)) {
+				errorEl.textContent = 'Enter a valid collection mint address.';
+				return;
+			}
+			payload = { agent_id: agentId, skill_name: name, gate_type: 'nft', nft_collection_mint: collection };
+			saved = { skill_name: name, gate_type: 'nft', nft_collection_mint: collection, price_usdc: 0, active: activeEl.checked };
+		} else {
+			const price = parseFloat(priceEl.value);
+			if (!Number.isFinite(price) || price < 0) { errorEl.textContent = 'Enter a valid price.'; return; }
+			payload = { agent_id: agentId, skill_name: name, gate_type: 'price', price_usdc: price };
+			saved = { skill_name: name, gate_type: 'price', price_usdc: price, active: activeEl.checked };
+		}
+
+		errorEl.textContent = '';
+		submitBtn.disabled = true;
+		submitBtn.textContent = 'Adding...';
+		try {
+			const r = await put('/api/monetization/prices', payload);
+			close();
+			onSaved(r?.price || saved);
+		} catch (err) {
+			errorEl.textContent = err?.body?.error || err?.message || 'Failed to add';
+			submitBtn.disabled = false;
+			submitBtn.textContent = 'Add';
+		}
+	});
+}
+
+// -- Payout Wallet Panel (monetization-specific) --
+
+function renderPayoutWalletPanel(wallet, agentId, host, me, agents, legacyWallets) {
+	const panel = document.createElement('div');
+	panel.className = 'dn-panel';
+
+	function paint(w) {
+		const evmAddr = w?.evm_address || w?.evm || '';
+		const solAddr = w?.solana_address || w?.solana || '';
+		const preferred = w?.preferred_network || 'solana';
+		const balance = w?.available_balance ?? w?.balance ?? 0;
+
+		panel.innerHTML = `
+			<div style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:14px">
+				<div>
+					<div class="dn-panel-title">Payout Wallet</div>
+					<div class="dn-panel-sub" style="margin:2px 0 0">Configure where earnings from this agent are sent.</div>
+				</div>
+				${balance > 0 ? `<span class="dn-tag success" style="font-size:13px">Balance: ${esc(formatUsdc(balance))}</span>` : ''}
+			</div>
+
+			<div class="mon-form-grid">
+				<label class="mon-field">
+					<span class="mon-label">EVM address (Base)</span>
+					<input data-slot="evm" type="text" placeholder="0x..." class="mon-input mon-mono"
+						value="${esc(evmAddr)}" />
+					<span data-slot="evm-hint" class="mon-hint"></span>
+				</label>
+				<label class="mon-field">
+					<span class="mon-label">Solana address</span>
+					<input data-slot="solana" type="text" placeholder="Base58 address..." class="mon-input mon-mono"
+						value="${esc(solAddr)}" />
+					<span data-slot="sol-hint" class="mon-hint"></span>
+				</label>
+			</div>
+
+			<div style="display:flex;align-items:center;gap:14px;margin-top:14px;flex-wrap:wrap">
+				<label class="mon-field" style="margin-bottom:0;flex:1;min-width:160px">
+					<span class="mon-label">Preferred network</span>
+					<select data-slot="network" class="mon-select">
+						<option value="solana" ${preferred === 'solana' ? 'selected' : ''}>Solana</option>
+						<option value="base" ${preferred === 'base' ? 'selected' : ''}>Base (EVM)</option>
+					</select>
+				</label>
+				<button class="dn-btn primary" data-action="save-wallet" style="align-self:flex-end">Save Wallet</button>
+			</div>
+
+			<div data-slot="wallet-error" class="mon-error"></div>
+		`;
+
+		const evmInput = panel.querySelector('[data-slot="evm"]');
+		const solInput = panel.querySelector('[data-slot="solana"]');
+		const evmHint = panel.querySelector('[data-slot="evm-hint"]');
+		const solHint = panel.querySelector('[data-slot="sol-hint"]');
+		const networkEl = panel.querySelector('[data-slot="network"]');
+		const errorEl = panel.querySelector('[data-slot="wallet-error"]');
+
+		evmInput.addEventListener('input', () => {
+			const v = evmInput.value.trim();
+			if (v && !EVM_ADDR_RE.test(v)) evmHint.textContent = 'Invalid EVM address (0x + 40 hex chars)';
+			else evmHint.textContent = '';
+		});
+
+		solInput.addEventListener('input', () => {
+			const v = solInput.value.trim();
+			if (v && !SOLANA_ADDR_RE.test(v)) solHint.textContent = 'Invalid Solana address';
+			else solHint.textContent = '';
+		});
+
+		panel.querySelector('[data-action="save-wallet"]').addEventListener('click', async () => {
+			const evm = evmInput.value.trim();
+			const sol = solInput.value.trim();
+			const network = networkEl.value;
+			errorEl.textContent = '';
+
+			if (evm && !EVM_ADDR_RE.test(evm)) { errorEl.textContent = 'Invalid EVM address.'; return; }
+			if (sol && !SOLANA_ADDR_RE.test(sol)) { errorEl.textContent = 'Invalid Solana address.'; return; }
+			if (!evm && !sol) { errorEl.textContent = 'Enter at least one wallet address.'; return; }
+
+			const btn = panel.querySelector('[data-action="save-wallet"]');
+			btn.disabled = true;
+			btn.textContent = 'Saving...';
+			try {
+				const saved = await withPayoutStepUp(async (extra) => {
+					try {
+						const data = await put('/api/monetization/wallet', {
+							agent_id: agentId,
+							evm_address: evm || undefined,
+							solana_address: sol || undefined,
+							preferred_network: network,
+							...extra,
+						});
+						return { ok: true, status: 200, data };
+					} catch (err) {
+						return { ok: false, status: err?.status || 0, data: err?.body || { error: err?.code, error_description: err?.message } };
+					}
+				});
+				if (!saved.ok) throw Object.assign(new Error(saved.data?.error_description || saved.data?.error || 'Save failed'), { body: saved.data });
+				toastMonetize(cooldownNotice(saved.data?.wallets));
+			} catch (err) {
+				errorEl.textContent = err?.body?.error || err?.message || 'Save failed';
+			}
+			btn.disabled = false;
+			btn.textContent = 'Save Wallet';
+		});
+	}
+
+	paint(wallet);
+	return panel;
+}
+
+// Format a human-denominated USDC amount (not atomics) for the net-take note.
+// Skill prices range from sub-cent (0.001) to dollars, so show enough precision
+// to keep tiny per-call prices meaningful without trailing-zero noise on whole cents.
+function formatNetUsdc(amount) {
+	const n = Number(amount);
+	if (!Number.isFinite(n) || n <= 0) return '$0.00';
+	const decimals = n < 0.01 ? 6 : n < 1 ? 4 : 2;
+	return `$${n.toFixed(decimals)}`;
+}
+
+// Format a USD-denominated amount (already in dollars, not atomics) with thousands
+// separators — e.g. 1234.5 → "$1,234.56". Matches formatUsdc's output so subscription
+// income and plan prices read consistently with the rest of the dashboard.
+function formatUsd(amount) {
+	const n = Number(amount);
+	if (!Number.isFinite(n)) return '$0.00';
+	return n.toLocaleString('en-US', { style: 'currency', currency: 'USD' });
+}
+
+// -- Recent payments --
+
+async function fetchRecentPayments(agents) {
+	if (!agents.length) return [];
+	const top = agents.slice(0, 8);
+	const lists = await Promise.all(
+		top.map((a) =>
+			safe(() => get(`/api/agents/${encodeURIComponent(a.id)}/payments?direction=received&limit=10`))
+				.then((r) => (r?.payments || []).map((p) => ({ ...p, _agent: a }))),
+		),
+	);
+	const merged = lists.flat().filter(Boolean);
+	merged.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+	return merged.slice(0, 50);
+}
+
+function renderPaymentsPanel(allPayments) {
+	const panel = document.createElement('div');
+	panel.className = 'dn-panel';
+	panel.innerHTML = `
+		<div style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:14px">
+			<div>
+				<div class="dn-panel-title">Recent Payments</div>
+				<div class="dn-panel-sub" style="margin:2px 0 0">Inbound USDC from skills, subscriptions, and API calls.</div>
+			</div>
+			<div data-slot="filters" role="group" aria-label="Filter payments by source" style="display:flex;gap:6px;flex-wrap:wrap">
+				${PAYMENT_FILTERS.map((f, i) => `
+					<button type="button" class="dn-btn ghost" data-filter="${esc(f.key)}" aria-pressed="${i === 0 ? 'true' : 'false'}" style="padding:4px 12px;font-size:12px${i === 0 ? ';background:var(--nxt-accent-soft);color:var(--nxt-ink)' : ''}">${esc(f.label)}</button>
+				`).join('')}
+			</div>
+		</div>
+		<div data-slot="payments"></div>
+	`;
+
+	const listHost = panel.querySelector('[data-slot="payments"]');
+	let activeFilter = 'all';
+	let visibleCount = 20;
+
+	function paint() {
+		const filtered = filterPayments(allPayments, activeFilter);
+		if (!filtered.length) {
+			listHost.innerHTML = `
+				<div class="dn-empty">
+					<h3>No payments yet</h3>
+					<p>Hook a widget into your site or issue an API key to start earning.</p>
+				</div>`;
+			return;
+		}
+		const slice = filtered.slice(0, visibleCount);
+		listHost.innerHTML = `
+			<div style="overflow-x:auto">
+				<table class="mon-table">
+					<thead>
+						<tr>
+							<th scope="col">When</th>
+							<th scope="col">Source</th>
+							<th scope="col" style="text-align:right">Amount</th>
+							<th scope="col">Status</th>
+							<th scope="col">Tx</th>
+						</tr>
+					</thead>
+					<tbody>${slice.map(paymentRow).join('')}</tbody>
+				</table>
+			</div>
+			${filtered.length > visibleCount
+				? `<div style="margin-top:14px;text-align:center"><button class="dn-btn" data-action="load-more">Load more · ${filtered.length - visibleCount} remaining</button></div>`
+				: ''}
+		`;
+		listHost.querySelector('[data-action="load-more"]')?.addEventListener('click', () => {
+			visibleCount += 20;
+			paint();
+		});
+	}
+
+	panel.querySelectorAll('[data-filter]').forEach((btn) => {
+		btn.addEventListener('click', () => {
+			activeFilter = btn.dataset.filter;
+			panel.querySelectorAll('[data-filter]').forEach((b) => {
+				const on = b.dataset.filter === activeFilter;
+				b.setAttribute('aria-pressed', on ? 'true' : 'false');
+				if (on) {
+					b.style.background = 'var(--nxt-accent-soft)';
+					b.style.color = 'var(--nxt-ink)';
+				} else {
+					b.style.background = '';
+					b.style.color = '';
+				}
+			});
+			visibleCount = 20;
+			paint();
+		});
+	});
+
+	paint();
+	return panel;
+}
+
+function filterPayments(payments, filter) {
+	if (filter === 'all') return payments;
+	return payments.filter((p) => {
+		const memo = (p.memo || '').toLowerCase();
+		const slug = (p.skill_slug || '').toLowerCase();
+		if (filter === 'subscriptions') return memo.includes('subscription') || slug.includes('subscription');
+		if (filter === 'tips') return memo.includes('tip');
+		if (filter === 'api') return memo.includes('api') || memo.includes('mcp') || !p.skill_name;
+		if (filter === 'skills') return Boolean(p.skill_name);
+		return true;
+	});
+}
+
+function paymentRow(p) {
+	const amount = p.amount_wei
+		? formatWeiAsEth(p.amount_wei)
+		: p.amount
+			? formatUsdc(p.amount)
+			: '--';
+	const status = (p.status || 'pending').toLowerCase();
+	const tag =
+		status === 'confirmed' || status === 'completed' || status === 'settled'
+			? '<span class="dn-tag success">Settled</span>'
+			: status === 'failed'
+				? '<span class="dn-tag danger">Failed</span>'
+				: '<span class="dn-tag warn">Pending</span>';
+	const source = paymentSource(p);
+	const tx = paymentTxLink(p);
+	return `
+		<tr>
+			<td style="color:var(--nxt-ink-dim);white-space:nowrap">${esc(relTime(p.created_at))}</td>
+			<td>${source}</td>
+			<td style="text-align:right;font-variant-numeric:tabular-nums">${esc(amount)}</td>
+			<td>${tag}</td>
+			<td>${tx}</td>
+		</tr>
+	`;
+}
+
+function paymentSource(p) {
+	const agentName = p._agent?.name ? esc(p._agent.name) : 'Agent';
+	if (p.skill_name) {
+		return `<div>${esc(p.skill_name)}</div><div style="color:var(--nxt-ink-fade);font-size:12px">${agentName}</div>`;
+	}
+	if (p.memo) {
+		return `<div>${esc(p.memo.slice(0, 80))}</div><div style="color:var(--nxt-ink-fade);font-size:12px">${agentName}</div>`;
+	}
+	return `<div>API call</div><div style="color:var(--nxt-ink-fade);font-size:12px">${agentName}</div>`;
+}
+
+function paymentTxLink(p) {
+	if (!p.tx_hash && !p.tx_signature) return '<span style="color:var(--nxt-ink-fade)">--</span>';
+	const hash = p.tx_hash || p.tx_signature;
+	const explorer =
+		p.chain_id === 8453
+			? `https://basescan.org/tx/${encodeURIComponent(hash)}`
+			: p.chain_id === 84532
+				? `https://sepolia.basescan.org/tx/${encodeURIComponent(hash)}`
+				: p.chain === 'solana'
+					? `https://solscan.io/tx/${encodeURIComponent(hash)}`
+					: `https://etherscan.io/tx/${encodeURIComponent(hash)}`;
+	return `<a href="${explorer}" target="_blank" rel="noopener" style="color:var(--nxt-accent);font-size:12px">${esc(hash.slice(0, 10))}...</a>`;
+}
+
+function formatWeiAsEth(wei) {
+	try {
+		const eth = Number(BigInt(wei)) / 1e18;
+		if (!Number.isFinite(eth)) return '--';
+		if (eth >= 0.0001) return `${eth.toFixed(4)} ETH`;
+		if (eth > 0) return `${eth.toExponential(2)} ETH`;
+		return '0 ETH';
+	} catch {
+		return '--';
+	}
+}
+
+// -- Withdrawals --
+
+function renderWithdrawals({ withdrawals, wallets, available, host, me, agents }) {
+	const panel = document.createElement('div');
+	panel.className = 'dn-panel';
+
+	const pending = withdrawals.filter((w) => w.status === 'pending' || w.status === 'processing');
+	const past = withdrawals.filter((w) => w.status === 'completed' || w.status === 'failed').slice(0, 10);
+
+	panel.innerHTML = `
+		<div style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:14px">
+			<div>
+				<div class="dn-panel-title">Withdrawals</div>
+				<div class="dn-panel-sub" style="margin:2px 0 0">Move your earned USDC to a wallet you control.</div>
+			</div>
+			<button class="dn-btn primary" data-action="open-withdraw">Withdraw now</button>
+		</div>
+
+		<div data-slot="pending"></div>
+		<div data-slot="past"></div>
+	`;
+
+	const pendingHost = panel.querySelector('[data-slot="pending"]');
+	const pastHost = panel.querySelector('[data-slot="past"]');
+
+	pendingHost.innerHTML = pending.length
+		? withdrawalsTable(pending, { title: 'Pending', showArrival: true })
+		: `<div style="padding:12px 0;color:var(--nxt-ink-dim);font-size:13px">No pending withdrawals.</div>`;
+
+	if (past.length) {
+		pastHost.innerHTML = `
+			<button class="dn-btn ghost" data-action="toggle-past" style="margin-top:14px;font-size:12px">
+				Show past withdrawals (${past.length})
+			</button>
+			<div data-slot="past-list" hidden style="margin-top:12px"></div>
+		`;
+		pastHost.querySelector('[data-action="toggle-past"]').addEventListener('click', () => {
+			const list = pastHost.querySelector('[data-slot="past-list"]');
+			const btn = pastHost.querySelector('[data-action="toggle-past"]');
+			if (list.hidden) {
+				list.hidden = false;
+				list.innerHTML = withdrawalsTable(past, { title: '', showArrival: false });
+				btn.textContent = 'Hide past withdrawals';
+			} else {
+				list.hidden = true;
+				btn.textContent = `Show past withdrawals (${past.length})`;
+			}
+		});
+	}
+
+	// Withdrawals land in a Solana wallet the user controls — the exact term the
+	// audit flagged as unexplained. Gate the modal behind the plain-language
+	// wallet/USDC explainer for first-timers; returning users pass straight through.
+	const openModal = async () => {
+		try {
+			const { ensureOnchainPrimer } = await import('../../shared/onchain-primer.js');
+			if (!(await ensureOnchainPrimer({ action: 'withdraw' }))) return;
+		} catch {
+			/* primer unavailable — never block a real withdrawal */
+		}
+		openWithdrawModal({ available, wallets, host, me, agents });
+	};
+	panel.querySelector('[data-action="open-withdraw"]').addEventListener('click', openModal);
+	document.addEventListener('dn:monetize:open-withdraw', openModal);
+
+	return panel;
+}
+
+function withdrawalsTable(rows, { title, showArrival }) {
+	const head = title ? `<div style="font-size:12px;font-weight:600;text-transform:uppercase;letter-spacing:0.06em;color:var(--nxt-ink-fade);margin:0 0 8px">${esc(title)}</div>` : '';
+	return `
+		${head}
+		<div style="overflow-x:auto">
+			<table class="mon-table">
+				<thead>
+					<tr>
+						<th scope="col">ID</th>
+						<th scope="col" style="text-align:right">Amount</th>
+						<th scope="col">Chain</th>
+						<th scope="col">Status</th>
+						<th scope="col">${showArrival ? 'Est. arrival' : 'Tx'}</th>
+					</tr>
+				</thead>
+				<tbody>
+					${rows.map((w) => `
+						<tr>
+							<td style="font-family:ui-monospace,monospace;font-size:11px;color:var(--nxt-ink-dim)">${esc(String(w.id).slice(0, 8))}...</td>
+							<td style="text-align:right;font-variant-numeric:tabular-nums">${esc(formatUsdc(Number(w.amount)))}</td>
+							<td style="color:var(--nxt-ink-dim)">${esc(w.chain)}</td>
+							<td>${statusTag(w.status)}</td>
+							<td style="color:var(--nxt-ink-dim)">${showArrival ? estArrival(w) : withdrawalTx(w)}</td>
+						</tr>`).join('')}
+				</tbody>
+			</table>
+		</div>
+	`;
+}
+
+function statusTag(status) {
+	const s = String(status || '').toLowerCase();
+	if (s === 'completed') return '<span class="dn-tag success">Completed</span>';
+	if (s === 'failed') return '<span class="dn-tag danger">Failed</span>';
+	if (s === 'processing') return '<span class="dn-tag warn">Processing</span>';
+	return '<span class="dn-tag warn">Pending</span>';
+}
+
+function estArrival(w) {
+	const minutes = w.status === 'processing' ? 5 : 30;
+	const eta = new Date(new Date(w.created_at).getTime() + minutes * 60_000);
+	const now = new Date();
+	if (eta < now) return 'momentarily';
+	const diffMin = Math.max(1, Math.round((eta - now) / 60_000));
+	return `~${diffMin}m`;
+}
+
+function withdrawalTx(w) {
+	if (!w.tx_signature) return '<span style="color:var(--nxt-ink-fade)">--</span>';
+	const sig = encodeURIComponent(w.tx_signature);
+	const url =
+		w.chain === 'solana'
+			? `https://solscan.io/tx/${sig}`
+			: w.chain === 'base'
+				? `https://basescan.org/tx/${sig}`
+				: `https://etherscan.io/tx/${sig}`;
+	return `<a href="${url}" target="_blank" rel="noopener" style="color:var(--nxt-accent);font-size:12px">view</a>`;
+}
+
+// -- Withdraw modal --
+
+function openWithdrawModal({ available, wallets, host, me, agents }) {
+	const existing = document.querySelector('[data-monetize-modal]');
+	if (existing) existing.remove();
+
+	const overlay = document.createElement('div');
+	overlay.setAttribute('data-monetize-modal', 'true');
+	overlay.className = 'mon-overlay';
+	overlay.innerHTML = `
+		<div role="dialog" aria-modal="true" aria-label="Withdraw USDC" class="mon-modal">
+			<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">
+				<div>
+					<div style="font-size:16px;font-weight:600;color:var(--nxt-ink)">Withdraw USDC</div>
+					<div style="font-size:12.5px;color:var(--nxt-ink-dim);margin-top:2px">Available: ${esc(formatUsdc(available))}</div>
+				</div>
+				<button class="dn-btn ghost" data-action="close" aria-label="Close" style="padding:4px 10px;font-size:18px">x</button>
+			</div>
+
+			<label class="mon-field">
+				<span class="mon-label">Chain</span>
+				<select data-slot="chain" class="mon-select">
+					<option value="solana">Solana (USDC)</option>
+					<option value="base">Base (USDC)</option>
+				</select>
+			</label>
+
+			<label class="mon-field">
+				<span class="mon-label">Destination address</span>
+				<input data-slot="address" type="text" placeholder="Wallet address" class="mon-input mon-mono" />
+				<span data-slot="addr-hint" class="mon-hint"></span>
+			</label>
+
+			<label class="mon-field">
+				<span class="mon-label">Amount (USDC)</span>
+				<div style="display:flex;gap:8px">
+					<input data-slot="amount" type="number" min="1" step="0.000001" placeholder="0.00" class="mon-input" style="flex:1" />
+					<button class="dn-btn" data-action="max" type="button">Max</button>
+				</div>
+			</label>
+
+			<div data-slot="error" class="mon-error"></div>
+
+			<div style="display:flex;gap:8px;justify-content:flex-end">
+				<button class="dn-btn ghost" data-action="cancel">Cancel</button>
+				<button class="dn-btn primary" data-action="submit">Request withdrawal</button>
+			</div>
+		</div>
+	`;
+
+	document.body.appendChild(overlay);
+
+	const chainEl = overlay.querySelector('[data-slot="chain"]');
+	const addrEl = overlay.querySelector('[data-slot="address"]');
+	const addrHint = overlay.querySelector('[data-slot="addr-hint"]');
+	const amountEl = overlay.querySelector('[data-slot="amount"]');
+	const errorEl = overlay.querySelector('[data-slot="error"]');
+	const submitBtn = overlay.querySelector('[data-action="submit"]');
+
+	const solWallet = wallets.find((w) => w.chain === 'solana');
+	const baseWallet = wallets.find((w) => w.chain === 'base' || w.chain === 'evm');
+
+	function syncDefaults() {
+		const chain = chainEl.value;
+		const fallback = chain === 'solana' ? solWallet : baseWallet;
+		if (fallback) {
+			addrEl.value = fallback.address;
+			addrHint.textContent = `Pre-filled from your ${chain === 'solana' ? 'Solana' : 'Base'} payout wallet.`;
+		} else {
+			addrEl.value = '';
+			addrHint.textContent = 'No default payout wallet for this chain. Paste an address.';
+		}
+	}
+	syncDefaults();
+	chainEl.addEventListener('change', syncDefaults);
+
+	overlay.querySelector('[data-action="max"]').addEventListener('click', () => {
+		amountEl.value = (available / 1_000_000).toString();
+	});
+
+	function close() {
+		document.removeEventListener('keydown', onKey);
+		overlay.remove();
+	}
+	function onKey(e) {
+		if (e.key === 'Escape') close();
+	}
+	document.addEventListener('keydown', onKey);
+
+	overlay.querySelector('[data-action="close"]').addEventListener('click', close);
+	overlay.querySelector('[data-action="cancel"]').addEventListener('click', close);
+	overlay.addEventListener('click', (e) => {
+		if (e.target === overlay) close();
+	});
+
+	submitBtn.addEventListener('click', async () => {
+		errorEl.textContent = '';
+		const chain = chainEl.value;
+		const addr = addrEl.value.trim();
+		const human = parseFloat(amountEl.value);
+
+		if (!Number.isFinite(human) || human <= 0) {
+			errorEl.textContent = 'Enter a valid amount.';
+			return;
+		}
+		const atomics = Math.round(human * 1_000_000);
+		if (atomics < MIN_WITHDRAWAL_USDC_ATOMICS) {
+			errorEl.textContent = 'Minimum withdrawal is 1 USDC.';
+			return;
+		}
+		if (atomics > available) {
+			errorEl.textContent = `Exceeds available (${formatUsdc(available)}).`;
+			return;
+		}
+		if (!addr) {
+			errorEl.textContent = 'Destination address required.';
+			return;
+		}
+		if (chain === 'solana' && !SOLANA_ADDR_RE.test(addr)) {
+			errorEl.textContent = 'Invalid Solana address.';
+			return;
+		}
+		if (chain === 'base' && !EVM_ADDR_RE.test(addr)) {
+			errorEl.textContent = 'Invalid Base address (expected 0x + 40 hex chars).';
+			return;
+		}
+
+		submitBtn.disabled = true;
+		submitBtn.textContent = 'Submitting...';
+		try {
+			// Try both endpoints
+			try {
+				await post('/api/monetization/withdrawals', {
+					amount: atomics,
+					chain,
+					to_address: addr,
+				});
+			} catch {
+				await post('/api/billing/withdrawals', {
+					amount: atomics,
+					chain,
+					currency_mint: USDC_MINTS[chain],
+					to_address: addr,
+				});
+			}
+			close();
+			toastMonetize('Withdrawal submitted');
+			renderSkeleton(host);
+			await loadAndRender(host, me, agents);
+		} catch (err) {
+			submitBtn.disabled = false;
+			submitBtn.textContent = 'Request withdrawal';
+			errorEl.textContent =
+				err?.body?.error_description || err?.message || 'Withdrawal request failed.';
+		}
+	});
+}
+
+// -- Legacy Payout wallets --
+
+function renderLegacyPayoutWallets({ wallets, host, me, agents }) {
+	const panel = document.createElement('div');
+	panel.className = 'dn-panel';
+	panel.setAttribute('data-payout-wallets-panel', '');
+
+	const render = (ws) => {
+		panel.innerHTML = `
+			<div style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:14px">
+				<div>
+					<div class="dn-panel-title">Saved Payout Wallets</div>
+					<div class="dn-panel-sub" style="margin:2px 0 0">Default addresses for withdrawals. One per chain.</div>
+				</div>
+				<button class="dn-btn primary" data-action="add-payout-wallet" style="flex-shrink:0">+ Add wallet</button>
+			</div>
+			${ws.length ? `
+				<div style="display:flex;flex-direction:column;gap:8px">
+					${ws.map((w) => `
+						<div style="display:flex;align-items:center;justify-content:space-between;gap:12px;padding:10px 12px;background:rgba(255,255,255,0.03);border:1px solid var(--nxt-stroke);border-radius:8px;flex-wrap:wrap" data-wallet-id="${esc(w.id)}">
+							<div style="min-width:0">
+								<div style="font-size:12px;color:var(--nxt-ink-fade);text-transform:capitalize;letter-spacing:0.04em;margin-bottom:2px">${esc(w.chain || 'unknown')}</div>
+								<div style="font-family:'JetBrains Mono',ui-monospace,monospace;font-size:12.5px;color:var(--nxt-ink);word-break:break-all">${esc(w.address || '')}</div>
+								${w.label ? `<div style="font-size:11.5px;color:var(--nxt-ink-dim);margin-top:2px">${esc(w.label)}</div>` : ''}
+							</div>
+							<button class="dn-btn danger" data-action="remove-payout-wallet" data-id="${esc(w.id)}" style="padding:5px 10px;font-size:12px;flex-shrink:0">Remove</button>
+						</div>
+					`).join('')}
+				</div>
+			` : `<div style="color:var(--nxt-ink-dim);font-size:13px">No payout wallets saved. Add one to pre-fill the withdrawal form.</div>`}
+		`;
+
+		panel.querySelector('[data-action="add-payout-wallet"]').addEventListener('click', () => {
+			openAddPayoutWalletModal({ panel, host, me, agents });
+		});
+
+		panel.querySelectorAll('[data-action="remove-payout-wallet"]').forEach((btn) => {
+			btn.addEventListener('click', async () => {
+				const id = btn.dataset.id;
+				btn.disabled = true;
+				btn.textContent = 'Removing...';
+				try {
+					await del(`/api/billing/payout-wallets/${encodeURIComponent(id)}`);
+					const updated = ws.filter((w) => w.id !== id);
+					render(updated);
+				} catch (err) {
+					btn.disabled = false;
+					btn.textContent = 'Remove';
+					toastMonetize(err?.body?.error || err?.message || 'Remove failed', true);
+				}
+			});
+		});
+	};
+
+	render(wallets);
+	return panel;
+}
+
+function openAddPayoutWalletModal({ panel, host, me, agents }) {
+	const existing = document.querySelector('[data-add-payout-modal]');
+	if (existing) existing.remove();
+
+	const overlay = document.createElement('div');
+	overlay.setAttribute('data-add-payout-modal', '');
+	overlay.className = 'mon-overlay';
+	overlay.innerHTML = `
+		<div role="dialog" aria-modal="true" aria-label="Add payout wallet" class="mon-modal">
+			<div style="font-size:16px;font-weight:600;color:var(--nxt-ink);margin-bottom:18px">Add payout wallet</div>
+
+			<label class="mon-field">
+				<span class="mon-label">Chain</span>
+				<select data-slot="chain" class="mon-select">
+					<option value="solana">Solana</option>
+					<option value="base">Base (EVM)</option>
+				</select>
+			</label>
+
+			<label class="mon-field">
+				<span class="mon-label">Wallet address</span>
+				<input data-slot="address" type="text" placeholder="Paste address..." class="mon-input mon-mono" />
+			</label>
+
+			<label class="mon-field">
+				<span class="mon-label">Label (optional)</span>
+				<input data-slot="label" type="text" maxlength="60" placeholder="e.g. Main treasury" class="mon-input" />
+			</label>
+
+			<div data-slot="error" class="mon-error"></div>
+
+			<div style="display:flex;gap:8px;justify-content:flex-end">
+				<button class="dn-btn ghost" data-action="cancel">Cancel</button>
+				<button class="dn-btn primary" data-action="submit">Save wallet</button>
+			</div>
+		</div>
+	`;
+	document.body.appendChild(overlay);
+
+	const chainEl = overlay.querySelector('[data-slot="chain"]');
+	const addrEl = overlay.querySelector('[data-slot="address"]');
+	const labelEl = overlay.querySelector('[data-slot="label"]');
+	const errorEl = overlay.querySelector('[data-slot="error"]');
+	const submitBtn = overlay.querySelector('[data-action="submit"]');
+	addrEl.focus();
+
+	const close = () => { overlay.remove(); document.removeEventListener('keydown', onKey); };
+	const onKey = (e) => { if (e.key === 'Escape') close(); };
+	document.addEventListener('keydown', onKey);
+	overlay.querySelector('[data-action="cancel"]').addEventListener('click', close);
+	overlay.addEventListener('click', (e) => { if (e.target === overlay) close(); });
+
+	submitBtn.addEventListener('click', async () => {
+		errorEl.textContent = '';
+		const chain = chainEl.value;
+		const address = addrEl.value.trim();
+		const label = labelEl.value.trim();
+
+		if (!address) { errorEl.textContent = 'Wallet address is required.'; return; }
+		if (chain === 'solana' && !SOLANA_ADDR_RE.test(address)) {
+			errorEl.textContent = 'Invalid Solana address.';
+			return;
+		}
+		if (chain === 'base' && !EVM_ADDR_RE.test(address)) {
+			errorEl.textContent = 'Invalid Base/EVM address (expected 0x + 40 hex chars).';
+			return;
+		}
+
+		submitBtn.disabled = true;
+		submitBtn.textContent = 'Saving...';
+		try {
+			const saved = await withPayoutStepUp(async (extra) => {
+				try {
+					const data = await post('/api/billing/payout-wallets', { chain, address, label: label || undefined, ...extra });
+					return { ok: true, status: 200, data };
+				} catch (err) {
+					return { ok: false, status: err?.status || 0, data: err?.body || { error: err?.code, error_description: err?.message } };
+				}
+			});
+			if (!saved.ok) throw Object.assign(new Error(saved.data?.error_description || saved.data?.error || 'Save failed.'), { body: saved.data });
+			close();
+			toastMonetize(cooldownNotice(saved.data?.wallet));
+			renderSkeleton(host);
+			await loadAndRender(host, me, agents);
+		} catch (err) {
+			submitBtn.disabled = false;
+			submitBtn.textContent = 'Save wallet';
+			errorEl.textContent = err?.body?.error || err?.message || 'Save failed.';
+		}
+	});
+}
+
+// -- Plan & usage --
+
+function renderPlanUsage(summary) {
+	const panel = document.createElement('div');
+	panel.className = 'dn-panel';
+
+	const plan = summary?.plan || 'free';
+	const quotas = summary?.quotas;
+	const usage = summary?.usage || {};
+
+	const meter = (label, used, max, fmt = (n) => String(n)) => {
+		const pct = max ? Math.min(100, (used / max) * 100) : 0;
+		const color = pct > 90 ? 'var(--nxt-danger)' : pct > 70 ? 'var(--nxt-warn)' : 'var(--nxt-success)';
+		return `
+			<div style="margin-bottom:14px">
+				<div style="display:flex;justify-content:space-between;font-size:13px;margin-bottom:6px">
+					<span>${esc(label)}</span>
+					<span style="color:var(--nxt-ink-fade)">${esc(fmt(used))} / ${max ? esc(fmt(max)) : 'unlimited'}</span>
+				</div>
+				<div style="height:6px;border-radius:3px;background:var(--nxt-stroke);overflow:hidden">
+					<div style="height:100%;width:${pct.toFixed(1)}%;background:${color};transition:width 400ms ease"></div>
+				</div>
+			</div>
+		`;
+	};
+
+	const fmtBytes = (n) => {
+		if (n >= 1e9) return (n / 1e9).toFixed(1) + ' GB';
+		if (n >= 1e6) return (n / 1e6).toFixed(1) + ' MB';
+		if (n >= 1e3) return Math.round(n / 1e3) + ' KB';
+		return `${n} B`;
+	};
+
+	panel.innerHTML = `
+		<div style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:14px">
+			<div>
+				<div class="dn-panel-title">Plan & Usage</div>
+				<div class="dn-panel-sub" style="margin:2px 0 0">
+					Current plan: <span style="color:var(--nxt-ink);text-transform:capitalize;font-weight:600">${esc(plan)}</span>
+				</div>
+			</div>
+			<a class="dn-btn" href="/pricing">Upgrade plan</a>
+		</div>
+
+		<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:24px">
+			<div>
+				${meter('Avatars', usage.avatar_count ?? 0, quotas?.max_avatars)}
+				${meter('Storage', usage.total_bytes ?? 0, quotas?.max_total_bytes, fmtBytes)}
+			</div>
+			<div>
+				${meter('MCP calls (24 h)', usage.mcp_calls_24h ?? 0, quotas?.mcp_calls_per_day)}
+				${meter('LLM calls this month', usage.llm_calls_month ?? 0, null)}
+			</div>
+		</div>
+	`;
+	return panel;
+}
+
+// -- Cosmetic creator earnings (R25) --
+//
+// Real, settled earnings from cosmetic sales tied to the creator's coins. When a
+// player buys a premium cosmetic inside one of your coin's /play worlds, a
+// configurable share of the settled USDC pays out to your Solana wallet on-chain.
+// This panel reads /api/cosmetics/earnings (settled-sale ledger) for the user's
+// Solana payout wallet(s) — only real numbers, with the payout's on-chain status.
+
+function renderCosmeticEarnings({ wallets }) {
+	const panel = document.createElement('div');
+	panel.className = 'dn-panel';
+
+	// Candidate Solana wallets the creator earns to, from their payout wallets.
+	const solWallets = [...new Set(
+		(wallets || [])
+			.map((w) => w?.solana_address || w?.solana || '')
+			.filter((a) => a && SOLANA_ADDR_RE.test(a)),
+	)];
+
+	panel.innerHTML = `
+		<div style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:6px">
+			<div>
+				<div class="dn-panel-title">Cosmetic creator earnings</div>
+				<div class="dn-panel-sub" style="margin:2px 0 0">
+					Your share of cosmetics sold in your coins’ worlds — paid out in USDC on-chain.
+				</div>
+			</div>
+			<div data-slot="wallet-pick"></div>
+		</div>
+		<div data-slot="ce-body"></div>
+	`;
+
+	const body = panel.querySelector('[data-slot="ce-body"]');
+
+	if (!solWallets.length) {
+		body.innerHTML = `
+			<div style="text-align:center;padding:26px 12px;color:var(--nxt-ink-fade)">
+				<div style="font-size:28px;opacity:.5" aria-hidden="true">✦</div>
+				<div style="font-weight:600;color:var(--nxt-ink);margin-top:6px">No Solana payout wallet yet</div>
+				<div style="font-size:13px;margin-top:6px;max-width:46ch;margin-inline:auto;line-height:1.5">
+					Add a Solana payout wallet above to start receiving your share of cosmetic
+					sales in your coins’ worlds. The split pays out in USDC on-chain.
+				</div>
+			</div>`;
+		return panel;
+	}
+
+	// Wallet picker (only when more than one) + load.
+	let selected = solWallets[0];
+	const pickHost = panel.querySelector('[data-slot="wallet-pick"]');
+	if (solWallets.length > 1) {
+		pickHost.innerHTML = `<select class="mon-select" aria-label="Earnings wallet">${
+			solWallets.map((w) => `<option value="${esc(w)}">${esc(w.slice(0, 4) + '…' + w.slice(-4))}</option>`).join('')
+		}</select>`;
+		pickHost.querySelector('select').addEventListener('change', (e) => {
+			selected = e.target.value;
+			loadCosmeticEarnings(body, selected);
+		});
+	}
+
+	loadCosmeticEarnings(body, selected);
+	return panel;
+}
+
+async function loadCosmeticEarnings(body, wallet) {
+	body.innerHTML = `<div style="padding:20px;color:var(--nxt-ink-fade);font-size:13px">Loading settled earnings…</div>`;
+	let data;
+	try {
+		data = await get(`/api/cosmetics/earnings?creator=${encodeURIComponent(wallet)}`);
+	} catch (err) {
+		body.innerHTML = `<div style="padding:18px;color:var(--nxt-danger);font-size:13px">
+			Couldn’t load earnings. <button class="dn-btn" data-slot="ce-retry" style="margin-left:8px">Retry</button></div>`;
+		body.querySelector('[data-slot="ce-retry"]')?.addEventListener('click', () => loadCosmeticEarnings(body, wallet));
+		return;
+	}
+
+	const t = data?.totals || {};
+	const usd = formatUsd;
+
+	if (!t.sales) {
+		body.innerHTML = `
+			<div style="text-align:center;padding:24px 12px;color:var(--nxt-ink-fade)">
+				<div style="font-weight:600;color:var(--nxt-ink)">No cosmetic sales yet</div>
+				<div style="font-size:13px;margin-top:6px;max-width:46ch;margin-inline:auto;line-height:1.5">
+					When a player buys a premium cosmetic inside one of your coins’ worlds,
+					your share lands here — and a payout is sent to your wallet on-chain.
+				</div>
+			</div>`;
+		return;
+	}
+
+	const stat = (label, value, sub) => `
+		<div style="background:var(--nxt-surface-2,rgba(255,255,255,.02));border:1px solid var(--nxt-stroke);border-radius:12px;padding:14px 16px">
+			<div style="font-size:12px;color:var(--nxt-ink-fade)">${esc(label)}</div>
+			<div style="font-size:22px;font-weight:700;margin-top:4px;letter-spacing:-.01em">${esc(value)}</div>
+			${sub ? `<div style="font-size:11.5px;color:var(--nxt-ink-fade);margin-top:2px">${esc(sub)}</div>` : ''}
+		</div>`;
+
+	const payoutBadge = (s) => {
+		const map = {
+			paid: ['var(--nxt-success)', 'Paid'],
+			pending: ['var(--nxt-warn)', 'Pending'],
+			failed: ['var(--nxt-danger)', 'Retrying'],
+			skipped: ['var(--nxt-ink-fade)', 'Accrued'],
+			none: ['var(--nxt-ink-fade)', '—'],
+		};
+		const [color, label] = map[s] || map.none;
+		return `<span style="font-size:11px;font-weight:600;color:${color}">${esc(label)}</span>`;
+	};
+
+	const recentRows = (data.recent || []).map((r) => {
+		const tx = r.payoutTx
+			? `<a href="https://solscan.io/tx/${esc(r.payoutTx)}" target="_blank" rel="noopener" style="color:var(--nxt-accent,#8aa0ff);text-decoration:none">view ↗</a>`
+			: '';
+		return `
+			<tr style="border-top:1px solid var(--nxt-stroke)">
+				<td style="padding:8px 10px">${esc(r.name)}</td>
+				<td style="padding:8px 10px;text-transform:capitalize;color:var(--nxt-ink-fade)">${esc(r.rarity)}</td>
+				<td style="padding:8px 10px;text-align:right;font-variant-numeric:tabular-nums">${usd(r.earnedUsdc)}</td>
+				<td style="padding:8px 10px">${payoutBadge(r.payoutStatus)} ${tx}</td>
+				<td style="padding:8px 10px;color:var(--nxt-ink-fade)">${r.settledAt ? esc(relTime(r.settledAt)) : ''}</td>
+			</tr>`;
+	}).join('');
+
+	body.innerHTML = `
+		<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin:6px 0 18px">
+			${stat('Total earned', usd(t.earnedUsdc), `${t.sales} sale${t.sales === 1 ? '' : 's'} · ${t.buyers} buyer${t.buyers === 1 ? '' : 's'}`)}
+			${stat('Paid out', usd(t.paidUsdc), 'settled on-chain')}
+			${stat('Pending', usd(t.pendingUsdc), 'awaiting payout')}
+			${stat('Last 30 days', usd(t.earned30dUsdc), null)}
+		</div>
+		${(data.perCosmetic || []).length ? `
+			<div style="font-size:12px;text-transform:uppercase;letter-spacing:.05em;color:var(--nxt-ink-fade);margin-bottom:8px">Top earning cosmetics</div>
+			<div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:18px">
+				${data.perCosmetic.slice(0, 8).map((c) => `
+					<div style="display:flex;align-items:center;gap:8px;background:var(--nxt-surface-2,rgba(255,255,255,.02));border:1px solid var(--nxt-stroke);border-radius:999px;padding:5px 12px;font-size:12.5px">
+						<span style="font-weight:600">${esc(c.name)}</span>
+						<span style="color:var(--nxt-ink-fade)">${c.sales}×</span>
+						<span style="font-weight:600;color:var(--nxt-success)">${usd(c.earnedUsdc)}</span>
+					</div>`).join('')}
+			</div>` : ''}
+		${recentRows ? `
+			<div style="font-size:12px;text-transform:uppercase;letter-spacing:.05em;color:var(--nxt-ink-fade);margin-bottom:6px">Recent sales</div>
+			<div style="overflow:auto;border:1px solid var(--nxt-stroke);border-radius:12px">
+				<table style="width:100%;border-collapse:collapse;font-size:13px">
+					<thead><tr style="text-align:left;color:var(--nxt-ink-fade)">
+						<th scope="col" style="padding:8px 10px;font-weight:500">Cosmetic</th>
+						<th scope="col" style="padding:8px 10px;font-weight:500">Rarity</th>
+						<th scope="col" style="padding:8px 10px;font-weight:500;text-align:right">Your cut</th>
+						<th scope="col" style="padding:8px 10px;font-weight:500">Payout</th>
+						<th scope="col" style="padding:8px 10px;font-weight:500">When</th>
+					</tr></thead>
+					<tbody>${recentRows}</tbody>
+				</table>
+			</div>` : ''}
+	`;
+}
+
+// -- Cosmetic revenue split (R25) --
+//
+// Set how much of each premium-cosmetic sale tied to one of your coins pays out to
+// your wallet. The share is real: it's the % of the settled USDC sent on-chain to
+// the coin's creator wallet at sale time (the rest funds the worlds the cosmetic is
+// worn in). Changing it is authorized by signing a message with the coin's creator
+// wallet — the same wallet the payout goes to — so no one else can redirect it.
+
+/** The creator's launched coins, from their agents' token metadata (mint+symbol). */
+function launchedCoins(agents) {
+	const seen = new Set();
+	const coins = [];
+	for (const a of agents || []) {
+		const m = a?.meta?.pumpfun || a?.meta?.token;
+		const mint = m?.mint || m?.address || m?.ca;
+		if (!mint || !SOLANA_ADDR_RE.test(String(mint)) || seen.has(String(mint))) continue;
+		seen.add(String(mint));
+		const sym = String(m.symbol || m.ticker || a.name || 'COIN').toUpperCase().replace(/^\$+/, '');
+		coins.push({ mint: String(mint), symbol: sym });
+	}
+	return coins;
+}
+
+/** Connect a Solana wallet and sign `message`, returning { signer, signature }.
+ *  Mirrors the link/sign flow in community/town-auth.js — ed25519 over the UTF-8
+ *  bytes, base58-encoded, exactly how the server (verifySiwsSignature) expects. */
+async function signSolanaMessage(message) {
+	const provider = window.phantom?.solana || window.solana;
+	if (!provider?.connect) throw new Error('No Solana wallet found — install Phantom to sign.');
+	const resp = await provider.connect();
+	const signer = (resp?.publicKey || provider.publicKey)?.toString();
+	if (!signer) throw new Error('Could not read wallet address.');
+	const encoded = new TextEncoder().encode(message);
+	const signed = await provider.signMessage(encoded, 'utf8');
+	const sigBytes = signed?.signature ?? signed;
+	const bs58 = (await import('bs58')).default;
+	return { signer, signature: bs58.encode(sigBytes) };
+}
+
+function renderCosmeticSplit({ agents }) {
+	const panel = document.createElement('div');
+	panel.className = 'dn-panel';
+
+	const coins = launchedCoins(agents);
+
+	panel.innerHTML = `
+		<div style="margin-bottom:6px">
+			<div class="dn-panel-title">Cosmetic revenue split</div>
+			<div class="dn-panel-sub" style="margin:2px 0 0">
+				Your share of premium cosmetics sold inside your coins’ worlds — paid out in USDC
+				on-chain. The platform keeps the rest to fund the worlds they’re worn in.
+			</div>
+		</div>
+		<div data-slot="split-list"></div>
+	`;
+
+	const list = panel.querySelector('[data-slot="split-list"]');
+
+	if (!coins.length) {
+		list.innerHTML = `
+			<div style="text-align:center;padding:24px 12px;color:var(--nxt-ink-fade)">
+				<div style="font-size:28px;opacity:.5" aria-hidden="true">✦</div>
+				<div style="font-weight:600;color:var(--nxt-ink);margin-top:6px">No coins launched yet</div>
+				<div style="font-size:13px;margin-top:6px;max-width:48ch;margin-inline:auto;line-height:1.5">
+					Launch a coin from one of your agents to open its 3D world. You’ll then set
+					your share of every premium cosmetic players buy inside it.
+				</div>
+				<a class="dn-btn primary" href="/dashboard/agents" style="margin-top:14px;display:inline-block">Go to Agents</a>
+			</div>`;
+		return panel;
+	}
+
+	list.innerHTML = coins.map((c) => `
+		<div data-mint="${esc(c.mint)}" style="border:1px solid var(--nxt-stroke);border-radius:12px;padding:14px 16px;margin-bottom:10px">
+			<div style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap">
+				<div style="display:flex;align-items:center;gap:8px;min-width:0">
+					<span style="font-weight:700">$${esc(c.symbol)}</span>
+					<a href="/play?coin=${encodeURIComponent(c.mint)}" target="_blank" rel="noopener"
+						style="font-size:11.5px;color:var(--nxt-ink-fade);text-decoration:none">
+						${esc(c.mint.slice(0, 4) + '…' + c.mint.slice(-4))} ↗</a>
+				</div>
+			</div>
+			<div data-slot="split-body" style="margin-top:10px">
+				<div style="color:var(--nxt-ink-fade);font-size:13px">Loading split…</div>
+			</div>
+		</div>`).join('');
+
+	for (const c of coins) {
+		const row = list.querySelector(`[data-mint="${CSS.escape(c.mint)}"] [data-slot="split-body"]`);
+		loadSplitRow(row, c.mint, c.symbol);
+	}
+
+	return panel;
+}
+
+async function loadSplitRow(body, mint, symbol) {
+	body.innerHTML = `<div style="color:var(--nxt-ink-fade);font-size:13px">Loading split…</div>`;
+	let cfg;
+	try {
+		cfg = await get(`/api/cosmetics/split?mint=${encodeURIComponent(mint)}`);
+	} catch {
+		body.innerHTML = `<div style="color:var(--nxt-danger);font-size:13px">
+			Couldn’t load split. <button class="dn-btn" data-slot="sp-retry" style="margin-left:8px;padding:4px 10px;font-size:12px">Retry</button></div>`;
+		body.querySelector('[data-slot="sp-retry"]')?.addEventListener('click', () => loadSplitRow(body, mint, symbol));
+		return;
+	}
+	renderSplitRow(body, mint, symbol, cfg);
+}
+
+function renderSplitRow(body, mint, symbol, cfg) {
+	const maxBps = Number.isFinite(Number(cfg?.maxBps)) ? Number(cfg.maxBps) : 9000;
+	const maxPct = Math.round(maxBps / 100);
+	const curBps = Math.max(0, Math.min(maxBps, Math.round(Number(cfg?.splitBps) || 0)));
+	const curPct = Math.round(curBps / 100);
+	const creator = cfg?.creatorWallet || null;
+
+	// No resolvable creator wallet → nothing to pay out to yet. Honest, designed state.
+	if (!creator) {
+		body.innerHTML = `
+			<div style="font-size:13px;color:var(--nxt-ink-fade);line-height:1.5">
+				We couldn’t resolve this coin’s creator wallet on-chain yet, so there’s no
+				payout target to split to. Once the coin’s creator is established, set your
+				share here.
+			</div>`;
+		return;
+	}
+
+	const creatorShort = creator.slice(0, 4) + '…' + creator.slice(-4);
+	const defaultTag = cfg?.isDefault
+		? `<span class="dn-tag" style="margin-left:8px">Default</span>`
+		: `<span class="dn-tag success" style="margin-left:8px">Custom</span>`;
+
+	body.innerHTML = `
+		<div style="display:flex;align-items:flex-end;gap:14px;flex-wrap:wrap">
+			<div style="flex:1 1 260px;min-width:220px">
+				<label style="display:flex;align-items:center;font-size:12px;color:var(--nxt-ink-fade);margin-bottom:6px">
+					Your share ${defaultTag}
+				</label>
+				<div style="display:flex;align-items:center;gap:10px">
+					<input type="range" data-slot="sp-range" min="0" max="${maxPct}" step="1" value="${curPct}"
+						aria-label="Your share of cosmetic sales (percent)" style="flex:1;accent-color:var(--nxt-accent,#8aa0ff)">
+					<div style="display:flex;align-items:center;gap:4px">
+						<input type="number" data-slot="sp-num" min="0" max="${maxPct}" step="1" value="${curPct}"
+							class="mon-select" style="width:70px;text-align:right" aria-label="Your share percent">
+						<span style="color:var(--nxt-ink-fade);font-size:13px">%</span>
+					</div>
+				</div>
+				<div data-slot="sp-hint" style="font-size:11.5px;color:var(--nxt-ink-fade);margin-top:6px"></div>
+			</div>
+			<div style="display:flex;flex-direction:column;gap:6px;align-items:flex-end">
+				<button class="dn-btn primary" data-slot="sp-save" style="padding:7px 16px" disabled>Save share</button>
+				<div style="font-size:11px;color:var(--nxt-ink-fade)">Pays to ${esc(creatorShort)}</div>
+			</div>
+		</div>
+		<div data-slot="sp-status" role="status" style="font-size:12.5px;margin-top:10px;min-height:16px"></div>
+	`;
+
+	const range = body.querySelector('[data-slot="sp-range"]');
+	const num = body.querySelector('[data-slot="sp-num"]');
+	const hint = body.querySelector('[data-slot="sp-hint"]');
+	const saveBtn = body.querySelector('[data-slot="sp-save"]');
+	const status = body.querySelector('[data-slot="sp-status"]');
+
+	const clampPct = (v) => Math.max(0, Math.min(maxPct, Math.round(Number(v) || 0)));
+	const paint = (pct) => {
+		hint.textContent = `Platform keeps ${100 - pct}% · max your share ${maxPct}%`;
+		saveBtn.disabled = pct === curPct;
+	};
+	const sync = (pct, from) => {
+		const v = clampPct(pct);
+		if (from !== 'range') range.value = String(v);
+		if (from !== 'num') num.value = String(v);
+		paint(v);
+	};
+
+	range.addEventListener('input', () => sync(range.value, 'range'));
+	num.addEventListener('input', () => sync(num.value, 'num'));
+	sync(curPct);
+
+	saveBtn.addEventListener('click', async () => {
+		const pct = clampPct(num.value);
+		const bps = pct * 100;
+		saveBtn.disabled = true;
+		status.style.color = 'var(--nxt-ink-fade)';
+		status.textContent = 'Approve the signature in your wallet…';
+		const ts = Math.floor(Date.now() / 1000);
+		// Rebuild the exact message the server re-derives + verifies (see
+		// splitConfigMessage in api/_lib/cosmetics-economy.js). bps is already clamped.
+		const message = `three.ws cosmetic revenue split\nmint: ${mint}\nshare: ${bps} bps\nts: ${ts}`;
+		let signer, signature;
+		try {
+			({ signer, signature } = await signSolanaMessage(message));
+		} catch (err) {
+			status.style.color = 'var(--nxt-danger)';
+			status.textContent = err?.message || 'Could not sign with your wallet.';
+			saveBtn.disabled = false;
+			return;
+		}
+		status.textContent = 'Saving…';
+		try {
+			const next = await post('/api/cosmetics/split', { mint, bps, ts, signature, signer });
+			renderSplitRow(body, mint, symbol, next);
+			const ok = body.querySelector('[data-slot="sp-status"]');
+			if (ok) { ok.style.color = 'var(--nxt-success)'; ok.textContent = `Saved — you now take ${Math.round((next.splitBps || 0) / 100)}% of $${symbol} cosmetic sales.`; }
+		} catch (err) {
+			status.style.color = 'var(--nxt-danger)';
+			status.textContent =
+				err?.code === 'not_creator'
+					? `This coin pays out to ${creatorShort}. Connect that wallet to change the split.`
+					: err?.code === 'bad_signature'
+						? 'Signature didn’t verify — make sure you signed with the creator wallet, then try again.'
+						: err?.code === 'no_creator'
+							? 'No creator wallet is established for this coin yet.'
+							: err?.message || 'Couldn’t save the split. Try again.';
+			saveBtn.disabled = false;
+		}
+	});
+}
+
+// -- Token earnings --
+
+function renderTokensPanel(agents) {
+	const launched = agents.filter((a) => {
+		const m = a?.meta?.pumpfun || a?.meta?.token;
+		return Boolean(m?.mint || m?.address || m?.ca);
+	});
+
+	const panel = document.createElement('div');
+	panel.className = 'dn-panel';
+
+	if (!launched.length) {
+		panel.innerHTML = `
+			<div style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:14px">
+				<div>
+					<div class="dn-panel-title">Token Earnings</div>
+					<div class="dn-panel-sub" style="margin:2px 0 0">Royalties from Pump.fun tokens your agents launched.</div>
+				</div>
+				<a class="dn-btn" href="/dashboard/tokens">Token dashboard</a>
+			</div>
+			<div class="dn-empty">
+				<h3>No tokens launched</h3>
+				<p>Launch a Pump.fun token from any agent to earn royalties on every trade.</p>
+				<a class="dn-btn primary" href="/dashboard/agents">Go to Agents</a>
+			</div>
+		`;
+		return panel;
+	}
+
+	panel.innerHTML = `
+		<div style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:14px">
+			<div>
+				<div class="dn-panel-title">Token Earnings</div>
+				<div class="dn-panel-sub" style="margin:2px 0 0">Royalties from Pump.fun tokens your agents launched.</div>
+			</div>
+			<a class="dn-btn" href="/dashboard/tokens">Full token dashboard</a>
+		</div>
+		<div style="overflow-x:auto">
+			<table class="mon-table">
+				<thead>
+					<tr>
+						<th scope="col">Ticker</th>
+						<th scope="col" style="text-align:right">Holders</th>
+						<th scope="col" style="text-align:right">Royalties</th>
+						<th></th>
+					</tr>
+				</thead>
+				<tbody>
+					${launched.map((a) => {
+						const meta = a.meta?.pumpfun || a.meta?.token || {};
+						const mint = meta.mint || meta.address || meta.ca || '';
+						const ticker = meta.symbol || meta.ticker || a.name || 'TOKEN';
+						const holders = meta.holders ?? '--';
+						const royalties = meta.royalties_atomics ? formatUsdc(meta.royalties_atomics) : '--';
+						return `
+							<tr>
+								<td style="font-weight:600">$${esc(String(ticker).toUpperCase())}</td>
+								<td style="text-align:right;font-variant-numeric:tabular-nums;color:var(--nxt-ink-dim)">${esc(String(holders))}</td>
+								<td style="text-align:right;font-variant-numeric:tabular-nums">${esc(royalties)}</td>
+								<td>
+									${mint
+										? `<a href="https://pump.fun/coin/${encodeURIComponent(mint)}" target="_blank" rel="noopener" style="color:var(--nxt-accent);font-size:12px">View token</a>`
+										: ''}
+								</td>
+							</tr>
+						`;
+					}).join('')}
+				</tbody>
+			</table>
+		</div>
+	`;
+	return panel;
+}
+
+// -- Subscription plans (creator) --
+
+function renderSubscriptionPlans({ creatorPlans, me }) {
+	const panel = document.createElement('div');
+	panel.className = 'dn-panel';
+
+	let plans = [...creatorPlans];
+
+	function paint() {
+		panel.innerHTML = `
+			<div style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:14px">
+				<div>
+					<div class="dn-panel-title">Subscription Plans</div>
+					<div class="dn-panel-sub" style="margin:2px 0 0">Plans you offer. Users can subscribe to unlock premium access to your agents.</div>
+				</div>
+				<button class="dn-btn primary" data-action="create-plan">+ New plan</button>
+			</div>
+			<div data-slot="plans-list"></div>
+		`;
+
+		const listHost = panel.querySelector('[data-slot="plans-list"]');
+
+		if (!plans.length) {
+			listHost.innerHTML = `
+				<div class="dn-empty">
+					<h3>No subscription plans</h3>
+					<p>Create a plan to let users subscribe to your agents and unlock premium skills.</p>
+				</div>`;
+		} else {
+			listHost.innerHTML = `
+				<div style="overflow-x:auto">
+					<table class="mon-table">
+						<thead>
+							<tr>
+								<th scope="col">Plan</th>
+								<th scope="col" style="text-align:right">Price</th>
+								<th scope="col">Interval</th>
+								<th scope="col">Status</th>
+								<th style="text-align:right"></th>
+							</tr>
+						</thead>
+						<tbody>
+							${plans.map((p) => `
+								<tr>
+									<td>
+										<div style="font-weight:600">${esc(p.name || 'Unnamed plan')}</div>
+										${p.description ? `<div style="font-size:12px;color:var(--nxt-ink-dim)">${esc(p.description.slice(0, 80))}</div>` : ''}
+									</td>
+									<td style="text-align:right;font-variant-numeric:tabular-nums">
+										${esc(formatUsd(p.price_usd))}
+									</td>
+									<td style="color:var(--nxt-ink-dim)">${esc(p.interval || 'monthly')}</td>
+									<td>
+										${p.active
+											? `<span class="dn-tag success">Active</span>`
+											: `<span class="dn-tag">Inactive</span>`
+										}
+									</td>
+									<td style="text-align:right">
+										<div style="display:inline-flex;gap:6px">
+											<button class="dn-btn" data-action="edit-plan" data-id="${esc(p.id)}" style="padding:5px 10px;font-size:12px">Edit</button>
+											<button class="dn-btn danger" data-action="delete-plan" data-id="${esc(p.id)}" style="padding:5px 10px;font-size:12px">Delete</button>
+										</div>
+									</td>
+								</tr>
+							`).join('')}
+						</tbody>
+					</table>
+				</div>
+			`;
+		}
+
+		panel.querySelector('[data-action="create-plan"]').addEventListener('click', () => {
+			openPlanModal(null, (saved) => {
+				plans.unshift(saved);
+				paint();
+			});
+		});
+
+		panel.querySelectorAll('[data-action="edit-plan"]').forEach((btn) => {
+			btn.addEventListener('click', () => {
+				const plan = plans.find((p) => p.id === btn.dataset.id);
+				if (!plan) return;
+				openPlanModal(plan, (updated) => {
+					const idx = plans.findIndex((p) => p.id === updated.id);
+					if (idx >= 0) plans[idx] = updated;
+					paint();
+				});
+			});
+		});
+
+		panel.querySelectorAll('[data-action="delete-plan"]').forEach((btn) => {
+			btn.addEventListener('click', async () => {
+				const id = btn.dataset.id;
+				const plan = plans.find((p) => p.id === id);
+				if (!confirm(`Delete plan "${plan?.name || id}"?`)) return;
+				btn.disabled = true;
+				btn.textContent = 'Deleting...';
+				try {
+					await del(`/api/subscriptions/plans/${encodeURIComponent(id)}`);
+					plans = plans.filter((p) => p.id !== id);
+					paint();
+					toastMonetize('Plan deleted');
+				} catch (err) {
+					toastMonetize(err?.message || 'Delete failed');
+					btn.disabled = false;
+					btn.textContent = 'Delete';
+				}
+			});
+		});
+	}
+
+	paint();
+	return panel;
+}
+
+function openPlanModal(existing, onSaved) {
+	const overlay = document.createElement('div');
+	overlay.className = 'mon-overlay';
+	overlay.innerHTML = `
+		<div role="dialog" aria-modal="true" aria-label="${existing ? 'Edit subscription plan' : 'Create subscription plan'}" class="mon-modal" style="width:min(460px,100%)">
+			<div style="font-size:16px;font-weight:600;margin-bottom:18px">${existing ? 'Edit plan' : 'Create plan'}</div>
+
+			<label class="mon-field">
+				<span class="mon-label">Plan name</span>
+				<input data-slot="name" type="text" maxlength="80" value="${esc(existing?.name || '')}"
+					placeholder="e.g. Pro access, VIP, Founder..." class="mon-input" />
+			</label>
+
+			<label class="mon-field">
+				<span class="mon-label">Description (optional)</span>
+				<textarea data-slot="description" maxlength="300" rows="2"
+					placeholder="What does this plan unlock?" class="mon-input" style="resize:vertical">${esc(existing?.description || '')}</textarea>
+			</label>
+
+			<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+				<label class="mon-field">
+					<span class="mon-label">Price (USD)</span>
+					<input data-slot="price" type="number" min="0.5" step="0.01" value="${esc(String(existing?.price_usd || ''))}"
+						placeholder="9.99" class="mon-input" />
+				</label>
+				<label class="mon-field">
+					<span class="mon-label">Interval</span>
+					<select data-slot="interval" class="mon-select">
+						<option value="monthly"${(!existing || existing.interval === 'monthly') ? ' selected' : ''}>Monthly</option>
+						<option value="weekly"${existing?.interval === 'weekly' ? ' selected' : ''}>Weekly</option>
+						<option value="yearly"${existing?.interval === 'yearly' ? ' selected' : ''}>Yearly</option>
+					</select>
+				</label>
+			</div>
+
+			<label style="display:flex;align-items:center;gap:10px;margin-bottom:18px;cursor:pointer">
+				<input data-slot="active" type="checkbox" ${(!existing || existing.active) ? 'checked' : ''}
+					style="width:16px;height:16px;cursor:pointer;accent-color:var(--nxt-accent)" />
+				<span style="font-size:13px;color:var(--nxt-ink)">Plan is active (visible to subscribers)</span>
+			</label>
+
+			<div data-slot="error" class="mon-error"></div>
+
+			<div style="display:flex;gap:8px;justify-content:flex-end">
+				<button class="dn-btn ghost" data-action="cancel">Cancel</button>
+				<button class="dn-btn primary" data-action="submit">${existing ? 'Save changes' : 'Create plan'}</button>
+			</div>
+		</div>
+	`;
+
+	document.body.appendChild(overlay);
+	const nameEl = overlay.querySelector('[data-slot="name"]');
+	const descEl = overlay.querySelector('[data-slot="description"]');
+	const priceEl = overlay.querySelector('[data-slot="price"]');
+	const intervalEl = overlay.querySelector('[data-slot="interval"]');
+	const activeEl = overlay.querySelector('[data-slot="active"]');
+	const errorEl = overlay.querySelector('[data-slot="error"]');
+	const submitBtn = overlay.querySelector('[data-action="submit"]');
+	nameEl.focus();
+
+	const close = () => overlay.remove();
+	overlay.querySelector('[data-action="cancel"]').addEventListener('click', close);
+	overlay.addEventListener('click', (e) => { if (e.target === overlay) close(); });
+	document.addEventListener('keydown', function onKey(e) {
+		if (e.key === 'Escape') { close(); document.removeEventListener('keydown', onKey); }
+	});
+
+	submitBtn.addEventListener('click', async () => {
+		const name = nameEl.value.trim();
+		const price = parseFloat(priceEl.value);
+		if (!name) { errorEl.textContent = 'Plan name is required.'; return; }
+		if (!Number.isFinite(price) || price < 0.5) { errorEl.textContent = 'Price must be at least $0.50.'; return; }
+		errorEl.textContent = '';
+		submitBtn.disabled = true;
+		submitBtn.textContent = existing ? 'Saving...' : 'Creating...';
+		const body = {
+			name,
+			description: descEl.value.trim() || undefined,
+			price_usd: price,
+			interval: intervalEl.value,
+			active: activeEl.checked,
+		};
+		try {
+			let saved;
+			if (existing) {
+				const r = await put(`/api/subscriptions/plans/${encodeURIComponent(existing.id)}`, body);
+				saved = r?.plan || { ...existing, ...body };
+			} else {
+				const r = await post('/api/subscriptions/plans', body);
+				saved = r?.plan || body;
+			}
+			toastMonetize(existing ? 'Plan updated' : 'Plan created');
+			close();
+			onSaved(saved);
+		} catch (err) {
+			errorEl.textContent = err?.body?.error || err?.message || 'Save failed';
+			submitBtn.disabled = false;
+			submitBtn.textContent = existing ? 'Save changes' : 'Create plan';
+		}
+	});
+}
+
+// -- Toast --
+
+function toastMonetize(msg, isError) {
+	let el = document.getElementById('dn-monetize-toast');
+	if (!el) {
+		el = document.createElement('div');
+		el.id = 'dn-monetize-toast';
+		el.setAttribute('role', 'status');
+		el.setAttribute('aria-live', 'polite');
+		el.style.cssText = `
+			position:fixed;left:50%;bottom:32px;transform:translateX(-50%) translateY(20px);
+			background:rgba(20,21,28,0.95);border:1px solid var(--nxt-stroke-strong);
+			color:var(--nxt-ink);padding:9px 16px;border-radius:999px;font-size:13px;
+			z-index:9999;opacity:0;transition:opacity .18s,transform .18s;
+			backdrop-filter:blur(20px);box-shadow:0 8px 24px rgba(0,0,0,0.4);pointer-events:none;`;
+		document.body.appendChild(el);
+	}
+	el.textContent = msg;
+	if (isError) el.style.borderColor = 'var(--nxt-danger)';
+	else el.style.borderColor = 'var(--nxt-stroke-strong)';
+	requestAnimationFrame(() => {
+		el.style.opacity = '1';
+		el.style.transform = 'translateX(-50%) translateY(0)';
+	});
+	clearTimeout(el._t);
+	el._t = setTimeout(() => {
+		el.style.opacity = '0';
+		el.style.transform = 'translateX(-50%) translateY(20px)';
+	}, 2400);
+}
+
+// -- Skeleton --
+
+function renderSkeleton(host) {
+	host.innerHTML = `
+		<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:14px">
+			${Array.from({ length: 4 }).map(() => `
+				<div class="dn-panel">
+					<div class="dn-skeleton" style="height:14px;width:60%;margin-bottom:14px"></div>
+					<div class="dn-skeleton" style="height:32px;width:80%;margin-bottom:10px"></div>
+					<div class="dn-skeleton" style="height:12px;width:90%"></div>
+				</div>`).join('')}
+		</div>
+		<div class="dn-panel" style="margin-top:18px">
+			<div class="dn-skeleton" style="height:14px;width:30%;margin-bottom:14px"></div>
+			<div class="dn-skeleton" style="height:180px;width:100%;border-radius:8px"></div>
+		</div>
+		<div class="dn-panel" style="margin-top:18px">
+			<div class="dn-skeleton" style="height:14px;width:25%;margin-bottom:14px"></div>
+			<div class="dn-skeleton" style="height:240px;width:100%;border-radius:8px"></div>
+		</div>
+	`;
+}
+
+// -- Styles --
+
+function injectStyles() {
+	if (document.getElementById('mon-styles')) return;
+	const style = document.createElement('style');
+	style.id = 'mon-styles';
+	style.textContent = `
+/* Monetize page styles */
+.mon-select {
+	padding: 8px 14px;
+	border-radius: 8px;
+	border: 1px solid var(--nxt-stroke);
+	background: rgba(255,255,255,0.04);
+	color: var(--nxt-ink);
+	font: inherit;
+	font-size: 13px;
+	cursor: pointer;
+	transition: border-color 0.12s;
+}
+.mon-select:hover { border-color: var(--nxt-stroke-strong); }
+.mon-select:focus-visible { outline: 2px solid var(--nxt-accent); outline-offset: 2px; }
+
+.mon-input {
+	padding: 9px 12px;
+	border-radius: 8px;
+	border: 1px solid var(--nxt-stroke);
+	background: rgba(255,255,255,0.04);
+	color: var(--nxt-ink);
+	font: inherit;
+	font-size: 13px;
+	transition: border-color 0.12s, box-shadow 0.12s;
+	width: 100%;
+}
+.mon-input:hover { border-color: var(--nxt-stroke-strong); }
+.mon-input:focus { border-color: var(--nxt-accent); box-shadow: 0 0 0 2px rgba(255,255,255,0.06); outline: none; }
+.mon-input-sm { width: 120px; text-align: right; }
+.mon-mono { font-family: 'JetBrains Mono', ui-monospace, monospace; }
+
+.mon-field { display: flex; flex-direction: column; gap: 6px; margin-bottom: 14px; }
+.mon-label { font-size: 12px; color: var(--nxt-ink-dim); font-weight: 500; }
+.mon-hint { font-size: 11.5px; color: var(--nxt-ink-fade); }
+.mon-fee-note { display: block; font-size: 11px; color: var(--nxt-ink-fade); margin-top: 4px; font-variant-numeric: tabular-nums; }
+.mon-error { font-size: 12.5px; color: var(--nxt-danger); min-height: 18px; margin-bottom: 10px; }
+.mon-form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+
+.mon-overlay {
+	position: fixed; inset: 0; z-index: 1000;
+	background: rgba(8,9,14,0.72); backdrop-filter: blur(6px);
+	display: grid; place-items: center; padding: 20px;
+}
+.mon-modal {
+	width: min(440px, 100%);
+	background: linear-gradient(180deg, rgba(22,24,32,0.97), rgba(16,17,24,0.97));
+	border: 1px solid var(--nxt-stroke-strong);
+	border-radius: 14px;
+	padding: 24px;
+	box-shadow: 0 20px 60px rgba(0,0,0,0.6);
+}
+
+.mon-table {
+	width: 100%;
+	border-collapse: collapse;
+	font-size: 13px;
+	min-width: 560px;
+}
+.mon-table th {
+	text-align: left;
+	font-weight: 500;
+	color: var(--nxt-ink-fade);
+	font-size: 11px;
+	text-transform: uppercase;
+	letter-spacing: 0.06em;
+	padding: 8px 10px;
+	border-bottom: 1px solid var(--nxt-stroke);
+}
+.mon-table td {
+	padding: 10px;
+	border-bottom: 1px solid var(--nxt-stroke);
+}
+.mon-table tbody tr {
+	transition: background 0.1s;
+}
+.mon-table tbody tr:hover {
+	background: rgba(255,255,255,0.02);
+}
+
+/* Toggle switch */
+.mon-toggle {
+	position: relative;
+	display: inline-block;
+	width: 36px;
+	height: 20px;
+	cursor: pointer;
+}
+.mon-toggle input {
+	opacity: 0;
+	width: 0;
+	height: 0;
+	position: absolute;
+}
+.mon-toggle-track {
+	position: absolute;
+	inset: 0;
+	background: var(--nxt-stroke-strong);
+	border-radius: 10px;
+	transition: background 0.2s;
+}
+.mon-toggle-track::before {
+	content: '';
+	position: absolute;
+	top: 2px;
+	left: 2px;
+	width: 16px;
+	height: 16px;
+	background: var(--nxt-ink);
+	border-radius: 50%;
+	transition: transform 0.2s;
+}
+.mon-toggle input:checked + .mon-toggle-track {
+	background: var(--nxt-success);
+}
+.mon-toggle input:checked + .mon-toggle-track::before {
+	transform: translateX(16px);
+}
+.mon-toggle input:focus-visible + .mon-toggle-track {
+	outline: 2px solid var(--nxt-accent);
+	outline-offset: 2px;
+}
+
+@media (max-width: 640px) {
+	.mon-form-grid { grid-template-columns: 1fr; }
+	.mon-input-sm { width: 80px; }
+	.mon-table { min-width: 480px; }
+}
+`;
+	document.head.appendChild(style);
+}

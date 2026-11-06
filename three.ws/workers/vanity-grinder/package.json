@@ -1,0 +1,20 @@
+{
+	"name": "@threews/vanity-grinder-batch",
+	"version": "1.0.0",
+	"private": true,
+	"type": "module",
+	"description": "Batch Solana vanity-address grinder for the premium inventory tier — runs on GCP spot CPU, seals every key in-process, writes only ciphertext.",
+	"main": "grind.mjs",
+	"scripts": {
+		"start": "node grind.mjs",
+		"grind": "node grind.mjs"
+	},
+	"dependencies": {
+		"bs58": "^5.0.0",
+		"@neondatabase/serverless": "^0.10.4",
+		"ws": "^8.18.0"
+	},
+	"engines": {
+		"node": ">=20"
+	}
+}

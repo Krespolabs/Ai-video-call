@@ -1,0 +1,235 @@
+/* Native pump.fun trade modal — styles for the openBuyModal widget in
+   coin-buy.js. Imported by that module so the modal carries its own styles to
+   any surface that opens it (the /play world, the pump.fun visualizer, …),
+   not just pages that already load coincommunities.css.
+
+   The design tokens below are scoped to the modal root so the file is fully
+   self-contained: on /play they shadow the identical :root tokens from
+   coincommunities.css (same values, no visual change); on every other page
+   they are the sole definition, so the modal renders correctly standalone. */
+
+.cc-buy-overlay {
+	--cc-bg2: #101010;
+	--cc-panel-solid: #0c0c0c;
+	--cc-edge: rgba(255, 255, 255, 0.12);
+	--cc-edge-hi: rgba(255, 255, 255, 0.55);
+	--cc-text: #f5f5f6;
+	--cc-dim: #8c8c92;
+	--cc-faint: #5a5a60;
+	--cc-accent: #ffffff;
+	--cc-ink: #060607;
+	--cc-live: #ffffff;
+	--cc-shadow: 0 16px 50px rgba(0, 0, 0, 0.7);
+	--cc-glow: 0 0 14px rgba(255, 255, 255, 0.35);
+	--cc-radius: 4px;
+	--cc-radius-sm: 2px;
+}
+
+/* ── Native buy modal ───────────────────────────────────────────────────── */
+.cc-buy-overlay {
+	position: fixed; inset: 0; z-index: 80;
+	display: flex; align-items: center; justify-content: center; padding: 20px;
+	background: rgba(4, 4, 6, 0.66); backdrop-filter: blur(6px);
+	opacity: 0; transition: opacity var(--duration-fast) var(--ease-standard);
+}
+.cc-buy-overlay.cc-on { opacity: 1; }
+/* Opened from a page that carries the site nav (a forked trade: /trades,
+   /radar, /smart-money) rather than from inside a /play world. The nav is
+   sticky at z-index 100 and its menus at 200, so the default 80 would slide
+   the modal's own header, and its close button, under the header bar. Kept as
+   an opt-in modifier so the /play HUD's stacking is untouched. */
+.cc-buy-overlay.cc-buy-elevated { z-index: 9000; }
+.cc-buy-card {
+	width: 100%; max-width: 380px;
+	background: var(--cc-panel-solid); border: 1px solid var(--cc-edge);
+	border-radius: var(--cc-radius); box-shadow: var(--cc-shadow);
+	padding: 18px; transform: translateY(10px) scale(0.99);
+	transition: transform var(--duration-fast) var(--ease-standard);
+}
+.cc-buy-overlay.cc-on .cc-buy-card { transform: translateY(0) scale(1); }
+.cc-buy-head { display: flex; align-items: center; gap: 11px; margin-bottom: 16px; }
+.cc-buy-img {
+	width: 40px; height: 40px; border-radius: var(--cc-radius-sm); object-fit: cover;
+	background: var(--cc-bg2); flex: none;
+}
+.cc-buy-img-ph { display: flex; align-items: center; justify-content: center; color: var(--cc-faint); font-size: 22px; }
+.cc-buy-titles { flex: 1; min-width: 0; }
+.cc-buy-name { font-weight: 800; font-size: 15px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.cc-buy-sub { display: flex; align-items: center; gap: 8px; margin-top: 2px; flex-wrap: wrap; }
+.cc-buy-sym { color: var(--cc-dim); font-size: 12px; }
+
+/* Lifecycle stage pill — a graduated coin must read as unmistakably different
+   from one still on the bonding curve. */
+.cc-buy-stage {
+	display: inline-flex; align-items: center; gap: 4px;
+	padding: 2px 8px; border-radius: 999px;
+	font-size: 10.5px; font-weight: 700; letter-spacing: 0.02em;
+	white-space: nowrap; border: 1px solid transparent;
+	transition: background var(--duration-fast) var(--ease-standard), border-color var(--duration-fast) var(--ease-standard), color var(--duration-fast) var(--ease-standard);
+}
+.cc-buy-stage[hidden] { display: none; }
+.cc-buy-stage-curve {
+	color: #d8c08a; background: rgba(216, 192, 138, 0.10); border-color: rgba(216, 192, 138, 0.32);
+}
+.cc-buy-stage-grad {
+	color: var(--cc-ink); background: var(--cc-accent); border-color: var(--cc-accent);
+	box-shadow: var(--cc-glow);
+}
+.cc-buy-x {
+	flex: none; width: 28px; height: 28px; border-radius: var(--cc-radius-sm);
+	background: none; border: 1px solid var(--cc-edge); color: var(--cc-dim);
+	cursor: pointer; font-size: 13px; line-height: 1; transition: border-color var(--duration-fast) var(--ease-standard), color var(--duration-fast) var(--ease-standard);
+}
+.cc-buy-x:hover { border-color: var(--cc-edge-hi); color: var(--cc-text); }
+.cc-buy-x:focus-visible { outline: 2px solid var(--focus-ring-color); outline-offset: 2px; }
+
+/* Buy / Sell direction toggle. */
+.cc-buy-tabs {
+	display: flex; gap: 4px; margin-bottom: 16px; padding: 3px;
+	background: var(--cc-bg2); border: 1px solid var(--cc-edge); border-radius: var(--cc-radius);
+}
+.cc-buy-tab {
+	flex: 1; padding: 8px 0; background: none; border: 1px solid transparent;
+	border-radius: var(--cc-radius-sm); color: var(--cc-dim);
+	font-size: 13px; font-weight: 800; letter-spacing: 0.03em; cursor: pointer;
+	transition: color var(--duration-fast) var(--ease-standard), background var(--duration-fast) var(--ease-standard), border-color var(--duration-fast) var(--ease-standard);
+}
+.cc-buy-tab:hover { color: var(--cc-text); }
+.cc-buy-tab.cc-on { background: rgba(255, 255, 255, 0.08); border-color: var(--cc-edge-hi); color: var(--cc-text); }
+.cc-buy-tab:focus-visible { outline: 2px solid var(--focus-ring-color); outline-offset: 2px; }
+
+.cc-buy-field { display: block; }
+.cc-buy-field-label { display: block; color: var(--cc-dim); font-size: 11px; letter-spacing: 0.14em; text-transform: uppercase; margin-bottom: 7px; }
+.cc-buy-amount-wrap {
+	display: flex; align-items: center; gap: 8px;
+	background: var(--cc-bg2); border: 1px solid var(--cc-edge); border-radius: var(--cc-radius);
+	padding: 12px 14px; transition: border-color var(--duration-fast) var(--ease-standard);
+}
+.cc-buy-amount-wrap:focus-within { border-color: var(--cc-edge-hi); }
+.cc-buy-amount {
+	flex: 1; min-width: 0; background: none; border: none; outline: none;
+	color: var(--cc-text); font-size: 22px; font-weight: 800; font-variant-numeric: tabular-nums;
+}
+.cc-buy-amount::-webkit-outer-spin-button, .cc-buy-amount::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+.cc-buy-amount { -moz-appearance: textfield; }
+.cc-buy-unit { color: var(--cc-dim); font-weight: 700; font-size: 14px; letter-spacing: 0.04em; }
+
+.cc-buy-presets { display: flex; gap: 7px; margin-top: 9px; }
+.cc-buy-preset {
+	flex: 1; padding: 8px 0; background: var(--cc-bg2); border: 1px solid var(--cc-edge);
+	border-radius: var(--cc-radius); color: var(--cc-dim); font-size: 12px; font-weight: 700;
+	cursor: pointer; transition: border-color var(--duration-fast) var(--ease-standard), color var(--duration-fast) var(--ease-standard), background var(--duration-fast) var(--ease-standard);
+}
+.cc-buy-preset:hover { border-color: var(--cc-edge-hi); color: var(--cc-text); }
+.cc-buy-preset:focus-visible { outline: 2px solid var(--focus-ring-color); outline-offset: 2px; }
+.cc-buy-preset.cc-on { background: rgba(255, 255, 255, 0.08); border-color: var(--cc-edge-hi); color: var(--cc-text); }
+
+/* Wallet balance / holdings line under the amount (USDC buys + all sells). */
+.cc-buy-bal {
+	display: flex; align-items: center; gap: 4px; margin-top: 10px;
+	color: var(--cc-dim); font-size: 12px; font-variant-numeric: tabular-nums;
+}
+.cc-buy-bal[hidden] { display: none; }
+.cc-buy-bal-warn { color: #d8c08a; }
+.cc-buy-bal-sep { color: var(--cc-faint); }
+
+.cc-buy-quote {
+	margin-top: 13px; min-height: 18px; font-size: 13px; color: var(--cc-text);
+	font-variant-numeric: tabular-nums; line-height: 1.4;
+}
+/* Fee disclosure — deliberately quiet (muted, small), but always present. */
+.cc-buy-fee {
+	margin-top: 7px; font-size: 11px; color: var(--cc-faint);
+	font-variant-numeric: tabular-nums; cursor: help;
+	display: flex; align-items: center; gap: 5px;
+}
+.cc-buy-fee[hidden] { display: none; }
+.cc-buy-fee-label { color: var(--cc-dim); }
+.cc-buy-fee-val { color: var(--cc-faint); }
+
+.cc-buy-quote-out { font-weight: 700; }
+.cc-buy-quote-impact { color: var(--cc-dim); }
+.cc-buy-quote-warn { color: #d8c08a; }
+.cc-buy-quote.cc-buy-quote-warn { font-size: 12px; }
+
+.cc-buy-slip { display: flex; align-items: center; gap: 7px; margin-top: 14px; }
+.cc-buy-slip-label { color: var(--cc-dim); font-size: 11px; letter-spacing: 0.08em; text-transform: uppercase; margin-right: auto; }
+.cc-buy-slip-btn {
+	padding: 5px 10px; background: var(--cc-bg2); border: 1px solid var(--cc-edge);
+	border-radius: var(--cc-radius-sm); color: var(--cc-dim); font-size: 12px; font-weight: 600;
+	font-variant-numeric: tabular-nums; cursor: pointer; transition: border-color var(--duration-fast) var(--ease-standard), color var(--duration-fast) var(--ease-standard);
+}
+.cc-buy-slip-btn:hover { border-color: var(--cc-edge-hi); color: var(--cc-text); }
+.cc-buy-slip-btn:focus-visible { outline: 2px solid var(--focus-ring-color); outline-offset: 2px; }
+.cc-buy-slip-btn.cc-on { border-color: var(--cc-edge-hi); color: var(--cc-text); background: rgba(255, 255, 255, 0.06); }
+
+.cc-buy-wallet {
+	display: flex; align-items: center; gap: 7px; margin-top: 15px;
+	color: var(--cc-dim); font-size: 12px; font-variant-numeric: tabular-nums;
+}
+.cc-buy-wallet-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--cc-live); box-shadow: var(--cc-glow); flex: none; }
+.cc-buy-wallet-off { color: var(--cc-faint); }
+
+/* Payer picker: trade from an owned agent's custodial wallet (server-signed,
+   no extension) instead of the browser wallet. Hidden unless the user is
+   signed in with agents AND the coin is SOL-denominated. */
+.cc-buy-payer {
+	display: flex; align-items: center; gap: 8px; margin-top: 8px;
+	color: var(--cc-dim); font-size: 12px;
+}
+.cc-buy-payer[hidden] { display: none; }
+.cc-buy-payer-label { color: var(--cc-faint); flex: none; }
+.cc-buy-payer-select {
+	flex: 1; min-width: 0;
+	padding: 6px 8px; border-radius: 8px;
+	border: 1px solid var(--cc-edge); background: rgba(255, 255, 255, 0.04);
+	color: var(--cc-text); font-size: 12px; font-family: inherit;
+	cursor: pointer;
+	transition: border-color var(--duration-fast) var(--ease-standard), background var(--duration-fast) var(--ease-standard);
+}
+.cc-buy-payer-select:hover { border-color: var(--cc-edge-hi); background: rgba(255, 255, 255, 0.06); }
+.cc-buy-payer-select:focus-visible { outline: 2px solid var(--cc-live); outline-offset: 2px; }
+
+.cc-buy-cta {
+	width: 100%; margin-top: 14px; padding: 14px;
+	background: var(--cc-accent); color: var(--cc-ink);
+	border: 1px solid var(--cc-accent); border-radius: var(--cc-radius);
+	font-weight: 800; font-size: 14px; letter-spacing: 0.03em; cursor: pointer;
+	box-shadow: var(--cc-glow); transition: transform var(--duration-fast) var(--ease-standard), box-shadow var(--duration-fast) var(--ease-standard), opacity var(--duration-fast) var(--ease-standard);
+}
+.cc-buy-cta:hover:not(:disabled) { transform: translateY(-1px); box-shadow: 0 0 22px rgba(255, 255, 255, 0.55); }
+.cc-buy-cta:active:not(:disabled) { transform: translateY(1px); }
+.cc-buy-cta:disabled { opacity: 0.45; cursor: default; box-shadow: none; }
+.cc-buy-cta:focus-visible { outline: 2px solid var(--focus-ring-color); outline-offset: 2px; }
+
+.cc-buy-status {
+	margin-top: 12px; font-size: 12.5px; line-height: 1.45; text-align: center;
+	color: var(--cc-dim); word-break: break-word;
+}
+.cc-buy-status[data-kind="ok"] { color: var(--cc-text); }
+.cc-buy-status[data-kind="err"] { color: #d88a8a; }
+.cc-buy-status a { color: inherit; text-decoration: underline; }
+.cc-buy-link { background: none; border: none; padding: 0; color: var(--cc-text); text-decoration: underline; cursor: pointer; font: inherit; }
+.cc-buy-link:focus-visible { outline: 2px solid var(--focus-ring-color); outline-offset: 2px; }
+
+.cc-buy-pumplink {
+	display: block; margin-top: 14px; text-align: center;
+	color: var(--cc-dim); font-size: 12px; text-decoration: none;
+	transition: color var(--duration-fast) var(--ease-standard);
+}
+.cc-buy-pumplink:hover { color: var(--cc-text); }
+.cc-buy-pumplink:focus-visible { outline: 2px solid var(--focus-ring-color); outline-offset: 2px; }
+
+/* ── Interactive states (QB-07) ────────────────────────────────────────────
+   A button dressed as an underlined link, with no hover. */
+
+.cc-buy-link {
+	transition:
+		color var(--duration-fast) var(--ease-standard),
+		text-decoration-thickness var(--duration-fast) var(--ease-standard);
+}
+
+.cc-buy-link:hover {
+	color: var(--ink-bright);
+	text-decoration-thickness: 2px;
+}

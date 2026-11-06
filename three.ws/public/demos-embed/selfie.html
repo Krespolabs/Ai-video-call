@@ -1,0 +1,100 @@
+<!doctype html>
+<html lang="en" style="background:transparent">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title data-i18n="demos_embed_selfie.meta_title">Selfie to Avatar · three.ws</title>
+  <meta name="robots" content="noindex">
+  <script type="module" src="/dist-lib/agent-3d.js"></script>
+  <style>
+    html, body {
+      background: transparent !important;
+      margin: 0; padding: 0;
+      font-family: 'Helvetica Neue', 'Helvetica Neue', Arial, sans-serif;
+      color: #161616;
+    }
+    .wrap { background: transparent; padding: 32px 24px; }
+    .eyebrow { font-size: 11px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: #0f62fe; margin-bottom: 6px; }
+    .title { font-size: clamp(22px,3vw,30px); font-weight: 300; color: #161616; margin: 0 0 8px; }
+    .title strong { font-weight: 600; }
+    .sub { font-size: 14px; color: #525252; line-height: 1.5; max-width: 520px; margin-bottom: 28px; }
+
+    /* Steps */
+    .steps { display: grid; grid-template-columns: repeat(3,1fr); gap: 1px; background: #e0e0e0; margin-bottom: 32px; }
+    .step { background: transparent; padding: 20px; }
+    .step-num { font-size: 28px; font-weight: 300; color: #0f62fe; line-height: 1; margin-bottom: 8px; }
+    .step-head { font-size: 14px; font-weight: 600; color: #161616; margin-bottom: 4px; }
+    .step-desc { font-size: 13px; color: #525252; line-height: 1.4; }
+
+    /* Avatar showcase */
+    .avatars { display: grid; grid-template-columns: repeat(auto-fill,minmax(160px,1fr)); gap: 1px; background: #e0e0e0; margin-bottom: 28px; }
+    .av-cell { background: transparent; position: relative; aspect-ratio: 3/4; overflow: hidden; }
+    agent-3d { width: 100%; height: 100%; display: block; background: transparent; --agent-bg: transparent; }
+    .av-label { position: absolute; bottom: 0; left: 0; right: 0; padding: 5px 8px; font-size: 10px; color: #525252; background: rgba(255,255,255,0.85); border-top: 1px solid #e0e0e0; text-align: center; }
+
+    /* CTA */
+    .cta-row { display: flex; gap: 12px; flex-wrap: wrap; }
+    .btn-primary { display: inline-flex; align-items: center; gap: 8px; background: #0f62fe; color: #fff; border: none; padding: 12px 20px; font-size: 13px; font-weight: 500; font-family: inherit; cursor: pointer; text-decoration: none; transition: background 0.12s; }
+    .btn-primary:hover { background: #0353e9; color: #fff; text-decoration: none; }
+    .btn-ghost { display: inline-flex; align-items: center; gap: 8px; background: transparent; color: #0f62fe; border: 1px solid #0f62fe; padding: 12px 20px; font-size: 13px; font-weight: 500; font-family: inherit; cursor: pointer; text-decoration: none; transition: background 0.12s; }
+    .btn-ghost:hover { background: #0f62fe; color: #fff; text-decoration: none; }
+
+    @media (max-width: 600px) {
+      .steps { grid-template-columns: 1fr; }
+      .avatars { grid-template-columns: repeat(2,1fr); }
+    }
+  </style>
+</head>
+<body style="background:transparent">
+  <div class="wrap">
+    <div class="eyebrow">three.ws · Selfie → Avatar</div>
+    <h1 class="title" data-i18n-html="demos_embed_selfie.one_photo_full_3d_avatar">One photo.<br><strong>Full 3D avatar.</strong></h1>
+    <p class="sub" data-i18n="demos_embed_selfie.upload_a_selfie_and_get_a_fully">Upload a selfie and get a fully rigged, animated 3D avatar in seconds. No 3D skills required. Use it as your agent identity on three.ws.</p>
+
+    <div class="steps">
+      <div class="step">
+        <div class="step-num">01</div>
+        <div class="step-head">Upload a selfie</div>
+        <div class="step-desc">Any front-facing photo works. The AI reconstructs your face and body in 3D.</div>
+      </div>
+      <div class="step">
+        <div class="step-num">02</div>
+        <div class="step-head">Get a rigged GLB</div>
+        <div class="step-desc">Fully animated. Compatible with three.ws, Unity, Unreal Engine, and the web.</div>
+      </div>
+      <div class="step">
+        <div class="step-num">03</div>
+        <div class="step-head">Deploy as your agent</div>
+        <div class="step-desc">Attach your avatar to an ERC-8004 on-chain identity. Your agent is live.</div>
+      </div>
+    </div>
+
+    <!-- Live avatar examples -->
+    <div class="avatars">
+      <div class="av-cell">
+        <agent-3d src="/avatars/realistic-female.glb"></agent-3d>
+        <div class="av-label">Realistic Female</div>
+      </div>
+      <div class="av-cell">
+        <agent-3d src="/avatars/studio.glb"></agent-3d>
+        <div class="av-label">Sample Avatar</div>
+      </div>
+      <div class="av-cell">
+        <agent-3d src="/avatars/michelle.glb"></agent-3d>
+        <div class="av-label">Michelle</div>
+      </div>
+      <div class="av-cell">
+        <agent-3d src="/avatars/cesium-man.glb"></agent-3d>
+        <div class="av-label">Cesium Man</div>
+      </div>
+    </div>
+
+    <div class="cta-row">
+      <a href="https://three.ws/create/selfie" target="_blank" class="btn-primary" rel="noopener" data-i18n="demos_embed_selfie.create_from_selfie">Create from selfie →</a>
+      <a href="https://three.ws/gallery" target="_blank" class="btn-ghost" rel="noopener" data-i18n="demos_embed_selfie.browse_gallery">Browse gallery</a>
+    </div>
+  </div>
+	<!-- Runtime i18n: detects locale, swaps annotated copy, mounts <lang-switcher>. -->
+	<script type="module" src="/i18n.js"></script>
+</body>
+</html>

@@ -1,0 +1,329 @@
+<!doctype html>
+<html lang="en">
+<head>
+	<script>/* three.ws theme boot — no-flash */(function(){try{var m=localStorage.getItem('twx_theme');var l=m==='auto'?(window.matchMedia&&window.matchMedia('(prefers-color-scheme: light)').matches):m==='light';document.documentElement.setAttribute('data-theme',l?'light':'dark');}catch(e){document.documentElement.setAttribute('data-theme','dark');}})();</script>
+	<meta charset="utf-8">
+	<title data-i18n="vanity_bounties_index.meta_title">Grind-Bounty Market · Trustless distributed vanity addresses · three.ws</title>
+	<meta name="viewport" content="width=device-width, initial-scale=1">
+	<meta name="description" content="Post a USDC bounty for a hard Solana vanity address; a fleet of workers grind it in parallel. The first verified match wins — but the found key is sealed to you, so the worker never sees your wallet. Earn by grinding open bounties." data-i18n-attr="content:vanity_bounties_index.meta_description">
+	<link rel="icon" href="/favicon.ico">
+	<link rel="stylesheet" href="/footer.css">
+	<link rel="stylesheet" href="/nav.css">
+	<link rel="stylesheet" href="/fonts/fonts.css" />
+	<script defer src="/footer-newsletter.js"></script>
+	<script src="/x402.js" type="module"></script>
+	<meta property="og:title" content="Grind-Bounty Market · three.ws" data-i18n-attr="content:vanity_bounties_index.meta_og_title">
+	<meta property="og:description" content="A decentralized x402 market for hard Solana vanity addresses. Post a bounty, a fleet grinds it, the winner is paid — and the key stays sealed to you end-to-end." data-i18n-attr="content:vanity_bounties_index.meta_og_description">
+	<meta property="og:image" content="https://three.ws/api/page-og?s=crypto&amp;t=Grind-Bounty+Market&amp;d=A+decentralized+x402+bounty+market+for+hard+Solana+vanity+addresses%3A+escrow+a+USDC+bounty+and+a+fleet+of+independent+workers+grinds+it+in+parallel.+The+first&amp;p=%2Fvanity%2Fbounties">
+	<meta name="twitter:card" content="summary_large_image">
+	<style>
+		* { box-sizing: border-box; }
+		:root {
+			--fg: #f0f0f0; --muted: #888; --dim: #666; --border: rgba(255,255,255,0.08);
+			--bg: #000; --card-bg: #0e0e10; --card-bg2:#141416;
+			--font-display: 'Space Grotesk', 'Inter', system-ui, sans-serif;
+			--radius: 12px;
+			--accent:#ffd54f; --good:#4ade80; --bad:#f87171; --info:#38bdf8;
+			--common:#94a3b8; --uncommon:#4ade80; --rare:#38bdf8; --epic:#a855f7; --legendary:#ffb020; --mythic:#ff5db1;
+		}
+		body { font: 15px/1.5 'Inter', system-ui, -apple-system, sans-serif; background:#000; color:var(--fg); margin:0; min-height:100vh; display:flex; flex-direction:column; }
+		main { flex:1; max-width:1100px; width:100%; margin:0 auto; padding:2.2rem 1rem 4rem; }
+		a { color:inherit; }
+		.skip-link{position:absolute;left:-999px}.skip-link:focus{left:1rem;top:1rem;background:#fff;color:#000;padding:.4rem .8rem;border-radius:6px;z-index:100}
+		.hero { margin-bottom:1.4rem; }
+		h1 { font-size:2.1rem; margin:0 0 .4rem; font-family:var(--font-display); letter-spacing:-0.02em; line-height:1.05; }
+		.lede { color:var(--muted); margin:0; max-width:66ch; }
+		.lede a { color:var(--accent); text-decoration:none; border-bottom:1px solid rgba(255,213,79,.4); }
+		.lede a:hover { border-bottom-color:var(--accent); }
+
+		.statstrip { display:flex; gap:.6rem; flex-wrap:wrap; margin:1.4rem 0 0; }
+		.stat { flex:1; min-width:140px; border:1px solid var(--border); border-radius:var(--radius); background:var(--card-bg); padding:.85rem 1rem; }
+		.stat .k { font-size:.7rem; text-transform:uppercase; letter-spacing:.05em; color:var(--dim); }
+		.stat .v { font-size:1.5rem; font-weight:800; font-family:var(--font-display); margin-top:.15rem; }
+		.stat .v.sm { font-size:1.15rem; }
+
+		.tabs { display:flex; gap:.3rem; margin:1.8rem 0 1.1rem; border-bottom:1px solid var(--border); flex-wrap:wrap; }
+		.tab { appearance:none; background:none; border:none; color:var(--muted); font:inherit; font-weight:600; padding:.65rem .9rem; cursor:pointer; border-bottom:2px solid transparent; margin-bottom:-1px; transition:color var(--duration-fast), border-color var(--duration-fast); }
+		.tab:hover { color:#ccc; }
+		.tab[aria-selected="true"] { color:#fff; border-bottom-color:#fff; }
+		.tab:focus-visible { outline:2px solid rgba(139,92,246,.7); outline-offset:2px; border-radius:6px; }
+		.panel { display:none; } .panel.show { display:block; animation:fade .25s ease; }
+		@keyframes fade { from{opacity:0;transform:translateY(4px)} to{opacity:1;transform:none} }
+
+		.controls { display:flex; gap:.6rem; flex-wrap:wrap; align-items:center; margin-bottom:1.1rem; }
+		.controls select, .controls input[type=text] { font:inherit; font-size:.85rem; background:#161616; color:var(--fg); border:1px solid rgba(255,255,255,.12); border-radius:8px; padding:.5rem .7rem; }
+		.controls label { font-size:.7rem; color:var(--dim); text-transform:uppercase; letter-spacing:.04em; }
+		.seg { display:flex; border:1px solid var(--border); border-radius:8px; overflow:hidden; }
+		.seg button { appearance:none; background:#141414; border:none; color:var(--muted); font:inherit; font-size:.82rem; font-weight:600; padding:.45rem .8rem; cursor:pointer; }
+		.seg button[aria-pressed="true"]{ background:#262626; color:#fff; }
+
+		.grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(290px,1fr)); gap:.9rem; }
+		.bcard { border:1px solid var(--border); border-radius:var(--radius); background:var(--card-bg); padding:1rem 1.1rem; display:flex; flex-direction:column; gap:.55rem; position:relative; transition:transform var(--duration-fast), border-color var(--duration-fast); }
+		.bcard:hover { transform:translateY(-2px); border-color:rgba(255,255,255,.18); }
+		.bcard .toprow { display:flex; justify-content:space-between; align-items:flex-start; gap:.5rem; }
+		.tierbadge { font-size:.66rem; font-weight:800; text-transform:uppercase; letter-spacing:.05em; padding:.2rem .5rem; border-radius:999px; color:#000; }
+		.reward { font-size:1.5rem; font-weight:800; font-family:var(--font-display); }
+		.reward small { font-size:.7rem; color:var(--dim); font-weight:600; }
+		.pat { font-family:'Space Grotesk',monospace; font-size:1.05rem; font-weight:700; word-break:break-all; }
+		.pat .hi { color:var(--accent); }
+		.meta { font-size:.74rem; color:var(--dim); display:flex; flex-wrap:wrap; gap:.5rem .9rem; }
+		.bcard .statusrow { display:flex; align-items:center; gap:.5rem; font-size:.74rem; margin-top:.2rem; }
+		.dot { width:7px; height:7px; border-radius:50%; display:inline-block; }
+		.dot.open{ background:var(--good); box-shadow:0 0 6px var(--good); } .dot.settled{ background:var(--info);} .dot.refunded{ background:var(--dim);} .dot.expired{ background:var(--bad);}
+		.bcard .btnrow { display:flex; gap:.5rem; margin-top:.3rem; flex-wrap:wrap; }
+		.timer { font-variant-numeric:tabular-nums; }
+
+		button.primary, button.ghost, a.primary, a.ghost { appearance:none; font:inherit; font-weight:700; border-radius:8px; cursor:pointer; text-decoration:none; display:inline-flex; align-items:center; gap:.4rem; transition:transform var(--duration-instant), background var(--duration-fast), border-color var(--duration-fast); }
+		button.primary, a.primary { background:#fff; color:#000; border:1px solid #fff; padding:.55rem 1rem; }
+		button.primary:hover, a.primary:hover { transform:translateY(-1px); }
+		button.primary:disabled { opacity:.5; cursor:not-allowed; transform:none; }
+		button.ghost, a.ghost { background:transparent; color:var(--fg); border:1px solid var(--border); padding:.5rem .9rem; }
+		button.ghost:hover, a.ghost:hover { border-color:rgba(255,255,255,.3); }
+		button.small { font-size:.78rem; padding:.4rem .7rem; }
+		button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-visible { outline:2px solid rgba(139,92,246,.7); outline-offset:2px; }
+
+		/* deep-linked bounty (#<id>) pinned above the board */
+		.linked { margin-bottom:1.1rem; }
+		.linked .linkedhead { display:flex; align-items:center; justify-content:space-between; gap:.6rem; font-size:.7rem; text-transform:uppercase; letter-spacing:.05em; color:var(--accent); margin-bottom:.5rem; }
+		.linked .bcard { border-color:rgba(255,213,79,.45); box-shadow:0 0 0 1px rgba(255,213,79,.12); }
+		.priority { display:flex; align-items:center; justify-content:space-between; gap:.6rem; flex-wrap:wrap; margin:0 0 1rem; padding:.6rem .8rem; border:1px solid rgba(255,213,79,.4); background:rgba(255,213,79,.07); border-radius:8px; font-size:.82rem; color:#fcd34d; }
+		.priority .hi { color:var(--accent); }
+		.empty { text-align:center; padding:3.5rem 1rem; border:1px dashed var(--border); border-radius:var(--radius); color:var(--muted); }
+		.empty .glyph { font-size:2.4rem; margin-bottom:.6rem; opacity:.5; }
+		.empty h3 { font-family:var(--font-display); margin:.2rem 0 .5rem; color:#ccc; }
+		.skel { border:1px solid var(--border); border-radius:var(--radius); background:var(--card-bg); height:180px; position:relative; overflow:hidden; }
+		.skel::after { content:''; position:absolute; inset:0; background:linear-gradient(90deg,transparent,rgba(255,255,255,.05),transparent); animation:sweep 1.3s infinite; }
+		@keyframes sweep { 0%{transform:translateX(-100%)} 100%{transform:translateX(100%)} }
+		.errbox, .okbox, .warnbox { display:none; margin-top:.9rem; padding:.7rem .9rem; border-radius:8px; font-size:.85rem; }
+		.errbox.show { display:block; border:1px solid rgba(248,113,113,.4); background:rgba(248,113,113,.08); color:#fca5a5; }
+		.okbox.show { display:block; border:1px solid rgba(74,222,128,.4); background:rgba(74,222,128,.08); color:#86efac; }
+		.warnbox.show { display:block; border:1px solid rgba(255,176,32,.4); background:rgba(255,176,32,.08); color:#fcd34d; }
+
+		/* forms */
+		.card { border:1px solid var(--border); border-radius:var(--radius); background:var(--card-bg); padding:1.4rem; }
+		.card h2 { font-family:var(--font-display); margin:0 0 .3rem; font-size:1.2rem; }
+		.card p.note { color:var(--muted); font-size:.84rem; margin:.2rem 0 1rem; }
+		label.fl { display:block; font-size:.72rem; text-transform:uppercase; letter-spacing:.04em; color:var(--dim); margin:.9rem 0 .3rem; }
+		input.t, textarea.t { width:100%; font:inherit; background:#161616; color:var(--fg); border:1px solid rgba(255,255,255,.12); border-radius:8px; padding:.6rem .8rem; }
+		textarea.t { min-height:90px; resize:vertical; font-family:'Space Grotesk',monospace; font-size:.82rem; }
+		.row { display:flex; gap:.7rem; flex-wrap:wrap; }
+		.row > div { flex:1; min-width:130px; }
+		.chk { display:flex; align-items:center; gap:.5rem; margin-top:.7rem; font-size:.86rem; color:#ccc; }
+		.kv { display:flex; justify-content:space-between; gap:1rem; padding:.35rem 0; border-bottom:1px solid var(--border); font-size:.86rem; }
+		.kv:last-child { border-bottom:none; } .kv .k { color:var(--dim); } .kv .v { font-weight:700; font-family:'Space Grotesk',monospace; }
+		.meter { height:10px; border-radius:6px; background:#1c1c1c; overflow:hidden; margin:.4rem 0; }
+		.meter > span { display:block; height:100%; transition:width var(--duration-slow) var(--ease-standard), background var(--duration-slow); }
+		.keybox { background:#0a0a0a; border:1px solid rgba(255,176,32,.35); border-radius:8px; padding:.8rem; margin-top:.8rem; }
+		.keybox code { display:block; word-break:break-all; font-family:'Space Grotesk',monospace; font-size:.78rem; color:#fcd34d; background:#111; padding:.5rem; border-radius:6px; margin:.4rem 0; }
+		.mono { font-family:'Space Grotesk',monospace; word-break:break-all; }
+
+		/* worker odometer */
+		.odo { display:flex; gap:.8rem; flex-wrap:wrap; margin:1rem 0; }
+		.odo .cell { flex:1; min-width:120px; border:1px solid var(--border); border-radius:10px; background:var(--card-bg2); padding:.7rem .9rem; }
+		.odo .cell .k { font-size:.66rem; text-transform:uppercase; letter-spacing:.05em; color:var(--dim); }
+		.odo .cell .v { font-size:1.3rem; font-weight:800; font-family:var(--font-display); font-variant-numeric:tabular-nums; }
+		.worklog { max-height:200px; overflow:auto; border:1px solid var(--border); border-radius:8px; background:#0a0a0a; padding:.6rem .8rem; font-family:'Space Grotesk',monospace; font-size:.78rem; color:var(--muted); margin-top:.8rem; }
+		.worklog .win { color:var(--good); } .worklog .miss { color:var(--dim); } .worklog .err { color:var(--bad); }
+		.spin { width:14px;height:14px;border:2px solid rgba(255,255,255,.2);border-top-color:#fff;border-radius:50%;display:inline-block;animation:rot .7s linear infinite;vertical-align:-2px }
+		@keyframes rot{to{transform:rotate(360deg)}}
+
+		.toast { position:fixed; left:50%; bottom:1.5rem; transform:translateX(-50%) translateY(120%); background:#1a1a1a; border:1px solid var(--border); color:#fff; padding:.6rem 1rem; border-radius:8px; font-size:.85rem; transition:transform var(--duration-base) var(--ease-standard); z-index:50; max-width:90vw; }
+		.toast.show { transform:translateX(-50%) translateY(0); }
+		@media (max-width:560px){ h1{font-size:1.6rem} }
+		@media (prefers-reduced-motion: reduce){ *{animation:none!important;transition:none!important} }
+	</style>
+
+	<link rel="canonical" href="https://three.ws/vanity/bounties">
+	<meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1">
+	<meta property="og:type" content="website">
+	<meta property="og:site_name" content="three.ws">
+	<meta property="og:locale" content="en_US">
+	<meta property="og:url" content="https://three.ws/vanity/bounties">
+	<meta property="og:image:alt" content="Grind-Bounty Market — three.ws">
+	<meta name="twitter:site" content="@trythreews">
+	<meta name="twitter:title" content="Grind-Bounty Market · three.ws" data-i18n-attr="content:vanity_bounties_index.meta_twitter_title">
+	<meta name="twitter:description" content="A decentralized x402 bounty market for hard Solana vanity addresses — escrow a USDC bounty and a fleet of independent workers grinds it in parallel. The first verified match wins, but the found key is sealed to you so the worker never sees your wallet. Earn USDC by grinding open bounties." data-i18n-attr="content:vanity_bounties_index.meta_twitter_description">
+	<meta name="twitter:image" content="https://three.ws/api/page-og?s=crypto&amp;t=Grind-Bounty+Market&amp;d=A+decentralized+x402+bounty+market+for+hard+Solana+vanity+addresses%3A+escrow+a+USDC+bounty+and+a+fleet+of+independent+workers+grinds+it+in+parallel.+The+first&amp;p=%2Fvanity%2Fbounties">
+	<script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"WebPage","name":"Grind-Bounty Market","description":"A decentralized x402 bounty market for hard Solana vanity addresses - escrow a USDC bounty and a fleet of independent workers grinds it in parallel. The first verified match wins, but the found key is sealed to you so the worker never sees your wallet. Earn USDC by grinding open bounties.","url":"https://three.ws/vanity/bounties","isPartOf":{"@type":"WebSite","name":"three.ws","url":"https://three.ws"},"primaryImageOfPage":"https://three.ws/api/page-og?s=crypto&t=Grind-Bounty+Market&d=A+decentralized+x402+bounty+market+for+hard+Solana+vanity+addresses+-+escrow+a+USDC+bounty+and+a+fleet+of+independent+workers+grinds+it+in+parallel.+The+first+v&p=%2Fvanity%2Fbounties"},{"@type":"BreadcrumbList","itemListElement":[{"@type":"ListItem","position":1,"name":"Home","item":"https://three.ws/"},{"@type":"ListItem","position":2,"name":"Vanity","item":"https://three.ws/vanity"},{"@type":"ListItem","position":3,"name":"Bounties","item":"https://three.ws/vanity/bounties"}]}]}</script>
+</head>
+<body>
+	<a href="#main" class="skip-link" data-i18n="vanity_bounties_index.skip_to_main_content">Skip to main content</a>
+	<header><div id="nav-container"></div></header>
+	<script src="/nav.js"></script>
+
+	<main id="main">
+		<div class="hero">
+			<h1 data-i18n="vanity_bounties_index.grind_bounty_market">Grind-Bounty Market</h1>
+			<p class="lede" data-i18n-html="vanity_bounties_index.hard_vanity_addresses_are_hours_to_years">
+				Hard vanity addresses are hours-to-years on one machine. Here you <strong>escrow a USDC bounty</strong>
+				and a fleet of independent workers grinds your pattern in parallel — the first verified match wins.
+				The breakthrough: the found key is <strong>sealed to your X25519 key</strong>, so the worker earns the
+				bounty yet <strong>never sees your wallet</strong>. Settlement is trustless via
+				<a href="/x402">x402</a>; unfilled bounties refund on expiry. Or
+				<a href="#earn" id="lede-earn">put your spare cores to work</a> and earn.
+			</p>
+			<div class="statstrip" id="statstrip" aria-live="polite"></div>
+		</div>
+
+		<div class="tabs" id="tablist" role="tablist" aria-label="Grind-bounty market views">
+			<button class="tab" role="tab" id="tab-board" aria-selected="true" aria-controls="panel-board" data-i18n="vanity_bounties_index.bounty_board">Bounty board</button>
+			<button class="tab" role="tab" id="tab-post" aria-selected="false" aria-controls="panel-post" data-i18n="vanity_bounties_index.post_a_bounty">Post a bounty</button>
+			<button class="tab" role="tab" id="tab-earn" aria-selected="false" aria-controls="panel-earn" data-i18n="vanity_bounties_index.grind_earn">Grind &amp; earn</button>
+			<button class="tab" role="tab" id="tab-open" aria-selected="false" aria-controls="panel-open" data-i18n="vanity_bounties_index.open_my_wallet">Open my wallet</button>
+			<button class="tab" role="tab" id="tab-leaderboard" aria-selected="false" aria-controls="panel-leaderboard" data-i18n="vanity_bounties_index.top_grinders">Top grinders</button>
+		</div>
+
+		<!-- BOARD -->
+		<section class="panel show" id="panel-board" role="tabpanel" aria-labelledby="tab-board">
+			<div class="controls">
+				<div class="seg" role="group" aria-label="Filter by status">
+					<button id="st-open" aria-pressed="true" data-i18n="vanity_bounties_index.open">Open</button>
+					<button id="st-settled" aria-pressed="false" data-i18n="vanity_bounties_index.won">Won</button>
+					<button id="st-all" aria-pressed="false" data-i18n="vanity_bounties_index.all">All</button>
+				</div>
+				<label for="sort-select" style="margin-left:auto" data-i18n="vanity_bounties_index.sort">Sort</label>
+				<select id="sort-select" aria-label="Sort board">
+					<option value="reward" data-i18n="vanity_bounties_index.biggest_reward">Biggest reward</option>
+					<option value="expiry" data-i18n="vanity_bounties_index.expiring_soon">Expiring soon</option>
+					<option value="recency" data-i18n="vanity_bounties_index.newest">Newest</option>
+				</select>
+				<button class="ghost small" id="refresh-board" title="Refresh" data-i18n="vanity_bounties_index.refresh" data-i18n-attr="title:vanity_bounties_index.refresh_title">Refresh</button>
+			</div>
+			<div id="linked-bounty" class="linked" hidden></div>
+			<div class="grid" id="board-grid" aria-live="polite"></div>
+			<div style="text-align:center;margin-top:1.4rem;display:none" id="loadmore-row">
+				<button class="ghost" id="loadmore-btn" data-i18n="vanity_bounties_index.load_more">Load more</button>
+			</div>
+		</section>
+
+		<!-- POST -->
+		<section class="panel" id="panel-post" role="tabpanel" aria-labelledby="tab-post">
+			<div class="card">
+				<h2 data-i18n="vanity_bounties_index.post_a_bounty_2">Post a bounty</h2>
+				<p class="note" data-i18n-html="vanity_bounties_index.choose_a_pattern_fund_the_escrow_in">Choose a pattern, fund the escrow in USDC, and the fleet starts grinding. You'll generate an X25519 key — <strong>save its private half</strong>, it's the only way to open the wallet when a worker finds it.</p>
+
+				<label class="fl" for="post-prefix" data-i18n-html="vanity_bounties_index.prefix_address_starts_with">Prefix <span style="text-transform:none;color:#555">— address starts with</span></label>
+				<div class="row">
+					<div><input class="t mono" id="post-prefix" placeholder="e.g. THREE" autocomplete="off" spellcheck="false" maxlength="6"></div>
+					<div>
+						<label class="fl" for="post-suffix" style="margin:0 0 .3rem" data-i18n-html="vanity_bounties_index.suffix_ends_with">Suffix <span style="text-transform:none;color:#555">— ends with</span></label>
+						<input class="t mono" id="post-suffix" placeholder="optional" autocomplete="off" spellcheck="false" maxlength="6">
+					</div>
+				</div>
+				<div class="chk"><input type="checkbox" id="post-ignorecase"><label for="post-ignorecase" data-i18n="vanity_bounties_index.case_insensitive_match_faster_less_specific">Case-insensitive match (faster, less specific)</label></div>
+
+				<!-- live difficulty + price oracle -->
+				<div id="quote-box" style="margin-top:1.1rem;display:none">
+					<div class="kv"><span class="k" data-i18n="vanity_bounties_index.difficulty">Difficulty</span><span class="v" id="q-tier">—</span></div>
+					<div class="meter"><span id="q-meter" style="width:0%"></span></div>
+					<div class="kv"><span class="k" data-i18n="vanity_bounties_index.expected_attempts">Expected attempts</span><span class="v" id="q-attempts">—</span></div>
+					<div class="kv"><span class="k" data-i18n="vanity_bounties_index.suggested_bounty">Suggested bounty</span><span class="v" id="q-suggested">—</span></div>
+				</div>
+				<div class="errbox" id="quote-err"></div>
+
+				<label class="fl" for="post-amount" data-i18n="vanity_bounties_index.bounty_usdc">Bounty (USDC)</label>
+				<div class="row">
+					<div><input class="t" id="post-amount" inputmode="decimal" placeholder="e.g. 0.50" autocomplete="off"></div>
+					<div style="display:flex;align-items:flex-end;gap:.4rem">
+						<button class="ghost small" id="use-floor" type="button" data-i18n="vanity_bounties_index.floor">Floor</button>
+						<button class="ghost small" id="use-suggested" type="button" data-i18n="vanity_bounties_index.suggested">Suggested</button>
+						<button class="ghost small" id="use-generous" type="button" data-i18n="vanity_bounties_index.fill_fast">Fill fast</button>
+					</div>
+				</div>
+
+				<label class="fl" for="post-expiry" data-i18n-html="vanity_bounties_index.expiry_hours_refunds_you_if_unfilled">Expiry (hours) <span style="text-transform:none;color:#555">— refunds you if unfilled</span></label>
+				<input class="t" id="post-expiry" inputmode="numeric" value="48" autocomplete="off">
+
+				<label class="fl" for="post-label" data-i18n-html="vanity_bounties_index.label_optional_public">Label <span style="text-transform:none;color:#555">(optional, public)</span></label>
+				<input class="t" id="post-label" maxlength="80" placeholder="e.g. My agent's wallet" autocomplete="off">
+
+				<label class="fl" for="post-refund" data-i18n-html="vanity_bounties_index.refund_address_solana_where_escrow_returns_o">Refund address (Solana) <span style="text-transform:none;color:#555">— where escrow returns on expiry</span></label>
+				<input class="t mono" id="post-refund" placeholder="Your Solana address" autocomplete="off" spellcheck="false">
+
+				<!-- X25519 recipient key -->
+				<label class="fl" for="post-recipient" data-i18n="vanity_bounties_index.your_sealed_delivery_key_x25519">Your sealed-delivery key (X25519)</label>
+				<div style="display:flex;gap:.5rem;flex-wrap:wrap;align-items:center">
+					<button class="ghost small" id="gen-key" type="button" data-i18n="vanity_bounties_index.generate_a_new_key">Generate a new key</button>
+					<span class="note" style="margin:0" data-i18n="vanity_bounties_index.or_paste_an_existing_public_key_below">or paste an existing public key below</span>
+				</div>
+				<input class="t mono" id="post-recipient" placeholder="X25519 public key (Base58)" autocomplete="off" spellcheck="false" style="margin-top:.5rem">
+				<div class="keybox" id="key-private" style="display:none">
+					<strong style="color:#fcd34d" data-i18n="vanity_bounties_index.save_this_private_key_now">⚠ Save this PRIVATE key now.</strong> three.ws never sees it. It is the ONLY way to open the wallet a worker finds — lose it and the bounty (and the wallet) are unrecoverable.
+					<code id="priv-value"></code>
+					<button class="ghost small" id="copy-priv" type="button" data-i18n="vanity_bounties_index.copy_private_key">Copy private key</button>
+					<button class="ghost small" id="download-key" type="button" data-i18n="vanity_bounties_index.download_key_file">Download key file</button>
+				</div>
+				<div class="chk" id="saved-chk-wrap" style="display:none"><input type="checkbox" id="saved-chk"><label for="saved-chk" data-i18n="vanity_bounties_index.i_ve_saved_my_private_key_somewhere">I've saved my private key somewhere safe.</label></div>
+
+				<div class="warnbox show" id="payout-warn" style="display:none">The market's payout wallet isn't configured in this environment, so escrow can't be returned — posting is disabled here. The board and grinder still work.</div>
+				<div style="display:flex;gap:.6rem;margin-top:1.3rem;align-items:center;flex-wrap:wrap">
+					<button class="primary" id="post-btn" disabled data-i18n="vanity_bounties_index.fund_post_bounty">Fund &amp; post bounty</button>
+					<span class="note" style="margin:0" id="post-hint" data-i18n="vanity_bounties_index.fill_in_a_pattern_amount_and_your">Fill in a pattern, amount, and your key.</span>
+				</div>
+				<div class="errbox" id="post-err"></div>
+				<div class="okbox" id="post-ok"></div>
+			</div>
+		</section>
+
+		<!-- EARN -->
+		<section class="panel" id="panel-earn" role="tabpanel" aria-labelledby="tab-earn">
+			<div class="card">
+				<h2 data-i18n="vanity_bounties_index.grind_earn_2">Grind &amp; earn</h2>
+				<p class="note" data-i18n-html="vanity_bounties_index.run_your_browser_s_cores_against_open">Run your browser's cores against open bounties and claim the reward when you find a match. We seal the key to the requester before submitting, so <strong>you never hold their secret</strong> — you just earn the bounty. Honest about CPU: this pegs your cores while running.</p>
+
+				<div id="earn-priority" class="priority" hidden></div>
+
+				<label class="fl" for="earn-payout" data-i18n-html="vanity_bounties_index.your_payout_address_solana_where_the_bounty">Your payout address (Solana) <span style="text-transform:none;color:#555">— where the bounty is sent</span></label>
+				<input class="t mono" id="earn-payout" placeholder="Your Solana USDC address" autocomplete="off" spellcheck="false">
+
+				<div class="row" style="margin-top:.6rem;align-items:flex-end">
+					<div>
+						<label class="fl" for="earn-workers" style="margin:0 0 .3rem" data-i18n="vanity_bounties_index.worker_threads">Worker threads</label>
+						<input class="t" id="earn-workers" inputmode="numeric" value="" placeholder="auto">
+					</div>
+					<div style="display:flex;gap:.5rem">
+						<button class="primary" id="earn-start" data-i18n="vanity_bounties_index.start_grinding">Start grinding</button>
+						<button class="ghost" id="earn-stop" disabled data-i18n="vanity_bounties_index.stop">Stop</button>
+					</div>
+				</div>
+
+				<div class="odo">
+					<div class="cell"><div class="k">Status</div><div class="v" id="o-status" style="font-size:1rem">Idle</div></div>
+					<div class="cell"><div class="k">Current target</div><div class="v mono" id="o-target" style="font-size:.85rem">—</div></div>
+					<div class="cell"><div class="k">Rate</div><div class="v" id="o-rate">0/s</div></div>
+					<div class="cell"><div class="k">Attempts</div><div class="v" id="o-attempts">0</div></div>
+					<div class="cell"><div class="k">Earned</div><div class="v" id="o-earned" style="color:var(--good)">$0.00</div></div>
+				</div>
+				<div class="worklog" id="worklog" aria-live="polite"><span class="miss" data-i18n="vanity_bounties_index.worker_idle_enter_a_payout_address_and">Worker idle. Enter a payout address and press Start.</span></div>
+			</div>
+		</section>
+
+		<!-- OPEN MY WALLET -->
+		<section class="panel" id="panel-open" role="tabpanel" aria-labelledby="tab-open">
+			<div class="card">
+				<h2 data-i18n="vanity_bounties_index.open_your_won_wallet">Open your won wallet</h2>
+				<p class="note" data-i18n-html="vanity_bounties_index.when_a_worker_fills_your_bounty_the">When a worker fills your bounty, the key is waiting — sealed to you. Paste your bounty id and your X25519 <strong>private</strong> key (it never leaves your browser) to decrypt the wallet locally.</p>
+				<label class="fl" for="open-id" data-i18n="vanity_bounties_index.bounty_id">Bounty id</label>
+				<input class="t mono" id="open-id" placeholder="e.g. a1b2c3d4e5f60718293a4b5c" autocomplete="off" spellcheck="false">
+				<label class="fl" for="open-priv" data-i18n="vanity_bounties_index.your_x25519_private_key">Your X25519 private key</label>
+				<input class="t mono" id="open-priv" placeholder="Base58 private key — stays in your browser" autocomplete="off" spellcheck="false">
+				<div style="display:flex;gap:.6rem;margin-top:1rem"><button class="primary" id="open-btn" data-i18n="vanity_bounties_index.reveal_open">Reveal &amp; open</button></div>
+				<div class="errbox" id="open-err"></div>
+				<div class="okbox" id="open-ok"></div>
+			</div>
+		</section>
+
+		<!-- LEADERBOARD -->
+		<section class="panel" id="panel-leaderboard" role="tabpanel" aria-labelledby="tab-leaderboard">
+			<div id="leaderboard" aria-live="polite"></div>
+		</section>
+	</main>
+
+	<div class="toast" id="toast" role="status" aria-live="polite"></div>
+	<footer class="h-footer-horizon"><div class="h-footer-inner" style="text-align:center;padding:2rem 1rem;color:#555;font-size:.8rem">three.ws — grind-bounty market · trustless distributed vanity · key stays sealed to you</div></footer>
+
+	<script type="module" src="/src/pages/vanity-bounties.js"></script>
+	<!-- Runtime i18n: detects locale, swaps annotated copy, mounts <lang-switcher>. -->
+	<script type="module" src="/i18n.js"></script>
+</body>
+</html>

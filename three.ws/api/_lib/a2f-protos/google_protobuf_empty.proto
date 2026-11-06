@@ -1,0 +1,8 @@
+// Vendored minimal stub of google/protobuf/empty.proto. The A2F controller
+// service file imports it; the message itself carries no fields.
+// SPDX-License-Identifier: Apache-2.0
+syntax = "proto3";
+
+package google.protobuf;
+
+message Empty {}

@@ -1,0 +1,4822 @@
+<!doctype html>
+<html lang="en">
+	<head>
+		<script>/* three.ws theme boot — no-flash; runtime in /theme-switcher.js */(function(){try{var m=localStorage.getItem('twx_theme');var l=m==='auto'?(window.matchMedia&&window.matchMedia('(prefers-color-scheme: light)').matches):m==='light';document.documentElement.setAttribute('data-theme',l?'light':'dark');}catch(e){document.documentElement.setAttribute('data-theme','dark');}})();</script>
+		<meta charset="UTF-8" />
+		<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+		<title data-i18n="forge.meta_title">Forge · Text & Image → 3D · three.ws</title>
+		<meta
+			name="description"
+			content="Type a description, get a textured 3D model. Forge turns a text prompt into an interactive GLB you can orbit, inspect in AR, and download."
+		 data-i18n-attr="content:forge.meta_description"/>
+		<meta property="og:title" content="Forge — Text & Image to 3D · three.ws"  data-i18n-attr="content:forge.meta_og_title"/>
+		<meta
+			property="og:description"
+			content="Describe an object, watch it become an interactive 3D model. Real generation, real GLB, downloadable."
+		 data-i18n-attr="content:forge.meta_og_description"/>
+		<meta property="og:type" content="website" />
+		<meta property="og:site_name" content="three.ws" />
+		<meta property="og:url" content="https://three.ws/forge" />
+		<meta property="og:image" content="https://three.ws/api/page-og?s=build&amp;t=Forge%3A+Text+%26+Image+to+3D&amp;d=Type+a+prompt%2C+or+drop+in+photos+or+a+sketch%2C+and+get+a+downloadable+textured+3D+model+%28GLB%29.+Pick+from+multiple+generation+engines+with+live+health+status.&amp;p=%2Fforge" />
+		<meta property="og:image:width" content="1200" />
+		<meta property="og:image:height" content="630" />
+		<meta name="twitter:card" content="summary_large_image" />
+		<meta name="twitter:site" content="@trythreews" />
+		<meta name="twitter:title" content="Forge · Text → 3D · three.ws"  data-i18n-attr="content:forge.meta_twitter_title"/>
+		<meta
+			name="twitter:description"
+			content="Type a description, get a textured 3D model. Forge turns a text prompt into an interactive GLB you can orbit, inspect in AR, and download."
+		 data-i18n-attr="content:forge.meta_twitter_description"/>
+		<meta name="twitter:image" content="https://three.ws/api/page-og?s=build&amp;t=Forge%3A+Text+%26+Image+to+3D&amp;d=Type+a+prompt%2C+or+drop+in+photos+or+a+sketch%2C+and+get+a+downloadable+textured+3D+model+%28GLB%29.+Pick+from+multiple+generation+engines+with+live+health+status.&amp;p=%2Fforge" />
+		<meta name="theme-color" content="#080814" />
+		<link rel="icon" href="/favicon.ico" sizes="any" />
+		<link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+		<link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png" />
+		<link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png" />
+		<link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+		<link rel="manifest" href="/manifest.webmanifest" />
+		<!-- style.css reaches fonts.css through two @import hops; without a
+		     preload the fonts are discovered late and every swap reflows the page. -->
+		<link rel="preload" href="/fonts/inter-latin.woff2" as="font" type="font/woff2" crossorigin />
+		<link rel="preload" href="/fonts/space-grotesk-latin.woff2" as="font" type="font/woff2" crossorigin />
+		<link rel="stylesheet" href="/style.css" />
+		<link rel="preconnect" href="https://cdn.jsdelivr.net" />
+		<!-- The meshopt decoder shim has to register before any model-viewer
+		     starts loading, so it stays a plain deferred script here. model-viewer
+		     itself is NOT loaded on arrival: this page's landing state has no 3D on
+		     screen, and parsing the 955 KB CDN bundle ahead of the first paint was
+		     the whole of its 1.5 s FCP. src/shared/model-viewer-loader.js fetches
+		     it (with CDN failover) the moment a generation starts, or when a
+		     showcase card needs a live preview. -->
+		<script src="/model-viewer-meshopt.js" defer></script>
+		<style>
+			/* No per-surface accent override — forge uses the global monochrome tokens. */
+
+			.forge-main {
+				max-width: none;
+				margin: 0;
+				padding: var(--space-md) clamp(var(--space-md), 4vw, var(--space-2xl)) var(--space-2xl);
+			}
+			.forge-head {
+				/* Reset the global site-nav `header` rule from style.css —
+				   this is an in-page hero, not the top bar. */
+				display: flex;
+				align-items: baseline;
+				gap: var(--space-md);
+				height: auto;
+				padding: 0 0 var(--space-md);
+				background: none;
+				backdrop-filter: none;
+				-webkit-backdrop-filter: none;
+				border-bottom: 1px solid var(--stroke);
+				overflow: visible;
+				white-space: normal;
+				line-height: var(--leading-normal);
+				z-index: auto;
+				-webkit-app-region: no-drag;
+				margin-bottom: var(--space-lg);
+			}
+
+			/* ── Workspace: composer rail + stage side by side on desktop ────── */
+			.forge-workspace {
+				display: grid;
+				/* Default (mobile / <1080px): one full-width column that may shrink
+				   below its content's min-content width, so the rail and stage stack
+				   vertically without forcing horizontal scroll. The 1080px query
+				   below restores the two-column desktop layout. */
+				grid-template-columns: minmax(0, 1fr);
+				gap: var(--space-lg);
+				align-items: start;
+			}
+			@media (min-width: 1080px) {
+				.forge-workspace {
+					grid-template-columns: minmax(380px, 440px) minmax(0, 1fr);
+					gap: var(--space-xl);
+				}
+				.forge-rail {
+					position: sticky;
+					top: 84px;
+				}
+			}
+			/* Stage column — the viewer/result, your creations, and the showcase.
+			   min-width:0 lets the 3D canvas shrink to its grid cell instead of
+			   forcing the rail narrow; the sections stack with even spacing. */
+			.forge-stage {
+				min-width: 0;
+				display: flex;
+				flex-direction: column;
+				gap: var(--space-lg);
+			}
+			/* forge-eyebrow removed — header is now inline h1 + tagline */
+			.forge-head h1 {
+				font-family: var(--font-display);
+				font-size: var(--text-xl);
+				line-height: 1;
+				margin: 0;
+				color: var(--ink);
+				flex: none;
+			}
+			.forge-head p {
+				color: var(--ink-dim);
+				font-size: var(--text-sm);
+				margin: 0;
+				line-height: var(--leading-normal);
+			}
+			/* Way out to the node builder for multi-step runs (generate, rig,
+			   remesh, export). Pushed to the right end of the hero row. */
+			.forge-head-link {
+				margin-left: auto;
+				flex: none;
+				font-size: var(--text-sm);
+				color: var(--ink-dim);
+				text-decoration: none;
+				border: 1px solid var(--stroke);
+				border-radius: 999px;
+				padding: 4px 12px;
+				transition: color var(--duration-fast) var(--ease-standard), border-color var(--duration-fast) var(--ease-standard), background-color var(--duration-fast) var(--ease-standard);
+			}
+			.forge-head-link:hover {
+				color: var(--ink);
+				border-color: var(--ink-dim);
+			}
+			.forge-head-link:active {
+				transform: translateY(1px);
+			}
+			.forge-head-link:focus-visible {
+				outline: 2px solid var(--accent, currentColor);
+				outline-offset: 2px;
+			}
+			/* "Free" lede tag: the first word a first-timer reads, so the core hook
+			   (this costs nothing, no account) lands immediately. */
+			.forge-free-tag {
+				display: inline-block;
+				font-family: var(--font-mono);
+				font-size: var(--text-2xs);
+				font-weight: var(--weight-semibold);
+				text-transform: uppercase;
+				letter-spacing: 0.08em;
+				color: var(--success);
+				border: 1px solid color-mix(in srgb, var(--success) 40%, transparent);
+				background: color-mix(in srgb, var(--success) 10%, transparent);
+				border-radius: var(--radius-sm);
+				padding: 1px 6px;
+				vertical-align: middle;
+				margin-right: 0.35rem;
+			}
+
+			/* Composer ---------------------------------------------------- */
+			.composer {
+				background: var(--surface-glass);
+				border: 1px solid var(--stroke-strong);
+				border-radius: var(--radius-lg);
+				padding: var(--space-md);
+				box-shadow: 0 24px 60px -30px rgba(0, 0, 0, 0.8);
+			}
+			.composer textarea {
+				width: 100%;
+				min-height: 120px;
+				resize: vertical;
+				background: transparent;
+				border: none;
+				outline: none;
+				color: var(--ink);
+				font-family: var(--font-body);
+				font-size: var(--text-lg);
+				line-height: var(--leading-normal);
+			}
+			/* The textarea drops its own outline so the composer reads as one
+			   surface, which left keyboard users with no focus signal at all on
+			   the page's primary input. Put a ring back for :focus-visible only,
+			   so pointer users keep the seamless look. */
+			.composer textarea:focus-visible {
+				outline: 2px solid var(--accent);
+				outline-offset: 3px;
+				border-radius: var(--radius-sm, 6px);
+			}
+			.composer textarea::placeholder {
+				color: var(--ink-dim);
+			}
+			.composer-row {
+				display: flex;
+				align-items: center;
+				gap: var(--space-sm);
+				margin-top: var(--space-sm);
+				padding-top: var(--space-sm);
+				border-top: 1px solid var(--stroke);
+				flex-wrap: wrap;
+			}
+			.aspect {
+				display: inline-flex;
+				gap: 2px;
+				background: var(--surface-1);
+				border: 1px solid var(--stroke);
+				border-radius: var(--radius-md);
+				padding: 2px;
+			}
+			.aspect button {
+				background: transparent;
+				border: none;
+				color: var(--ink-dim);
+				font-family: var(--font-mono);
+				font-size: var(--text-xs);
+				padding: 0.32rem 0.55rem;
+				border-radius: var(--radius-sm);
+				cursor: pointer;
+				transition:
+					background var(--duration-fast),
+					color var(--duration-fast);
+			}
+			.aspect button:hover {
+				color: var(--ink);
+			}
+			.aspect button[aria-pressed='true'] {
+				background: var(--surface-3);
+				color: var(--ink);
+			}
+			/* Live backend health on the engine buttons: a throttled upstream gets
+			   an amber dot, a down/unconfigured one a red dot and the reason in its
+			   tooltip. Both states are decoded by the legend below the picker, so
+			   each one has to actually render, or the legend explains a swatch that
+			   never appears. Dots ride ::after so the label spacing stays put. */
+			.aspect button[data-health='degraded']::after,
+			.aspect button[data-health='down']::after,
+			.aspect button[data-health='unconfigured']::after {
+				content: '';
+				display: inline-block;
+				width: 0.4em;
+				height: 0.4em;
+				margin-left: 0.35em;
+				border-radius: 50%;
+				background: var(--warning, #e0a93e);
+				vertical-align: 0.08em;
+			}
+			/* A disabled button is dimmed to 0.45, which would wash the red dot out
+			   to roughly the amber one, keep it full-strength so "unavailable"
+			   stays distinguishable from "busy" at a glance. */
+			.aspect button[data-health='down']::after,
+			.aspect button[data-health='unconfigured']::after {
+				background: var(--danger, #e05a5a);
+				opacity: 1;
+			}
+			.aspect button:disabled {
+				opacity: 0.45;
+				cursor: not-allowed;
+			}
+			/* Key glyph marks BYOK engines (Meshy/Tripo/Rodin/Stability/Replicate)
+			   so users see which lanes run on their own API key vs the free/included
+			   ones. Sits inside the button after the label; the health dot stays on
+			   ::after, so the two never collide. */
+			.aspect button .eng-key {
+				width: 0.82em;
+				height: 0.82em;
+				margin-left: 0.42em;
+				vertical-align: -0.13em;
+				opacity: 0.5;
+				transition: opacity var(--duration-fast);
+			}
+			.aspect button:hover .eng-key,
+			.aspect button[aria-pressed='true'] .eng-key {
+				opacity: 0.95;
+			}
+			/* "FREE" pill on zero-cost engines (catalog free:true). A quiet green
+			   accent so the free lanes read at a glance without shouting over the
+			   selected-state styling. Sits after the label, before the health dot. */
+			.aspect button .eng-free {
+				margin-left: 0.45em;
+				padding: 0.05em 0.4em;
+				border-radius: 999px;
+				font-size: 0.62em;
+				font-weight: 700;
+				letter-spacing: 0.04em;
+				line-height: 1.5;
+				vertical-align: 0.08em;
+				/* Dark theme is the default — a bright mint reads on the dark button. */
+				color: var(--success);
+				background: rgba(34, 197, 94, 0.14);
+				border: 1px solid rgba(74, 222, 128, 0.38);
+			}
+			html[data-theme='light'] .aspect button .eng-free {
+				color: #0a7d33;
+				background: rgba(34, 197, 94, 0.16);
+				border-color: rgba(34, 197, 94, 0.32);
+			}
+			.aspect button:disabled .eng-free {
+				opacity: 0.5;
+			}
+			/* Static legend decoding the engine-button affordances (FREE pill, key
+			   glyph, health dots) so the picker is self-explanatory at a glance. */
+			.engine-legend {
+				display: flex;
+				flex-wrap: wrap;
+				gap: var(--space-xs) var(--space-md);
+				margin: var(--space-2xs) 0 0;
+				font-size: var(--text-xs);
+				color: var(--ink-dim);
+			}
+			.engine-legend .el-item {
+				display: inline-flex;
+				align-items: center;
+				gap: 0.4em;
+				white-space: nowrap;
+			}
+			.engine-legend .el-free {
+				padding: 0.05em 0.4em;
+				border-radius: 999px;
+				font-size: 0.85em;
+				font-weight: 700;
+				letter-spacing: 0.04em;
+				color: var(--success);
+				background: rgba(34, 197, 94, 0.14);
+				border: 1px solid rgba(74, 222, 128, 0.38);
+			}
+			html[data-theme='light'] .engine-legend .el-free {
+				color: #0a7d33;
+				background: rgba(34, 197, 94, 0.16);
+				border-color: rgba(34, 197, 94, 0.32);
+			}
+			.engine-legend .el-key {
+				width: 0.92em;
+				height: 0.92em;
+				opacity: 0.6;
+			}
+			.engine-legend .el-dot {
+				width: 0.5em;
+				height: 0.5em;
+				border-radius: 50%;
+			}
+			.engine-legend .el-dot-busy {
+				background: var(--warning, #e0a93e);
+			}
+			.engine-legend .el-dot-down {
+				background: var(--danger, #e05a5a);
+				opacity: 0.7;
+			}
+			.aspect button:focus-visible,
+			.chip:focus-visible,
+			.btn:focus-visible {
+				outline: 2px solid var(--accent);
+				outline-offset: 2px;
+			}
+			.btn {
+				display: inline-flex;
+				align-items: center;
+				gap: 0.5rem;
+				font-family: var(--font-display);
+				font-weight: 600;
+				font-size: var(--text-base);
+				color: #0b0b0b;
+				background: var(--accent);
+				border: 1px solid var(--accent);
+				border-radius: var(--radius-md);
+				padding: 0.6rem 1.2rem;
+				cursor: pointer;
+				transition:
+					transform var(--duration-fast) var(--ease-standard),
+					opacity var(--duration-fast),
+					box-shadow var(--duration-fast);
+			}
+			.btn:hover {
+				box-shadow: 0 0 0 4px var(--accent-soft);
+			}
+			.btn:active {
+				transform: translateY(1px);
+			}
+			.btn[disabled] {
+				opacity: 0.45;
+				cursor: not-allowed;
+			}
+			.btn-ghost {
+				background: transparent;
+				color: var(--ink);
+				border: 1px solid var(--stroke-strong);
+			}
+			.btn-ghost:hover {
+				background: var(--surface-2);
+				box-shadow: none;
+			}
+			/* Primary action — full-width, monochrome fill. */
+			#generate {
+				width: 100%;
+				justify-content: center;
+				font-size: var(--text-lg);
+				padding: 0.75rem 1.2rem;
+				background: var(--btn-primary-bg);
+				border-color: transparent;
+				color: var(--btn-primary-fg);
+			}
+			#generate:hover {
+				box-shadow:
+					0 0 0 4px var(--accent-soft),
+					0 8px 28px -8px rgba(255, 255, 255, 0.15);
+			}
+			/* Gated (High needs $THREE): readable "locked perk" state, not a faded
+			   dead button — the lock panel above explains, this stays legible. */
+			#generate.is-gated,
+			#generate.is-gated:hover {
+				opacity: 1;
+				cursor: not-allowed;
+				background: var(--surface-2);
+				color: var(--muted);
+				border: 1px solid rgba(245, 196, 81, 0.4);
+				box-shadow: none;
+			}
+			.gen-kbd {
+				font-family: var(--font-mono);
+				font-size: 0.72em;
+				line-height: 1;
+				padding: 0.2em 0.4em;
+				border-radius: var(--radius-sm);
+				background: rgba(0, 0, 0, 0.16);
+				border: 1px solid rgba(0, 0, 0, 0.22);
+				color: inherit;
+				opacity: 0.85;
+			}
+			/* In hints the inherited ink is --ink-dim (#888): 0.85 opacity drags it
+			   to ~4.4:1 against the chip bg, under the 4.5:1 axe AA floor. Full
+			   opacity measures 5.6:1 with no visible design change. */
+			.views-hint .gen-kbd {
+				opacity: 1;
+			}
+			@media (max-width: 560px) {
+				.gen-kbd {
+					display: none;
+				}
+			}
+
+			/* Prompt tools — surprise · coach · counter -------------------- */
+			.prompt-tools {
+				display: flex;
+				align-items: center;
+				gap: var(--space-sm);
+				margin-top: var(--space-xs);
+				flex-wrap: wrap;
+			}
+			.ptool {
+				display: inline-flex;
+				align-items: center;
+				gap: 0.4rem;
+				background: var(--surface-1);
+				border: 1px solid var(--stroke);
+				border-radius: 999px;
+				color: var(--ink-dim);
+				font-family: var(--font-mono);
+				font-size: var(--text-xs);
+				letter-spacing: 0.02em;
+				padding: 0.32rem 0.72rem;
+				cursor: pointer;
+				transition:
+					color var(--duration-fast),
+					border-color var(--duration-fast),
+					background var(--duration-fast);
+			}
+			.ptool:hover {
+				color: var(--ink);
+				border-color: var(--stroke-strong);
+				background: var(--surface-2);
+			}
+			.ptool:focus-visible {
+				outline: 2px solid var(--accent);
+				outline-offset: 2px;
+			}
+			.ptool svg {
+				width: 14px;
+				height: 14px;
+			}
+			.ptool.is-rolling svg {
+				animation: dice-roll 0.5s cubic-bezier(0.3, 0.7, 0.3, 1);
+			}
+			@keyframes dice-roll {
+				from {
+					transform: rotate(0);
+				}
+				to {
+					transform: rotate(360deg);
+				}
+			}
+			@media (prefers-reduced-motion: reduce) {
+				.ptool.is-rolling svg {
+					animation: none;
+				}
+			}
+			.prompt-coach {
+				display: inline-flex;
+				align-items: center;
+				gap: 0.45rem;
+				font-size: var(--text-xs);
+				color: var(--ink-dim);
+				line-height: 1.4;
+				min-height: 1.2em;
+				flex: 1 1 12rem;
+				min-width: 0;
+			}
+			.prompt-coach::before {
+				content: '';
+				width: 6px;
+				height: 6px;
+				border-radius: 50%;
+				background: var(--ink-dim);
+				flex: none;
+				transition:
+					background var(--duration-base),
+					box-shadow var(--duration-base);
+			}
+			.prompt-coach[data-grade='strong'] {
+				color: var(--success);
+			}
+			.prompt-coach[data-grade='strong']::before {
+				background: var(--success);
+				box-shadow: 0 0 8px var(--success);
+			}
+			.prompt-coach[data-grade='warn'] {
+				color: var(--warning, #e0a93e);
+			}
+			.prompt-coach[data-grade='warn']::before {
+				background: var(--warning, #e0a93e);
+			}
+			.prompt-coach[data-grade='tip']::before {
+				background: var(--accent);
+			}
+			.prompt-count {
+				font-family: var(--font-mono);
+				font-size: var(--text-xs);
+				color: var(--ink-dim);
+				flex: none;
+				font-variant-numeric: tabular-nums;
+				margin-left: auto;
+			}
+			.prompt-count[data-near='true'] {
+				color: var(--warning, #e0a93e);
+			}
+			.chips-more {
+				background: transparent;
+				border: 1px dashed var(--stroke-strong);
+				border-radius: 999px;
+				color: var(--ink-dim);
+				font-family: var(--font-mono);
+				font-size: var(--text-xs);
+				letter-spacing: 0.04em;
+				padding: 0.4rem 0.85rem;
+				cursor: pointer;
+				transition:
+					color var(--duration-fast),
+					border-color var(--duration-fast),
+					transform var(--duration-slow) var(--ease-standard);
+			}
+			.chips-more:hover {
+				color: var(--ink);
+				border-color: var(--accent);
+			}
+			.chips-more:focus-visible {
+				outline: 2px solid var(--accent);
+				outline-offset: 2px;
+			}
+			.chips-more.is-rolling {
+				transform: rotate(180deg);
+			}
+			@media (prefers-reduced-motion: reduce) {
+				.chips-more.is-rolling {
+					transform: none;
+				}
+			}
+			.chip.is-swapping {
+				opacity: 0;
+			}
+
+			/* Quality tier + engine + BYOK --------------------------------- */
+			.forge-quality {
+				display: flex;
+				flex-direction: column;
+				gap: var(--space-sm);
+				margin-top: var(--space-sm);
+				padding-top: var(--space-sm);
+				border-top: 1px solid var(--stroke);
+			}
+			.fq-row {
+				display: flex;
+				align-items: center;
+				gap: var(--space-sm);
+				flex-wrap: wrap;
+			}
+			.fq-label {
+				font-family: var(--font-mono);
+				font-size: var(--text-xs);
+				text-transform: uppercase;
+				letter-spacing: 0.04em;
+				color: var(--ink-dim);
+				min-width: 4.2rem;
+			}
+			/* The engine picker carries far more lanes (8) than the other segmented
+			   controls (Quality 3, Aspect 4), so it can't sit on one line — it grows
+			   to the form column and wraps to multiple rows inside its pill instead
+			   of overflowing. The label tops the block so it lines up with the first
+			   row of buttons rather than floating centered against a tall pill. */
+			.fq-row--engine {
+				align-items: flex-start;
+			}
+			.fq-row--engine .fq-label {
+				padding-top: 0.34rem;
+			}
+			.engine-pill {
+				flex: 1 1 auto;
+				flex-wrap: wrap;
+				row-gap: 2px;
+				justify-content: flex-start;
+			}
+			/* The engine buttons arrive with the catalog. An empty pill is 6px tall
+			   and a filled one is 54px, so the row it sits in used to grow half a
+			   second into the load and push the example chips down with it. Reserve
+			   the filled height while it is empty; `:empty` stops matching the
+			   moment buildEngineButtons() writes, so a taller set is free to be
+			   taller. Keep in step with `.aspect button` padding + font size. */
+			.engine-pill:empty {
+				min-height: 50px;
+			}
+			/* Shown by buildEngineButtons() when no lane can serve the active tab —
+			   keeps the pill from collapsing to an empty box. */
+			.engine-empty {
+				padding: 0.32rem 0.55rem;
+				font-family: var(--font-mono);
+				font-size: var(--text-xs);
+				color: var(--ink-dim);
+			}
+			/* forge.js hides the #aspect control itself when the mode makes it
+			   irrelevant — collapse the labeled row with it, no orphan label. */
+			/* High is a $THREE holder perk — a small lock pill on the button makes
+			   the premium nature legible before the user selects it (a quality
+			   signal, not a nag). Gold while locked, green once the viewer holds
+			   $THREE. forge.js (applyHighAffordances) flips data-state from the
+			   live /api/three/access read. */
+			#tier button[data-tier='high'] {
+				display: inline-flex;
+				align-items: center;
+				gap: 0.4rem;
+			}
+			.tier-lock {
+				display: inline-flex;
+				align-items: center;
+				gap: 0.22rem;
+				font-family: var(--font-mono);
+				font-size: 0.68em;
+				line-height: 1;
+				padding: 0.18em 0.42em;
+				border-radius: 999px;
+				color: #f0d488;
+				background: rgba(245, 196, 81, 0.12);
+				border: 1px solid rgba(245, 196, 81, 0.32);
+				transition:
+					color var(--duration-fast),
+					background var(--duration-fast),
+					border-color var(--duration-fast);
+			}
+			.tier-lock-ico {
+				width: 0.92em;
+				height: 0.92em;
+			}
+			.tier-lock[data-state='unlocked'] {
+				color: #6ee7a8;
+				background: rgba(110, 231, 168, 0.13);
+				border-color: rgba(110, 231, 168, 0.34);
+			}
+			#tier button[data-tier='high']:hover .tier-lock,
+			#tier button[data-tier='high']:focus-visible .tier-lock {
+				border-color: rgba(245, 196, 81, 0.55);
+			}
+			#tier button[data-tier='high']:hover .tier-lock[data-state='unlocked'],
+			#tier button[data-tier='high']:focus-visible .tier-lock[data-state='unlocked'] {
+				border-color: rgba(110, 231, 168, 0.55);
+			}
+			#tier button[data-tier='high'][aria-pressed='true'] .tier-lock {
+				background: rgba(245, 196, 81, 0.2);
+			}
+			#tier button[data-tier='high'][aria-pressed='true'] .tier-lock[data-state='unlocked'] {
+				background: rgba(110, 231, 168, 0.2);
+			}
+			/* Inline holder note under the Quality row — links to /three. forge.js
+			   hides it while High is selected (the full in-place lock panel takes
+			   over) and swaps the copy once the viewer is a holder. */
+			.fq-holder-note {
+				display: flex;
+				align-items: center;
+				gap: 0.4rem;
+				margin: 0.1rem 0 0;
+				font-size: var(--text-xs);
+				line-height: 1.5;
+				color: var(--ink-dim);
+			}
+			.fq-holder-note a {
+				color: var(--accent);
+				text-decoration: none;
+				font-weight: 500;
+				white-space: nowrap;
+				transition: opacity var(--duration-fast);
+			}
+			.fq-holder-note a:hover {
+				text-decoration: underline;
+				opacity: 0.85;
+			}
+			.fq-holder-note a:focus-visible {
+				outline: 2px solid var(--accent);
+				outline-offset: 2px;
+				border-radius: 2px;
+			}
+			.fq-holder-note .fq-holder-ico {
+				color: #f5c451;
+				font-size: 0.9em;
+			}
+			.fq-holder-note[data-state='unlocked'] .fq-holder-ico {
+				color: #6ee7a8;
+			}
+			/* Quiet holder free-quota line under Generate + the Forge-local wallet
+			   connect chip (Part A). Token-only, matches the holder-note treatment. */
+			.fq-perk-row {
+				display: flex;
+				align-items: center;
+				gap: 0.6rem;
+				flex-wrap: wrap;
+				margin: 0.6rem 0 0;
+			}
+			.fq-perk-line {
+				margin: 0;
+				font-size: var(--text-xs);
+				line-height: 1.5;
+				color: var(--ink-dim);
+				display: inline-flex;
+				align-items: center;
+				gap: 0.35rem;
+			}
+			.fq-perk-line[data-state='perk'] {
+				color: var(--ink);
+			}
+			.fq-perk-line .fq-perk-ico {
+				color: #6ee7a8;
+			}
+			.fq-perk-line strong {
+				color: #6ee7a8;
+				font-weight: 700;
+			}
+			.fq-perk-line a {
+				color: var(--accent);
+				text-decoration: none;
+				font-weight: 500;
+			}
+			.fq-perk-line a:hover {
+				text-decoration: underline;
+			}
+			.fq-perk-line a:focus-visible {
+				outline: 2px solid var(--accent);
+				outline-offset: 2px;
+				border-radius: 2px;
+			}
+			.fq-connect-btn {
+				display: inline-flex;
+				align-items: center;
+				gap: 0.35rem;
+				font-size: var(--text-xs);
+				font-weight: 600;
+				color: var(--ink);
+				background: var(--surface-2);
+				border: 1px solid var(--surface-3);
+				border-radius: var(--radius-pill);
+				padding: 5px 12px;
+				cursor: pointer;
+				transition: border-color var(--duration-fast), transform var(--duration-fast), background var(--duration-fast);
+			}
+			.fq-connect-btn:hover {
+				border-color: var(--accent);
+				transform: translateY(-1px);
+			}
+			.fq-connect-btn:focus-visible {
+				outline: 2px solid var(--accent);
+				outline-offset: 2px;
+			}
+			.fq-connect-btn.is-connected {
+				color: #6ee7a8;
+				border-color: rgba(110, 231, 168, 0.4);
+			}
+			.fq-connect-btn .fq-connect-ico {
+				font-size: 0.95em;
+				opacity: 0.8;
+			}
+			@media (prefers-reduced-motion: reduce) {
+				.tier-lock {
+					transition: none;
+				}
+				.fq-connect-btn {
+					transition: none;
+				}
+			}
+			.fq-row:has(> .aspect.is-hidden) {
+				display: none;
+			}
+			/* The key field appears only for bring-your-own-key engines, so it
+			   reads as a deliberate, self-contained zone — an inset panel with an
+			   accent edge that eases in when the engine is selected. */
+			.byok-row {
+				display: flex;
+				align-items: center;
+				gap: var(--space-sm);
+				flex-wrap: wrap;
+				position: relative;
+				padding: 0.7rem 0.8rem 0.7rem 1rem;
+				background: var(--surface-2);
+				border: 1px solid var(--stroke);
+				border-radius: var(--radius-md);
+			}
+			.byok-row::before {
+				content: '';
+				position: absolute;
+				left: 0;
+				top: 0.6rem;
+				bottom: 0.6rem;
+				width: 2px;
+				border-radius: 0 2px 2px 0;
+				background: var(--accent);
+				opacity: 0.7;
+			}
+			.byok-row:not(.is-hidden) {
+				animation: byok-reveal 0.22s ease both;
+			}
+			@keyframes byok-reveal {
+				from {
+					opacity: 0;
+					transform: translateY(-3px);
+				}
+				to {
+					opacity: 1;
+					transform: none;
+				}
+			}
+			@media (prefers-reduced-motion: reduce) {
+				.byok-row:not(.is-hidden) {
+					animation: none;
+				}
+			}
+			.byok-row .fq-label {
+				min-width: 0;
+				color: var(--ink);
+			}
+			.byok-input {
+				flex: 1 1 16rem;
+				min-width: 0;
+				background: var(--bg);
+				border: 1px solid var(--stroke);
+				border-radius: var(--radius-md);
+				color: var(--ink);
+				font-family: var(--font-mono);
+				font-size: var(--text-sm);
+				padding: 0.5rem 0.7rem;
+				outline: none;
+				transition:
+					border-color var(--duration-fast),
+					box-shadow var(--duration-fast),
+					background var(--duration-fast);
+			}
+			.byok-input:hover {
+				border-color: var(--stroke-strong);
+			}
+			.byok-input:focus-visible {
+				border-color: var(--accent);
+				box-shadow: 0 0 0 3px var(--accent-soft);
+			}
+			.byok-input[aria-invalid='true'] {
+				border-color: var(--danger);
+				box-shadow: 0 0 0 3px color-mix(in srgb, var(--danger) 22%, transparent);
+			}
+			.byok-hint {
+				flex-basis: 100%;
+				font-size: var(--text-xs);
+				line-height: 1.5;
+				color: var(--ink-dim);
+			}
+			.byok-hint a {
+				color: var(--accent);
+				text-decoration: none;
+				font-weight: 500;
+				white-space: nowrap;
+				transition: opacity var(--duration-fast);
+			}
+			.byok-hint a:hover {
+				text-decoration: underline;
+				opacity: 0.85;
+			}
+			.fq-estimate {
+				margin: 0;
+				font-family: var(--font-mono);
+				font-size: var(--text-xs);
+				color: var(--ink-dim);
+				min-height: 1.1em;
+			}
+			.fq-estimate strong {
+				color: var(--ink);
+				font-weight: 600;
+			}
+			.fq-estimate .est-free {
+				color: var(--success);
+				font-weight: 700;
+			}
+			.fq-estimate .est-cost {
+				color: var(--ink);
+				font-weight: 700;
+			}
+
+			/* Mode switch — now lives inside .composer as the first element */
+			.mode-switch-wrap {
+				display: flex;
+				margin: calc(-1 * var(--space-md)) calc(-1 * var(--space-md)) var(--space-sm);
+				border-bottom: 1px solid var(--stroke);
+			}
+			.mode-switch {
+				display: flex;
+				width: 100%;
+				gap: 0;
+				background: transparent;
+				border: none;
+				border-radius: 0;
+				padding: 0;
+			}
+			.mode-switch button {
+				flex: 1;
+				background: transparent;
+				border: none;
+				border-bottom: 2px solid transparent;
+				color: var(--ink-dim);
+				font-family: var(--font-display);
+				font-size: var(--text-sm);
+				font-weight: 600;
+				padding: 0.65rem 0.6rem;
+				border-radius: 0;
+				cursor: pointer;
+				transition:
+					color var(--duration-fast),
+					border-color var(--duration-fast);
+				margin-bottom: -1px;
+			}
+			.mode-switch button:hover {
+				color: var(--ink);
+			}
+			.mode-switch button[aria-selected='true'] {
+				background: transparent;
+				color: var(--ink);
+				border-bottom-color: var(--accent);
+			}
+			.mode-switch button:focus-visible {
+				outline: 2px solid var(--accent);
+				outline-offset: 2px;
+			}
+
+			/* View slots — image / multi-view mode ------------------------- */
+			.image-pane {
+				display: flex;
+				flex-direction: column;
+			}
+			.views-grid {
+				display: grid;
+				grid-template-columns: repeat(3, 1fr);
+				gap: var(--space-sm);
+			}
+			@media (max-width: 620px) {
+				.views-grid {
+					grid-template-columns: repeat(2, 1fr);
+				}
+			}
+			/* Sketch mode reuses the view-slot kit with a single, wider slot.
+			   Declared after both .views-grid rules so it wins at every width. */
+			.sketch-grid {
+				grid-template-columns: minmax(140px, 240px);
+			}
+			.view-slot {
+				position: relative;
+				aspect-ratio: 1 / 1;
+				border: 1px dashed var(--stroke-strong);
+				border-radius: var(--radius-md);
+				background: var(--surface-1);
+				overflow: hidden;
+				display: grid;
+				place-items: center;
+				cursor: pointer;
+				transition:
+					border-color var(--duration-fast),
+					background var(--duration-fast),
+					transform var(--duration-fast);
+			}
+			.view-slot:hover {
+				border-color: var(--accent);
+			}
+			.view-slot:focus-visible {
+				outline: 2px solid var(--accent);
+				outline-offset: 2px;
+			}
+			.view-slot.drop-target {
+				border-color: var(--accent);
+				border-style: solid;
+				background: var(--accent-soft);
+				transform: scale(1.02);
+			}
+			.view-slot[data-state='uploaded'] {
+				border-style: solid;
+				cursor: grab;
+			}
+			.view-slot[data-state='uploaded']:active {
+				cursor: grabbing;
+			}
+			.view-slot[data-state='error'] {
+				border-color: var(--danger);
+				border-style: solid;
+			}
+			.view-slot.dragging {
+				opacity: 0.4;
+			}
+			/* Past the selected engine's image cap (Pixal3D: 4), Match my photo
+			   never reads a 5th/6th view, so the slot is visibly inert rather than
+			   silently ignored. src/forge.js toggles data-disabled per engine. */
+			.view-slot[data-disabled='true'] {
+				opacity: 0.35;
+				cursor: not-allowed;
+				border-style: dotted;
+			}
+			.view-slot[data-disabled='true']:hover {
+				border-color: var(--stroke-strong);
+			}
+			/* Inner regions toggled by the slot's data-state. */
+			.vs-empty,
+			.vs-uploading,
+			.vs-error {
+				display: none;
+				flex-direction: column;
+				align-items: center;
+				justify-content: center;
+				gap: 0.35rem;
+				color: var(--ink-dim);
+				font-size: var(--text-xs);
+				padding: 0.5rem;
+				text-align: center;
+			}
+			.vs-thumb,
+			.vs-remove,
+			.vs-badge {
+				display: none;
+			}
+			.view-slot[data-state='empty'] .vs-empty {
+				display: flex;
+			}
+			.view-slot[data-state='uploading'] .vs-uploading {
+				display: flex;
+			}
+			.view-slot[data-state='uploaded'] .vs-thumb {
+				display: block;
+			}
+			.view-slot[data-state='uploaded'] .vs-remove {
+				display: grid;
+			}
+			.view-slot[data-state='uploaded'] .vs-badge {
+				display: block;
+			}
+			.view-slot[data-state='error'] .vs-error {
+				display: flex;
+			}
+			.vs-icon {
+				font-size: 1.5rem;
+				line-height: 1;
+				color: var(--ink-dim);
+			}
+			.vs-label {
+				font-family: var(--font-mono);
+				letter-spacing: 0.08em;
+				text-transform: uppercase;
+			}
+			.vs-thumb {
+				width: 100%;
+				height: 100%;
+				object-fit: cover;
+				pointer-events: none;
+			}
+			.vs-remove {
+				position: absolute;
+				top: 5px;
+				right: 5px;
+				width: 22px;
+				height: 22px;
+				place-items: center;
+				border: none;
+				border-radius: 50%;
+				background: rgba(0, 0, 0, 0.6);
+				color: #fff;
+				font-size: 1rem;
+				line-height: 1;
+				cursor: pointer;
+				backdrop-filter: blur(4px);
+				transition: background var(--duration-fast);
+			}
+			.vs-remove:hover {
+				background: var(--danger);
+			}
+			.vs-badge {
+				position: absolute;
+				bottom: 5px;
+				left: 5px;
+				font-family: var(--font-mono);
+				font-size: 0.6rem;
+				text-transform: uppercase;
+				letter-spacing: 0.06em;
+				padding: 1px 6px;
+				border-radius: 999px;
+				background: rgba(0, 0, 0, 0.6);
+				color: var(--ink);
+				backdrop-filter: blur(4px);
+			}
+			.vs-uploading .shimmer {
+				position: absolute;
+				inset: 0;
+				background: linear-gradient(
+					100deg,
+					transparent 20%,
+					rgba(255, 255, 255, 0.06) 50%,
+					transparent 80%
+				);
+				background-size: 200% 100%;
+				animation: shimmer 1.4s linear infinite;
+			}
+			.vs-retry {
+				background: transparent;
+				border: 1px solid var(--stroke-strong);
+				color: var(--ink);
+				border-radius: var(--radius-sm);
+				font-size: var(--text-xs);
+				padding: 0.2rem 0.5rem;
+				cursor: pointer;
+			}
+			.vs-retry:hover {
+				border-color: var(--accent);
+			}
+			.views-hint {
+				color: var(--ink-dim);
+				font-size: var(--text-xs);
+				margin: var(--space-sm) 0 0;
+				text-align: center;
+			}
+
+			/* Match my photo (Pixal3D): shown only while that engine is selected
+			   (src/forge.js updatePixal3dPanel). */
+			.pixal3d-panel {
+				margin-top: var(--space-sm);
+				padding: var(--space-sm);
+				border: 1px solid var(--stroke);
+				border-radius: var(--radius-md);
+				background: var(--surface-1);
+			}
+			.pixal3d-panel-title {
+				margin: 0 0 var(--space-xs);
+				font-size: var(--text-xs);
+				color: var(--ink-dim);
+			}
+			.pixal3d-fill-row {
+				display: flex;
+				align-items: center;
+				gap: 0.5rem;
+				font-size: var(--text-xs);
+				cursor: pointer;
+			}
+			.pixal3d-fill-row input:disabled {
+				cursor: not-allowed;
+			}
+
+			/* Live multi-view counter: turns the anonymous empty boxes into a
+			   legible "0 of 6" progress with pips, and teaches that more views ⇒
+			   sharper mesh. Updated by src/forge.js as slots fill. */
+			.views-counter {
+				display: flex;
+				align-items: center;
+				justify-content: center;
+				gap: 0.55rem;
+				margin-top: var(--space-sm);
+				font-family: var(--font-mono);
+				font-size: var(--text-xs);
+				color: var(--ink-dim);
+			}
+			.views-pips {
+				display: inline-flex;
+				gap: 4px;
+			}
+			.views-pips i {
+				width: 9px;
+				height: 9px;
+				border-radius: 50%;
+				border: 1px solid var(--stroke-strong);
+				background: transparent;
+				transition:
+					background var(--duration-base) var(--ease-standard),
+					border-color var(--duration-base) var(--ease-standard),
+					transform var(--duration-base) var(--ease-standard);
+			}
+			.views-pips i[data-filled='true'] {
+				background: var(--accent);
+				border-color: var(--accent);
+				transform: scale(1.08);
+			}
+			.views-counter .vc-text strong {
+				color: var(--ink);
+				font-weight: 600;
+			}
+			.views-counter .vc-quality {
+				color: var(--accent);
+			}
+			@media (prefers-reduced-motion: reduce) {
+				.views-pips i {
+					transition: none;
+				}
+			}
+
+			/* Required-input cue for the sketch prompt — sketch mode can't generate
+			   without a description, so it earns a visible "Required" tag that turns
+			   to a danger tint when the user tries to submit empty. */
+			.req-tag {
+				display: inline-block;
+				margin-left: 0.4rem;
+				font-family: var(--font-mono);
+				font-size: 0.62rem;
+				letter-spacing: 0.06em;
+				text-transform: uppercase;
+				color: var(--ink-dim);
+				border: 1px solid var(--stroke);
+				border-radius: 999px;
+				padding: 1px 6px;
+				vertical-align: 0.1em;
+				transition:
+					color var(--duration-fast),
+					border-color var(--duration-fast),
+					background var(--duration-fast);
+			}
+			.image-prompt[aria-invalid='true'] {
+				border-color: var(--danger);
+			}
+			.image-prompt[aria-invalid='true'] + .views-hint .req-tag,
+			.req-tag[data-missing='true'] {
+				color: var(--danger);
+				border-color: var(--danger);
+				background: color-mix(in srgb, var(--danger) 14%, transparent);
+			}
+			.image-prompt {
+				width: 100%;
+				min-height: 52px;
+				resize: vertical;
+				margin-top: var(--space-sm);
+				background: transparent;
+				border: 1px solid var(--stroke);
+				border-radius: var(--radius-md);
+				outline: none;
+				color: var(--ink);
+				font-family: var(--font-body);
+				font-size: var(--text-base);
+				line-height: var(--leading-normal);
+				padding: 0.55rem 0.7rem;
+			}
+			.image-prompt:focus {
+				border-color: var(--stroke-strong);
+			}
+			.image-prompt::placeholder {
+				color: var(--ink-dim);
+			}
+			.views-badge {
+				font-family: var(--font-mono);
+				font-size: 0.62rem;
+				text-transform: uppercase;
+				letter-spacing: 0.06em;
+				color: var(--ink-dim);
+				border: 1px solid var(--stroke);
+				border-radius: 999px;
+				padding: 1px 7px;
+				margin-left: 0.5rem;
+			}
+
+			/* Automated quality-check chip: surfaces the confidence the vision QA
+			   gate assigned this generation. Color-coded by band; verified (passed
+			   the semantic gate) reads green, checked (trusted by the fast scorer)
+			   stays neutral, low warns amber. */
+			.quality-badge {
+				display: inline-flex;
+				align-items: center;
+				gap: 4px;
+				font-family: var(--font-mono);
+				font-size: 0.62rem;
+				text-transform: uppercase;
+				letter-spacing: 0.06em;
+				border-radius: 999px;
+				padding: 1px 8px;
+				margin-left: 0.4rem;
+				border: 1px solid var(--stroke);
+				color: var(--ink-dim);
+			}
+			.quality-badge::before {
+				content: '';
+				width: 6px;
+				height: 6px;
+				border-radius: 999px;
+				background: currentColor;
+				opacity: 0.9;
+			}
+			.quality-badge[data-band='verified'] {
+				color: var(--success);
+				border-color: color-mix(in srgb, var(--success) 40%, transparent);
+				background: color-mix(in srgb, var(--success) 8%, transparent);
+			}
+			.quality-badge[data-band='low'] {
+				color: var(--warn);
+				border-color: color-mix(in srgb, var(--warn) 40%, transparent);
+				background: color-mix(in srgb, var(--warn) 8%, transparent);
+			}
+			.quality-badge.is-hidden {
+				display: none;
+			}
+
+			/* Example chips ------------------------------------------------ */
+			.chips {
+				display: flex;
+				flex-wrap: wrap;
+				gap: var(--space-xs);
+				margin-top: var(--space-sm);
+			}
+			.chip {
+				background: var(--surface-1);
+				border: 1px solid var(--stroke);
+				border-radius: 999px;
+				color: var(--ink-dim);
+				font-size: var(--text-sm);
+				padding: 0.4rem 0.85rem;
+				cursor: pointer;
+				transition:
+					color var(--duration-fast),
+					border-color var(--duration-fast),
+					background var(--duration-fast),
+					opacity var(--duration-fast) var(--ease-standard);
+			}
+			.chip:hover {
+				color: var(--ink);
+				border-color: var(--accent);
+				background: var(--accent-soft);
+			}
+			/* Independence Day presets (July 1–5) — soft red/white/blue edge so
+			   they read as seasonal alongside the library chips. Injected by
+			   forge.js only within the window; pinned across "More ideas". */
+			.chip--festive {
+				border-color: color-mix(in srgb, #6f8cff 55%, var(--stroke));
+				background: linear-gradient(
+					90deg,
+					color-mix(in srgb, #ff5a5f 10%, var(--surface-1)),
+					color-mix(in srgb, #6f8cff 10%, var(--surface-1))
+				);
+			}
+			.chip--festive::before {
+				content: '🎆 ';
+			}
+			.chip--festive:hover {
+				border-color: #ff5a5f;
+			}
+
+			/* Workspace / states ------------------------------------------ */
+			.stage {
+				min-height: min(calc(100svh - 200px), 700px);
+				display: flex;
+				flex-direction: column;
+			}
+			.stage > .panel,
+			.stage > .forge-empty {
+				flex: 1;
+			}
+
+			.panel {
+				background: var(--surface-glass);
+				border: 1px solid var(--stroke);
+				border-radius: var(--radius-lg);
+				overflow: hidden;
+			}
+			.is-hidden {
+				display: none !important;
+			}
+
+			/* Generating state */
+			.gen {
+				display: grid;
+				grid-template-columns: 1fr 1.1fr;
+				gap: var(--space-md);
+				padding: var(--space-md);
+			}
+			@media (max-width: 720px) {
+				.gen {
+					grid-template-columns: 1fr;
+				}
+				.composer-row {
+					justify-content: stretch;
+				}
+				.composer-row .btn {
+					width: 100%;
+					justify-content: center;
+				}
+			}
+			.gen-preview {
+				position: relative;
+				aspect-ratio: 1 / 1;
+				border-radius: var(--radius-md);
+				border: 1px solid var(--stroke);
+				background: var(--surface-1);
+				overflow: hidden;
+				display: grid;
+				place-items: center;
+			}
+			.gen-preview img {
+				width: 100%;
+				height: 100%;
+				object-fit: cover;
+				animation: paint-in 0.9s cubic-bezier(0.2, 0.7, 0.2, 1) both;
+			}
+			@keyframes paint-in {
+				from {
+					opacity: 0;
+					filter: blur(16px) saturate(0.7);
+					transform: scale(1.05);
+				}
+				to {
+					opacity: 1;
+					filter: blur(0) saturate(1);
+					transform: none;
+				}
+			}
+			/* Reconstruction scanline — sweeps the reference image while the mesh
+			   step is live, so the wait reads as work, not silence. */
+			.gen-preview.is-reconstructing::after {
+				content: '';
+				position: absolute;
+				inset: 0;
+				background: linear-gradient(
+					180deg,
+					transparent 0%,
+					color-mix(in srgb, var(--accent) 30%, transparent) 50%,
+					transparent 100%
+				);
+				background-size: 100% 34%;
+				background-repeat: no-repeat;
+				animation: forge-scan 2.6s ease-in-out infinite;
+				mix-blend-mode: screen;
+				pointer-events: none;
+			}
+			@keyframes forge-scan {
+				from {
+					background-position: 0 -40%;
+				}
+				to {
+					background-position: 0 140%;
+				}
+			}
+			@media (prefers-reduced-motion: reduce) {
+				.gen-preview img {
+					animation: none;
+				}
+				.gen-preview.is-reconstructing::after {
+					display: none;
+				}
+			}
+			.gen-preview .shimmer {
+				position: absolute;
+				inset: 0;
+				background: linear-gradient(
+					100deg,
+					transparent 20%,
+					rgba(255, 255, 255, 0.06) 50%,
+					transparent 80%
+				);
+				background-size: 200% 100%;
+				animation: shimmer 1.4s linear infinite;
+			}
+			@keyframes shimmer {
+				to {
+					background-position: -200% 0;
+				}
+			}
+			.gen-steps {
+				display: flex;
+				flex-direction: column;
+				justify-content: center;
+				gap: var(--space-sm);
+			}
+			/* Stage timeline list. Rows are rendered by src/forge-timeline.js; the
+			   markers are the dots below, so the list itself carries none. */
+			.gen-stages {
+				list-style: none;
+				margin: 0;
+				padding: 0;
+				display: flex;
+				flex-direction: column;
+				gap: var(--space-sm);
+			}
+			.step {
+				display: flex;
+				align-items: flex-start;
+				gap: 0.7rem;
+				color: var(--ink-dim);
+				font-size: var(--text-sm);
+			}
+			.step .dot {
+				width: 14px;
+				height: 14px;
+				border-radius: 50%;
+				border: 2px solid var(--stroke-strong);
+				flex: none;
+				margin-top: 0.2em;
+			}
+			.step-body {
+				display: flex;
+				flex-direction: column;
+				gap: 0.15rem;
+				min-width: 0;
+				flex: 1 1 auto;
+			}
+			.step-label {
+				line-height: var(--leading-tight);
+			}
+			.step-detail {
+				font-size: var(--text-2xs);
+				line-height: 1.45;
+				color: var(--ink-dim);
+				opacity: 0.85;
+			}
+			.step[data-state='pending'] .step-detail {
+				opacity: 0.6;
+			}
+			/* Reference view revealed inside the timeline the moment the API hands
+			   one over. Anchor, so it is keyboard reachable and opens full size. */
+			.step-thumb {
+				flex: none;
+				width: 34px;
+				height: 34px;
+				border-radius: var(--radius-sm, 6px);
+				overflow: hidden;
+				border: 1px solid var(--stroke);
+				background: var(--surface-1);
+				display: block;
+				transition: border-color var(--duration-fast) var(--ease-standard), transform var(--duration-fast) var(--ease-standard);
+			}
+			.step-thumb img {
+				width: 100%;
+				height: 100%;
+				object-fit: cover;
+				display: block;
+				animation: paint-in 0.9s cubic-bezier(0.2, 0.7, 0.2, 1) both;
+			}
+			.step-thumb:hover {
+				border-color: var(--accent);
+				transform: scale(1.06);
+			}
+			.step-thumb:focus-visible {
+				outline: 2px solid var(--accent);
+				outline-offset: 2px;
+				border-color: var(--accent);
+			}
+			.step-thumb:active {
+				transform: scale(0.98);
+			}
+			@media (prefers-reduced-motion: reduce) {
+				.step-thumb,
+				.step-thumb img {
+					transition: none;
+					animation: none;
+				}
+				.step-thumb:hover {
+					transform: none;
+				}
+			}
+			/* Cold-start warming card: a designed, honest waiting state for a GPU
+			   worker that is booting, instead of a silent stall. */
+			.gen-warming {
+				display: flex;
+				align-items: flex-start;
+				gap: 0.6rem;
+				margin-top: var(--space-sm);
+				padding: var(--space-sm) var(--space-md);
+				border: 1px solid color-mix(in srgb, var(--warning, #e0a93e) 40%, var(--stroke));
+				border-radius: var(--radius-md);
+				background: color-mix(in srgb, var(--warning, #e0a93e) 7%, var(--surface-2));
+			}
+			.gen-warming.is-hidden {
+				display: none;
+			}
+			.gen-warming-pip {
+				flex: none;
+				width: 9px;
+				height: 9px;
+				margin-top: 0.35rem;
+				border-radius: 50%;
+				background: var(--warning, #e0a93e);
+				box-shadow: 0 0 0 0 color-mix(in srgb, var(--warning, #e0a93e) 60%, transparent);
+				animation: warm-pulse 1.9s ease-out infinite;
+			}
+			@keyframes warm-pulse {
+				to {
+					box-shadow: 0 0 0 10px transparent;
+				}
+			}
+			.gen-warming-copy {
+				min-width: 0;
+			}
+			.gen-warming-title {
+				margin: 0;
+				font-size: var(--text-sm);
+				font-weight: 600;
+				color: var(--ink);
+			}
+			.gen-warming-body {
+				margin: 0.2rem 0 0;
+				font-size: var(--text-xs);
+				line-height: 1.5;
+				color: var(--ink-dim);
+			}
+			.gen-warming-count {
+				margin: 0.3rem 0 0;
+				font-family: var(--font-mono);
+				font-size: var(--text-2xs);
+				color: var(--warning, #e0a93e);
+			}
+			.gen-warming[data-phase='over'] .gen-warming-pip {
+				animation-duration: 3.2s;
+			}
+			@media (prefers-reduced-motion: reduce) {
+				.gen-warming-pip {
+					animation: none;
+				}
+			}
+			.step[data-state='active'] {
+				color: var(--ink);
+			}
+			.step[data-state='active'] .dot {
+				border-color: var(--accent);
+				border-top-color: transparent;
+				animation: spin 0.8s linear infinite;
+			}
+			.step[data-state='done'] {
+				color: var(--ink);
+			}
+			.step[data-state='done'] .dot {
+				background: var(--success);
+				border-color: var(--success);
+			}
+			@keyframes spin {
+				to {
+					transform: rotate(360deg);
+				}
+			}
+			.gen-meta {
+				font-family: var(--font-mono);
+				font-size: var(--text-xs);
+				color: var(--ink-dim);
+				margin-top: var(--space-xs);
+			}
+			.gen-meta strong {
+				color: var(--ink);
+				font-weight: 600;
+			}
+			/* Leave-the-page reassurance: the generation is server-tracked, so the
+			   user is free to navigate away and pick the result up from the gallery
+			   (or a notification) later. */
+			.gen-leave-hint {
+				margin: var(--space-xs) 0 0;
+				font-size: var(--text-xs);
+				line-height: 1.5;
+				color: var(--ink-dim);
+			}
+			/* Lane-switch notice, shown when the server (or the client's automatic
+			   retry) moved this generation onto a backup engine mid-flight, so a
+			   failover is informative rather than silent. Filled by forge.js. */
+			.gen-note {
+				display: flex;
+				align-items: baseline;
+				gap: 0.45rem;
+				margin-top: var(--space-xs);
+				font-size: var(--text-xs);
+				line-height: 1.5;
+				color: var(--warning, #e0a93e);
+			}
+			.gen-note::before {
+				content: '';
+				width: 6px;
+				height: 6px;
+				border-radius: 50%;
+				background: var(--warning, #e0a93e);
+				flex: none;
+				transform: translateY(-1px);
+			}
+
+			/* Honest elapsed-vs-typical meter. The fill maps real elapsed time
+			   against the engine's real catalog ETA on an asymptotic curve that
+			   never reaches 100% on its own — only a real finished GLB snaps it to
+			   full. Past the typical time it holds near the cap and recolours to
+			   amber ("longer than usual"), so the bar is informative, never faked. */
+			.gen-progress {
+				position: relative;
+				height: 5px;
+				margin-top: var(--space-sm);
+				border-radius: 999px;
+				background: var(--surface-1);
+				border: 1px solid var(--stroke);
+				overflow: hidden;
+			}
+			.gen-progress-fill {
+				position: absolute;
+				inset: 0;
+				width: 0%;
+				border-radius: inherit;
+				background: linear-gradient(
+					90deg,
+					color-mix(in srgb, var(--accent) 70%, transparent),
+					var(--accent)
+				);
+				transition: width var(--duration-slow) var(--ease-standard), background var(--duration-slow) var(--ease-standard);
+			}
+			/* Moving sheen reads as live work without implying a known finish. */
+			.gen-progress-fill::after {
+				content: '';
+				position: absolute;
+				inset: 0;
+				background: linear-gradient(
+					100deg,
+					transparent 30%,
+					rgba(255, 255, 255, 0.28) 50%,
+					transparent 70%
+				);
+				background-size: 220% 100%;
+				animation: gen-sheen 1.6s linear infinite;
+			}
+			.gen-progress[data-over='true'] .gen-progress-fill {
+				background: linear-gradient(
+					90deg,
+					color-mix(in srgb, var(--warning, #e0a93e) 70%, transparent),
+					var(--warning, #e0a93e)
+				);
+			}
+			.gen-progress[data-done='true'] .gen-progress-fill {
+				background: linear-gradient(
+					90deg,
+					color-mix(in srgb, var(--success) 70%, transparent),
+					var(--success)
+				);
+			}
+			.gen-progress[data-done='true'] .gen-progress-fill::after,
+			.gen-progress[data-indeterminate='true'] .gen-progress-fill::after {
+				animation-play-state: running;
+			}
+			/* No catalog ETA (unknown duration) — a slim travelling band instead of
+			   a measured fill, so we never imply a finish time we don't have. */
+			.gen-progress[data-indeterminate='true'] .gen-progress-fill {
+				width: 38% !important;
+				animation: gen-indeterminate 1.5s ease-in-out infinite;
+			}
+			@keyframes gen-sheen {
+				to {
+					background-position: -220% 0;
+				}
+			}
+			@keyframes gen-indeterminate {
+				0% {
+					transform: translateX(-120%);
+				}
+				100% {
+					transform: translateX(330%);
+				}
+			}
+			@media (prefers-reduced-motion: reduce) {
+				.gen-progress-fill::after {
+					animation: none;
+				}
+				.gen-progress[data-indeterminate='true'] .gen-progress-fill {
+					animation: none;
+					width: 100% !important;
+					opacity: 0.5;
+				}
+				.gen-progress-fill {
+					transition: none;
+				}
+			}
+
+			/* Result state */
+			.viewer-shell {
+				position: relative;
+			}
+			.viewer-shell .viewer-load-error {
+				display: none;
+				position: absolute;
+				inset: 0;
+				z-index: 4;
+				align-items: center;
+				justify-content: center;
+				flex-direction: column;
+				gap: var(--space-sm);
+				text-align: center;
+				background: radial-gradient(120% 120% at 50% 0%, #1a1612 0%, #0b0a09 70%);
+				padding: var(--space-xl);
+			}
+			html[data-theme='light'] .viewer-shell .viewer-load-error {
+				background: radial-gradient(120% 120% at 50% 0%, #f3eee9 0%, #e7e2dc 70%);
+			}
+			.viewer-shell.has-load-error .viewer-load-error {
+				display: flex;
+			}
+			.viewer-shell.has-load-error model-viewer {
+				opacity: 0;
+				pointer-events: none;
+			}
+			/* Load skeleton — covers the dark void between a result being revealed and
+			   the GLB actually painting. Shown while .is-loading is set, removed on the
+			   model-viewer 'load' event (or on load error, which has its own panel). */
+			.viewer-shell .viewer-skeleton {
+				display: none;
+				position: absolute;
+				inset: 0;
+				z-index: 3;
+				align-items: center;
+				justify-content: center;
+				overflow: hidden;
+				background: radial-gradient(120% 120% at 50% 0%, #1a1612 0%, #0b0a09 70%);
+			}
+			html[data-theme='light'] .viewer-shell .viewer-skeleton {
+				background: radial-gradient(120% 120% at 50% 0%, #f3eee9 0%, #e7e2dc 70%);
+			}
+			.viewer-shell.is-loading .viewer-skeleton {
+				display: flex;
+			}
+			.viewer-shell.is-loading.has-load-error .viewer-skeleton {
+				display: none;
+			}
+			.viewer-skeleton-sheen {
+				position: absolute;
+				inset: 0;
+				background: linear-gradient(
+					105deg,
+					transparent 30%,
+					color-mix(in srgb, var(--accent) 12%, transparent) 50%,
+					transparent 70%
+				);
+				transform: translateX(-100%);
+				animation: viewer-skeleton-sweep 1.6s ease-in-out infinite;
+			}
+			.viewer-skeleton-label {
+				position: relative;
+				z-index: 1;
+				font-family: var(--font-mono);
+				font-size: var(--text-xs);
+				color: var(--ink-dim);
+				letter-spacing: 0.04em;
+			}
+			@keyframes viewer-skeleton-sweep {
+				to {
+					transform: translateX(100%);
+				}
+			}
+			@media (prefers-reduced-motion: reduce) {
+				.viewer-skeleton-sheen {
+					animation: none;
+				}
+			}
+			.viewer-load-error-icon {
+				font-size: 2rem;
+				opacity: 0.5;
+			}
+			.viewer-load-error p {
+				color: var(--ink-dim);
+				font-size: var(--text-sm);
+				max-width: 28ch;
+				margin: 0;
+				line-height: var(--leading-normal);
+			}
+			.result model-viewer {
+				width: 100%;
+				height: min(62vh, 600px);
+				background: radial-gradient(120% 120% at 50% 0%, #1a1612 0%, #0b0a09 70%);
+				--poster-color: transparent;
+				transition: opacity var(--duration-slow) var(--ease-standard);
+			}
+			html[data-theme='light'] .result model-viewer {
+				background: radial-gradient(120% 120% at 50% 0%, #f3eee9 0%, #e7e2dc 70%);
+			}
+			/* Materialize reveal — the WebGL overlay src/forge-reveal.js plays the
+			   dissolve in, then crossfades away to the standing viewer beneath. */
+			.forge-reveal-overlay {
+				position: absolute;
+				inset: 0;
+				z-index: 2;
+				pointer-events: none;
+				transition: opacity var(--duration-slow) var(--ease-standard);
+			}
+			.forge-reveal-overlay canvas {
+				display: block;
+				width: 100%;
+				height: 100%;
+			}
+			.forge-reveal-overlay.is-fading {
+				opacity: 0;
+			}
+
+			/* Cinema mode — distraction-free fullscreen turntable (F / Esc).
+			   Built for screen recording: chrome hides until the pointer rests
+			   on the bottom bar. */
+			body.forge-cinema {
+				overflow: hidden;
+			}
+			.result.is-cinema {
+				position: fixed;
+				inset: 0;
+				z-index: 90;
+				border: none;
+				border-radius: 0;
+				display: flex;
+				flex-direction: column;
+				background: radial-gradient(120% 90% at 50% 10%, #181a1f 0%, #0a0b0d 60%, #060708 100%);
+			}
+			.result.is-cinema > :not(.viewer-shell):not(.result-bar) {
+				display: none;
+			}
+			.result.is-cinema .viewer-shell {
+				flex: 1;
+				min-height: 0;
+				display: flex;
+			}
+			.result.is-cinema model-viewer {
+				flex: 1;
+				height: 100%;
+				background: transparent;
+			}
+			.result.is-cinema .result-bar {
+				position: absolute;
+				left: 0;
+				right: 0;
+				bottom: 0;
+				border-top: none;
+				background: linear-gradient(transparent, rgba(0, 0, 0, 0.6));
+				opacity: 0;
+				transition: opacity var(--duration-base) var(--ease-standard);
+			}
+			.result.is-cinema .result-bar:hover,
+			.result.is-cinema .result-bar:focus-within {
+				opacity: 1;
+			}
+			.result.is-cinema::after {
+				content: 'F or Esc to exit · drag to orbit';
+				position: absolute;
+				top: 14px;
+				right: 16px;
+				font-family: var(--font-mono);
+				font-size: 12px;
+				color: rgba(255, 255, 255, 0.55);
+				pointer-events: none;
+				animation: cinema-hint 4.5s ease forwards;
+			}
+			@keyframes cinema-hint {
+				0%,
+				70% {
+					opacity: 1;
+				}
+				100% {
+					opacity: 0;
+				}
+			}
+			.result-bar {
+				display: flex;
+				align-items: center;
+				justify-content: space-between;
+				gap: var(--space-sm);
+				padding: var(--space-sm) var(--space-md);
+				border-top: 1px solid var(--stroke);
+				flex-wrap: wrap;
+			}
+			.result-bar .label {
+				font-size: var(--text-sm);
+				color: var(--ink-dim);
+				min-width: 0;
+				overflow: hidden;
+				text-overflow: ellipsis;
+				white-space: nowrap;
+			}
+			.result-creator {
+				font-size: var(--text-sm);
+				color: var(--ink-dim);
+				text-decoration: none;
+				white-space: nowrap;
+			}
+			.result-creator:hover,
+			.result-creator:focus-visible {
+				color: var(--ink);
+				text-decoration: underline;
+			}
+			/* Auto-save confirmation chip — shown briefly after generation completes */
+			@keyframes saved-pop {
+				0%   { opacity: 0; transform: translateY(3px); }
+				20%  { opacity: 1; transform: translateY(0); }
+				80%  { opacity: 1; }
+				100% { opacity: 0; }
+			}
+			.saved-chip {
+				font-size: 0.7rem;
+				color: var(--accent);
+				background: var(--accent-soft);
+				border: 1px solid color-mix(in srgb, var(--accent) 40%, transparent);
+				border-radius: 999px;
+				padding: 1px 8px;
+				flex: none;
+				white-space: nowrap;
+				animation: saved-pop 3s ease forwards;
+			}
+			.saved-chip.is-hidden { display: none; }
+
+			/* "What we actually asked the model" — the art-directed rewrite, shown
+			   under the result bar. Collapsed by default: context, not headline. */
+			.directed {
+				border-top: 1px solid var(--stroke);
+			}
+			.directed[hidden] {
+				display: none;
+			}
+			.directed-summary {
+				display: flex;
+				align-items: center;
+				gap: var(--space-xs);
+				padding: var(--space-sm) var(--space-md);
+				cursor: pointer;
+				list-style: none;
+				font-size: var(--text-sm);
+				color: var(--ink-dim);
+				transition: color var(--duration-fast) var(--ease-standard), background var(--duration-fast) var(--ease-standard);
+			}
+			.directed-summary::-webkit-details-marker {
+				display: none;
+			}
+			.directed-summary:hover {
+				color: var(--ink);
+				background: var(--surface-1);
+			}
+			.directed-summary:focus-visible {
+				outline: 2px solid var(--accent);
+				outline-offset: -2px;
+				color: var(--ink);
+			}
+			.directed-summary:active {
+				background: var(--surface-2);
+			}
+			.directed-chip {
+				flex: none;
+				font-family: var(--font-mono);
+				font-size: var(--text-2xs);
+				letter-spacing: 0.08em;
+				text-transform: uppercase;
+				color: var(--accent);
+				background: var(--accent-soft);
+				border: 1px solid color-mix(in srgb, var(--accent) 40%, transparent);
+				border-radius: 999px;
+				padding: 1px 8px;
+			}
+			.directed-summary-text {
+				min-width: 0;
+			}
+			.directed-caret {
+				flex: none;
+				margin-left: auto;
+				transition: transform var(--duration-base) var(--ease-standard);
+			}
+			.directed[open] .directed-caret {
+				transform: rotate(180deg);
+			}
+			.directed-body {
+				padding: 0 var(--space-md) var(--space-md);
+				display: flex;
+				flex-direction: column;
+				gap: var(--space-sm);
+				animation: directed-in 0.24s ease both;
+			}
+			@keyframes directed-in {
+				from {
+					opacity: 0;
+					transform: translateY(-4px);
+				}
+			}
+			.directed-intro {
+				margin: 0;
+				font-size: var(--text-xs);
+				line-height: 1.55;
+				color: var(--ink-dim);
+				max-width: 68ch;
+			}
+			.directed-block {
+				min-width: 0;
+			}
+			.directed-label {
+				margin: 0 0 0.25rem;
+				font-family: var(--font-mono);
+				font-size: var(--text-2xs);
+				letter-spacing: 0.1em;
+				text-transform: uppercase;
+				color: var(--ink-dim);
+			}
+			.directed-model {
+				text-transform: none;
+				letter-spacing: 0;
+				opacity: 0.8;
+			}
+			.directed-text {
+				margin: 0;
+				font-size: var(--text-sm);
+				line-height: 1.6;
+				color: var(--ink);
+				overflow-wrap: anywhere;
+			}
+			.directed-text--enhanced {
+				padding: var(--space-sm) var(--space-md);
+				border: 1px solid var(--stroke);
+				border-left: 2px solid var(--accent);
+				border-radius: var(--radius-md);
+				background: var(--surface-1);
+			}
+			.directed-actions {
+				display: flex;
+				align-items: center;
+				gap: var(--space-xs);
+				flex-wrap: wrap;
+			}
+			.directed-status {
+				font-size: var(--text-xs);
+				color: var(--accent);
+			}
+			@media (prefers-reduced-motion: reduce) {
+				.directed-body {
+					animation: none;
+				}
+				.directed-caret {
+					transition: none;
+				}
+			}
+			/* The action row carries seventeen tools. As a `flex: none` item inside
+			   the wrapping result bar its base size was max-content, which measured
+			   ~2570px at EVERY viewport, so its own flex-wrap never had anything to
+			   wrap against: the row simply ran off the panel and `overflow-x: clip`
+			   on <body> hid the remainder without so much as a scrollbar. Twelve of
+			   the seventeen actions, Download GLB included, rendered off-screen and
+			   could not be clicked at 320, 768 or 1440. Giving the row the bar's
+			   full width is what lets the wrap it already declared do its job. */
+			.result-bar .actions {
+				display: flex;
+				gap: var(--space-xs);
+				flex: 1 1 100%;
+				min-width: 0;
+				align-items: center;
+				flex-wrap: wrap;
+				justify-content: flex-start;
+			}
+
+			/* Refine — re-run the same prompt/views one quality tier higher. An
+			   accent-tinted "level up" affordance: clearly more inviting than the
+			   ghost buttons, but it yields visual primacy to the solid "Make
+			   another" CTA beside it. Hidden by JS once the result is already High. */
+			.btn-refine {
+				color: var(--accent);
+				background: var(--accent-soft);
+				border: 1px solid color-mix(in srgb, var(--accent) 55%, transparent);
+			}
+			.btn-refine:hover {
+				background: color-mix(in srgb, var(--accent) 18%, transparent);
+				box-shadow: 0 0 0 3px var(--accent-soft);
+			}
+			.btn-refine .refine-arrow {
+				transition: transform var(--duration-fast) var(--ease-standard);
+			}
+			.btn-refine:hover .refine-arrow {
+				transform: translateY(-2px);
+			}
+			@media (prefers-reduced-motion: reduce) {
+				.btn-refine .refine-arrow {
+					transition: none;
+				}
+			}
+
+			/* On phones the action row is the most cramped surface — let it wrap
+			   into a tidy grid where the two primary CTAs (Refine + Make another)
+			   span full width and lead, with the secondary tools below them. */
+			@media (max-width: 560px) {
+				.result-bar {
+					flex-direction: column;
+					align-items: stretch;
+				}
+				.result-bar .actions {
+					display: grid;
+					grid-template-columns: 1fr 1fr;
+					gap: var(--space-xs);
+					justify-content: stretch;
+				}
+				.result-bar .actions > .btn {
+					width: 100%;
+					justify-content: center;
+				}
+				/* Primary CTAs first and full-bleed; the verdict pair spans too. */
+				.result-bar .actions #again,
+				.result-bar .actions #refine {
+					grid-column: 1 / -1;
+					order: -2;
+				}
+				.result-bar .actions #refine {
+					order: -3;
+				}
+				.result-bar .actions .verdict {
+					grid-column: 1 / -1;
+					order: -1;
+					justify-content: center;
+				}
+			}
+
+			/* Download stamping — dim the link while the GLB is being fetched + stamped */
+			#download[data-stamping] {
+				opacity: 0.5;
+				pointer-events: none;
+				cursor: wait;
+			}
+			#download[data-stamping]::after {
+				content: '…';
+			}
+
+			/* Category picker — appears below the result bar after generation */
+			.cat-picker {
+				display: flex;
+				align-items: center;
+				gap: var(--space-xs);
+				padding: var(--space-xs) var(--space-md);
+				border-top: 1px solid var(--stroke);
+				flex-wrap: wrap;
+			}
+			.cat-picker-label {
+				font-size: var(--text-xs);
+				color: var(--ink-dim);
+				font-family: var(--font-mono);
+				letter-spacing: 0.06em;
+				white-space: nowrap;
+				flex: none;
+			}
+			.forge-cat-btn {
+				background: var(--surface-1);
+				border: 1px solid var(--stroke);
+				border-radius: 999px;
+				color: var(--ink-dim);
+				font-size: var(--text-xs);
+				font-family: var(--font-mono);
+				padding: 0.25rem 0.7rem;
+				cursor: pointer;
+				transition: background var(--duration-fast), color var(--duration-fast), border-color var(--duration-fast);
+			}
+			.forge-cat-btn:hover {
+				color: var(--ink);
+				border-color: var(--stroke-strong);
+			}
+			.forge-cat-btn:focus-visible {
+				outline: 2px solid var(--accent);
+				outline-offset: 2px;
+			}
+			.forge-cat-btn.active {
+				background: var(--surface-3);
+				border-color: var(--stroke-strong);
+				color: var(--ink);
+			}
+			/* Destination row: shares the category picker's chip styling. */
+			.dest-picker-status {
+				font-size: var(--text-xs);
+				font-family: var(--font-mono);
+				color: var(--ink-dim);
+				margin-left: auto;
+				opacity: 0;
+				transition: opacity var(--duration-fast);
+			}
+			.dest-picker-status.is-visible {
+				opacity: 1;
+			}
+			.forge-cat-btn:active {
+				transform: translateY(1px);
+			}
+			@media (prefers-reduced-motion: reduce) {
+				.forge-cat-btn:active {
+					transform: none;
+				}
+				.dest-picker-status {
+					transition: none;
+				}
+			}
+			/* Two-class grouping inside the picker: "Agents" (can get a brain) vs
+			   "Items" (objects). Subtle labels + a divider keep it scannable. */
+			.cat-group-label {
+				font-size: var(--text-xs);
+				font-family: var(--font-mono);
+				color: var(--ink);
+				letter-spacing: 0.04em;
+				opacity: 0.75;
+				white-space: nowrap;
+				flex: none;
+			}
+			.cat-group-sep {
+				width: 1px;
+				align-self: stretch;
+				min-height: 18px;
+				background: var(--stroke);
+				margin: 0 0.25rem;
+				flex: none;
+			}
+			.cat-picker-help {
+				flex-basis: 100%;
+				margin: 0.35rem 0 0;
+				font-size: var(--text-xs);
+				color: var(--ink-dim);
+				line-height: 1.45;
+			}
+
+			/* Keep / discard verdict (the flywheel signal) */
+			.verdict {
+				display: inline-flex;
+				gap: 2px;
+				background: var(--surface-1);
+				border: 1px solid var(--stroke);
+				border-radius: var(--radius-md);
+				padding: 2px;
+			}
+			.verdict button {
+				background: transparent;
+				border: none;
+				color: var(--ink-dim);
+				font-size: var(--text-sm);
+				padding: 0.34rem 0.6rem;
+				border-radius: var(--radius-sm);
+				cursor: pointer;
+				transition:
+					background var(--duration-fast),
+					color var(--duration-fast);
+			}
+			.verdict button:hover {
+				color: var(--ink);
+			}
+			.verdict button:focus-visible {
+				outline: 2px solid var(--accent);
+				outline-offset: 2px;
+			}
+			.verdict button[aria-pressed='true'][data-outcome='accepted'] {
+				background: color-mix(in srgb, var(--success) 22%, transparent);
+				color: var(--success);
+			}
+			.verdict button[aria-pressed='true'][data-outcome='rejected'] {
+				background: color-mix(in srgb, var(--danger) 20%, transparent);
+				color: var(--danger);
+			}
+
+			/* Optimize / retopology panel --------------------------------- */
+			.optimize {
+				border-top: 1px solid var(--stroke);
+			}
+			.optimize-toggle {
+				width: 100%;
+				display: flex;
+				align-items: center;
+				justify-content: space-between;
+				gap: var(--space-sm);
+				background: transparent;
+				border: none;
+				color: var(--ink);
+				font-family: var(--font-display);
+				font-weight: 600;
+				font-size: var(--text-sm);
+				padding: var(--space-sm) var(--space-md);
+				cursor: pointer;
+			}
+			.optimize-toggle:hover {
+				background: var(--surface-2);
+			}
+			.optimize-toggle:focus-visible {
+				outline: 2px solid var(--accent);
+				outline-offset: -2px;
+			}
+			.optimize-toggle .chev {
+				transition: transform var(--duration-fast) var(--ease-standard);
+				color: var(--ink-dim);
+			}
+			.optimize[data-open='true'] .optimize-toggle .chev {
+				transform: rotate(180deg);
+			}
+			.optimize-body {
+				display: none;
+				flex-direction: column;
+				gap: var(--space-md);
+				padding: 0 var(--space-md) var(--space-md);
+			}
+			.optimize[data-open='true'] .optimize-body {
+				display: flex;
+			}
+			.opt-field {
+				display: flex;
+				flex-direction: column;
+				gap: 0.4rem;
+			}
+			.opt-field > span {
+				font-size: var(--text-xs);
+				color: var(--ink-dim);
+				font-family: var(--font-mono);
+				text-transform: uppercase;
+				letter-spacing: 0.04em;
+			}
+			.seg {
+				display: inline-flex;
+				flex-wrap: wrap;
+				gap: 2px;
+				background: var(--surface-1);
+				border: 1px solid var(--stroke);
+				border-radius: var(--radius-md);
+				padding: 2px;
+			}
+			.seg button {
+				flex: 1 1 auto;
+				background: transparent;
+				border: none;
+				color: var(--ink-dim);
+				font-family: var(--font-mono);
+				font-size: var(--text-xs);
+				padding: 0.4rem 0.7rem;
+				border-radius: var(--radius-sm);
+				cursor: pointer;
+				transition:
+					background var(--duration-fast),
+					color var(--duration-fast);
+			}
+			.seg button:hover {
+				color: var(--ink);
+			}
+			.seg button[aria-pressed='true'] {
+				background: var(--surface-3);
+				color: var(--ink);
+			}
+			.seg button:focus-visible {
+				outline: 2px solid var(--accent);
+				outline-offset: 2px;
+			}
+			.opt-mode-hint {
+				font-size: var(--text-xs);
+				color: var(--ink-dim);
+				line-height: 1.4;
+				min-height: 1.4em;
+			}
+			.opt-row {
+				display: flex;
+				gap: var(--space-md);
+				flex-wrap: wrap;
+			}
+			.opt-row .opt-field {
+				flex: 1 1 140px;
+			}
+			.opt-select {
+				background: var(--surface-1);
+				border: 1px solid var(--stroke);
+				border-radius: var(--radius-md);
+				color: var(--ink);
+				font-family: var(--font-mono);
+				font-size: var(--text-xs);
+				padding: 0.45rem 0.6rem;
+			}
+			.opt-select:focus-visible {
+				outline: 2px solid var(--accent);
+				outline-offset: 1px;
+			}
+			.opt-actions {
+				display: flex;
+				align-items: center;
+				gap: var(--space-md);
+				flex-wrap: wrap;
+			}
+			.opt-status {
+				font-size: var(--text-xs);
+				font-family: var(--font-mono);
+				color: var(--ink-dim);
+			}
+			.opt-status[data-kind='error'] {
+				color: var(--danger);
+			}
+			.opt-status[data-kind='done'] {
+				color: var(--success);
+			}
+			.opt-stats {
+				display: flex;
+				gap: var(--space-md);
+				flex-wrap: wrap;
+				font-family: var(--font-mono);
+				font-size: var(--text-xs);
+				color: var(--ink-dim);
+			}
+			.opt-stats strong {
+				color: var(--ink);
+				font-weight: 600;
+			}
+
+			/* Stylize — one-click geometric filters ----------------------- */
+			.stylize {
+				border-top: 1px solid var(--stroke);
+				padding: var(--space-md);
+			}
+			.stylize-head h3 {
+				font-family: var(--font-display);
+				font-size: var(--text-base);
+				margin: 0 0 0.15rem;
+			}
+			.stylize-sub {
+				color: var(--ink-dim);
+				font-size: var(--text-sm);
+				line-height: var(--leading-normal);
+				margin: 0 0 var(--space-md);
+				max-width: 60ch;
+			}
+			.stylize-gallery {
+				display: grid;
+				grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+				gap: var(--space-sm);
+			}
+			.stylize-card {
+				display: flex;
+				flex-direction: column;
+				align-items: flex-start;
+				gap: 0.35rem;
+				text-align: left;
+				background: var(--surface-1);
+				border: 1px solid var(--stroke);
+				border-radius: var(--radius-md);
+				padding: var(--space-sm);
+				cursor: pointer;
+				color: var(--ink);
+				font: inherit;
+				transition:
+					border-color var(--duration-fast),
+					transform var(--duration-fast),
+					box-shadow var(--duration-fast),
+					background var(--duration-fast);
+			}
+			.stylize-card:hover {
+				border-color: var(--stroke-strong);
+				transform: translateY(-2px);
+				box-shadow: 0 16px 36px -26px rgba(0, 0, 0, 0.9);
+			}
+			.stylize-card:focus-visible {
+				outline: 2px solid var(--accent);
+				outline-offset: 2px;
+			}
+			.stylize-card:active {
+				transform: translateY(0);
+			}
+			.stylize-card[aria-pressed='true'] {
+				border-color: var(--accent);
+				background: var(--accent-soft);
+			}
+			.stylize-card[disabled] {
+				opacity: 0.5;
+				cursor: not-allowed;
+				transform: none;
+				box-shadow: none;
+			}
+			.stylize-thumb {
+				width: 100%;
+				aspect-ratio: 16 / 10;
+				display: grid;
+				place-items: center;
+				border-radius: var(--radius-sm);
+				background: radial-gradient(120% 120% at 50% 0%, #161616 0%, #0c0c0c 75%);
+				color: var(--ink-dim);
+				transition:
+					color var(--duration-fast),
+					transform var(--duration-base) var(--ease-standard);
+			}
+			.stylize-thumb svg {
+				width: 58%;
+				height: 58%;
+			}
+			.stylize-card:hover .stylize-thumb,
+			.stylize-card[aria-pressed='true'] .stylize-thumb {
+				color: var(--accent);
+			}
+			.stylize-card:hover .stylize-thumb svg {
+				transform: scale(1.08) rotate(-4deg);
+			}
+			.stylize-name {
+				font-family: var(--font-display);
+				font-weight: 600;
+				font-size: var(--text-sm);
+			}
+			.stylize-blurb {
+				color: var(--ink-dim);
+				font-size: var(--text-xs);
+				line-height: var(--leading-tight);
+			}
+			.stylize-controls {
+				display: flex;
+				align-items: center;
+				justify-content: space-between;
+				gap: var(--space-md);
+				margin-top: var(--space-md);
+				flex-wrap: wrap;
+			}
+			.stylize-slider {
+				display: inline-flex;
+				align-items: center;
+				gap: var(--space-sm);
+				font-family: var(--font-mono);
+				font-size: var(--text-xs);
+				color: var(--ink-dim);
+			}
+			.stylize-slider input[type='range'] {
+				accent-color: var(--accent);
+				width: 160px;
+				cursor: pointer;
+			}
+			.stylize-slider input[type='range']:focus-visible {
+				outline: 2px solid var(--accent);
+				outline-offset: 3px;
+			}
+			.stylize-slider output {
+				color: var(--ink);
+				min-width: 2.5ch;
+				text-align: right;
+			}
+			.stylize-actions {
+				display: inline-flex;
+				align-items: center;
+				gap: var(--space-xs);
+				flex-wrap: wrap;
+			}
+			.stylize-status {
+				margin-top: var(--space-sm);
+				font-family: var(--font-mono);
+				font-size: var(--text-xs);
+				color: var(--ink-dim);
+				min-height: 1.2em;
+			}
+			.stylize-status[data-kind='busy'] {
+				color: var(--accent);
+			}
+			.stylize-status[data-kind='error'] {
+				color: var(--danger);
+			}
+			.stylize-status[data-kind='done'] {
+				color: var(--success);
+			}
+			.stylize[data-busy='true'] .stylize-thumb svg {
+				animation: spin 1.1s linear infinite;
+			}
+
+			/* Your creations gallery -------------------------------------- */
+			.creations {
+				margin-top: var(--space-2xl);
+			}
+			.creations-head {
+				display: flex;
+				align-items: baseline;
+				justify-content: space-between;
+				gap: var(--space-sm);
+				margin-bottom: var(--space-md);
+			}
+			.creations-head h2 {
+				font-family: var(--font-display);
+				font-size: var(--text-lg);
+				margin: 0;
+			}
+			.creations-head .count {
+				font-family: var(--font-mono);
+				font-size: var(--text-xs);
+				color: var(--ink-dim);
+			}
+			.creations-head .creations-all {
+				margin-left: auto;
+				font-size: var(--text-xs);
+				font-weight: 600;
+				color: var(--ink-dim);
+				text-decoration: none;
+				border-bottom: 1px solid transparent;
+				transition: color var(--duration-fast) var(--ease-standard), border-color var(--duration-fast) var(--ease-standard);
+			}
+			.creations-head .creations-all:hover {
+				color: var(--ink-bright);
+				border-bottom-color: var(--stroke-strong);
+			}
+			.creations-head .creations-all:focus-visible {
+				outline: 2px solid var(--accent);
+				outline-offset: 2px;
+			}
+			.creations-grid {
+				display: grid;
+				grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+				gap: 12px;
+			}
+			/* Compare mode ------------------------------------------------- */
+			.compare-toggle {
+				margin-left: auto;
+				background: transparent;
+				border: 1px solid var(--stroke-strong);
+				color: var(--ink-dim);
+				border-radius: var(--radius-pill);
+				padding: 0.25rem 0.7rem;
+				font-family: var(--font-mono);
+				font-size: var(--text-xs);
+				cursor: pointer;
+				transition:
+					color var(--duration-fast),
+					border-color var(--duration-fast),
+					background var(--duration-fast);
+			}
+			.compare-toggle:hover {
+				color: var(--ink);
+				border-color: var(--ink-dim);
+			}
+			.compare-toggle:focus-visible {
+				outline: 2px solid var(--accent);
+				outline-offset: 2px;
+			}
+			.compare-toggle[aria-pressed='true'] {
+				background: var(--accent-soft);
+				border-color: var(--accent);
+				color: var(--ink);
+			}
+			.compare-hint {
+				margin: 0 0 var(--space-sm);
+				font-size: var(--text-xs);
+				color: var(--ink-dim);
+			}
+			/* In compare mode a card is a selectable target, not a link to the
+			   viewer, so it reads differently and shows its selection order. */
+			.creations-grid.is-comparing .creation {
+				cursor: copy;
+			}
+			.creations-grid.is-comparing .creation[aria-pressed='true'] {
+				border-color: var(--accent);
+				box-shadow: 0 0 0 2px var(--accent-soft);
+			}
+			.creation .pick {
+				position: absolute;
+				top: 6px;
+				right: 6px;
+				width: 22px;
+				height: 22px;
+				border-radius: 50%;
+				display: grid;
+				place-items: center;
+				background: var(--accent);
+				color: var(--btn-primary-fg, #000);
+				font-family: var(--font-mono);
+				font-size: 11px;
+				font-weight: 700;
+				line-height: 1;
+			}
+			.compare-tray {
+				position: sticky;
+				bottom: 12px;
+				margin-top: var(--space-md);
+				display: flex;
+				align-items: center;
+				justify-content: space-between;
+				gap: var(--space-sm);
+				flex-wrap: wrap;
+				padding: 0.6rem 0.85rem;
+				background: var(--surface-1);
+				border: 1px solid var(--stroke-strong);
+				border-radius: var(--radius-md);
+				box-shadow: 0 16px 40px -20px rgba(0, 0, 0, 0.8);
+			}
+			.compare-tray-label {
+				font-family: var(--font-mono);
+				font-size: var(--text-xs);
+				color: var(--ink-dim);
+			}
+			.compare-tray-actions {
+				display: flex;
+				gap: 8px;
+			}
+			.compare-go {
+				background: var(--btn-primary-bg);
+				border-color: transparent;
+				color: var(--btn-primary-fg);
+			}
+			/* Compare modal ------------------------------------------------ */
+			.compare-modal {
+				position: fixed;
+				inset: 0;
+				/* Above the page's own chrome (the 1000-level starter toast and
+				   onboarding cards) and level with the shared full-screen modals
+				   in src/shared/*, which is the repo's convention for a dialog
+				   that owns the screen. */
+				z-index: 10000;
+				background: rgba(0, 0, 0, 0.72);
+				backdrop-filter: blur(6px);
+				display: grid;
+				place-items: center;
+				padding: clamp(8px, 3vw, 32px);
+				animation: compare-fade 0.18s ease-out;
+			}
+			@keyframes compare-fade {
+				from {
+					opacity: 0;
+				}
+			}
+			.compare-modal-inner {
+				width: min(1180px, 100%);
+				max-height: 100%;
+				overflow-y: auto;
+				background: var(--surface-1);
+				border: 1px solid var(--stroke-strong);
+				border-radius: var(--radius-lg);
+				padding: clamp(14px, 2.5vw, 22px);
+			}
+			.compare-modal-head {
+				display: flex;
+				align-items: center;
+				justify-content: space-between;
+				gap: var(--space-sm);
+			}
+			.compare-modal-head h2 {
+				font-family: var(--font-display);
+				font-size: var(--text-lg);
+				margin: 0;
+			}
+			.compare-modal-tools {
+				display: flex;
+				align-items: center;
+				gap: 14px;
+			}
+			.compare-sync {
+				display: flex;
+				align-items: center;
+				gap: 6px;
+				font-family: var(--font-mono);
+				font-size: var(--text-xs);
+				color: var(--ink-dim);
+				cursor: pointer;
+			}
+			.compare-close {
+				background: transparent;
+				border: 1px solid var(--stroke-strong);
+				color: var(--ink);
+				border-radius: var(--radius-sm);
+				width: 30px;
+				height: 30px;
+				font-size: 20px;
+				line-height: 1;
+				cursor: pointer;
+			}
+			.compare-close:hover {
+				background: var(--surface-2);
+			}
+			.compare-close:focus-visible,
+			.compare-sync input:focus-visible {
+				outline: 2px solid var(--accent);
+				outline-offset: 2px;
+			}
+			.compare-prompt {
+				margin: 6px 0 14px;
+				color: var(--ink-dim);
+				font-size: var(--text-sm);
+			}
+			.compare-panes {
+				display: grid;
+				grid-template-columns: 1fr 1fr;
+				gap: 14px;
+			}
+			.compare-pane {
+				border: 1px solid var(--stroke);
+				border-radius: var(--radius-md);
+				overflow: hidden;
+				background: var(--surface-2);
+				display: flex;
+				flex-direction: column;
+			}
+			.compare-pane model-viewer {
+				width: 100%;
+				aspect-ratio: 1 / 1;
+				background: var(--surface-2);
+				display: block;
+			}
+			.compare-pane-meta {
+				padding: 10px 12px;
+				border-top: 1px solid var(--stroke);
+				display: flex;
+				flex-direction: column;
+				gap: 3px;
+			}
+			.compare-pane-engine {
+				font-family: var(--font-mono);
+				font-size: var(--text-xs);
+				color: var(--ink);
+			}
+			.compare-pane-sub {
+				font-family: var(--font-mono);
+				font-size: var(--text-xs);
+				color: var(--ink-dim);
+			}
+			@media (max-width: 720px) {
+				.compare-panes {
+					grid-template-columns: 1fr;
+				}
+			}
+			@media (prefers-reduced-motion: reduce) {
+				.compare-modal {
+					animation: none;
+				}
+			}
+			/* Showcase uses larger cards — the section spans full width */
+			#showcase .creations-grid {
+				grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+				gap: 14px;
+			}
+			.creation {
+				position: relative;
+				display: flex;
+				flex-direction: column;
+				text-align: left;
+				background: var(--surface-1);
+				border: 1px solid var(--stroke);
+				border-radius: 12px;
+				overflow: hidden;
+				cursor: pointer;
+				padding: 0;
+				color: inherit;
+				font: inherit;
+				transition:
+					border-color var(--duration-fast),
+					transform var(--duration-fast),
+					box-shadow var(--duration-fast);
+			}
+			.creation:hover {
+				border-color: var(--stroke-strong);
+				transform: translateY(-2px);
+				box-shadow: 0 12px 32px -16px rgba(0, 0, 0, 0.7);
+			}
+			.creation:focus-visible {
+				outline: 2px solid var(--accent);
+				outline-offset: 2px;
+			}
+			/* Delete a saved creation. The control is a sibling of the card inside
+			   .creation-wrap (the card is itself a <button>, so nesting would be
+			   invalid HTML). Hidden until hover/focus on pointer devices; always
+			   visible on touch, where hover cannot reveal it. */
+			.creation-wrap {
+				position: relative;
+				display: flex;
+			}
+			.creation-wrap .creation {
+				width: 100%;
+			}
+			.creation-del {
+				position: absolute;
+				top: 6px;
+				right: 6px;
+				z-index: 2;
+				min-width: 22px;
+				height: 22px;
+				padding: 0 6px;
+				border: 1px solid var(--stroke-strong);
+				border-radius: 999px;
+				background: rgba(0, 0, 0, 0.55);
+				backdrop-filter: blur(4px);
+				color: var(--ink-dim);
+				font-size: 13px;
+				line-height: 1;
+				cursor: pointer;
+				opacity: 0;
+				transition:
+					opacity var(--duration-fast),
+					color var(--duration-fast),
+					border-color var(--duration-fast),
+					background var(--duration-fast);
+			}
+			.creation-wrap:hover .creation-del,
+			.creation-wrap:focus-within .creation-del {
+				opacity: 1;
+			}
+			.creation-del:hover,
+			.creation-del.is-armed {
+				color: var(--danger);
+				border-color: var(--danger);
+				background: rgba(0, 0, 0, 0.75);
+			}
+			.creation-del:focus-visible {
+				outline: 2px solid var(--accent);
+				outline-offset: 2px;
+			}
+			.creation-del.is-armed {
+				opacity: 1;
+				font-family: var(--font-mono);
+				font-size: 11px;
+			}
+			.creation-del:disabled {
+				cursor: default;
+				color: var(--ink-dim);
+			}
+			@media (hover: none) {
+				.creation-del {
+					opacity: 1;
+				}
+			}
+			.creation .thumb {
+				aspect-ratio: 1 / 1;
+				width: 100%;
+				object-fit: cover;
+				background: var(--surface-2);
+				display: block;
+			}
+			.creation .thumb.placeholder {
+				display: grid;
+				place-items: center;
+				color: var(--ink-dim);
+				font-size: 1.6rem;
+			}
+			.creation .thumb.gradient-ph {
+				display: flex;
+				align-items: center;
+				justify-content: center;
+				position: relative;
+				overflow: hidden;
+				padding: 1rem;
+			}
+			.creation .thumb .gradient-ph-text {
+				font-size: 12px;
+				line-height: 1.45;
+				color: rgba(255,255,255,0.5);
+				display: -webkit-box;
+				-webkit-line-clamp: 4;
+				-webkit-box-orient: vertical;
+				overflow: hidden;
+				text-align: center;
+				letter-spacing: 0.01em;
+			}
+			.creation .meta {
+				padding: 0.55rem 0.7rem;
+				font-size: 12.5px;
+				color: var(--ink-dim);
+				line-height: 1.4;
+				display: -webkit-box;
+				-webkit-line-clamp: 2;
+				-webkit-box-orient: vertical;
+				overflow: hidden;
+			}
+			.creation .badge {
+				position: absolute;
+				top: 6px;
+				right: 6px;
+				font-size: 0.65rem;
+				font-family: var(--font-mono);
+				padding: 1px 6px;
+				border-radius: 999px;
+				background: rgba(0, 0, 0, 0.55);
+				backdrop-filter: blur(4px);
+			}
+			.creation .badge[data-outcome='accepted'] {
+				color: var(--success);
+			}
+			.creation .badge[data-outcome='rejected'] {
+				color: var(--danger);
+			}
+
+			/* Fresh from the Forge — community showcase ------------------- */
+			/* Taller thumb area for showcase cards */
+			#showcase .creation .thumb {
+				aspect-ratio: unset;
+				min-height: 200px;
+				height: 200px;
+			}
+			/* Showcase cards get slightly larger meta text + 3-line clamp */
+			#showcase .creation .meta {
+				font-size: 0.8rem;
+				-webkit-line-clamp: 3;
+				padding: 0.6rem 0.75rem;
+			}
+			.showcase-head-right {
+				display: inline-flex;
+				align-items: center;
+				gap: var(--space-xs);
+			}
+			.showcase-refresh {
+				display: inline-grid;
+				place-items: center;
+				width: 26px;
+				height: 26px;
+				background: transparent;
+				border: 1px solid var(--stroke);
+				border-radius: 50%;
+				color: var(--ink-dim);
+				cursor: pointer;
+				transition:
+					color var(--duration-fast),
+					border-color var(--duration-fast),
+					transform var(--duration-base) var(--ease-standard);
+			}
+			.showcase-refresh:hover {
+				color: var(--ink);
+				border-color: var(--stroke-strong);
+				transform: rotate(90deg);
+			}
+			.showcase-refresh:focus-visible {
+				outline: 2px solid var(--accent);
+				outline-offset: 2px;
+			}
+			.showcase-sub {
+				margin: calc(-1 * var(--space-sm)) 0 var(--space-md);
+				color: var(--ink-dim);
+				font-size: var(--text-sm);
+			}
+			.showcase-sub strong {
+				color: var(--ink);
+			}
+			.showcase-view-all {
+				font-family: var(--font-mono);
+				font-size: var(--text-xs);
+				color: var(--ink-dim);
+				text-decoration: none;
+				letter-spacing: 0.03em;
+				transition: color var(--duration-fast);
+			}
+			.showcase-view-all:hover { color: var(--ink); }
+			/* Card footer: time-ago on the left, Remix on the right. */
+			.showcase-foot {
+				display: flex;
+				flex-direction: row;
+				align-items: center;
+				justify-content: space-between;
+				gap: var(--space-sm);
+				padding: 0.4rem 0.75rem 0.6rem;
+				margin-top: auto;
+				border-top: 1px solid var(--stroke);
+				/* Above .showcase-open so the vote/Remix/x402 controls stay clickable. */
+				position: relative;
+				z-index: 2;
+			}
+			/* Stretched primary card action (buildCard in forge-showcase.js): a real
+			   <button> instead of role="button" on the card, so the footer's own
+			   controls are not nested inside an interactive element (WCAG 4.1.2). */
+			.showcase-open {
+				position: absolute;
+				inset: 0;
+				z-index: 1;
+				background: transparent;
+				border: 0;
+				padding: 0;
+				margin: 0;
+				cursor: pointer;
+				border-radius: inherit;
+			}
+			.showcase-open:focus-visible {
+				outline: 2px solid var(--accent);
+				outline-offset: -2px;
+			}
+			.showcase-when {
+				font-family: var(--font-mono);
+				font-size: 0.7rem;
+				color: var(--ink-dim);
+				flex-shrink: 0;
+			}
+			.showcase-remix {
+				font-family: var(--font-mono);
+				white-space: nowrap;
+				flex-shrink: 0;
+				font-size: 11px;
+				letter-spacing: 0.04em;
+				padding: 3px 10px;
+				border-radius: 999px;
+				border: 1px solid var(--stroke);
+				background: transparent;
+				color: var(--ink-dim);
+				cursor: pointer;
+				transition:
+					color var(--duration-fast),
+					border-color var(--duration-fast),
+					background var(--duration-fast);
+			}
+			.showcase-card:hover .showcase-remix,
+			.showcase-remix:hover {
+				color: var(--ink);
+				border-color: var(--accent);
+			}
+			.showcase-remix:hover {
+				background: var(--accent-soft);
+			}
+			.showcase-remix:focus-visible {
+				outline: 2px solid var(--accent);
+				outline-offset: 2px;
+			}
+			.showcase-card:focus-visible {
+				outline: 2px solid var(--accent);
+				outline-offset: 2px;
+			}
+			/* Hover-to-spin: the card's real model, laid over the square thumb,
+			   faded in only after its GLB finishes loading. Ground must be OPAQUE
+			   (--surface-2 is 5% white): a translucent background lets the photo
+			   thumb bleed through the spinning render and the card reads as broken. */
+			.showcase-preview {
+				position: absolute;
+				top: 0;
+				left: 0;
+				right: 0;
+				aspect-ratio: 1 / 1;
+				width: 100%;
+				background: var(--bg-1, #1a1a1a);
+				opacity: 0;
+				pointer-events: none;
+				transition: opacity var(--duration-base) var(--ease-standard);
+			}
+			.showcase-card.is-previewing .showcase-preview {
+				opacity: 1;
+			}
+			@media (prefers-reduced-motion: reduce) {
+				.showcase-refresh,
+				.showcase-remix,
+				.showcase-preview {
+					transition: none;
+				}
+				.showcase-refresh:hover {
+					transform: none;
+				}
+			}
+
+			/* Remix flash: border pulse + glow on the prompt box when a prompt loads */
+			@keyframes prompt-remix-flash {
+				0%   {
+					box-shadow: 0 0 0 0 color-mix(in srgb, var(--accent) 60%, transparent);
+					border-color: var(--accent);
+					background: color-mix(in srgb, var(--accent) 6%, transparent);
+				}
+				30%  {
+					box-shadow: 0 0 0 5px color-mix(in srgb, var(--accent) 18%, transparent);
+					border-color: var(--accent);
+				}
+				100% {
+					box-shadow: 0 0 0 0 transparent;
+					border-color: var(--stroke);
+					background: var(--surface-2, transparent);
+				}
+			}
+			#prompt.remix-flash {
+				animation: prompt-remix-flash 0.9s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+			}
+
+			/* Remix toast — slides in from above, then fades out */
+			@keyframes toast-enter {
+				from { opacity: 0; transform: translateX(-50%) translateY(-10px); }
+				to   { opacity: 1; transform: translateX(-50%) translateY(0); }
+			}
+			.remix-toast {
+				position: fixed;
+				top: 5.5rem;
+				left: 50%;
+				transform: translateX(-50%) translateY(0);
+				background: color-mix(in srgb, var(--surface-3, #1a1a1a) 92%, transparent);
+				backdrop-filter: blur(12px);
+				-webkit-backdrop-filter: blur(12px);
+				border: 1px solid color-mix(in srgb, var(--accent) 55%, transparent);
+				color: var(--ink);
+				font-size: 0.78rem;
+				font-weight: 500;
+				letter-spacing: 0.01em;
+				padding: 0.45rem 1.1rem 0.45rem 0.9rem;
+				border-radius: 999px;
+				pointer-events: none;
+				white-space: nowrap;
+				z-index: 1000;
+				opacity: 1;
+				display: flex;
+				align-items: center;
+				gap: 0.45rem;
+				box-shadow: 0 4px 24px rgba(0, 0, 0, 0.4);
+				animation: toast-enter 0.3s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+				transition: opacity var(--duration-slow) var(--ease-standard), transform var(--duration-slow) var(--ease-standard);
+			}
+			.remix-toast .toast-dot {
+				width: 6px;
+				height: 6px;
+				border-radius: 50%;
+				background: var(--accent);
+				flex: none;
+			}
+			.remix-toast.fade-out {
+				opacity: 0;
+				transform: translateX(-50%) translateY(-8px);
+			}
+
+			/* Forge empty state — open canvas, not a boxed notice */
+			.forge-empty {
+				display: flex;
+				flex-direction: column;
+				align-items: center;
+				justify-content: center;
+				min-height: 420px;
+				gap: var(--space-md);
+				border: 1px dashed var(--stroke);
+				border-radius: var(--radius-lg);
+				background: var(--surface-1);
+			}
+			.forge-empty-art {
+				width: 140px;
+				color: var(--ink-dim);
+				opacity: 0.6;
+				animation: forge-cube-float 6s ease-in-out infinite;
+			}
+			@keyframes forge-cube-float {
+				0%, 100% { transform: translateY(0); }
+				50% { transform: translateY(-8px); }
+			}
+			@media (prefers-reduced-motion: reduce) {
+				.forge-empty-art { animation: none; }
+			}
+			.forge-empty-label {
+				font-family: var(--font-mono);
+				font-size: var(--text-xs);
+				letter-spacing: 0.08em;
+				text-transform: uppercase;
+				color: var(--ink-dim);
+				margin: 0;
+			}
+			/* Roll & Forge is the zero-typing path: one click picks a curated random
+			   prompt and generates it, so a first-timer reaches the "wow" with no
+			   prompt paralysis. Sits between the label and the starters as the hero
+			   action of the empty stage. */
+			.forge-roll {
+				margin-top: var(--space-2xs);
+			}
+			.forge-roll .roll-die {
+				transition: transform var(--duration-base) var(--ease-emphasized, var(--ease-standard));
+			}
+			.forge-roll:hover .roll-die {
+				transform: rotate(24deg);
+			}
+			.forge-roll.is-rolling .roll-die {
+				animation: forge-roll-spin 480ms var(--ease-emphasized, ease);
+			}
+			@keyframes forge-roll-spin {
+				from { transform: rotate(0); }
+				to { transform: rotate(360deg); }
+			}
+			@media (prefers-reduced-motion: reduce) {
+				.forge-roll .roll-die,
+				.forge-roll:hover .roll-die,
+				.forge-roll.is-rolling .roll-die {
+					transition: none;
+					animation: none;
+					transform: none;
+				}
+			}
+			/* Free-to-use reassurance: the first-timer's top hesitation is cost and
+			   sign-up. State it plainly right under the primary action. */
+			.forge-empty-free {
+				font-family: var(--font-mono);
+				font-size: var(--text-2xs);
+				letter-spacing: 0.06em;
+				color: var(--ink-faint);
+				margin: 0;
+			}
+			/* Starter prompts inside the empty stage: a first-time visitor sees
+			   exactly what to type and can generate in one click. Reuses the .chip
+			   look; wired in forge.js (fills the prompt and submits). */
+			.forge-empty-starters {
+				display: flex;
+				flex-wrap: wrap;
+				justify-content: center;
+				gap: var(--space-xs);
+				padding: 0 var(--space-md);
+			}
+			.forge-empty-hint {
+				font-size: var(--text-xs);
+				color: var(--ink-dim);
+				margin: 0;
+			}
+
+			/* Error + unconfigured notices */
+			.notice {
+				padding: var(--space-2xl) var(--space-lg);
+				text-align: center;
+				color: var(--ink-dim);
+			}
+			.notice h3 {
+				color: var(--ink);
+				font-family: var(--font-display);
+				margin: 0 0 var(--space-xs);
+			}
+			.notice p {
+				max-width: 48ch;
+				margin: 0 auto;
+				line-height: var(--leading-normal);
+			}
+			.notice .glyph {
+				font-size: 2.4rem;
+				opacity: 0.5;
+				display: block;
+				margin-bottom: var(--space-sm);
+			}
+			.notice.error h3 {
+				color: var(--danger);
+			}
+			.notice .actions {
+				margin-top: var(--space-md);
+				display: inline-flex;
+				gap: var(--space-xs);
+				/* A recovery row must never run off the panel: at 320px a two-button
+				   row (or one long label) used to clip its own text against the
+				   right edge, so the escape hatch was unreadable exactly where the
+				   user needed it most. */
+				flex-wrap: wrap;
+				justify-content: center;
+				max-width: 100%;
+			}
+			.notice .actions .btn {
+				max-width: 100%;
+				white-space: normal;
+			}
+			.hint-foot {
+				text-align: center;
+				color: var(--ink-dim);
+				font-size: var(--text-xs);
+				margin-top: var(--space-lg);
+				line-height: var(--leading-normal);
+			}
+			.hint-foot a {
+				color: var(--ink);
+			}
+
+			/* ── Mobile polish (≤720px) ─────────────────────────────────────
+			   The rail and stage already stack via .forge-workspace's default
+			   single column; these rules keep the dense composer controls from
+			   overflowing the viewport and meet phone touch/zoom ergonomics. */
+			@media (max-width: 720px) {
+				/* Hero: stack the title above the tagline instead of a cramped
+				   baseline-aligned flex row that overflows narrow screens. */
+				.forge-head {
+					flex-direction: column;
+					align-items: flex-start;
+					gap: var(--space-xs);
+				}
+				.forge-head h1 {
+					font-size: var(--text-lg);
+				}
+				.forge-head-link {
+					margin-left: 0;
+				}
+				/* Engine / quality / tier / aspect button groups carry up to seven
+				   chips — let them wrap instead of forcing horizontal scroll. */
+				.aspect {
+					flex-wrap: wrap;
+				}
+				/* iOS zooms the page when a focused field is under 16px. Bump the
+				   few sub-16px controls in the rail to the reading baseline. */
+				.byok-input {
+					font-size: var(--text-base);
+				}
+				/* Comfortable tap targets for the small chip-style controls. */
+				.aspect button,
+				.seg button {
+					min-height: 44px;
+				}
+				.ptool,
+				.chip,
+				.chips-more,
+				.forge-cat-btn,
+				.verdict button {
+					min-height: 44px;
+				}
+				.opt-select {
+					font-size: var(--text-sm);
+					min-height: 44px;
+				}
+			}
+
+			/* Fullscreen cinema bar must clear the home-indicator / notch. */
+			.result.is-cinema .result-bar {
+				padding-bottom: calc(var(--space-sm) + env(safe-area-inset-bottom, 0px));
+				padding-left: max(var(--space-md), env(safe-area-inset-left, 0px));
+				padding-right: max(var(--space-md), env(safe-area-inset-right, 0px));
+			}
+
+			/* ── Your GPU (Modly) ───────────────────────────────────────────────
+			   Opt-in local lane. An inset panel in the photos tab, styled like the
+			   BYOK row so "runs somewhere other than our cloud" reads consistently.
+			   data-state drives the status dot: idle, probing, connected,
+			   not-running, blocked. */
+			.modly-panel {
+				position: relative;
+				margin-top: var(--space-sm);
+				padding: 0.75rem 0.85rem 0.75rem 1rem;
+				background: var(--surface-2);
+				border: 1px solid var(--stroke);
+				border-radius: var(--radius-md);
+				transition: border-color var(--duration-fast);
+			}
+			.modly-panel::before {
+				content: '';
+				position: absolute;
+				left: 0;
+				top: 0.6rem;
+				bottom: 0.6rem;
+				width: 2px;
+				border-radius: 0 2px 2px 0;
+				background: var(--stroke-strong);
+				transition: background var(--duration-fast);
+			}
+			.modly-panel[data-state='connected']::before {
+				background: var(--success);
+			}
+			.modly-panel[data-state='not-running']::before,
+			.modly-panel[data-state='blocked']::before {
+				background: var(--warning, #e0a93e);
+			}
+			.modly-panel[data-state='connected'] {
+				border-color: color-mix(in srgb, var(--success) 35%, var(--stroke));
+			}
+			.modly-head {
+				display: flex;
+				align-items: center;
+				gap: var(--space-sm);
+				flex-wrap: wrap;
+			}
+			.modly-ico {
+				flex: none;
+				display: inline-grid;
+				place-items: center;
+				width: 32px;
+				height: 32px;
+				border-radius: var(--radius-sm);
+				background: var(--surface-3);
+				color: var(--ink);
+			}
+			.modly-ico svg {
+				width: 18px;
+				height: 18px;
+			}
+			.modly-copy {
+				flex: 1 1 10rem;
+				min-width: 0;
+			}
+			.modly-title {
+				margin: 0;
+				font-size: var(--text-sm);
+				font-weight: 650;
+				color: var(--ink);
+				display: flex;
+				align-items: center;
+				gap: 0.4em;
+			}
+			.modly-pill {
+				display: inline-block;
+				padding: 0.05em 0.45em;
+				border-radius: 999px;
+				font-size: 0.72em;
+				font-weight: 700;
+				letter-spacing: 0.03em;
+				line-height: 1.5;
+				white-space: nowrap;
+				color: var(--success);
+				background: rgba(34, 197, 94, 0.14);
+				border: 1px solid rgba(74, 222, 128, 0.38);
+			}
+			html[data-theme='light'] .modly-pill {
+				color: #0a7d33;
+				background: rgba(34, 197, 94, 0.16);
+				border-color: rgba(34, 197, 94, 0.32);
+			}
+			.modly-sub {
+				margin: 0.1rem 0 0;
+				font-size: var(--text-xs);
+				color: var(--ink-dim);
+			}
+			.modly-sub a,
+			.modly-status a {
+				color: var(--ink);
+				text-decoration: underline;
+				text-underline-offset: 2px;
+			}
+			.modly-sub a:hover,
+			.modly-status a:hover {
+				color: var(--accent);
+			}
+			.modly-actions {
+				display: flex;
+				gap: var(--space-xs);
+				margin-left: auto;
+			}
+			.modly-btn {
+				display: inline-flex;
+				align-items: center;
+				gap: 0.4rem;
+				font: inherit;
+				font-size: var(--text-xs);
+				font-weight: 600;
+				color: var(--ink);
+				background: var(--surface-1);
+				border: 1px solid var(--stroke-strong);
+				border-radius: var(--radius-pill);
+				padding: 5px 12px;
+				cursor: pointer;
+				transition: border-color var(--duration-fast), transform var(--duration-fast), background var(--duration-fast);
+			}
+			.modly-btn:hover:not(:disabled) {
+				border-color: var(--accent);
+				transform: translateY(-1px);
+			}
+			.modly-btn:active:not(:disabled) {
+				transform: translateY(0);
+				background: var(--surface-3);
+			}
+			.modly-btn:focus-visible {
+				outline: 2px solid var(--accent);
+				outline-offset: 2px;
+			}
+			.modly-btn:disabled {
+				cursor: progress;
+				opacity: 0.7;
+			}
+			.modly-btn-quiet {
+				background: transparent;
+				border-color: var(--stroke);
+				color: var(--ink-dim);
+			}
+			.modly-dot {
+				width: 7px;
+				height: 7px;
+				border-radius: 50%;
+				background: var(--ink-dim);
+				opacity: 0.6;
+			}
+			.modly-panel[data-state='connected'] .modly-dot {
+				background: var(--success);
+				opacity: 1;
+				box-shadow: 0 0 6px var(--success);
+			}
+			.modly-panel[data-state='not-running'] .modly-dot,
+			.modly-panel[data-state='blocked'] .modly-dot {
+				background: var(--warning, #e0a93e);
+				opacity: 1;
+			}
+			.modly-panel[data-state='probing'] .modly-dot {
+				background: var(--accent);
+				opacity: 1;
+				animation: modly-pulse 1s ease-in-out infinite;
+			}
+			@keyframes modly-pulse {
+				50% {
+					opacity: 0.25;
+				}
+			}
+			.modly-status {
+				margin: 0.55rem 0 0;
+				font-size: var(--text-xs);
+				line-height: 1.5;
+				color: var(--ink-dim);
+			}
+			.modly-status:empty {
+				display: none;
+			}
+			.modly-status strong {
+				color: var(--ink);
+			}
+			.modly-status code,
+			.modly-origin-msg code {
+				font-family: var(--font-mono);
+				font-size: 0.95em;
+				overflow-wrap: anywhere;
+			}
+			.modly-status:not(:empty) {
+				animation: byok-reveal 0.22s ease both;
+			}
+			.modly-spinner {
+				display: inline-block;
+				width: 0.85em;
+				height: 0.85em;
+				margin-right: 0.45em;
+				vertical-align: -0.1em;
+				border: 2px solid var(--stroke-strong);
+				border-top-color: var(--accent);
+				border-radius: 50%;
+				animation: modly-spin 0.8s linear infinite;
+			}
+			@keyframes modly-spin {
+				to {
+					transform: rotate(360deg);
+				}
+			}
+			.modly-advanced {
+				margin-top: 0.5rem;
+				font-size: var(--text-xs);
+			}
+			.modly-advanced summary {
+				cursor: pointer;
+				color: var(--ink-dim);
+				width: fit-content;
+				border-radius: var(--radius-sm);
+			}
+			.modly-advanced summary:hover {
+				color: var(--ink);
+			}
+			.modly-advanced summary:focus-visible {
+				outline: 2px solid var(--accent);
+				outline-offset: 2px;
+			}
+			.modly-origin-row {
+				display: flex;
+				align-items: center;
+				gap: var(--space-xs);
+				flex-wrap: wrap;
+				margin-top: 0.45rem;
+			}
+			.modly-origin-label {
+				color: var(--ink-dim);
+			}
+			.modly-origin-input {
+				flex: 1 1 12rem;
+				min-width: 0;
+				font-family: var(--font-mono);
+				font-size: var(--text-xs);
+				color: var(--ink);
+				background: var(--surface-1);
+				border: 1px solid var(--stroke-strong);
+				border-radius: var(--radius-sm);
+				padding: 5px 8px;
+				transition: border-color var(--duration-fast);
+			}
+			.modly-origin-input:hover {
+				border-color: var(--ink-dim);
+			}
+			.modly-origin-input:focus-visible {
+				outline: 2px solid var(--accent);
+				outline-offset: 1px;
+			}
+			.modly-origin-input[aria-invalid='true'] {
+				border-color: var(--danger);
+			}
+			.modly-origin-msg {
+				margin: 0.35rem 0 0;
+				color: var(--ink-dim);
+			}
+			.modly-origin-msg[data-tone='error'] {
+				color: var(--danger);
+			}
+			.modly-origin-msg[data-tone='ok'] {
+				color: var(--success);
+			}
+			/* Modly engines in the picker carry the same mint pill, worded for the lane. */
+			.aspect button .eng-local {
+				white-space: nowrap;
+			}
+			/* Save row under the result bar, for a model made on the user's GPU. */
+			.modly-save {
+				display: flex;
+				align-items: center;
+				gap: var(--space-sm);
+				flex-wrap: wrap;
+				margin-top: var(--space-sm);
+				padding: 0.6rem 0.8rem;
+				background: var(--surface-2);
+				border: 1px solid var(--stroke);
+				border-radius: var(--radius-md);
+			}
+			.modly-save[hidden] {
+				display: none;
+			}
+			.modly-save-text {
+				flex: 1 1 14rem;
+				margin: 0;
+				font-size: var(--text-xs);
+				line-height: 1.5;
+				color: var(--ink-dim);
+			}
+			.modly-save-text a {
+				color: var(--ink);
+				text-decoration: underline;
+				text-underline-offset: 2px;
+			}
+			.modly-save-text a:hover {
+				color: var(--accent);
+			}
+			.modly-save-text[data-tone='ok'] strong {
+				color: var(--success);
+			}
+			.modly-save-text[data-tone='error'] strong {
+				color: var(--danger);
+			}
+			@media (prefers-reduced-motion: reduce) {
+				.modly-btn,
+				.modly-panel,
+				.modly-panel::before,
+				.modly-origin-input {
+					transition: none;
+				}
+				.modly-status:not(:empty) {
+					animation: none;
+				}
+				.modly-panel[data-state='probing'] .modly-dot,
+				.modly-spinner {
+					animation: none;
+				}
+			}
+		</style>
+	
+	<link rel="canonical" href="https://three.ws/forge">
+	<script type="application/ld+json">{"@context":"https://schema.org","@type":"WebPage","name":"Forge — Text & Image to 3D","description":"Type a prompt — or drop in photos or a sketch — and get a downloadable textured 3D model (GLB). Pick from multiple generation engines with live health status.","url":"https://three.ws/forge","isPartOf":{"@type":"WebSite","name":"three.ws","url":"https://three.ws"}}</script>
+
+	<meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1">
+	<meta property="og:locale" content="en_US">
+	<meta property="og:image:alt" content="Forge — Text & Image to 3D — three.ws">
+</head>
+	<body class="forge-page">
+		<div id="nav-container"></div>
+
+		<main class="forge-main">
+			<header class="forge-head">
+				<h1 data-i18n="forge.forge">Forge</h1>
+				<p data-i18n-html="forge.free_text_or_photos_textured_3d_model"><span class="forge-free-tag">Free</span> text or photos → textured 3D model. Orbit, AR, download.</p>
+				<a class="forge-head-link" href="/forge/workflows" data-i18n="forge.chain_steps_in_workflows">Chain steps in Workflows</a>
+				<noscript>
+					<p>The Forge turns a text prompt or photos into a downloadable, textured 3D model in your browser, and that generation pipeline needs JavaScript. Enable JavaScript and reload to forge. The same lane is also callable as a keyless API: <a href="/3d">the free 3D API</a>.</p>
+					<p><a href="/">three.ws home</a> · <a href="/docs">Read the docs</a></p>
+				</noscript>
+			</header>
+
+			<div class="forge-workspace">
+				<div class="forge-rail">
+			<form class="composer" id="composer" autocomplete="off">
+				<div class="mode-switch-wrap">
+					<div
+						class="mode-switch"
+						role="tablist"
+						aria-label="Generation mode"
+						id="mode-switch"
+					>
+						<button type="button" role="tab" id="tab-text" data-mode="text" aria-selected="true" aria-controls="text-pane" tabindex="0" data-i18n="forge.describe_it">
+							Describe it
+						</button>
+						<button type="button" role="tab" id="tab-image" data-mode="image" aria-selected="false" aria-controls="image-pane" tabindex="-1" data-i18n="forge.from_photos">
+							From photos
+						</button>
+						<!-- Hidden until the catalog reports a live sketch engine (TripoSG
+						     self-host) — no dead tab on deployments without the worker. -->
+						<!-- Not `hidden`. revealSketchMode() hides this tab when the catalog
+						     reports no sketch lane, which is the minority deployment; on a
+						     deployment that has one, waiting for the catalog meant the tab
+						     appeared ~400 ms in, wrapped the tab row onto a second line and
+						     dropped the whole composer 38 px. That single shift was 0.19 of
+						     this page's 0.23 CLS. Ship the state production is in and let
+						     the catalog take it away where it does not apply. -->
+						<button type="button" role="tab" id="tab-sketch" data-mode="sketch" aria-selected="false" aria-controls="sketch-pane" tabindex="-1" data-i18n="forge.from_a_sketch">
+							From a sketch
+						</button>
+					</div>
+				</div>
+				<!-- Text → 3D -->
+				<div id="text-pane" role="tabpanel" aria-labelledby="tab-text">
+					<label for="prompt" class="sr-only" data-i18n="forge.describe_the_object_to_generate">Describe the object to generate</label>
+					<textarea
+						id="prompt"
+						name="prompt"
+						maxlength="1000"
+						placeholder="a worn leather armchair, studio lighting, plain background"
+						aria-describedby="prompt-coach"
+					></textarea>
+					<div class="prompt-tools" id="prompt-tools">
+						<button type="button" class="ptool" id="surprise" aria-label="Surprise me: fill the box with a random vivid prompt" data-i18n-attr="aria-label:forge.fill_the_box_with_a_random_v_arialabel">
+							<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+								<rect x="3" y="3" width="18" height="18" rx="3" />
+								<circle cx="8.5" cy="8.5" r="1.4" fill="currentColor" stroke="none" />
+								<circle cx="15.5" cy="15.5" r="1.4" fill="currentColor" stroke="none" />
+								<circle cx="15.5" cy="8.5" r="1.4" fill="currentColor" stroke="none" />
+								<circle cx="8.5" cy="15.5" r="1.4" fill="currentColor" stroke="none" />
+							</svg>
+							Surprise me
+						</button>
+						<!-- Ships the exact message grade('') writes for an empty prompt, so
+						     .prompt-tools is its settled height in the first frame. It used
+						     to ship empty at min-height:1.2em and grow when updateCoach()
+						     ran, wrapping the coach onto its own line in this flex-wrap row
+						     and pushing the quality tiles, the composer and the example
+						     chips down with it: 38px at desktop widths, measured against
+						     production. tests/forge-prompt-coach.test.js reads this file and
+						     src/forge-prompt-studio.js so the two copies cannot drift.
+						     data-no-i18n because the text becomes dynamic the moment anyone
+						     types (docs/site-performance.md rule 6). -->
+						<span class="prompt-coach" id="prompt-coach" data-grade="tip" aria-live="polite" data-no-i18n>Name one object and a material, e.g. “a brass compass, weathered”.</span>
+						<span class="prompt-count" id="prompt-count">0 / 1000</span>
+					</div>
+				</div>
+
+				<!-- Image / multi-view → 3D -->
+				<div id="image-pane" class="image-pane is-hidden" role="tabpanel" aria-labelledby="tab-image">
+					<div
+						class="views-grid"
+						id="views-grid"
+						aria-label="Reference views — add up to four photos of the same object"
+					></div>
+					<div class="views-counter" id="views-counter" aria-live="polite">
+						<span class="views-pips" id="views-pips" aria-hidden="true"></span>
+						<span class="vc-text" id="views-counter-text"
+							 data-i18n-html="forge.0_of_6_views"><strong>0</strong> of 6 views</span
+						>
+					</div>
+					<input
+						type="file"
+						id="view-file-input"
+						accept="image/png,image/jpeg,image/webp"
+						multiple
+						hidden
+					/>
+					<label for="image-prompt" class="is-hidden"
+						 data-i18n="forge.optional_guidance_for_reconstruction">Optional guidance for reconstruction</label
+					>
+					<textarea
+						id="image-prompt"
+						class="image-prompt"
+						maxlength="1000"
+						placeholder="Optional guidance — e.g. “matte plastic, neutral pose, no background”"
+					></textarea>
+					<p class="views-hint" data-i18n-html="forge.add_1_6_views_of_the_same">
+						Add 1-6 views of the <strong>same</strong> object (front · back · left ·
+						right · angles). Drag to drop, click to browse, paste from the clipboard
+						(<kbd class="gen-kbd">⌘V</kbd> / <kbd class="gen-kbd">Ctrl+V</kbd>), drag a thumbnail to reorder.
+						PNG/JPG/WebP, up to 8&nbsp;MB each.
+					</p>
+					<!-- Match my photo (Pixal3D): only shown while that engine is selected.
+					     Front/Back/Left/Right are the same first four slots every engine
+					     uses, so no separate upload UI, just the cap (handled in JS via
+					     activeMaxImages()) and this single opt-in for a one-photo job. -->
+					<section class="pixal3d-panel is-hidden" id="pixal3d-panel" aria-labelledby="pixal3d-panel-title">
+						<p class="pixal3d-panel-title" id="pixal3d-panel-title">
+							<strong>Match my photo</strong> fuses your 1-4 photos pixel-aligned instead of
+							guessing the unseen sides. Label them Front/Back/Left/Right by drop order.
+						</p>
+						<label class="pixal3d-fill-row" for="pixal3d-fill-sides">
+							<input type="checkbox" id="pixal3d-fill-sides" />
+							Only one photo? Let the worker synthesize the other three sides.
+						</label>
+					</section>
+					<!-- Your GPU: opt-in local generation through Modly (src/forge-modly.js).
+					     Nothing contacts localhost until Connect is pressed. -->
+					<section class="modly-panel" id="modly-panel" data-state="idle" aria-labelledby="modly-title">
+						<div class="modly-head">
+							<span class="modly-ico" aria-hidden="true">
+								<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+									<rect x="4" y="4" width="16" height="16" rx="2" />
+									<rect x="9" y="9" width="6" height="6" rx="1" />
+									<path d="M9 1v3M15 1v3M9 20v3M15 20v3M20 9h3M20 14h3M1 9h3M1 14h3" />
+								</svg>
+							</span>
+							<div class="modly-copy">
+								<h3 class="modly-title" id="modly-title">Use your GPU <span class="modly-pill">Free</span></h3>
+								<p class="modly-sub">Generate on this computer with <a href="https://modly3d.app/" target="_blank" rel="noopener">Modly</a>.</p>
+							</div>
+							<div class="modly-actions">
+								<button type="button" class="modly-btn" id="modly-connect" aria-describedby="modly-status"><span class="modly-dot" aria-hidden="true"></span><span id="modly-connect-label">Connect</span></button>
+								<button type="button" class="modly-btn modly-btn-quiet" id="modly-disconnect" hidden>Disconnect</button>
+							</div>
+						</div>
+						<p class="modly-status" id="modly-status" role="status" aria-live="polite"></p>
+						<details class="modly-advanced">
+							<summary>Custom address</summary>
+							<div class="modly-origin-row">
+								<label class="modly-origin-label" for="modly-origin">Modly address</label>
+								<input
+									class="modly-origin-input"
+									id="modly-origin"
+									type="text"
+									inputmode="url"
+									spellcheck="false"
+									autocomplete="off"
+									placeholder="http://localhost:8765"
+									aria-describedby="modly-origin-msg"
+								/>
+								<button type="button" class="modly-btn" id="modly-origin-save">Save</button>
+							</div>
+							<p class="modly-origin-msg" id="modly-origin-msg" aria-live="polite">Only needed if you changed Modly's port. Leave empty for the default.</p>
+						</details>
+					</section>
+				</div>
+
+				<!-- Sketch → 3D (TripoSG-scribble) -->
+				<div id="sketch-pane" class="image-pane is-hidden" role="tabpanel" aria-labelledby="tab-sketch">
+					<div
+						class="views-grid sketch-grid"
+						id="sketch-grid"
+						aria-label="Your sketch — add one drawing"
+					></div>
+					<input
+						type="file"
+						id="sketch-file-input"
+						accept="image/png,image/jpeg,image/webp"
+						hidden
+					/>
+					<label for="sketch-prompt" class="is-hidden"
+						 data-i18n="forge.what_does_the_sketch_depict_required">What does the sketch depict? (required)</label
+					>
+					<textarea
+						id="sketch-prompt"
+						class="image-prompt"
+						maxlength="1000"
+						aria-required="true"
+						placeholder="What is it? — e.g. “a cartoon rocket with two tail fins”"
+					></textarea>
+					<p class="views-hint" data-i18n-html="forge.drop_one_drawing_dark_strokes_on_a">
+						Drop one drawing — dark strokes on a light background work best — and say
+						what it depicts<span class="req-tag" id="sketch-req-tag">Required</span>.
+						PNG/JPG/WebP, up to 8&nbsp;MB. The result is untextured geometry: use
+						<strong>Stylize</strong> or <strong>Retexture</strong> on it after.
+					</p>
+				</div>
+
+				<!-- Quality tier + generation engine + BYOK key -->
+				<div class="forge-quality" id="forge-quality">
+					<div class="fq-row">
+						<span class="fq-label" id="tier-label" data-i18n="forge.quality">Quality</span>
+						<div class="aspect" role="group" aria-labelledby="tier-label" id="tier">
+							<button
+								type="button"
+								data-tier="draft"
+								aria-pressed="false"
+								title="Draft: fastest and low-poly. Good for blockout and iteration."
+							 data-i18n="forge.draft" data-i18n-attr="title:forge.draft_fastest_and_low_poly_g_title">
+								Draft
+							</button>
+							<button
+								type="button"
+								data-tier="standard"
+								aria-pressed="true"
+								title="Standard: balanced detail, photoreal reference views, 2K textures. The default for most assets."
+							 data-i18n="forge.standard" data-i18n-attr="title:forge.standard_balanced_detail_pho_title">
+								Standard
+							</button>
+							<button
+								type="button"
+								data-tier="high"
+								data-access="locked"
+								aria-pressed="false"
+								aria-label="High quality, a $THREE holder feature"
+								title="High: maximum detail and PBR textures on self-hosted GPU workers. Slower; $THREE holder feature or pay per generation."
+							 data-i18n-html="forge.high_three" data-i18n-attr="aria-label:forge.high_quality_three_holder_fe_arialabel;title:forge.high_maximum_detail_and_pbr_title">
+								<span class="tier-name">High</span>
+								<span class="tier-lock" data-state="locked" title="High quality is a $THREE holder feature">
+									<svg class="tier-lock-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg>
+									<span class="tier-lock-txt">$THREE</span>
+								</span>
+							</button>
+						</div>
+					</div>
+					<p class="fq-holder-note" id="fq-holder-note" data-state="locked" data-i18n-html="forge.high_quality_is_a_three_holder_feature">
+						<span class="fq-holder-ico" aria-hidden="true">◆</span> High quality is a
+						<a href="/three-token">$THREE holder</a> feature: hold to unlock, or pay per generation.
+					</p>
+					<div class="fq-row fq-row--engine">
+						<span class="fq-label" id="engine-label" data-i18n="forge.engine">Engine</span>
+						<div
+							class="aspect engine-pill"
+							role="group"
+							aria-labelledby="engine-label"
+							id="engine"
+						></div>
+					</div>
+					<p class="engine-legend" id="engine-legend" data-i18n-html="forge.free_no_api_key_your_own_key">
+						<span class="el-item"><span class="el-free">FREE</span> no API key</span>
+						<span class="el-item"
+							><svg class="el-key" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="8" cy="15" r="4"/><path d="M10.85 12.15 19 4"/><path d="m18 5 2 2"/><path d="m15 8 2 2"/></svg>
+							your own key</span
+						>
+						<span class="el-item"><span class="el-dot el-dot-busy"></span> busy</span>
+						<span class="el-item"><span class="el-dot el-dot-down"></span> unavailable</span>
+					</p>
+					<div class="byok-row is-hidden" id="byok-row">
+						<label class="fq-label" for="provider-key" id="byok-label" data-i18n="forge.api_key">API key</label>
+						<input
+							class="byok-input"
+							id="provider-key"
+							type="password"
+							autocomplete="off"
+							autocapitalize="off"
+							spellcheck="false"
+							placeholder="Your provider API key (kept in this browser)"
+							aria-describedby="byok-hint"
+						/>
+						<span class="byok-hint" id="byok-hint"></span>
+					</div>
+					<p class="fq-estimate" id="estimate" aria-live="polite"></p>
+					<p class="fq-estimate fq-quote" id="forge-quote" aria-live="polite" hidden></p>
+				</div>
+
+				<div class="composer-row">
+					<div
+						class="aspect"
+						role="group"
+						aria-label="Reference image aspect ratio"
+						id="aspect"
+					>
+						<button type="button" data-aspect="1:1" aria-pressed="true">1:1</button>
+						<button type="button" data-aspect="4:3" aria-pressed="false">4:3</button>
+						<button type="button" data-aspect="3:4" aria-pressed="false">3:4</button>
+						<button type="button" data-aspect="16:9" aria-pressed="false">16:9</button>
+					</div>
+				</div>
+				<button class="btn" id="generate" type="submit" title="Generate (Enter). Shift+Enter for a new line." data-i18n-html="forge.generate" data-i18n-attr="title:forge.generate_enter_shift_enter_f_title">
+					<span id="generate-label">Generate</span>
+					<kbd class="gen-kbd" aria-hidden="true">↵</kbd>
+				</button>
+
+				<!-- Quiet holder line under Generate: an active free-quota perk for $THREE
+				     holders, or a non-blocking upsell + a reachable wallet connect so a
+				     holder who hasn't connected can reveal their perk. Filled by forge.js
+				     (updatePerkLine) from the wallet-aware access matrix. -->
+				<!-- Ships in its default (no wallet, no tier) state rather than hidden.
+				     Waiting for /api/three/access to reveal the row inserted two blocks
+				     above the example chips half a second into the load and pushed the
+				     whole rail down: 0.20 of this page's CLS, on every visit.
+				     updatePerkLine() swaps the text in place when the matrix resolves,
+				     and hides the connect button for anyone who turns out to be
+				     connected, which is the rarer case and the one that can afford a
+				     reflow. -->
+				<div class="fq-perk-row" id="forge-perk-row">
+					<p class="fq-perk-line" id="forge-perk-line" aria-live="polite" data-state="upsell">
+						<a href="/three#tiers">Hold $THREE for up to 10× free generations →</a>
+					</p>
+					<button type="button" class="fq-connect-btn" id="connect-wallet-btn" data-i18n-html="forge.connect_wallet">
+						<span class="fq-connect-ico" aria-hidden="true">◎</span>
+						<span data-wallet-label>Connect wallet</span>
+					</button>
+				</div>
+
+			</form>
+
+			<!-- These labels are a space reservation as much as they are copy. On every
+			     JS visit forge-prompt-studio.js replaces them with generated prompts
+			     (capped at 64 characters each), and the row is a flex-wrap container:
+			     when the static labels were half the width of the generated ones the
+			     row gained a line on load and pushed the whole page down, which was
+			     the largest layout shift on /forge. Written at the generator's cap so
+			     the row reserves its worst case at first paint and the rotation can
+			     only ever fit inside it. Keep new examples at 58 to 64 characters.
+			     No data-i18n here on purpose (data-no-i18n keeps i18n-annotate from
+			     adding it back): the generated replacements are English regardless of
+			     locale, so a translated label would only be visible for the instant
+			     before it is overwritten, and rewriting it back on a late catalog
+			     load is what caused the earlier shift on this same row. -->
+			<div class="chips" id="examples" aria-label="Example prompts" data-no-i18n>
+				<button class="chip" type="button">a low-poly red fox sitting upright, matte fur, soft studio light</button>
+				<button class="chip" type="button">a sci-fi combat helmet, brushed titanium, glowing blue visor</button>
+				<button class="chip" type="button">a potted monstera in a hammered copper pot, soft studio light</button>
+				<button class="chip" type="button">a vintage film camera, worn black leather, polished chrome trim</button>
+				<button class="chip" type="button">a glazed ceramic teapot with a bamboo handle, soft studio light</button>
+				<button class="chips-more" type="button" id="chips-more" aria-label="More ideas: swap in a fresh set of example prompts" data-i18n="forge.more_ideas" data-i18n-attr="aria-label:forge.swap_in_a_fresh_set_of_examp_arialabel">↻ More ideas</button>
+			</div>
+				</div>
+				<!-- ── Stage column: viewer, your creations, community showcase ── -->
+				<div class="forge-stage">
+
+			<section class="stage" id="stage" aria-live="polite">
+				<!-- Empty / idle -->
+				<div class="forge-empty" id="state-empty">
+					<div class="forge-empty-art" aria-hidden="true">
+						<svg viewBox="0 0 240 200" fill="none" xmlns="http://www.w3.org/2000/svg">
+							<!-- isometric cube wireframe -->
+							<g stroke="currentColor" stroke-linecap="round" stroke-linejoin="round">
+								<!-- top face -->
+								<polygon points="120,24 190,64 120,104 50,64" stroke-width="1.5" opacity="0.5"/>
+								<!-- left face -->
+								<polygon points="50,64 120,104 120,168 50,128" stroke-width="1.5" opacity="0.3"/>
+								<!-- right face -->
+								<polygon points="190,64 120,104 120,168 190,128" stroke-width="1.5" opacity="0.3"/>
+								<!-- internal cross lines on top face -->
+								<line x1="120" y1="24" x2="120" y2="104" stroke-width="0.75" opacity="0.2"/>
+								<line x1="50" y1="64" x2="190" y2="64" stroke-width="0.75" opacity="0.2"/>
+								<!-- vertex dots -->
+								<circle cx="120" cy="24" r="2.5" fill="currentColor" opacity="0.5"/>
+								<circle cx="190" cy="64" r="2.5" fill="currentColor" opacity="0.4"/>
+								<circle cx="50" cy="64" r="2.5" fill="currentColor" opacity="0.4"/>
+								<circle cx="120" cy="104" r="2.5" fill="currentColor" opacity="0.6"/>
+								<circle cx="190" cy="128" r="2.5" fill="currentColor" opacity="0.3"/>
+								<circle cx="50" cy="128" r="2.5" fill="currentColor" opacity="0.3"/>
+								<circle cx="120" cy="168" r="2.5" fill="currentColor" opacity="0.4"/>
+							</g>
+						</svg>
+					</div>
+					<p class="forge-empty-label" data-i18n="forge.enter_a_prompt_to_generate">Enter a prompt to generate</p>
+					<button class="btn forge-roll" type="button" id="roll-forge" aria-label="Roll &amp; Forge: forge a random model, no prompt needed" data-i18n-attr="aria-label:forge.forge_a_random_model_no_prom_arialabel">
+						<svg class="roll-die" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+							<rect x="3" y="3" width="18" height="18" rx="4" />
+							<circle cx="8.5" cy="8.5" r="1.3" fill="currentColor" stroke="none" />
+							<circle cx="15.5" cy="15.5" r="1.3" fill="currentColor" stroke="none" />
+							<circle cx="15.5" cy="8.5" r="1.3" fill="currentColor" stroke="none" />
+							<circle cx="8.5" cy="15.5" r="1.3" fill="currentColor" stroke="none" />
+							<circle cx="12" cy="12" r="1.3" fill="currentColor" stroke="none" />
+						</svg>
+						Roll &amp; Forge
+					</button>
+					<p class="forge-empty-free" data-i18n="forge.free_no_sign_up_yours_to_download">Free · no sign-up · yours to download</p>
+					<div class="forge-empty-starters" id="empty-starters" role="group" aria-label="Starter prompts: click one to generate" data-no-i18n>
+						<!-- Same space-reservation rule as the #examples row above: written at
+						     the generator's 64-character cap, no data-i18n. -->
+						<button class="chip" type="button">a glazed ceramic teapot with a bamboo handle, soft studio light</button>
+						<button class="chip" type="button">a sci-fi combat helmet, brushed titanium, glowing blue visor</button>
+						<button class="chip" type="button">a low-poly red fox sitting upright, matte fur, soft studio light</button>
+						<button class="chip" type="button">a worn leather messenger bag, aged brass buckles, matte finish</button>
+						<button class="chip" type="button">a crystal dragon figurine, faceted glass, catching warm light</button>
+						<button class="chip" type="button">a chrome toaster in mid-century diner style, polished steel</button>
+					</div>
+					<p class="forge-empty-hint" data-i18n="forge.or_click_a_starter_it_generates_immediately">Or click a starter: it generates immediately.</p>
+				</div>
+
+				<!-- Generating -->
+				<div class="panel gen is-hidden" id="state-generating">
+					<div class="gen-preview" id="gen-preview">
+						<div class="shimmer" aria-hidden="true"></div>
+					</div>
+					<div class="gen-steps">
+						<!-- Named stage timeline. Every row, and every state change on it, is
+						     driven by a real /api/forge signal (see src/forge-timeline.js);
+						     the lane decides which stages exist, so a text→3D engine with no
+						     reference-image step simply never shows one. -->
+						<ol class="gen-stages" id="gen-stages" role="list" aria-live="polite"></ol>
+						<!-- Cold-start honesty: shown only when the API reports cold_start
+						     for the chosen self-hosted GPU lane, and dismissed by the first
+						     real "running" poll, never by a timer. -->
+						<div class="gen-warming is-hidden" id="gen-warming" role="status" data-phase="off">
+							<span class="gen-warming-pip" aria-hidden="true"></span>
+							<div class="gen-warming-copy">
+								<p class="gen-warming-title">Waking up a GPU</p>
+								<p class="gen-warming-body"></p>
+								<p class="gen-warming-count"></p>
+							</div>
+						</div>
+						<div
+							class="gen-progress"
+							id="gen-progress"
+							role="progressbar"
+							aria-label="Generation progress"
+							aria-valuemin="0"
+							aria-valuemax="100"
+							aria-valuenow="0"
+						>
+							<div class="gen-progress-fill" id="gen-progress-fill"></div>
+						</div>
+						<div class="gen-meta" id="gen-meta">Elapsed 0s</div>
+						<p class="gen-leave-hint" data-i18n="forge.feel_free_to_leave_this_page_your">
+							Feel free to leave this page. Your model keeps generating, lands in
+							your gallery automatically, and signed-in creators get notified when
+							it's ready.
+						</p>
+						<div class="gen-note is-hidden" id="gen-note" role="status" aria-live="polite"></div>
+						<div style="margin-top: var(--space-sm)">
+							<button class="btn btn-ghost" type="button" id="cancel" data-i18n="forge.cancel">Cancel</button>
+						</div>
+					</div>
+				</div>
+
+				<!-- Result -->
+				<div class="panel result is-hidden" id="state-result">
+					<div class="viewer-shell" id="viewer-shell">
+						<model-viewer
+							id="viewer"
+							camera-controls
+							auto-rotate
+							auto-rotate-delay="0"
+							rotation-per-second="18deg"
+							shadow-intensity="1.0"
+							shadow-softness="0.9"
+							exposure="1.5"
+							tone-mapping="aces"
+							environment-image="/environments/gallery/env.hdr"
+							ar
+							ar-modes="webxr scene-viewer quick-look"
+							interaction-prompt="none"
+							crossorigin="anonymous"
+							alt="Generated 3D model"
+						></model-viewer>
+						<div class="viewer-skeleton" id="viewer-skeleton" aria-hidden="true">
+							<span class="viewer-skeleton-sheen"></span>
+							<span class="viewer-skeleton-label" data-i18n="forge.loading_model">Loading model…</span>
+						</div>
+						<div class="viewer-load-error" id="viewer-load-error" role="alert" aria-live="polite">
+							<span class="viewer-load-error-icon" aria-hidden="true">⚠</span>
+							<p data-i18n="forge.model_failed_to_load_often_a_brief">Model failed to load. That is usually a brief network hiccup on the file: retry, or use the download button below to save it directly.</p>
+							<button type="button" class="btn ghost" id="viewer-retry" data-i18n="forge.retry_loading">Retry loading</button>
+						</div>
+					</div>
+					<div class="result-bar">
+						<span class="label" id="result-label" role="status" aria-live="polite"></span>
+						<a class="result-creator is-hidden" id="result-creator" data-i18n="forge.by">by @</a>
+						<span class="saved-chip is-hidden" id="result-saved" aria-label="Auto-saved to gallery" data-i18n="forge.saved" data-i18n-attr="aria-label:forge.auto_saved_to_gallery_arialabel">Saved ✓</span>
+						<span
+							class="views-badge is-hidden"
+							id="result-views"
+							title="Reference views fused"
+						 data-i18n-attr="title:forge.reference_views_fused_title"></span>
+						<span
+							class="quality-badge is-hidden"
+							id="result-quality"
+							title="Automated quality check"
+						 data-i18n-attr="title:forge.automated_quality_check_title"></span>
+						<div class="actions">
+							<button
+								class="btn btn-ghost"
+								type="button"
+								id="cinema"
+								aria-pressed="false"
+								title="Cinema mode: fullscreen turntable for recording (F)"
+							 data-i18n-attr="title:forge.cinema_mode_fullscreen_turnt_title">
+								<svg
+									width="15"
+									height="15"
+									viewBox="0 0 24 24"
+									fill="none"
+									stroke="currentColor"
+									stroke-width="2"
+									stroke-linecap="round"
+									stroke-linejoin="round"
+									aria-hidden="true"
+								>
+									<path d="M8 3H5a2 2 0 0 0-2 2v3" />
+									<path d="M16 3h3a2 2 0 0 1 2 2v3" />
+									<path d="M8 21H5a2 2 0 0 1-2-2v-3" />
+									<path d="M16 21h3a2 2 0 0 0 2-2v-3" />
+								</svg>
+								Cinema
+							</button>
+							<div
+								class="verdict"
+								id="verdict"
+								role="group"
+								aria-label="Rate this model"
+							>
+								<button
+									type="button"
+									data-outcome="accepted"
+									aria-pressed="false"
+									title="Keep: good result"
+								 data-i18n="forge.keep" data-i18n-attr="title:forge.keep_good_result_title">
+									👍 Keep
+								</button>
+								<button
+									type="button"
+									data-outcome="rejected"
+									aria-pressed="false"
+									title="Discard: bad result"
+								 data-i18n="forge.discard" data-i18n-attr="title:forge.discard_bad_result_title">
+									👎 Discard
+								</button>
+							</div>
+							<button
+								class="btn btn-ghost"
+								type="button"
+								id="forge-share-btn"
+								aria-label="Share this creation"
+							 data-i18n-attr="aria-label:forge.share_this_creation_arialabel">
+								<svg
+									width="15"
+									height="15"
+									viewBox="0 0 24 24"
+									fill="none"
+									stroke="currentColor"
+									stroke-width="2"
+									stroke-linecap="round"
+									stroke-linejoin="round"
+									aria-hidden="true"
+								>
+									<circle cx="18" cy="5" r="3" />
+									<circle cx="6" cy="12" r="3" />
+									<circle cx="18" cy="19" r="3" />
+									<line x1="8.59" y1="13.51" x2="15.42" y2="17.49" />
+									<line x1="15.41" y1="6.51" x2="8.59" y2="10.49" />
+								</svg>
+								Share
+							</button>
+							<a
+								class="btn btn-ghost"
+								id="forge-segment-btn"
+								title="Split this model into selectable parts"
+								 data-i18n="forge.split_into_parts" data-i18n-attr="title:forge.split_this_model_into_select_title">Split into parts</a
+							>
+							<button
+								class="btn btn-ghost"
+								type="button"
+								id="forge-gameready-btn"
+								aria-expanded="false"
+								title="Retopologize to a poly budget and export an engine-ready GLB + FBX"
+							 data-i18n-attr="title:forge.retopologize_to_a_poly_budge_title">
+								<svg
+									width="15"
+									height="15"
+									viewBox="0 0 24 24"
+									fill="none"
+									stroke="currentColor"
+									stroke-width="2"
+									stroke-linecap="round"
+									stroke-linejoin="round"
+									aria-hidden="true"
+								>
+									<polygon points="12 2 2 7 12 12 22 7 12 2" />
+									<polyline points="2 17 12 22 22 17" />
+									<polyline points="2 12 12 17 22 12" />
+								</svg>
+								Game-Ready
+							</button>
+							<button
+								class="btn btn-ghost"
+								type="button"
+								id="forge-embed-btn"
+								title="Embed this model on any website"
+							 data-i18n-attr="title:forge.embed_this_model_on_any_webs_title">
+								<svg
+									width="15"
+									height="15"
+									viewBox="0 0 24 24"
+									fill="none"
+									stroke="currentColor"
+									stroke-width="2"
+									stroke-linecap="round"
+									stroke-linejoin="round"
+									aria-hidden="true"
+								>
+									<polyline points="16 18 22 12 16 6" />
+									<polyline points="8 6 2 12 8 18" />
+								</svg>
+								Embed
+							</button>
+							<button
+								class="btn btn-ghost"
+								type="button"
+								id="forge-ar-btn"
+								title="View this model in AR, placed in your room"
+							 data-i18n-attr="title:forge.view_this_model_in_ar_place_title">
+								<svg
+									width="15"
+									height="15"
+									viewBox="0 0 24 24"
+									fill="none"
+									stroke="currentColor"
+									stroke-width="2"
+									stroke-linecap="round"
+									stroke-linejoin="round"
+									aria-hidden="true"
+								>
+									<path d="M12 2 3 7v10l9 5 9-5V7l-9-5Z" />
+									<path d="m3 7 9 5 9-5" />
+									<path d="M12 12v10" />
+								</svg>
+								View in AR
+							</button>
+							<a
+								class="btn btn-ghost"
+								id="forge-irl-btn"
+								href="/irl"
+								title="Place this model in your real room, anchored and shareable (IRL)"
+							 data-i18n-attr="title:forge.place_this_model_in_your_real_title">
+								<svg
+									width="15"
+									height="15"
+									viewBox="0 0 24 24"
+									fill="none"
+									stroke="currentColor"
+									stroke-width="2"
+									stroke-linecap="round"
+									stroke-linejoin="round"
+									aria-hidden="true"
+								>
+									<path d="M12 2v4" />
+									<path d="M12 18v4" />
+									<path d="M4.93 4.93l2.83 2.83" />
+									<path d="M16.24 16.24l2.83 2.83" />
+									<path d="M2 12h4" />
+									<path d="M18 12h4" />
+									<path d="M4.93 19.07l2.83-2.83" />
+									<path d="M16.24 7.76l2.83-2.83" />
+									<circle cx="12" cy="12" r="3" />
+								</svg>
+								Place IRL
+							</a>
+							<button
+								class="btn btn-refine is-hidden"
+								type="button"
+								id="refine"
+								title="Re-run this exact prompt at a higher quality tier"
+							 data-i18n-attr="title:forge.re_run_this_exact_prompt_at_title">
+								<svg
+									class="refine-arrow"
+									width="15"
+									height="15"
+									viewBox="0 0 24 24"
+									fill="none"
+									stroke="currentColor"
+									stroke-width="2"
+									stroke-linecap="round"
+									stroke-linejoin="round"
+									aria-hidden="true"
+								>
+									<line x1="12" y1="19" x2="12" y2="5" />
+									<polyline points="5 12 12 5 19 12" />
+								</svg>
+								<span id="refine-label">Refine</span>
+							</button>
+							<a class="btn btn-ghost" id="open-in-composer" href="/compose" title="Open this model in Scene Composer to attach it to an avatar or place it in a scene" data-i18n="forge.compose" data-i18n-attr="title:forge.open_this_model_in_scene_com_title">Compose</a>
+							<a class="btn btn-ghost" id="download" download data-i18n="forge.download_glb">Download GLB</a>
+							<a class="btn btn-ghost" id="materialize-it" href="/materialize" title="Order this model as a real, high-precision physical print, shipped to you">Materialize</a>
+							<button class="btn" type="button" id="again" data-i18n="forge.make_another">Make another</button>
+						</div>
+					</div>
+					<!-- Shown only for a result generated on the user's GPU (Modly): it is
+					     not a server-side creation, so saving it is an explicit step. -->
+					<div class="modly-save" id="modly-save" hidden>
+						<p class="modly-save-text" id="modly-save-text" role="status" aria-live="polite"></p>
+						<button type="button" class="modly-btn" id="modly-save-btn">Save to my avatars</button>
+					</div>
+
+					<!-- What the model was actually asked for: the art-directed rewrite
+					     that painted the reference view, straight from the API's
+					     directed_prompt field. Hidden unless the server reports one.
+					     Wired in src/forge-directed-prompt.js. -->
+					<details class="directed" id="forge-directed" hidden>
+						<summary class="directed-summary">
+							<span class="directed-chip">art-directed</span>
+							<span class="directed-summary-text">What we actually asked the model</span>
+							<svg class="directed-caret" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+								<polyline points="6 9 12 15 18 9" />
+							</svg>
+						</summary>
+						<div class="directed-body">
+							<p class="directed-intro">
+								Your words set the subject. Before anything is painted, an art
+								director rewrites them into a single-subject brief with materials,
+								lighting and composition cues, and that rewrite is what conditions
+								the reference view your mesh is built from.
+							</p>
+							<div class="directed-block">
+								<p class="directed-label">You typed</p>
+								<p class="directed-text" id="forge-directed-raw"></p>
+							</div>
+							<div class="directed-block">
+								<p class="directed-label">
+									Sent to the reference painter
+									<span class="directed-model" id="forge-directed-model" hidden></span>
+								</p>
+								<p class="directed-text directed-text--enhanced" id="forge-directed-text"></p>
+							</div>
+							<div class="directed-actions">
+								<button class="btn" type="button" id="forge-directed-vary" title="Run this brief again right now: the director and the reference painter resolve it differently every time">Try a variation</button>
+								<button class="btn btn-ghost" type="button" id="forge-directed-copy">Copy prompt</button>
+								<button class="btn btn-ghost" type="button" id="forge-directed-use">Use as my prompt</button>
+								<span class="directed-status" id="forge-directed-status" role="status" aria-live="polite"></span>
+							</div>
+						</div>
+					</details>
+
+					<!-- Destination: what the model is for. One tap, remembered in this
+					     browser and sent with every later generation, so the funnel report
+					     can say which use case Forge actually serves. The chip ids mirror
+					     src/shared/forge-destinations.js, the list the server validates
+					     against (tests/forge-funnel.test.js holds the two in step). Static
+					     markup so the i18n pass localizes it like every other control here.
+					     Optional and never blocks anything. -->
+					<div class="cat-picker dest-picker" id="forge-destination-picker" role="group" aria-labelledby="forge-destination-label" hidden>
+						<span class="cat-picker-label" id="forge-destination-label" data-i18n="forge.making_this_for">Making this for:</span>
+						<button class="forge-cat-btn" type="button" data-dest="game" aria-pressed="false" title="Unity, Unreal, Godot, a web game" data-i18n="forge.dest_game" data-i18n-attr="title:forge.dest_game_hint">Game</button>
+						<button class="forge-cat-btn" type="button" data-dest="web" aria-pressed="false" title="A site, a product page, a 3D embed" data-i18n="forge.dest_web" data-i18n-attr="title:forge.dest_web_hint">Web</button>
+						<button class="forge-cat-btn" type="button" data-dest="avatar" aria-pressed="false" title="A character to rig and animate" data-i18n="forge.dest_avatar" data-i18n-attr="title:forge.dest_avatar_hint">Avatar</button>
+						<button class="forge-cat-btn" type="button" data-dest="simulation" aria-pressed="false" title="Robotics, physics, synthetic data" data-i18n="forge.dest_simulation" data-i18n-attr="title:forge.dest_simulation_hint">Simulation</button>
+						<button class="forge-cat-btn" type="button" data-dest="print" aria-pressed="false" title="A physical 3D print" data-i18n="forge.dest_print" data-i18n-attr="title:forge.dest_print_hint">Print</button>
+						<button class="forge-cat-btn" type="button" data-dest="ar" aria-pressed="false" title="Placing it in a real room" data-i18n="forge.dest_ar" data-i18n-attr="title:forge.dest_ar_hint">AR</button>
+						<button class="forge-cat-btn" type="button" data-dest="play" aria-pressed="false" title="Exploring what it can do" data-i18n="forge.dest_play" data-i18n-attr="title:forge.dest_play_hint">Just playing</button>
+						<span class="dest-picker-status" id="forge-destination-status" role="status" aria-live="polite" data-saved="Saved. We will remember this for your next models." data-i18n-attr="data-saved:forge.destination_saved"></span>
+					</div>
+
+					<!-- Category picker — label your model so the gallery and explore feed
+					     can surface it under the right filter. Wired in forge.js via the
+					     forge-category-picker id; hidden by default, becomes visible when
+					     the user is signed in or when a creation_id is available. -->
+					<div class="cat-picker" id="forge-category-picker" hidden>
+						<span class="cat-picker-label" data-i18n="forge.tag_as">Tag as:</span>
+						<span class="cat-group-label" title="Can be given a brain and become an agent" data-i18n="forge.agents" data-i18n-attr="title:forge.can_be_given_a_brain_and_bec_title">Agents</span>
+						<button class="forge-cat-btn" type="button" data-cat="avatar" data-i18n="forge.avatar">Avatar</button>
+						<button class="forge-cat-btn" type="button" data-cat="creature" data-i18n="forge.creature">Creature</button>
+						<span class="cat-group-sep" aria-hidden="true"></span>
+						<span class="cat-group-label" title="3D objects — props, not personalities" data-i18n="forge.items" data-i18n-attr="title:forge.3d_objects_props_not_persona_title">Items</span>
+						<button class="forge-cat-btn" type="button" data-cat="item" data-i18n="forge.item">Item</button>
+						<button class="forge-cat-btn" type="button" data-cat="accessory" data-i18n="forge.accessory">Accessory</button>
+						<button class="forge-cat-btn" type="button" data-cat="scene" data-i18n="forge.scene">Scene</button>
+						<button class="forge-cat-btn" type="button" data-cat="vehicle" data-i18n="forge.vehicle">Vehicle</button>
+						<p class="cat-picker-help" data-i18n="forge.only_avatars_creatures_can_be_given_a">Only avatars &amp; creatures can be given a brain and become agents — everything else saves as a 3D item.</p>
+					</div>
+
+					<!-- Optimize topology panel (triangle / quad / low-poly remesh) is
+					     injected into this result panel by /src/forge-optimize.js. -->
+
+					<!-- Stylize — one-click geometric filters on the current model -->
+					<div class="stylize" id="stylize-panel" data-busy="false" hidden>
+						<div class="stylize-head">
+							<h3 data-i18n="forge.stylize">Stylize</h3>
+							<p class="stylize-sub" data-i18n="forge.one_click_geometric_filters_restyle_this_mod">
+								One-click geometric filters. Restyle this model as voxels, bricks,
+								an open lattice, or low-poly — source color is carried over where
+								the style allows.
+							</p>
+						</div>
+						<div
+							class="stylize-gallery"
+							id="stylize-gallery"
+							role="group"
+							aria-label="Stylization filters"
+						></div>
+						<div class="stylize-controls is-hidden" id="stylize-controls">
+							<div class="stylize-slider">
+								<label id="stylize-res-label" for="stylize-res" data-i18n="forge.resolution">Resolution</label>
+								<input type="range" id="stylize-res" min="8" max="96" value="32" />
+								<output id="stylize-res-val" for="stylize-res">32</output>
+							</div>
+							<div class="stylize-actions">
+								<button class="btn btn-ghost" type="button" id="stylize-apply" data-i18n="forge.re_apply">
+									Re-apply
+								</button>
+								<a class="btn btn-ghost" id="stylize-download" download hidden
+									 data-i18n="forge.download_stylized_glb">Download stylized GLB</a
+								>
+								<button
+									class="btn btn-ghost"
+									type="button"
+									id="stylize-revert"
+									hidden
+								 data-i18n="forge.revert_to_original">
+									Revert to original
+								</button>
+							</div>
+						</div>
+						<div
+							class="stylize-status"
+							id="stylize-status"
+							role="status"
+							aria-live="polite"
+						></div>
+					</div>
+				</div>
+
+				<!-- Error -->
+				<div class="panel notice error is-hidden" id="state-error">
+					<span class="glyph" aria-hidden="true">⚠</span>
+					<h3 id="error-title" data-i18n="forge.generation_failed">Generation failed</h3>
+					<p id="error-message" data-i18n="forge.something_went_wrong_try_a_simpler_single">
+						Something went wrong. Try a simpler, single-subject prompt.
+					</p>
+					<!-- One-click engine switches, populated only when a lane failed and
+					     other configured engines can still serve the same request. -->
+					<div class="actions is-hidden" id="error-lanes" role="group" aria-label="Retry on another engine"></div>
+					<div class="actions">
+						<button class="btn" type="button" id="retry" data-i18n="forge.try_again">Try again</button>
+						<button class="btn btn-ghost is-hidden" type="button" id="refine-locally" data-i18n="forge.refine_current_model_instead">Refine current model instead</button>
+						<button class="btn btn-ghost is-hidden" type="button" id="generate-anyway" data-i18n="forge.generate_anyway">Generate anyway</button>
+					</div>
+				</div>
+
+				<!-- Unconfigured -->
+				<div class="panel notice is-hidden" id="state-unconfigured">
+					<span class="glyph" aria-hidden="true">◌</span>
+					<h3 data-i18n="forge.generator_not_configured">Generator not configured</h3>
+					<p data-i18n-html="forge.no_3d_engine_is_reachable_on_this">
+						No 3D engine is reachable on this deployment. Set any one of
+						<code>NVIDIA_API_KEY</code> or <code>HF_TOKEN</code> for the free lanes, or
+						<code>REPLICATE_API_TOKEN</code> for the flux → TRELLIS pipeline — Forge picks
+						up whichever is configured with no further changes.
+					</p>
+				</div>
+			</section>
+
+			<!-- Your creations — durable, reusable models tied to this browser -->
+			<section class="creations is-hidden" id="creations" aria-label="Your forged models">
+				<div class="creations-head">
+					<h2 data-i18n="forge.your_creations">Your creations</h2>
+					<span class="count" id="creations-count"></span>
+					<button
+						type="button"
+						class="compare-toggle is-hidden"
+						id="compare-toggle"
+						aria-pressed="false"
+					>
+						Compare
+					</button>
+					<!-- This strip is scoped to the current browser. /mine merges it with
+					     the agents and avatars on the account, so a creation is findable
+					     from any device once you are signed in. -->
+					<a class="creations-all" href="/mine" data-i18n="forge.everything_you_made">Everything you made →</a>
+				</div>
+				<!-- Same-prompt hint: appears only when the gallery actually holds two
+				     generations of one prompt, which is the comparison worth making. -->
+				<p class="compare-hint is-hidden" id="compare-hint"></p>
+				<div class="creations-grid" id="creations-grid"></div>
+				<!-- Selection tray, visible only in compare mode -->
+				<div class="compare-tray is-hidden" id="compare-tray" role="status">
+					<span class="compare-tray-label" id="compare-tray-label"></span>
+					<div class="compare-tray-actions">
+						<button type="button" class="btn btn-ghost" id="compare-clear">Clear</button>
+						<button type="button" class="btn compare-go" id="compare-open" disabled>
+							Compare
+						</button>
+					</div>
+				</div>
+			</section>
+
+			<!-- Side-by-side compare: two generations of one prompt, engine A vs
+			     engine B. Camera orbit is synced across both viewers so a shape
+			     difference reads as a shape difference, not a camera difference. -->
+			<div
+				class="compare-modal is-hidden"
+				id="compare-modal"
+				role="dialog"
+				aria-modal="true"
+				aria-labelledby="compare-modal-title"
+			>
+				<div class="compare-modal-inner">
+					<div class="compare-modal-head">
+						<h2 id="compare-modal-title">Compare generations</h2>
+						<div class="compare-modal-tools">
+							<label class="compare-sync">
+								<input type="checkbox" id="compare-sync" checked />
+								<span>Sync cameras</span>
+							</label>
+							<button
+								type="button"
+								class="compare-close"
+								id="compare-close"
+								aria-label="Close compare"
+							>
+								&times;
+							</button>
+						</div>
+					</div>
+					<p class="compare-prompt" id="compare-prompt"></p>
+					<div class="compare-panes" id="compare-panes"></div>
+				</div>
+			</div>
+
+			<!-- Fresh from the Forge — newest community models (src/forge-showcase.js).
+			     Hidden until the public feed returns real rows, so deployments without
+			     a durable store never show a hollow strip. -->
+			<section
+				class="creations showcase is-hidden"
+				id="showcase"
+				aria-label="Fresh from the Forge — recent community models"
+			>
+				<div class="creations-head">
+					<h2 data-i18n="forge.fresh_from_the_forge">Fresh from the Forge</h2>
+					<div class="showcase-head-right">
+						<a href="/gallery#forge-section" class="showcase-view-all" data-i18n="forge.view_all">View all →</a>
+						<span class="count" id="showcase-count"></span>
+						<button
+							type="button"
+							class="showcase-refresh"
+							id="showcase-refresh"
+							title="Refresh the community feed"
+							aria-label="Refresh the community feed"
+						 data-i18n-attr="aria-label:forge.refresh_the_community_feed_arialabel;title:forge.refresh_the_community_feed_title">
+							<svg
+								width="13"
+								height="13"
+								viewBox="0 0 24 24"
+								fill="none"
+								stroke="currentColor"
+								stroke-width="2"
+								stroke-linecap="round"
+								stroke-linejoin="round"
+								aria-hidden="true"
+							>
+								<path d="M21 12a9 9 0 1 1-2.64-6.36" />
+								<path d="M21 3v6h-6" />
+							</svg>
+						</button>
+					</div>
+				</div>
+				<p class="showcase-sub" data-i18n-html="forge.what_other_people_just_forged_open_one">
+					What other people just forged. Open one in the viewer, or
+					<strong>Remix</strong> its prompt and make it yours.
+				</p>
+				<div class="creations-grid" id="showcase-grid"></div>
+			</section>
+
+			<p class="hint-foot" data-i18n-html="forge.multi_engine_pipeline_engines_marked_free_ru">
+				Multi-engine pipeline. Engines marked FREE run with no key: NVIDIA-hosted generation plus our own self-hosted GPU workers (TRELLIS, Hunyuan3D, TripoSG). Meshy, Tripo, Rodin, Stability, and Replicate run on your own API key. Best results: one clearly described subject with a material and lighting cue. Photo mode accepts up to 6 views for multi-view reconstruction. The same pipeline is available to agents over MCP at <a href="/docs">/api/mcp-3d</a>.
+			</p>
+				</div><!-- /.forge-stage -->
+				</div><!-- /.forge-workspace -->
+		</main>
+
+		<script src="/nav.js" defer></script>
+		<script type="module" src="/src/forge.js"></script>
+		<script type="module" src="/src/forge-prompt-studio.js"></script>
+	<script type="module" src="/src/forge-directed-prompt.js"></script>
+		<script type="module" src="/src/forge-enhance.js"></script>
+		<script type="module" src="/src/forge-refine.js"></script>
+		<script type="module" src="/src/forge-rig.js"></script>
+		<script type="module" src="/src/forge-materials.js"></script>
+		<script type="module" src="/src/forge-conversational-refine.js"></script>
+			<script type="module" src="/src/forge-stylize.js"></script>
+		<script type="module" src="/src/forge-optimize.js"></script>
+		<script type="module" src="/src/forge-segment.js"></script>
+		<script type="module" src="/src/forge-gameready.js"></script>
+		<script type="module" src="/src/forge-export.js"></script>
+		<script type="module" src="/src/forge-reel.js"></script>
+		<script type="module" src="/src/forge-embed-panel.js"></script>
+		<script type="module" src="/src/forge-ar.js"></script>
+		<script type="module" src="/src/forge-showcase.js"></script>
+		<script type="module" src="/src/forge-dropzone.js"></script>
+		<script type="module" src="/src/forge-more-like-this.js"></script>
+		<script type="module" src="/src/forge-wait.js"></script>
+		<div id="footer-container"></div>
+		<script src="/footer.js" defer></script>
+		<!-- Runtime i18n: detects locale, swaps annotated copy, mounts <lang-switcher>. -->
+	<script type="module" src="/i18n.js"></script>
+</body>
+</html>

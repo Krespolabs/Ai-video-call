@@ -1,0 +1,64 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" width="256" height="256" role="img" aria-label="three.ws embodied avatar">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#0b0b16"/>
+      <stop offset="100%" stop-color="#10101f"/>
+    </linearGradient>
+    <radialGradient id="avatarGlow" cx="50%" cy="42%" r="60%">
+      <stop offset="0%" stop-color="#e0e7ff" stop-opacity="0.95"/>
+      <stop offset="45%" stop-color="#818cf8" stop-opacity="0.85"/>
+      <stop offset="100%" stop-color="#60a5fa" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="figure" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#eef2ff"/>
+      <stop offset="100%" stop-color="#a5b4fc"/>
+    </linearGradient>
+    <linearGradient id="edge" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#7ec8e3"/>
+      <stop offset="100%" stop-color="#818cf8"/>
+    </linearGradient>
+    <filter id="soft" x="-30%" y="-30%" width="160%" height="160%">
+      <feGaussianBlur stdDeviation="2.4" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+    <filter id="vtx" x="-150%" y="-150%" width="400%" height="400%">
+      <feGaussianBlur stdDeviation="5" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+
+  <!-- App-tile background -->
+  <rect width="256" height="256" rx="56" fill="url(#bg)"/>
+  <rect x="0.75" y="0.75" width="254.5" height="254.5" rx="55.25" fill="none" stroke="#ffffff" stroke-opacity="0.06"/>
+
+  <!-- Isometric cube — the three.ws mark.
+       top=128,46  left=44,87  right=212,87  mid=128,128  bl=44,201  br=212,201  bottom=128,242 -->
+  <!-- Faces (subtle, so the avatar reads first) -->
+  <polygon points="128,46 44,87 128,128 212,87" fill="#1b1b30" fill-opacity="0.55"/>
+  <polygon points="44,87 44,201 128,242 128,128" fill="#15152a" fill-opacity="0.6"/>
+  <polygon points="212,87 212,201 128,242 128,128" fill="#10101f" fill-opacity="0.6"/>
+
+  <!-- Glowing embodied avatar suspended inside the cube -->
+  <circle cx="128" cy="132" r="58" fill="url(#avatarGlow)" opacity="0.55"/>
+  <g filter="url(#soft)">
+    <!-- head -->
+    <circle cx="128" cy="112" r="20" fill="url(#figure)"/>
+    <!-- shoulders / torso -->
+    <path d="M92 178 q0 -34 36 -34 q36 0 36 34 q0 8 -8 8 h-56 q-8 0 -8 -8 z" fill="url(#figure)"/>
+  </g>
+
+  <!-- Cube edges, drawn over the avatar so it sits inside the lattice -->
+  <g stroke="url(#edge)" stroke-linejoin="round" fill="none" filter="url(#soft)">
+    <polygon points="128,46 212,87 212,201 128,242 44,201 44,87" stroke-width="4.5" opacity="0.9"/>
+    <path d="M128,46 L128,128 M44,87 L128,128 M212,87 L128,128 M128,128 L128,242"
+          stroke-width="2.6" opacity="0.5"/>
+  </g>
+
+  <!-- Bright vertices -->
+  <g fill="#eaf6ff" filter="url(#vtx)">
+    <circle cx="128" cy="46" r="5.5"/>
+    <circle cx="212" cy="87" r="4" opacity="0.8"/>
+    <circle cx="44" cy="87" r="4" opacity="0.8"/>
+    <circle cx="128" cy="128" r="3.5" opacity="0.6"/>
+  </g>
+</svg>

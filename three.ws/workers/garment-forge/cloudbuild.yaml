@@ -1,0 +1,94 @@
+substitutions:
+  _REGION: us-central1
+  _RUN_SA: avatar-reconstruction-sa@aerial-vehicle-466722-p5.iam.gserviceaccount.com
+  _SERVICE: garment-forge
+  _REPO: garment-forge
+  # Job records + rig staging share the fleet's worker-artifact bucket;
+  # published garments + catalog go to the public bucket the runtime consumer
+  # (src/garment-catalog.js) reads.
+  _GCS_BUCKET: three-ws-avatar-reconstructions
+  _PUBLISH_BUCKET: three-ws-garments
+  # Mesh generation failover chain, priority order: warm RTX 2.1 primary,
+  # L4 2.1 fallback, TRELLIS last (different model, always-compatible API).
+  _MESH_WORKER_URLS: https://model-hunyuan3d-21-rtx-lp642k3kpa-uc.a.run.app,https://model-hunyuan3d-21-lp642k3kpa-uc.a.run.app,https://model-trellis-lp642k3kpa-uc.a.run.app
+  _RIG_URL: https://model-rig-lp642k3kpa-uc.a.run.app
+
+steps:
+  # Stage the canonical reference body into the Docker context. The repo keeps
+  # a single copy (public/avatars/parametric-base.glb); the image bakes it so
+  # cold starts never fetch it.
+  - id: stage-refbody
+    name: gcr.io/cloud-builders/docker
+    entrypoint: bash
+    args:
+      - -c
+      - mkdir -p workers/garment-forge/assets &&
+        cp public/avatars/parametric-base.glb workers/garment-forge/assets/refbody.glb
+
+  - id: build
+    name: gcr.io/cloud-builders/docker
+    dir: workers/garment-forge
+    args:
+      - build
+      - --tag
+      - ${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO}/server:$SHORT_SHA
+      - --tag
+      - ${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO}/server:latest
+      - --cache-from
+      - ${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO}/server:latest
+      - .
+
+  - id: push
+    name: gcr.io/cloud-builders/docker
+    args:
+      - push
+      - --all-tags
+      - ${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO}/server
+
+  - id: deploy
+    name: gcr.io/google.com/cloudsdktool/cloud-sdk:slim
+    entrypoint: gcloud
+    args:
+      - run
+      - deploy
+      - ${_SERVICE}
+      - --image=${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO}/server:$SHORT_SHA
+      - --region=${_REGION}
+      - --service-account=${_RUN_SA}
+      - --platform=managed
+      - --port=8080
+      - --cpu=4
+      # 16Gi, raised from 8Gi on 2026-08-07 after production OOMed ("Memory limit
+      # of 8192 MiB exceeded with 8645 MiB used") and Cloud Run killed the
+      # instance with SIGKILL, taking any in-flight garment job with it. MAX_CONCURRENT
+      # is 2, so the ceiling has to cover two pipelines at peak plus the model
+      # residents; 8Gi only covered it when the second job lagged the first.
+      # 16Gi is the most Cloud Run allows at --cpu=4.
+      - --memory=16Gi
+      # Jobs run as post-202 background work, so the CPU must stay allocated
+      # between requests (throttled CPU starves a job the moment pollers go
+      # quiet) and one instance stays warm so a scale-to-zero reclaim cannot
+      # kill a pipeline mid-flight. The stale-job watchdog in main.py is the
+      # backstop for the remaining reclaim windows (deploys, crashes).
+      - --no-cpu-throttling
+      - --min-instances=1
+      - --max-instances=2
+      - --timeout=600
+      - --allow-unauthenticated
+      - --set-env-vars=^;^GCS_BUCKET=${_GCS_BUCKET};PUBLISH_BUCKET=${_PUBLISH_BUCKET};MESH_WORKER_URLS=${_MESH_WORKER_URLS};RIG_URL=${_RIG_URL};GOOGLE_CLOUD_PROJECT=$PROJECT_ID;VERTEX_IMAGEN_MODEL=gemini-2.5-flash-image;VERTEX_IMAGEN_LOCATION=global;VERTEX_IMAGE_SIZE=2K;MAX_CONCURRENT=2
+      - --set-secrets=API_KEY=avatar-reconstruction-key:latest
+
+images:
+  - ${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO}/server:$SHORT_SHA
+  - ${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO}/server:latest
+
+options:
+  machineType: E2_HIGHCPU_8
+  logging: CLOUD_LOGGING_ONLY
+
+# The project's default compute service account was deleted (see
+# docs/ops/gcp-production.md): every Cloud Build must pin the build SA
+# explicitly or the submit fails with "Unknown service account".
+serviceAccount: projects/aerial-vehicle-466722-p5/serviceAccounts/three-ws-build@aerial-vehicle-466722-p5.iam.gserviceaccount.com
+
+timeout: 1200s

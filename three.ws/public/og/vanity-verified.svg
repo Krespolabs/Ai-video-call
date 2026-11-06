@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="240" height="40" viewBox="0 0 240 40" role="img" aria-label="Verified trustless · three.ws">
+	<title>Verified trustless · three.ws</title>
+	<defs>
+		<linearGradient id="g" x1="0" y1="0" x2="0" y2="1">
+			<stop offset="0" stop-color="#101510"/>
+			<stop offset="1" stop-color="#0a0d0a"/>
+		</linearGradient>
+	</defs>
+	<rect x="0.5" y="0.5" width="239" height="39" rx="8" fill="url(#g)" stroke="#2a3a2a"/>
+	<circle cx="24" cy="20" r="10" fill="none" stroke="#4ade80" stroke-width="2"/>
+	<path d="M19.5 20.2 L22.8 23.5 L28.8 16.5" fill="none" stroke="#4ade80" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/>
+	<text x="44" y="17.5" font-family="'Space Grotesk',system-ui,sans-serif" font-size="13" font-weight="700" fill="#4ade80">Verified trustless</text>
+	<text x="44" y="31" font-family="system-ui,sans-serif" font-size="10" fill="#7a8a7a">three.ws · provably-fair vanity</text>
+</svg>

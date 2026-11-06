@@ -1,0 +1,144 @@
+/*
+ * /stablecoins — small additions on top of coin-pages.css. Everything here is
+ * scoped to sc-* helpers: the stat grid, the peg-mechanism filter (reusing the
+ * hm-seg segmented-control look), mechanism chips, chain tags, and the off-peg
+ * deviation badge. All colors reference the shared --cv-* tokens so both themes
+ * are covered automatically.
+ */
+
+.sc-stats-grid {
+	display: grid;
+	gap: 1rem;
+	grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+	margin-bottom: 1.5rem;
+}
+
+/* Filter row: reuse the heatmap segmented control, allow it to wrap on mobile. */
+#sc-filter {
+	flex-wrap: wrap;
+}
+
+/* Off-peg deviation badge next to a depegged price. */
+.sc-depeg {
+	margin-left: 0.4rem;
+	font-size: 0.6875rem;
+	font-weight: 600;
+	font-family: var(--cv-font-mono);
+	vertical-align: middle;
+	opacity: 0.85;
+}
+
+/* Peg-mechanism chip — colored per mechanism, built on the shared .cv-chip. */
+.cv-chip.sc-mech {
+	border: 1px solid transparent;
+	white-space: nowrap;
+}
+.cv-chip.sc-mech.fiat {
+	background: color-mix(in srgb, var(--cv-accent) 14%, transparent);
+	color: var(--cv-accent);
+	border-color: color-mix(in srgb, var(--cv-accent) 30%, transparent);
+}
+.cv-chip.sc-mech.crypto {
+	background: var(--cv-green-soft);
+	color: var(--cv-green);
+	border-color: color-mix(in srgb, var(--cv-green) 30%, transparent);
+}
+.cv-chip.sc-mech.algo {
+	background: color-mix(in srgb, #f59e0b 16%, transparent);
+	color: #b45309;
+	border-color: color-mix(in srgb, #f59e0b 34%, transparent);
+}
+html[data-theme='dark'] .cv-chip.sc-mech.algo,
+html:not([data-theme='light']) .cv-chip.sc-mech.algo {
+	color: var(--warn);
+}
+.cv-chip.sc-mech.other {
+	background: var(--cv-surface-3);
+	color: var(--cv-text-2);
+	border-color: var(--cv-border);
+}
+
+/* Chain tags — compact, mono, wrap under their cell. */
+.sc-chains {
+	display: inline-flex;
+	flex-wrap: wrap;
+	gap: 0.3rem;
+	max-width: 15rem;
+}
+.sc-chain {
+	font-size: 0.6875rem;
+	font-weight: 500;
+	color: var(--cv-text-2);
+	background: var(--cv-surface-2);
+	border: 1px solid var(--cv-border);
+	border-radius: var(--cv-radius-sm);
+	padding: 0.0625rem 0.375rem;
+	white-space: nowrap;
+}
+.sc-chain.more {
+	color: var(--cv-text-3);
+	background: transparent;
+}
+
+/* Feed-unavailable state (error or empty): a titled message, the reason, and a
+   retry that re-fetches in place beside a way back into Markets. */
+.sc-unavailable {
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	gap: 0.5rem;
+}
+.sc-unavailable p {
+	margin: 0;
+	max-width: 34rem;
+}
+.sc-unavailable-title {
+	color: var(--cv-text);
+	font-weight: 600;
+	font-size: 1rem;
+}
+.sc-unavailable-detail {
+	font-size: 0.875rem;
+	line-height: 1.5;
+}
+.sc-unavailable-actions {
+	margin-top: 0.5rem;
+	display: flex;
+	flex-wrap: wrap;
+	justify-content: center;
+	gap: 0.5rem;
+	font-size: 0.875rem;
+}
+.sc-unavailable-actions .sep {
+	color: var(--cv-text-3);
+}
+.sc-unavailable-actions a {
+	color: var(--cv-accent);
+	text-decoration: underline;
+	text-underline-offset: 2px;
+}
+.sc-unavailable-actions a:hover {
+	color: var(--cv-accent-hover);
+}
+.sc-unavailable-actions a:focus-visible {
+	outline: 2px solid var(--cv-accent);
+	outline-offset: 2px;
+	border-radius: 2px;
+}
+
+/* Phones: the shared table keeps a 540px floor and scrolls inside its wrap. Hold
+   the sticky name column and the price column to their content so the peg
+   price, the number this board exists for, is on screen before any horizontal
+   swipe; market cap and the rest follow with one. */
+@media (max-width: 639px) {
+	#sc-table .name-cell {
+		width: 1%;
+	}
+	#sc-table .name-cell .nm {
+		max-width: 7.5rem;
+	}
+	#sc-table .price {
+		width: 1%;
+		white-space: nowrap;
+	}
+}

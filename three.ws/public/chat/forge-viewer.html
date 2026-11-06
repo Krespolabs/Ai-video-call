@@ -1,0 +1,1051 @@
+<!doctype html>
+<html lang="en">
+	<head>
+		<meta charset="utf-8" />
+		<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+		<title>three.ws Forge — 3D preview</title>
+		<style>
+			:root {
+				--bg: #0a0c10;
+				--panel: rgba(13, 16, 21, 0.72);
+				--stroke: rgba(255, 255, 255, 0.12);
+				--stroke-strong: rgba(255, 255, 255, 0.22);
+				--text: #e8eaed;
+				--muted: #9aa3ad;
+				--accent: #7c5cff;
+				--accent-2: #18e0c8;
+				--danger: #ff6b6b;
+			}
+			* {
+				box-sizing: border-box;
+			}
+			html,
+			body {
+				margin: 0;
+				height: 100%;
+				background: var(--bg);
+				color: var(--text);
+				font-family: ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+				overflow: hidden;
+				-webkit-font-smoothing: antialiased;
+			}
+			#stage {
+				position: fixed;
+				inset: 0;
+				display: block;
+			}
+			canvas {
+				display: block;
+				width: 100%;
+				height: 100%;
+				outline: none;
+			}
+
+			/* ── Loading ─────────────────────────────────────────── */
+			#loading {
+				position: fixed;
+				inset: 0;
+				display: flex;
+				align-items: center;
+				justify-content: center;
+				transition: opacity 0.5s ease;
+			}
+			#loading.hidden {
+				opacity: 0;
+				pointer-events: none;
+			}
+			#preview-bg {
+				position: absolute;
+				inset: -6%;
+				background-size: cover;
+				background-position: center;
+				filter: blur(26px) brightness(0.42) saturate(1.1);
+				transform: scale(1.12);
+				opacity: 0;
+				transition: opacity 0.8s ease;
+			}
+			#preview-bg.shown {
+				opacity: 1;
+			}
+			.shimmer {
+				position: absolute;
+				inset: 0;
+				background:
+					radial-gradient(120% 120% at 30% 20%, rgba(124, 92, 255, 0.16), transparent 60%),
+					radial-gradient(120% 120% at 75% 80%, rgba(24, 224, 200, 0.12), transparent 60%),
+					var(--bg);
+			}
+			.shimmer::after {
+				content: '';
+				position: absolute;
+				inset: 0;
+				background: linear-gradient(110deg, transparent 30%, rgba(255, 255, 255, 0.05) 50%, transparent 70%);
+				transform: translateX(-100%);
+				animation: sweep 2.4s ease-in-out infinite;
+			}
+			@keyframes sweep {
+				to {
+					transform: translateX(100%);
+				}
+			}
+			.card {
+				position: relative;
+				width: min(420px, 86vw);
+				padding: 26px 24px 22px;
+				border-radius: 18px;
+				background: var(--panel);
+				border: 1px solid var(--stroke);
+				backdrop-filter: blur(18px);
+				-webkit-backdrop-filter: blur(18px);
+				box-shadow: 0 24px 60px rgba(0, 0, 0, 0.45);
+				text-align: center;
+			}
+			.thumb {
+				width: 96px;
+				height: 96px;
+				margin: 0 auto 16px;
+				border-radius: 14px;
+				border: 1px solid var(--stroke-strong);
+				background-size: cover;
+				background-position: center;
+				position: relative;
+				overflow: hidden;
+				background-color: #11151b;
+			}
+			.thumb .ring {
+				position: absolute;
+				inset: -2px;
+				border-radius: inherit;
+			}
+			.spinner {
+				width: 22px;
+				height: 22px;
+				flex: 0 0 auto;
+			}
+			.spinner circle {
+				fill: none;
+				stroke: var(--accent-2);
+				stroke-width: 4;
+				stroke-linecap: round;
+				stroke-dasharray: 90 150;
+				transform-origin: center;
+				animation: spin 1s linear infinite;
+			}
+			@keyframes spin {
+				to {
+					transform: rotate(360deg);
+				}
+			}
+			.status-row {
+				display: flex;
+				align-items: center;
+				justify-content: center;
+				gap: 10px;
+				font-size: 15px;
+				font-weight: 600;
+				letter-spacing: 0.01em;
+			}
+			.prompt {
+				margin: 4px 0 16px;
+				font-size: 13px;
+				color: var(--muted);
+				line-height: 1.45;
+				display: -webkit-box;
+				-webkit-line-clamp: 2;
+				-webkit-box-orient: vertical;
+				overflow: hidden;
+			}
+			.bar {
+				position: relative;
+				height: 5px;
+				border-radius: 999px;
+				background: rgba(255, 255, 255, 0.08);
+				overflow: hidden;
+			}
+			.bar > i {
+				position: absolute;
+				top: 0;
+				left: 0;
+				height: 100%;
+				width: 40%;
+				border-radius: inherit;
+				background: linear-gradient(90deg, var(--accent), var(--accent-2));
+				animation: indet 1.5s ease-in-out infinite;
+			}
+			@keyframes indet {
+				0% {
+					left: -42%;
+				}
+				100% {
+					left: 100%;
+				}
+			}
+			.sub {
+				margin-top: 12px;
+				font-size: 12px;
+				color: var(--muted);
+				font-variant-numeric: tabular-nums;
+			}
+
+			/* ── Viewer chrome ───────────────────────────────────── */
+			#hud {
+				position: fixed;
+				left: 14px;
+				top: 12px;
+				right: 14px;
+				display: flex;
+				align-items: flex-start;
+				gap: 10px;
+				pointer-events: none;
+				opacity: 0;
+				transition: opacity 0.6s ease 0.2s;
+			}
+			#hud.shown {
+				opacity: 1;
+			}
+			.hud-title {
+				max-width: min(62%, 520px);
+				padding: 7px 12px;
+				font-size: 13px;
+				line-height: 1.35;
+				color: var(--text);
+				background: var(--panel);
+				border: 1px solid var(--stroke);
+				border-radius: 10px;
+				backdrop-filter: blur(12px);
+				-webkit-backdrop-filter: blur(12px);
+				display: -webkit-box;
+				-webkit-line-clamp: 2;
+				-webkit-box-orient: vertical;
+				overflow: hidden;
+			}
+			.chips {
+				display: flex;
+				gap: 6px;
+				flex-wrap: wrap;
+			}
+			.chip {
+				font-size: 10px;
+				font-weight: 600;
+				letter-spacing: 0.04em;
+				text-transform: uppercase;
+				color: var(--muted);
+				padding: 4px 8px;
+				border-radius: 999px;
+				background: var(--panel);
+				border: 1px solid var(--stroke);
+				backdrop-filter: blur(12px);
+				-webkit-backdrop-filter: blur(12px);
+			}
+			#toolbar {
+				position: fixed;
+				left: 50%;
+				bottom: 14px;
+				transform: translateX(-50%) translateY(8px);
+				display: flex;
+				gap: 6px;
+				padding: 6px;
+				border-radius: 14px;
+				background: var(--panel);
+				border: 1px solid var(--stroke);
+				backdrop-filter: blur(16px);
+				-webkit-backdrop-filter: blur(16px);
+				box-shadow: 0 12px 32px rgba(0, 0, 0, 0.4);
+				opacity: 0;
+				transition: opacity 0.6s ease 0.3s, transform 0.6s ease 0.3s;
+				max-width: calc(100vw - 28px);
+				flex-wrap: wrap;
+				justify-content: center;
+			}
+			#toolbar.shown {
+				opacity: 1;
+				transform: translateX(-50%) translateY(0);
+			}
+			.btn {
+				appearance: none;
+				border: 1px solid transparent;
+				background: transparent;
+				color: var(--text);
+				font: inherit;
+				font-size: 12.5px;
+				font-weight: 600;
+				display: inline-flex;
+				align-items: center;
+				gap: 6px;
+				padding: 8px 12px;
+				border-radius: 9px;
+				cursor: pointer;
+				text-decoration: none;
+				transition: background 0.16s ease, border-color 0.16s ease, opacity 0.16s ease;
+				white-space: nowrap;
+			}
+			.btn:hover {
+				background: rgba(255, 255, 255, 0.08);
+			}
+			.btn:active {
+				background: rgba(255, 255, 255, 0.14);
+			}
+			.btn:focus-visible {
+				outline: none;
+				border-color: var(--accent-2);
+				box-shadow: 0 0 0 2px rgba(24, 224, 200, 0.35);
+			}
+			.btn[aria-pressed='true'] {
+				background: rgba(124, 92, 255, 0.22);
+				border-color: rgba(124, 92, 255, 0.5);
+			}
+			.btn.primary {
+				background: linear-gradient(90deg, var(--accent), #6b8bff);
+				color: #fff;
+			}
+			.btn.primary:hover {
+				filter: brightness(1.08);
+			}
+			.btn[disabled] {
+				opacity: 0.45;
+				cursor: default;
+			}
+			.btn svg {
+				width: 15px;
+				height: 15px;
+				flex: 0 0 auto;
+			}
+			.btn .label-sm {
+				display: inline;
+			}
+			@media (max-width: 560px) {
+				.btn .label-sm {
+					display: none;
+				}
+				.btn {
+					padding: 9px 11px;
+				}
+			}
+
+			/* ── End states ──────────────────────────────────────── */
+			#state {
+				position: fixed;
+				inset: 0;
+				display: none;
+				align-items: center;
+				justify-content: center;
+				padding: 20px;
+			}
+			#state.shown {
+				display: flex;
+			}
+			.state-card {
+				width: min(440px, 88vw);
+				padding: 28px 26px;
+				border-radius: 18px;
+				background: var(--panel);
+				border: 1px solid var(--stroke);
+				backdrop-filter: blur(18px);
+				-webkit-backdrop-filter: blur(18px);
+				text-align: center;
+				box-shadow: 0 24px 60px rgba(0, 0, 0, 0.45);
+			}
+			.state-icon {
+				width: 46px;
+				height: 46px;
+				margin: 0 auto 14px;
+				display: grid;
+				place-items: center;
+				border-radius: 50%;
+				background: rgba(255, 107, 107, 0.14);
+				color: var(--danger);
+			}
+			.state-title {
+				font-size: 17px;
+				font-weight: 700;
+				margin-bottom: 8px;
+			}
+			.state-msg {
+				font-size: 13.5px;
+				color: var(--muted);
+				line-height: 1.5;
+				margin-bottom: 20px;
+			}
+			.state-actions {
+				display: flex;
+				gap: 8px;
+				justify-content: center;
+				flex-wrap: wrap;
+			}
+			.toast {
+				position: fixed;
+				left: 50%;
+				bottom: 74px;
+				transform: translateX(-50%) translateY(8px);
+				background: var(--panel);
+				border: 1px solid var(--stroke);
+				color: var(--text);
+				font-size: 12.5px;
+				padding: 9px 14px;
+				border-radius: 10px;
+				backdrop-filter: blur(14px);
+				-webkit-backdrop-filter: blur(14px);
+				opacity: 0;
+				pointer-events: none;
+				transition: opacity 0.25s ease, transform 0.25s ease;
+				max-width: calc(100vw - 32px);
+				text-align: center;
+			}
+			.toast.shown {
+				opacity: 1;
+				transform: translateX(-50%) translateY(0);
+			}
+			.sr-only {
+				position: absolute;
+				width: 1px;
+				height: 1px;
+				padding: 0;
+				margin: -1px;
+				overflow: hidden;
+				clip: rect(0, 0, 0, 0);
+				white-space: nowrap;
+				border: 0;
+			}
+		</style>
+
+		<script type="importmap">
+			{
+				"imports": {
+					"three": "https://esm.sh/three@0.160.0",
+					"three/addons/controls/OrbitControls.js": "https://esm.sh/three@0.160.0/examples/jsm/controls/OrbitControls.js?external=three",
+					"three/addons/loaders/GLTFLoader.js": "https://esm.sh/three@0.160.0/examples/jsm/loaders/GLTFLoader.js?external=three",
+					"three/addons/environments/RoomEnvironment.js": "https://esm.sh/three@0.160.0/examples/jsm/environments/RoomEnvironment.js?external=three",
+					"three/addons/libs/meshopt_decoder.module.js": "https://esm.sh/three@0.160.0/examples/jsm/libs/meshopt_decoder.module.js"
+				}
+			}
+		</script>
+	</head>
+	<body>
+		<canvas id="stage" aria-label="3D model viewer"></canvas>
+
+		<div id="loading" role="status" aria-live="polite">
+			<div id="preview-bg"></div>
+			<div class="shimmer"></div>
+			<div class="card">
+				<div class="thumb" id="thumb">
+					<svg class="ring" viewBox="0 0 100 100" aria-hidden="true">
+						<circle cx="50" cy="50" r="47" fill="none" stroke="rgba(255,255,255,.08)" stroke-width="3" />
+					</svg>
+				</div>
+				<div class="status-row">
+					<svg class="spinner" viewBox="0 0 50 50" aria-hidden="true"><circle cx="25" cy="25" r="20" /></svg>
+					<span id="status-label">Starting generation…</span>
+				</div>
+				<div class="prompt" id="prompt-text"></div>
+				<div class="bar"><i></i></div>
+				<div class="sub" id="sub-line">Forging a real, textured 3D model</div>
+			</div>
+		</div>
+
+		<header id="hud">
+			<div class="hud-title" id="hud-title"></div>
+			<div class="chips" id="hud-chips"></div>
+		</header>
+
+		<nav id="toolbar" aria-label="Model controls"></nav>
+
+		<div id="state" role="alertdialog" aria-live="assertive">
+			<div class="state-card">
+				<div class="state-icon" id="state-icon">
+					<svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+						<circle cx="12" cy="12" r="10" /><line x1="12" y1="8" x2="12" y2="12" /><line x1="12" y1="16" x2="12.01" y2="16" />
+					</svg>
+				</div>
+				<div class="state-title" id="state-title">Something went wrong</div>
+				<div class="state-msg" id="state-msg"></div>
+				<div class="state-actions" id="state-actions"></div>
+			</div>
+		</div>
+
+		<div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+		<script type="module">
+			import * as THREE from 'three';
+			import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+			import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+			import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
+
+			// ── Payload ──────────────────────────────────────────────
+			// { job, glb, preview, prompt, eta, meta:{path,tier,backend}, error }
+			let data = {};
+			try {
+				data = JSON.parse(decodeURIComponent(location.hash.slice(1))) || {};
+			} catch {
+				data = {};
+			}
+			const FORGE = '/api/forge';
+			const el = (id) => document.getElementById(id);
+
+			const ICONS = {
+				download:
+					'<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/>',
+				external:
+					'<path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/>',
+				expand: '<polyline points="15 3 21 3 21 9"/><polyline points="9 21 3 21 3 15"/><line x1="21" y1="3" x2="14" y2="10"/><line x1="3" y1="21" x2="10" y2="14"/>',
+				reset: '<polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"/>',
+				rotate: '<path d="M23 4v6h-6"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/>',
+				rig: '<circle cx="12" cy="5" r="2"/><path d="M12 7v6"/><path d="M9 21l3-8 3 8"/><path d="M6 11l6 2 6-2"/>',
+			};
+			function icon(name) {
+				return (
+					'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' +
+					(ICONS[name] || '') +
+					'</svg>'
+				);
+			}
+
+			let toastTimer;
+			function toast(msg) {
+				const t = el('toast');
+				t.textContent = msg;
+				t.classList.add('shown');
+				clearTimeout(toastTimer);
+				toastTimer = setTimeout(() => t.classList.remove('shown'), 3200);
+			}
+
+			const promptText = String(data.prompt || '').trim();
+			if (promptText) {
+				el('prompt-text').textContent = '“' + promptText + '”';
+			}
+			if (data.preview) {
+				const bg = el('preview-bg');
+				bg.style.backgroundImage = 'url("' + data.preview + '")';
+				el('thumb').style.backgroundImage = 'url("' + data.preview + '")';
+				const img = new Image();
+				img.onload = () => bg.classList.add('shown');
+				img.src = data.preview;
+			}
+
+			// ── End-state renderer ───────────────────────────────────
+			function showState({ title, msg, actions, danger = true }) {
+				el('loading').classList.add('hidden');
+				el('state-title').textContent = title;
+				el('state-msg').textContent = msg;
+				const iconWrap = el('state-icon');
+				iconWrap.style.background = danger ? 'rgba(255,107,107,.14)' : 'rgba(24,224,200,.14)';
+				iconWrap.style.color = danger ? 'var(--danger)' : 'var(--accent-2)';
+				const wrap = el('state-actions');
+				wrap.innerHTML = '';
+				for (const a of actions) {
+					if (a.href) {
+						const link = document.createElement('a');
+						link.className = 'btn' + (a.primary ? ' primary' : '');
+						link.href = a.href;
+						link.target = '_blank';
+						link.rel = 'noopener';
+						link.textContent = a.label;
+						wrap.appendChild(link);
+					} else {
+						const b = document.createElement('button');
+						b.className = 'btn' + (a.primary ? ' primary' : '');
+						b.textContent = a.label;
+						b.addEventListener('click', a.onClick);
+						wrap.appendChild(b);
+					}
+				}
+				el('state').classList.add('shown');
+			}
+
+			const forgeLink = promptText
+				? 'https://three.ws/forge?prompt=' + encodeURIComponent(promptText)
+				: 'https://three.ws/forge';
+
+			function fail(title, msg, { retry = true } = {}) {
+				const actions = [{ label: 'Open in Forge ↗', href: forgeLink, primary: !retry }];
+				if (retry && promptText) {
+					actions.unshift({
+						label: 'Try again',
+						primary: true,
+						onClick: () => {
+							el('state').classList.remove('shown');
+							el('loading').classList.remove('hidden');
+							resubmit();
+						},
+					});
+				}
+				showState({ title, msg, actions });
+			}
+
+			// ── Progress labelling (no server %, drive from elapsed) ──
+			const STAGES = [
+				[0, 'Generating concept image'],
+				[7, 'Reconstructing geometry'],
+				[22, 'Texturing surface'],
+				[40, 'Finalizing mesh'],
+			];
+			const started = performance.now();
+			let lastStatus = '';
+			function tickLabel() {
+				const secs = (performance.now() - started) / 1000;
+				let label = STAGES[0][1];
+				for (const [t, l] of STAGES) if (secs >= t) label = l;
+				if (lastStatus === 'queued' && secs < 4) label = 'Queued';
+				el('status-label').textContent = label;
+				const mm = Math.floor(secs / 60);
+				const ss = Math.floor(secs % 60);
+				const etaTxt = data.eta ? ' · ~' + Math.round(data.eta) + 's typical' : '';
+				el('sub-line').textContent = (mm ? mm + 'm ' : '') + ss + 's elapsed' + etaTxt;
+			}
+			const labelTimer = setInterval(tickLabel, 500);
+			tickLabel();
+
+			// ── Polling ──────────────────────────────────────────────
+			const MAX_MS = 6 * 60 * 1000;
+			async function pollUntilDone(jobId) {
+				const deadline = performance.now() + MAX_MS;
+				let delay = 2500;
+				while (performance.now() < deadline) {
+					await new Promise((r) => setTimeout(r, delay));
+					let res, body;
+					try {
+						res = await fetch(FORGE + '?job=' + encodeURIComponent(jobId), { credentials: 'include' });
+						body = await res.json().catch(() => ({}));
+					} catch {
+						continue; // transient network — keep trying
+					}
+					if (res.status === 429) {
+						const ra = Number(res.headers.get('retry-after'));
+						delay = Math.min(8000, (ra ? ra * 1000 : 0) || delay + 1000);
+						continue;
+					}
+					delay = 2500;
+					lastStatus = body.status || '';
+					if (body.status === 'done' && body.glb_url) return body.glb_url;
+					if (body.status === 'failed') {
+						return fail(
+							'Generation failed',
+							body.error || 'The model couldn’t be generated. Try a clearer single-subject prompt.'
+						);
+					}
+				}
+				fail(
+					'Still working…',
+					'This is taking longer than usual. Your model may still finish in Forge — open it there to check.',
+					{ retry: true }
+				);
+				return null;
+			}
+
+			async function resubmit() {
+				try {
+					const res = await fetch(FORGE, {
+						method: 'POST',
+						headers: { 'content-type': 'application/json' },
+						credentials: 'include',
+						body: JSON.stringify({ prompt: promptText }),
+					});
+					const body = await res.json().catch(() => ({}));
+					if (!res.ok) return fail('Couldn’t start', body.message || body.error || 'Forge rejected the request.');
+					if (body.glb_url) return loadModel(body.glb_url);
+					if (body.job_id) {
+						const url = await pollUntilDone(body.job_id);
+						if (url) loadModel(url);
+						return;
+					}
+					fail('No model returned', 'Forge didn’t return a model. Try again or open it in Forge.');
+				} catch {
+					fail('Connection lost', 'Could not reach the Forge service. Check your connection and retry.');
+				}
+			}
+
+			// ── Three.js viewer ──────────────────────────────────────
+			let renderer, scene, camera, controls, mixer, clock, current;
+			let autoRotate = true;
+			let frameInfo = null;
+			let loadedGlbUrl = null;
+
+			function initThree() {
+				const canvas = el('stage');
+				try {
+					renderer = new THREE.WebGLRenderer({ canvas, antialias: true, preserveDrawingBuffer: false });
+				} catch {
+					return false;
+				}
+				renderer.setPixelRatio(Math.min(devicePixelRatio || 1, 2));
+				renderer.setSize(innerWidth, innerHeight, false);
+				renderer.outputColorSpace = THREE.SRGBColorSpace;
+				renderer.toneMapping = THREE.ACESFilmicToneMapping;
+				renderer.toneMappingExposure = 1.05;
+				renderer.shadowMap.enabled = true;
+				renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+
+				scene = new THREE.Scene();
+				scene.background = new THREE.Color(0x0a0c10);
+
+				const pmrem = new THREE.PMREMGenerator(renderer);
+				scene.environment = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
+
+				camera = new THREE.PerspectiveCamera(45, innerWidth / innerHeight, 0.01, 2000);
+				camera.position.set(0, 1.1, 3.2);
+
+				controls = new OrbitControls(camera, renderer.domElement);
+				controls.enableDamping = true;
+				controls.dampingFactor = 0.07;
+				controls.autoRotate = true;
+				controls.autoRotateSpeed = 1.4;
+				controls.addEventListener('start', () => {
+					autoRotate = false;
+					controls.autoRotate = false;
+					syncRotateBtn();
+				});
+
+				const key = new THREE.DirectionalLight(0xffffff, 2.0);
+				key.position.set(4, 7, 5);
+				key.castShadow = true;
+				key.shadow.mapSize.set(2048, 2048);
+				key.shadow.bias = -0.0004;
+				key.shadow.normalBias = 0.02;
+				scene.add(key);
+				scene.add(new THREE.HemisphereLight(0xbfd4ff, 0x10131a, 0.35));
+
+				clock = new THREE.Clock();
+				addEventListener('resize', onResize);
+				renderer.setAnimationLoop(render);
+				return true;
+			}
+
+			function onResize() {
+				if (!renderer) return;
+				renderer.setSize(innerWidth, innerHeight, false);
+				camera.aspect = innerWidth / innerHeight;
+				camera.updateProjectionMatrix();
+			}
+
+			function render() {
+				const dt = clock.getDelta();
+				if (mixer) mixer.update(dt);
+				if (controls) controls.update();
+				renderer.render(scene, camera);
+			}
+
+			async function fetchGlb(url) {
+				// Durable GLB URLs are public CDN assets that commonly answer with a
+				// wildcard CORS header — an anonymous fetch (no credentials) is the only
+				// one such a server accepts, and it lets us reuse the blob for a reliable
+				// named download. Falls back to a direct loader fetch on failure.
+				const res = await fetch(url, { mode: 'cors', credentials: 'omit' });
+				if (!res.ok) throw new Error('Model fetch failed (' + res.status + ')');
+				const blob = await res.blob();
+				return URL.createObjectURL(blob);
+			}
+
+			function frameObject(obj) {
+				const box = new THREE.Box3().setFromObject(obj);
+				const size = box.getSize(new THREE.Vector3());
+				const center = box.getCenter(new THREE.Vector3());
+				const maxDim = Math.max(size.x, size.y, size.z) || 1;
+				obj.position.sub(center);
+
+				const fitDist = (maxDim / 2 / Math.tan((camera.fov * Math.PI) / 360)) * 1.5;
+				camera.near = maxDim / 100;
+				camera.far = maxDim * 100;
+				camera.updateProjectionMatrix();
+				controls.minDistance = maxDim * 0.4;
+				controls.maxDistance = maxDim * 6;
+				controls.target.set(0, 0, 0);
+				frameInfo = { dist: fitDist, height: maxDim * 0.18, maxDim };
+				resetView(true);
+
+				// Contact-shadow ground at the model's feet.
+				const groundY = -size.y / 2;
+				const ground = new THREE.Mesh(
+					new THREE.PlaneGeometry(maxDim * 12, maxDim * 12),
+					new THREE.ShadowMaterial({ opacity: 0.28 })
+				);
+				ground.rotation.x = -Math.PI / 2;
+				ground.position.y = groundY;
+				ground.receiveShadow = true;
+				scene.add(ground);
+			}
+
+			function resetView(instant) {
+				if (!frameInfo) return;
+				const { dist, height } = frameInfo;
+				const target = new THREE.Vector3(dist * 0.0, height, dist);
+				if (instant) {
+					camera.position.copy(target);
+				} else {
+					const from = camera.position.clone();
+					const t0 = performance.now();
+					(function ease() {
+						const k = Math.min(1, (performance.now() - t0) / 450);
+						const e = 1 - Math.pow(1 - k, 3);
+						camera.position.lerpVectors(from, target, e);
+						if (k < 1) requestAnimationFrame(ease);
+					})();
+				}
+				controls.target.set(0, 0, 0);
+			}
+
+			function fadeIn(obj) {
+				const mats = [];
+				obj.traverse((n) => {
+					if (n.isMesh) {
+						n.castShadow = true;
+						n.receiveShadow = true;
+						const list = Array.isArray(n.material) ? n.material : [n.material];
+						for (const m of list) {
+							if (!m) continue;
+							m.userData._t = m.transparent;
+							m.userData._o = m.opacity;
+							m.transparent = true;
+							m.opacity = 0;
+							mats.push(m);
+						}
+					}
+				});
+				const t0 = performance.now();
+				(function step() {
+					const k = Math.min(1, (performance.now() - t0) / 600);
+					for (const m of mats) m.opacity = (m.userData._o ?? 1) * k;
+					if (k < 1) requestAnimationFrame(step);
+					else
+						for (const m of mats) {
+							m.transparent = m.userData._t ?? false;
+							m.opacity = m.userData._o ?? 1;
+							m.needsUpdate = true;
+						}
+				})();
+			}
+
+			const gltfLoader = new GLTFLoader();
+			try {
+				const { MeshoptDecoder } = await import('three/addons/libs/meshopt_decoder.module.js');
+				gltfLoader.setMeshoptDecoder(MeshoptDecoder);
+			} catch {
+				/* meshopt optional — vanilla GLBs load without it */
+			}
+
+			async function loadModel(url) {
+				loadedGlbUrl = url;
+				if (!renderer && !initThree()) {
+					return showState({
+						title: '3D not supported here',
+						msg: 'Your browser/device can’t render WebGL. Download the model or open it in Forge.',
+						danger: true,
+						actions: [
+							{ label: 'Download GLB', href: url, primary: true },
+							{ label: 'Open in Forge ↗', href: forgeLink },
+						],
+					});
+				}
+				let objectUrl = url;
+				try {
+					objectUrl = await fetchGlb(url);
+				} catch {
+					/* fall back to the raw url; GLTFLoader will retry it directly */
+				}
+				gltfLoader.load(
+					objectUrl,
+					(gltf) => {
+						clearInterval(labelTimer);
+						if (current) {
+							scene.remove(current);
+						}
+						current = gltf.scene;
+						scene.add(current);
+						frameObject(current);
+						fadeIn(current);
+						if (gltf.animations && gltf.animations.length) {
+							mixer = new THREE.AnimationMixer(current);
+							mixer.clipAction(gltf.animations[0]).play();
+						}
+						revealViewer();
+					},
+					undefined,
+					() => {
+						fail(
+							'Couldn’t load the model',
+							'The generated file didn’t load. It may have expired — regenerate it, or open it in Forge.'
+						);
+					}
+				);
+			}
+
+			function revealViewer() {
+				el('loading').classList.add('hidden');
+				el('state').classList.remove('shown');
+				buildHud();
+				buildToolbar();
+				requestAnimationFrame(() => {
+					el('hud').classList.add('shown');
+					el('toolbar').classList.add('shown');
+				});
+			}
+
+			function buildHud() {
+				if (promptText) el('hud-title').textContent = promptText;
+				else el('hud-title').style.display = 'none';
+				const chips = el('hud-chips');
+				chips.innerHTML = '';
+				const m = data.meta || {};
+				for (const v of [m.backend, m.tier, m.path]) {
+					if (!v) continue;
+					const c = document.createElement('span');
+					c.className = 'chip';
+					c.textContent = v;
+					chips.appendChild(c);
+				}
+			}
+
+			let rotateBtn;
+			function syncRotateBtn() {
+				if (rotateBtn) rotateBtn.setAttribute('aria-pressed', String(autoRotate));
+			}
+
+			function mkBtn({ name, label, labelSm, onClick, href, primary, pressed, aria }) {
+				const tag = href ? 'a' : 'button';
+				const b = document.createElement(tag);
+				b.className = 'btn' + (primary ? ' primary' : '');
+				b.innerHTML = icon(name) + '<span class="' + (labelSm ? 'label-sm' : '') + '">' + label + '</span>';
+				b.setAttribute('aria-label', aria || label);
+				if (pressed !== undefined) b.setAttribute('aria-pressed', String(pressed));
+				if (href) {
+					b.href = href;
+					b.target = '_blank';
+					b.rel = 'noopener';
+				} else {
+					b.addEventListener('click', onClick);
+				}
+				return b;
+			}
+
+			async function download() {
+				try {
+					const blobUrl = await fetchGlb(loadedGlbUrl);
+					const a = document.createElement('a');
+					a.href = blobUrl;
+					a.download = (promptText ? promptText.slice(0, 40).replace(/[^a-z0-9]+/gi, '-') : 'forge-model') + '.glb';
+					document.body.appendChild(a);
+					a.click();
+					a.remove();
+					setTimeout(() => URL.revokeObjectURL(blobUrl), 4000);
+				} catch {
+					window.open(loadedGlbUrl, '_blank', 'noopener');
+				}
+			}
+
+			function buildToolbar() {
+				const bar = el('toolbar');
+				bar.innerHTML = '';
+
+				bar.appendChild(mkBtn({ name: 'download', label: 'Download', labelSm: true, onClick: download, aria: 'Download GLB' }));
+
+				rotateBtn = mkBtn({
+					name: 'rotate',
+					label: 'Spin',
+					labelSm: true,
+					pressed: autoRotate,
+					onClick: () => {
+						autoRotate = !autoRotate;
+						controls.autoRotate = autoRotate;
+						syncRotateBtn();
+					},
+				});
+				bar.appendChild(rotateBtn);
+
+				bar.appendChild(
+					mkBtn({
+						name: 'reset',
+						label: 'Recenter',
+						labelSm: true,
+						onClick: () => resetView(false),
+						aria: 'Recenter camera',
+					})
+				);
+
+				if (document.fullscreenEnabled) {
+					bar.appendChild(
+						mkBtn({
+							name: 'expand',
+							label: 'Fullscreen',
+							labelSm: true,
+							onClick: () => {
+								if (document.fullscreenElement) document.exitFullscreen();
+								else document.documentElement.requestFullscreen().catch(() => {});
+							},
+						})
+					);
+				}
+
+				// Rig & animate — backend-supported but may be disabled on a
+				// deployment; self-heals on the unconfigured response.
+				const rigBtn = mkBtn({
+					name: 'rig',
+					label: 'Rig & Animate',
+					labelSm: true,
+					primary: true,
+					onClick: () => rigAndAnimate(rigBtn),
+				});
+				bar.appendChild(rigBtn);
+
+				bar.appendChild(mkBtn({ name: 'external', label: 'Forge', labelSm: true, href: forgeLink, aria: 'Open in Forge' }));
+			}
+
+			async function rigAndAnimate(btn) {
+				if (!loadedGlbUrl) return;
+				btn.setAttribute('disabled', '');
+				const restore = btn.innerHTML;
+				btn.innerHTML = icon('rig') + '<span class="label-sm">Rigging…</span>';
+				try {
+					const res = await fetch(FORGE + '?action=rig', {
+						method: 'POST',
+						headers: { 'content-type': 'application/json' },
+						credentials: 'include',
+						body: JSON.stringify({ glb_url: loadedGlbUrl }),
+					});
+					const body = await res.json().catch(() => ({}));
+					if (res.status === 501 || body.error === 'rig_unconfigured') {
+						btn.remove();
+						toast('Auto-rigging isn’t enabled on this deployment.');
+						return;
+					}
+					if (!res.ok || !body.job_id) {
+						btn.innerHTML = restore;
+						btn.removeAttribute('disabled');
+						toast(body.message || 'Rigging is busy — try again shortly.');
+						return;
+					}
+					toast('Rigging your model — this adds a skeleton + idle motion.');
+					const rigged = await pollUntilDone(body.job_id);
+					if (rigged) {
+						el('loading').classList.remove('hidden');
+						el('status-label').textContent = 'Loading rigged model';
+						await loadModel(rigged);
+						toast('Rigged & animated.');
+					} else {
+						btn.innerHTML = restore;
+						btn.removeAttribute('disabled');
+					}
+				} catch {
+					btn.innerHTML = restore;
+					btn.removeAttribute('disabled');
+					toast('Rigging failed — try again.');
+				}
+			}
+
+			// ── Boot ─────────────────────────────────────────────────
+			(function boot() {
+				if (data.error) {
+					clearInterval(labelTimer);
+					return fail('Couldn’t generate', String(data.error));
+				}
+				if (data.glb) return loadModel(data.glb);
+				if (data.job) {
+					(async () => {
+						const url = await pollUntilDone(data.job);
+						if (url) loadModel(url);
+					})();
+					return;
+				}
+				clearInterval(labelTimer);
+				fail('Nothing to show', 'No model or job was provided. Try generating again.');
+			})();
+		</script>
+	</body>
+</html>

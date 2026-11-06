@@ -1,0 +1,1111 @@
+<!doctype html>
+<html lang="en">
+	<head>
+		<meta charset="utf-8" />
+		<meta name="viewport" content="width=device-width, initial-scale=1" />
+		<title data-i18n="demos_selfie_fit.meta_title">Selfie Fit · three.ws lab</title>
+		<meta name="robots" content="noindex" />
+		<link rel="stylesheet" href="/style.css" />
+		<link rel="stylesheet" href="/nav.css" />
+		<style>
+			:root { color-scheme: dark; }
+			body { background: #060606; color: #eee; font: 15px/1.5 -apple-system, system-ui, sans-serif; margin: 0; }
+			.stage { max-width: 1100px; margin: 0 auto; padding: 48px 24px 80px; }
+			.crumb a { color: #8a8d98; text-decoration: none; }
+			.crumb a:hover { color: #3dc1ff; }
+			h1 { font-size: 28px; font-weight: 600; letter-spacing: -0.015em; margin: 14px 0 8px; }
+			h2 { font-size: 16px; font-weight: 600; margin: 0 0 12px; letter-spacing: -0.005em; }
+			.sub { color: #8a8d98; max-width: 64ch; margin: 0 0 30px; }
+			.grid { display: grid; grid-template-columns: 1fr 360px; gap: 24px; }
+			@media (max-width: 880px) { .grid { grid-template-columns: 1fr; } }
+			.panel {
+				background: #101010; border: 1.5px solid #202020; border-radius: 14px;
+				padding: 22px; display: flex; flex-direction: column; gap: 14px;
+			}
+			.slots { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; }
+			@media (max-width: 600px) { .slots { grid-template-columns: 1fr; } }
+			.slot {
+				background: #080808; border: 1.5px dashed #202020; border-radius: 12px;
+				aspect-ratio: 3 / 4; position: relative; overflow: hidden; cursor: pointer;
+				display: flex; align-items: center; justify-content: center;
+				transition: border-color var(--duration-fast), transform var(--duration-fast);
+			}
+			.slot:hover { border-color: #2e2e2e; }
+			.slot.active { border-color: #3dc1ff; border-style: solid; }
+			.slot.filled { border-style: solid; border-color: #2e2e2e; cursor: default; }
+			.slot .placeholder {
+				color: #6a6d7c; font-size: 12px; text-align: center; padding: 12px;
+				display: flex; flex-direction: column; align-items: center; gap: 6px;
+			}
+			.slot .placeholder .label {
+				color: #eee; font-size: 13px; font-weight: 600; text-transform: uppercase;
+				letter-spacing: 0.08em;
+			}
+			.slot video, .slot canvas.overlay, .slot img.preview {
+				position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover;
+			}
+			.slot video { transform: scaleX(-1); background: #000; }
+			.slot canvas.overlay { transform: scaleX(-1); pointer-events: none; }
+			.slot .badge {
+				position: absolute; top: 8px; left: 8px; right: 8px;
+				display: flex; gap: 6px; flex-wrap: wrap; pointer-events: none;
+			}
+			.chip {
+				font-size: 10.5px; font-weight: 600; padding: 3px 7px; border-radius: 6px;
+				background: rgba(0,0,0,0.6); border: 1px solid rgba(255,255,255,0.1);
+				color: #8a8d98; letter-spacing: 0.04em; text-transform: uppercase;
+			}
+			.chip.ok { color: #3dc1ff; border-color: rgba(61, 193, 255,0.35); background: rgba(61, 193, 255,0.12); }
+			.chip.bad { color: #ff6b6b; border-color: rgba(255,107,107,0.35); background: rgba(255,107,107,0.12); }
+			.slot .footer {
+				position: absolute; bottom: 0; left: 0; right: 0;
+				background: linear-gradient(180deg, transparent, rgba(0,0,0,0.85));
+				padding: 14px 10px 10px; display: flex; gap: 6px; justify-content: center;
+			}
+			.slot-btn {
+				background: rgba(255,255,255,0.08); color: #eee; border: 0;
+				padding: 6px 10px; font-size: 11px; font-weight: 600; border-radius: 6px;
+				cursor: pointer; letter-spacing: 0.04em; text-transform: uppercase;
+			}
+			.slot-btn.primary { background: #3dc1ff; color: #0a0a0a; }
+			.slot-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+			.slot .upload-input { display: none; }
+
+			.opts { display: flex; flex-direction: column; gap: 14px; }
+			.opt-row { display: flex; flex-direction: column; gap: 8px; }
+			.opt-row .label {
+				font-size: 12px; color: #8a8d98; text-transform: uppercase; letter-spacing: 0.08em;
+			}
+			.radios { display: flex; gap: 8px; flex-wrap: wrap; }
+			.radio {
+				display: flex; align-items: center; gap: 6px; cursor: pointer;
+				background: #080808; border: 1px solid #202020; border-radius: 9px;
+				padding: 8px 12px; font-size: 13px;
+			}
+			.radio input { accent-color: #3dc1ff; }
+			.radio:hover { border-color: #2e2e2e; }
+			.radio.selected { border-color: #3dc1ff; color: #3dc1ff; }
+
+			button.submit {
+				background: #3dc1ff; color: #0a0a0a; border: 0; border-radius: 9px;
+				padding: 12px 16px; font-weight: 600; cursor: pointer; font: inherit;
+				font-size: 15px;
+			}
+			button.submit:disabled { opacity: 0.35; cursor: not-allowed; }
+
+			.log {
+				background: #080808; border: 1px solid #202020; border-radius: 9px;
+				padding: 12px; font-family: ui-monospace, monospace; font-size: 12px;
+				line-height: 1.6; color: #8a8d98; max-height: 320px; overflow: auto; white-space: pre-wrap;
+			}
+			.log .ok { color: #3dc1ff; }
+			.log .err { color: #ff6b6b; }
+			.log .info { color: #66d9ef; }
+			.log .warn { color: #ffb84d; }
+
+			.result-card {
+				background: linear-gradient(180deg, rgba(61, 193, 255,0.06), rgba(61, 193, 255,0.02));
+				border: 1.5px solid rgba(61, 193, 255,0.3); border-radius: 14px;
+				padding: 20px; display: none;
+			}
+			.result-card.show { display: block; }
+			.result-card .url {
+				font-family: ui-monospace, monospace; font-size: 12px; color: #8a8d98;
+				background: #080808; border: 1px solid #202020; border-radius: 9px;
+				padding: 10px 12px; margin: 10px 0; overflow-x: auto; white-space: nowrap;
+			}
+
+			.iframe-modal {
+				position: fixed; inset: 0; background: rgba(0,0,0,0.85);
+				display: none; align-items: center; justify-content: center; z-index: 9999;
+				padding: 24px;
+			}
+			.iframe-modal.open { display: flex; }
+			.iframe-modal .frame-shell {
+				position: relative; width: 100%; max-width: 980px; height: 100%; max-height: 720px;
+				background: #0b0b0b; border-radius: 14px; overflow: hidden;
+				border: 1.5px solid #202020;
+			}
+			.iframe-modal iframe { width: 100%; height: 100%; border: 0; display: block; background: #fff; }
+			.iframe-modal .close {
+				position: absolute; top: 12px; right: 12px; z-index: 2;
+				background: rgba(0,0,0,0.6); color: #eee; border: 1px solid rgba(255,255,255,0.15);
+				border-radius: 8px; padding: 6px 12px; font-weight: 600; cursor: pointer;
+			}
+		</style>
+	</head>
+	<body>
+		<header><div id="nav-container"></div></header>
+
+		<main class="stage">
+			<p class="crumb" data-i18n-html="demos_selfie_fit.lab"><a href="/demos">&larr; lab</a></p>
+			<h1 data-i18n="demos_selfie_fit.selfie_fit">Selfie Fit</h1>
+			<p class="sub" data-i18n-html="demos_selfie_fit.three_photo_capture_with_live_face_landmark">
+				Three-photo capture with live face-landmark quality gates. Each slot
+				runs a 468-point wireframe overlay and head-pose estimator on the
+				webcam feed (or a single uploaded image) and only unlocks when the
+				yaw lands in the expected range. Submit posts the three JPEGs to
+				<code>/api/onboarding/avaturn-session</code> and opens the returned
+				three.ws Selfie editor session in an iframe. Sandbox only &mdash;
+				does not touch the live <code>/create</code> or
+				<code>/avatars/:id</code> flows.
+			</p>
+
+			<div class="grid">
+				<section class="panel">
+					<h2 data-i18n="demos_selfie_fit.1_capture_three_photos">1. Capture three photos</h2>
+					<div class="slots">
+						<div class="slot" data-slot="frontal">
+							<div class="placeholder">
+								<div class="label">Frontal</div>
+								<div>Face the camera straight on</div>
+								<div>Yaw target: &lt; 15&deg;</div>
+							</div>
+							<div class="badge"></div>
+							<div class="footer" hidden>
+								<button class="slot-btn" data-slot-action="camera" data-i18n="demos_selfie_fit.camera">Camera</button>
+								<button class="slot-btn" data-slot-action="upload" data-i18n="demos_selfie_fit.upload">Upload</button>
+							</div>
+							<input class="upload-input" type="file" accept="image/jpeg,image/png" />
+						</div>
+						<div class="slot" data-slot="left">
+							<div class="placeholder">
+								<div class="label">Left ~45&deg;</div>
+								<div>Turn your head left</div>
+								<div>Yaw target: 30&ndash;60&deg;</div>
+							</div>
+							<div class="badge"></div>
+							<div class="footer" hidden>
+								<button class="slot-btn" data-slot-action="camera" data-i18n="demos_selfie_fit.camera_2">Camera</button>
+								<button class="slot-btn" data-slot-action="upload" data-i18n="demos_selfie_fit.upload_2">Upload</button>
+							</div>
+							<input class="upload-input" type="file" accept="image/jpeg,image/png" />
+						</div>
+						<div class="slot" data-slot="right">
+							<div class="placeholder">
+								<div class="label">Right ~45&deg;</div>
+								<div>Turn your head right</div>
+								<div>Yaw target: -60 to -30&deg;</div>
+							</div>
+							<div class="badge"></div>
+							<div class="footer" hidden>
+								<button class="slot-btn" data-slot-action="camera" data-i18n="demos_selfie_fit.camera_3">Camera</button>
+								<button class="slot-btn" data-slot-action="upload" data-i18n="demos_selfie_fit.upload_3">Upload</button>
+							</div>
+							<input class="upload-input" type="file" accept="image/jpeg,image/png" />
+						</div>
+					</div>
+					<p style="color:#6a6d7c;font-size:12px;margin:0" data-i18n-html="demos_selfie_fit.click_a_slot_to_start_choose_camera">
+						Click a slot to start. Choose <strong>Camera</strong> for a live
+						feed with real-time face-landmark gates, or <strong>Upload</strong>
+						to validate an existing JPEG/PNG.
+					</p>
+				</section>
+
+				<section class="panel opts">
+					<h2 data-i18n="demos_selfie_fit.2_options">2. Options</h2>
+					<div class="opt-row">
+						<div class="label">Body type</div>
+						<div class="radios" id="body-radios">
+							<label class="radio selected"><input type="radio" name="body" value="male" checked /> Masculine</label>
+							<label class="radio"><input type="radio" name="body" value="female" /> Feminine</label>
+							<label class="radio"><input type="radio" name="body" value="male" /> Neutral</label>
+						</div>
+					</div>
+					<div class="opt-row">
+						<div class="label">Style</div>
+						<div class="radios" id="style-radios">
+							<label class="radio selected"><input type="radio" name="style" value="v1" checked /> v1</label>
+							<label class="radio"><input type="radio" name="style" value="v2" /> v2</label>
+						</div>
+					</div>
+					<button class="submit" id="submit-btn" disabled data-i18n="demos_selfie_fit.upload_0_3">Upload 0/3</button>
+					<div class="result-card" id="result-card">
+						<h2 style="margin:0 0 6px;color:#3dc1ff" data-i18n="demos_selfie_fit.three_ws_selfie_session_ready">three.ws Selfie session ready</h2>
+						<div style="color:#8a8d98;font-size:13px">Open the editor to refine and export your avatar.</div>
+						<div class="url" id="result-url"></div>
+						<button class="submit" id="open-session-btn" data-i18n="demos_selfie_fit.open_three_ws_selfie_editor">Open three.ws Selfie editor</button>
+					</div>
+					<div class="opt-row">
+						<div class="label">Log</div>
+						<div class="log" id="log">booting...</div>
+					</div>
+				</section>
+			</div>
+		</main>
+
+		<div class="iframe-modal" id="iframe-modal">
+			<div class="frame-shell">
+				<button class="close" id="modal-close" data-i18n="demos_selfie_fit.close">Close</button>
+				<iframe id="session-iframe" allow="camera; microphone; clipboard-write" referrerpolicy="no-referrer"></iframe>
+			</div>
+		</div>
+
+		<script src="/nav.js" defer></script>
+
+		<script type="module">
+			// Load the FaceLandmarker WASM Tasks bundle via CDN so the demo works in
+			// dev (vite serves /node_modules but the WASM file resolution from
+			// imported bundles is finicky; CDN is the simplest reliable path).
+			import {
+				FilesetResolver,
+				FaceLandmarker,
+				DrawingUtils,
+			} from 'https://cdn.skypack.dev/@mediapipe/tasks-vision@0.10.18';
+
+			const $ = (sel, root = document) => root.querySelector(sel);
+			const $$ = (sel, root = document) => Array.from(root.querySelectorAll(sel));
+
+			// Both submit endpoints below are cookie-session mutations behind the
+			// double-submit CSRF check (api/_lib/csrf.js), so each POST needs its
+			// own freshly minted token: they are single-use and burned on first
+			// use, which is why this mints per call rather than caching one.
+			// Signed-out visitors get null and the POST answers 401, which the
+			// submit handler already surfaces.
+			async function csrfHeader() {
+				try {
+					const r = await fetch('/api/csrf-token', { credentials: 'include' });
+					if (!r.ok) return {};
+					const j = await r.json();
+					const token = j?.data?.token || j?.token;
+					return token ? { 'x-csrf-token': token } : {};
+				} catch {
+					return {};
+				}
+			}
+
+			// ── Face quality scoring ─────────────────────────────────────────────
+			// Blur:  variance of the 4-neighbour Laplacian on a 64×64 face crop.
+			//        Scores below BLUR_MIN indicate the frame is too blurry to use.
+			// Luma:  mean luminance of the face crop. Below LUMA_MIN = too dark,
+			//        above LUMA_MAX = overexposed.
+			const BLUR_MIN  = 3.5;   // tune: lower → more permissive
+			const LUMA_MIN  = 40;    // 0–255 scale
+			const LUMA_MAX  = 218;
+
+			let _qCanvas = null, _qCtx = null;
+			function computeFaceQuality(video, lms) {
+				const SIZE = 64;
+				if (!_qCanvas) {
+					_qCanvas = document.createElement('canvas');
+					_qCanvas.width = _qCanvas.height = SIZE;
+					_qCtx = _qCanvas.getContext('2d', { willReadFrequently: true });
+				}
+				// Bounding box of landmarks in normalised [0,1] coords
+				let minX = 1, minY = 1, maxX = 0, maxY = 0;
+				for (const lm of lms) {
+					if (lm.x < minX) minX = lm.x;
+					if (lm.y < minY) minY = lm.y;
+					if (lm.x > maxX) maxX = lm.x;
+					if (lm.y > maxY) maxY = lm.y;
+				}
+				const pad = 0.05;
+				const vw = video.videoWidth, vh = video.videoHeight;
+				const fx = Math.max(0, (minX - pad)) * vw;
+				const fy = Math.max(0, (minY - pad)) * vh;
+				const fw = Math.min(vw - fx, (maxX - minX + 2 * pad) * vw);
+				const fh = Math.min(vh - fy, (maxY - minY + 2 * pad) * vh);
+				if (fw < 4 || fh < 4) return { luma: 0, blur: 0 };
+
+				// Draw face crop at SIZE×SIZE (note: video is displayed mirrored in CSS
+				// but the raw pixel data is un-mirrored — same as landmark coords).
+				_qCtx.drawImage(video, fx, fy, fw, fh, 0, 0, SIZE, SIZE);
+				const { data: d } = _qCtx.getImageData(0, 0, SIZE, SIZE);
+				const n = SIZE * SIZE;
+				const grays = new Float32Array(n);
+				let lumaSum = 0;
+				for (let i = 0, j = 0; i < d.length; i += 4, j++) {
+					const g = 0.299 * d[i] + 0.587 * d[i + 1] + 0.114 * d[i + 2];
+					grays[j] = g;
+					lumaSum += g;
+				}
+				const luma = lumaSum / n;
+				// 4-neighbour Laplacian variance (blur estimator)
+				let ls = 0, ls2 = 0, ln = 0;
+				for (let row = 1; row < SIZE - 1; row++) {
+					for (let col = 1; col < SIZE - 1; col++) {
+						const c = grays[row * SIZE + col];
+						const lap = 4 * c
+							- grays[(row - 1) * SIZE + col]
+							- grays[(row + 1) * SIZE + col]
+							- grays[row * SIZE + (col - 1)]
+							- grays[row * SIZE + (col + 1)];
+						ls += lap; ls2 += lap * lap; ln++;
+					}
+				}
+				const mean = ls / ln;
+				const blur = Math.sqrt(Math.max(0, ls2 / ln - mean * mean));
+				return { luma, blur };
+			}
+
+			// ── Log helper ──────────────────────────────────────────────────────
+			const logEl = $('#log');
+			logEl.textContent = '';
+			const log = (msg, cls = '') => {
+				const t = new Date().toTimeString().slice(0, 8);
+				const span = document.createElement('span');
+				if (cls) span.className = cls;
+				span.textContent = `[${t}] ${msg}`;
+				logEl.appendChild(span);
+				logEl.appendChild(document.createTextNode('\n'));
+				logEl.scrollTop = logEl.scrollHeight;
+			};
+
+			// ── Slot configuration ──────────────────────────────────────────────
+			// Yaw sign convention here: looking left (camera's right) → positive yaw.
+			// We computed yaw from un-mirrored landmarks (video is CSS-mirrored only
+			// for display), so a real left-head-turn produces positive yaw.
+			const SLOTS = {
+				frontal: { label: 'frontal', min: -15, max: 15 },
+				left:    { label: 'left',    min: 30,  max: 60 },
+				right:   { label: 'right',   min: -60, max: -30 },
+			};
+
+			const state = {
+				images: { frontal: null, left: null, right: null }, // { blob, width, height }
+				passes: { frontal: false, left: false, right: false },
+				bodyType: 'male',
+				style: 'v1',
+				activeSlot: null,
+				stream: null,
+				rafId: 0,
+				videoEl: null,
+				overlayEl: null,
+				landmarker: null,
+				lastVideoTime: -1,
+				lastDetect: null, // { yaw, pitch, roll, faceFound, centered }
+			};
+
+			// ── FaceLandmarker init ─────────────────────────────────────────────
+			log('loading face-landmark model...', 'info');
+			let landmarkerReady = (async () => {
+				const fileset = await FilesetResolver.forVisionTasks(
+					'https://cdn.skypack.dev/@mediapipe/tasks-vision@0.10.18/wasm',
+				);
+				const lm = await FaceLandmarker.createFromOptions(fileset, {
+					baseOptions: {
+						modelAssetPath:
+							'https://storage.googleapis.com/mediapipe-models/face_landmarker/face_landmarker/float16/1/face_landmarker.task',
+						delegate: 'GPU',
+					},
+					runningMode: 'VIDEO',
+					numFaces: 1,
+					outputFaceBlendshapes: false,
+					outputFacialTransformationMatrixes: false,
+				});
+				state.landmarker = lm;
+				log('face-landmark model ready', 'ok');
+				return lm;
+			})().catch((err) => {
+				log('model load failed: ' + err.message, 'err');
+				throw err;
+			});
+
+			// ── Slot wiring ─────────────────────────────────────────────────────
+			$$('.slot').forEach((slotEl) => {
+				const slot = slotEl.getAttribute('data-slot');
+				const placeholder = $('.placeholder', slotEl);
+				const footer = $('.footer', slotEl);
+				const input = $('.upload-input', slotEl);
+
+				slotEl.addEventListener('click', (e) => {
+					if (slotEl.classList.contains('filled')) return;
+					if (e.target.closest('[data-slot-action]')) return;
+					// First click reveals the camera/upload chooser
+					if (footer.hasAttribute('hidden')) {
+						footer.removeAttribute('hidden');
+						placeholder.style.opacity = '0.35';
+					}
+				});
+
+				$$('[data-slot-action]', slotEl).forEach((btn) => {
+					btn.addEventListener('click', async (e) => {
+						e.stopPropagation();
+						const action = btn.getAttribute('data-slot-action');
+						if (action === 'camera') {
+							await startCamera(slot);
+						} else if (action === 'upload') {
+							input.click();
+						}
+					});
+				});
+
+				input.addEventListener('change', async () => {
+					const file = input.files?.[0];
+					if (!file) return;
+					await acceptUpload(slot, file);
+					input.value = '';
+				});
+			});
+
+			// ── Camera capture ──────────────────────────────────────────────────
+			async function startCamera(slot) {
+				if (state.activeSlot && state.activeSlot !== slot) {
+					stopCamera();
+				}
+				state.activeSlot = slot;
+				const slotEl = $(`.slot[data-slot="${slot}"]`);
+				slotEl.classList.add('active');
+				const placeholder = $('.placeholder', slotEl);
+				placeholder.style.display = 'none';
+
+				// Build / reuse video + overlay
+				let video = $('video', slotEl);
+				if (!video) {
+					video = document.createElement('video');
+					video.autoplay = true;
+					video.playsInline = true;
+					video.muted = true;
+					slotEl.appendChild(video);
+				}
+				let overlay = $('canvas.overlay', slotEl);
+				if (!overlay) {
+					overlay = document.createElement('canvas');
+					overlay.className = 'overlay';
+					slotEl.appendChild(overlay);
+				}
+				const badge = $('.badge', slotEl);
+				const footer = $('.footer', slotEl);
+				footer.innerHTML = '';
+				const shootBtn = document.createElement('button');
+				shootBtn.className = 'slot-btn primary';
+				shootBtn.textContent = 'Capture';
+				shootBtn.disabled = true;
+				shootBtn.addEventListener('click', (e) => {
+					e.stopPropagation();
+					captureFromCamera(slot);
+				});
+				const cancelBtn = document.createElement('button');
+				cancelBtn.className = 'slot-btn';
+				cancelBtn.textContent = 'Cancel';
+				cancelBtn.addEventListener('click', (e) => {
+					e.stopPropagation();
+					cancelCamera(slot);
+				});
+				footer.appendChild(shootBtn);
+				footer.appendChild(cancelBtn);
+
+				state.videoEl = video;
+				state.overlayEl = overlay;
+				state.shootBtn = shootBtn;
+				state.badgeEl = badge;
+
+				try {
+					log(`requesting camera for ${slot}...`, 'info');
+					state.stream = await navigator.mediaDevices.getUserMedia({
+						video: { facingMode: 'user', width: { ideal: 1280 }, height: { ideal: 960 } },
+						audio: false,
+					});
+					video.srcObject = state.stream;
+					await new Promise((res) => video.addEventListener('loadedmetadata', res, { once: true }));
+					await video.play();
+					log(`camera stream ${video.videoWidth}x${video.videoHeight}`, 'info');
+					await landmarkerReady;
+					tick();
+				} catch (err) {
+					log('camera error: ' + err.message, 'err');
+					cancelCamera(slot);
+				}
+			}
+
+			function cancelCamera(slot) {
+				stopCamera();
+				const slotEl = $(`.slot[data-slot="${slot}"]`);
+				slotEl.classList.remove('active');
+				$('.placeholder', slotEl).style.display = '';
+				$('.placeholder', slotEl).style.opacity = '';
+				$('video', slotEl)?.remove();
+				$('canvas.overlay', slotEl)?.remove();
+				const footer = $('.footer', slotEl);
+				footer.setAttribute('hidden', '');
+				footer.innerHTML = `
+					<button class="slot-btn" data-slot-action="camera">Camera</button>
+					<button class="slot-btn" data-slot-action="upload">Upload</button>
+				`;
+				// Re-wire the rebuilt buttons
+				$$('[data-slot-action]', footer).forEach((btn) => {
+					btn.addEventListener('click', async (e) => {
+						e.stopPropagation();
+						const action = btn.getAttribute('data-slot-action');
+						if (action === 'camera') await startCamera(slot);
+						else if (action === 'upload') $('.upload-input', slotEl).click();
+					});
+				});
+				$('.badge', slotEl).innerHTML = '';
+				state.activeSlot = null;
+			}
+
+			function stopCamera() {
+				cancelAnimationFrame(state.rafId);
+				state.rafId = 0;
+				if (state.stream) {
+					state.stream.getTracks().forEach((t) => t.stop());
+					state.stream = null;
+				}
+				if (state.videoEl) {
+					state.videoEl.srcObject = null;
+				}
+				state.videoEl = null;
+				state.overlayEl = null;
+				state.shootBtn = null;
+				state.badgeEl = null;
+				state.lastVideoTime = -1;
+			}
+
+			// ── Detection loop ──────────────────────────────────────────────────
+			function tick() {
+				const video = state.videoEl;
+				const overlay = state.overlayEl;
+				const slot = state.activeSlot;
+				if (!video || !overlay || !slot || !state.landmarker) return;
+
+				const w = video.videoWidth;
+				const h = video.videoHeight;
+				if (w && h && (overlay.width !== w || overlay.height !== h)) {
+					overlay.width = w;
+					overlay.height = h;
+				}
+
+				let result = null;
+				if (video.currentTime !== state.lastVideoTime && w && h) {
+					state.lastVideoTime = video.currentTime;
+					try {
+						result = state.landmarker.detectForVideo(video, performance.now());
+					} catch (err) {
+						// transient — model may not be warm; skip frame
+					}
+				}
+
+				const ctx = overlay.getContext('2d');
+				ctx.clearRect(0, 0, overlay.width, overlay.height);
+
+				const slotCfg = SLOTS[slot];
+				let pass = false;
+				let yawDeg = null, pitchDeg = null, rollDeg = null;
+				let faceFound = false;
+				let centered = false;
+
+				if (result && result.faceLandmarks && result.faceLandmarks[0]) {
+					faceFound = true;
+					const lms = result.faceLandmarks[0];
+
+					// Draw wireframe (tesselation gives a sense of all 468 landmarks)
+					const utils = new DrawingUtils(ctx);
+					utils.drawConnectors(lms, FaceLandmarker.FACE_LANDMARKS_TESSELATION, {
+						color: 'rgba(61, 193, 255,0.35)', lineWidth: 0.5,
+					});
+					utils.drawConnectors(lms, FaceLandmarker.FACE_LANDMARKS_FACE_OVAL, {
+						color: '#3dc1ff', lineWidth: 1.5,
+					});
+					utils.drawConnectors(lms, FaceLandmarker.FACE_LANDMARKS_RIGHT_EYE, {
+						color: '#66d9ef', lineWidth: 1.2,
+					});
+					utils.drawConnectors(lms, FaceLandmarker.FACE_LANDMARKS_LEFT_EYE, {
+						color: '#66d9ef', lineWidth: 1.2,
+					});
+
+					const pose = estimateHeadPose(lms);
+					yawDeg = pose.yaw;
+					pitchDeg = pose.pitch;
+					rollDeg = pose.roll;
+
+					// Centering: nose-tip landmark 1 should be near horizontal/vertical mid
+					const nose = lms[1] || lms[4];
+					centered = nose && Math.abs(nose.x - 0.5) < 0.22 && Math.abs(nose.y - 0.5) < 0.28;
+
+					// Blur + lighting quality gates (sampled every frame; cheap at 64px)
+					const q = computeFaceQuality(video, lms);
+					state._quality = q;
+
+					const yawOk = yawDeg >= slotCfg.min && yawDeg <= slotCfg.max;
+					const blurOk = q.blur >= BLUR_MIN;
+					const lumaOk = q.luma >= LUMA_MIN && q.luma <= LUMA_MAX;
+					pass = yawOk && centered && blurOk && lumaOk;
+				}
+
+				// Throttled log: only when state changes
+				const stateKey = JSON.stringify({ faceFound, pass, yaw: yawDeg != null ? Math.round(yawDeg) : null });
+				if (stateKey !== state._lastLogKey) {
+					state._lastLogKey = stateKey;
+					if (!faceFound) {
+						log(`${slot}: no face detected`, 'warn');
+					} else {
+						log(
+							`${slot}: face found, yaw=${yawDeg.toFixed(1)}°, pitch=${pitchDeg.toFixed(1)}°, roll=${rollDeg.toFixed(1)}° ${pass ? '✓' : '(target ' + slotCfg.min + '..' + slotCfg.max + '°)'}`,
+							pass ? 'ok' : 'info',
+						);
+					}
+				}
+
+				// Badge UI
+				state.badgeEl.innerHTML = '';
+				const chips = [];
+				chips.push(makeChip(faceFound ? 'face' : 'no face', faceFound ? 'ok' : 'bad'));
+				if (faceFound) {
+					const q = state._quality || { blur: 0, luma: 0 };
+					chips.push(makeChip(`yaw ${yawDeg.toFixed(0)}°`, (yawDeg >= slotCfg.min && yawDeg <= slotCfg.max) ? 'ok' : 'bad'));
+					chips.push(makeChip(centered ? 'centered' : 'recenter', centered ? 'ok' : 'bad'));
+					chips.push(makeChip(q.blur < BLUR_MIN ? 'blurry' : 'sharp', q.blur >= BLUR_MIN ? 'ok' : 'bad'));
+					const lumaLabel = q.luma < LUMA_MIN ? 'too dark' : q.luma > LUMA_MAX ? 'overexposed' : 'lit ✓';
+					chips.push(makeChip(lumaLabel, (q.luma >= LUMA_MIN && q.luma <= LUMA_MAX) ? 'ok' : 'bad'));
+				}
+				chips.forEach((c) => state.badgeEl.appendChild(c));
+
+				if (state.shootBtn) state.shootBtn.disabled = !pass;
+
+				state.rafId = requestAnimationFrame(tick);
+			}
+
+			function makeChip(text, kind) {
+				const el = document.createElement('span');
+				el.className = 'chip ' + kind;
+				el.textContent = text;
+				return el;
+			}
+
+			async function captureFromCamera(slot) {
+				const video = state.videoEl;
+				if (!video) return;
+				const w = video.videoWidth;
+				const h = video.videoHeight;
+				const c = document.createElement('canvas');
+				c.width = w; c.height = h;
+				const ctx = c.getContext('2d');
+				ctx.drawImage(video, 0, 0, w, h); // un-mirrored
+				const blob = await new Promise((res) => c.toBlob(res, 'image/jpeg', 0.92));
+				if (!blob) {
+					log('capture failed: toBlob returned null', 'err');
+					return;
+				}
+				log(`captured ${slot} frame (${blob.size} bytes, ${w}x${h})`, 'ok');
+				stopCamera();
+				await acceptBlob(slot, blob, w, h, true);
+			}
+
+			// ── Upload path ─────────────────────────────────────────────────────
+			async function acceptUpload(slot, file) {
+				log(`validating uploaded ${slot} (${file.name}, ${file.size} bytes)...`, 'info');
+				const url = URL.createObjectURL(file);
+				const img = await new Promise((res, rej) => {
+					const i = new Image();
+					i.onload = () => res(i);
+					i.onerror = () => rej(new Error('decode failed'));
+					i.src = url;
+				});
+				URL.revokeObjectURL(url);
+
+				await landmarkerReady;
+				// Switch the landmarker to IMAGE mode for one-shot detect, then back.
+				const imgLandmarker = await FaceLandmarker.createFromOptions(
+					await FilesetResolver.forVisionTasks(
+						'https://cdn.skypack.dev/@mediapipe/tasks-vision@0.10.18/wasm',
+					),
+					{
+						baseOptions: {
+							modelAssetPath:
+								'https://storage.googleapis.com/mediapipe-models/face_landmarker/face_landmarker/float16/1/face_landmarker.task',
+							delegate: 'GPU',
+						},
+						runningMode: 'IMAGE',
+						numFaces: 1,
+						outputFaceBlendshapes: false,
+					},
+				);
+				const result = imgLandmarker.detect(img);
+				imgLandmarker.close();
+
+				const slotCfg = SLOTS[slot];
+				if (!result.faceLandmarks || !result.faceLandmarks[0]) {
+					log(`${slot}: upload rejected — no face detected`, 'err');
+					return;
+				}
+				const lms = result.faceLandmarks[0];
+				const pose = estimateHeadPose(lms);
+				const nose = lms[1] || lms[4];
+				const centered = nose && Math.abs(nose.x - 0.5) < 0.30 && Math.abs(nose.y - 0.5) < 0.35;
+				const yawOk = pose.yaw >= slotCfg.min && pose.yaw <= slotCfg.max;
+				log(
+					`${slot} upload: yaw=${pose.yaw.toFixed(1)}°, pitch=${pose.pitch.toFixed(1)}°, roll=${pose.roll.toFixed(1)}°, centered=${centered}`,
+					'info',
+				);
+				if (!yawOk || !centered) {
+					log(
+						`${slot}: upload rejected — yaw must be ${slotCfg.min}..${slotCfg.max}° and face must be centered`,
+						'err',
+					);
+					return;
+				}
+				// Re-encode through a canvas to get a JPEG blob with known dims.
+				const c = document.createElement('canvas');
+				c.width = img.naturalWidth;
+				c.height = img.naturalHeight;
+				const ctx = c.getContext('2d');
+				ctx.drawImage(img, 0, 0);
+				const blob = await new Promise((res) => c.toBlob(res, 'image/jpeg', 0.92));
+				await acceptBlob(slot, blob, c.width, c.height, true, lms);
+			}
+
+			async function acceptBlob(slot, blob, w, h, drawOverlay, landmarks) {
+				state.images[slot] = { blob, width: w, height: h };
+				state.passes[slot] = true;
+				const slotEl = $(`.slot[data-slot="${slot}"]`);
+				slotEl.classList.remove('active');
+				slotEl.classList.add('filled');
+				$('.placeholder', slotEl)?.remove();
+				$('video', slotEl)?.remove();
+				$('canvas.overlay', slotEl)?.remove();
+
+				// Show preview
+				const previewUrl = URL.createObjectURL(blob);
+				const previewImg = document.createElement('img');
+				previewImg.className = 'preview';
+				previewImg.style.transform = 'scaleX(-1)'; // match camera mirror feel
+				previewImg.src = previewUrl;
+				previewImg.onload = () => URL.revokeObjectURL(previewUrl);
+				slotEl.appendChild(previewImg);
+
+				$('.badge', slotEl).innerHTML = '';
+				const ok = makeChip('captured', 'ok');
+				$('.badge', slotEl).appendChild(ok);
+
+				const footer = $('.footer', slotEl);
+				footer.removeAttribute('hidden');
+				footer.innerHTML = '';
+				const retake = document.createElement('button');
+				retake.className = 'slot-btn';
+				retake.textContent = 'Retake';
+				retake.addEventListener('click', (e) => {
+					e.stopPropagation();
+					resetSlot(slot);
+				});
+				footer.appendChild(retake);
+
+				log(`${slot}: photo accepted`, 'ok');
+				updateSubmit();
+			}
+
+			function resetSlot(slot) {
+				state.images[slot] = null;
+				state.passes[slot] = false;
+				const slotEl = $(`.slot[data-slot="${slot}"]`);
+				slotEl.classList.remove('filled', 'active');
+				$('.preview', slotEl)?.remove();
+				$('.badge', slotEl).innerHTML = '';
+				let placeholder = $('.placeholder', slotEl);
+				if (!placeholder) {
+					placeholder = document.createElement('div');
+					placeholder.className = 'placeholder';
+					const cfg = SLOTS[slot];
+					const labelText = slot === 'frontal' ? 'Frontal' : slot === 'left' ? 'Left ~45°' : 'Right ~45°';
+					placeholder.innerHTML = `
+						<div class="label">${labelText}</div>
+						<div>Yaw target: ${cfg.min}° to ${cfg.max}°</div>
+					`;
+					slotEl.insertBefore(placeholder, slotEl.firstChild);
+				}
+				placeholder.style.display = '';
+				placeholder.style.opacity = '';
+				const footer = $('.footer', slotEl);
+				footer.setAttribute('hidden', '');
+				footer.innerHTML = `
+					<button class="slot-btn" data-slot-action="camera">Camera</button>
+					<button class="slot-btn" data-slot-action="upload">Upload</button>
+				`;
+				$$('[data-slot-action]', footer).forEach((btn) => {
+					btn.addEventListener('click', async (e) => {
+						e.stopPropagation();
+						const action = btn.getAttribute('data-slot-action');
+						if (action === 'camera') await startCamera(slot);
+						else if (action === 'upload') $('.upload-input', slotEl).click();
+					});
+				});
+				updateSubmit();
+			}
+
+			// ── Head-pose estimation from landmarks ─────────────────────────────
+			// Simple geometric estimator. Yaw uses the asymmetry between the two
+			// outer-eye-corner-to-nose distances; pitch uses nose-tip vs eye-midline
+			// vertical offset; roll uses the angle between the two outer eye corners.
+			// Indices (MediaPipe face mesh):
+			//   33  = right eye outer corner (subject's right)
+			//   263 = left eye outer corner  (subject's left)
+			//   1   = nose tip
+			//   199 = chin
+			function estimateHeadPose(lms) {
+				const r = lms[33];   // subject's right eye, camera's left
+				const l = lms[263];  // subject's left eye, camera's right
+				const nose = lms[1];
+				// Roll: angle between eye corners on the image plane
+				const dxEye = l.x - r.x;
+				const dyEye = l.y - r.y;
+				const roll = (Math.atan2(dyEye, dxEye) * 180) / Math.PI;
+				// Yaw: ratio of nose offset from each eye corner along x.
+				// Positive yaw = head turned to subject's left (camera sees more of right cheek).
+				const distR = Math.hypot(nose.x - r.x, nose.y - r.y);
+				const distL = Math.hypot(nose.x - l.x, nose.y - l.y);
+				const yawRaw = (distR - distL) / (distR + distL);
+				// Sign convention chosen so that real left head turn → positive yaw.
+				// (Image is un-mirrored at this point.)
+				const yaw = -yawRaw * 90; // approximate degrees in ±60° range
+				// Pitch: vertical offset between nose tip and eye midline, normalised
+				// by eye span. Positive pitch = head tilted up.
+				const eyeMidY = (l.y + r.y) / 2;
+				const eyeSpan = Math.hypot(l.x - r.x, l.y - r.y) || 1;
+				const pitchRaw = (eyeMidY - nose.y) / eyeSpan;
+				const pitch = pitchRaw * 90;
+				return { yaw, pitch, roll };
+			}
+
+			// ── Options ─────────────────────────────────────────────────────────
+			$$('#body-radios input').forEach((input, i, all) => {
+				input.addEventListener('change', () => {
+					state.bodyType = input.value;
+					all.forEach((x) => x.parentElement.classList.toggle('selected', x.checked));
+					log(`body type → ${input.value}`, 'info');
+				});
+			});
+			$$('#style-radios input').forEach((input, i, all) => {
+				input.addEventListener('change', () => {
+					state.style = input.value;
+					all.forEach((x) => x.parentElement.classList.toggle('selected', x.checked));
+					log(`style → ${input.value}`, 'info');
+				});
+			});
+
+			// ── Submit ──────────────────────────────────────────────────────────
+			const submitBtn = $('#submit-btn');
+			function updateSubmit() {
+				const n = ['frontal', 'left', 'right'].filter((k) => state.passes[k]).length;
+				submitBtn.textContent = n === 3 ? 'Submit to three.ws Selfie pipeline' : `Upload ${n}/3`;
+				submitBtn.disabled = n !== 3;
+			}
+
+			submitBtn.addEventListener('click', async () => {
+				submitBtn.disabled = true;
+				const original = submitBtn.textContent;
+				submitBtn.textContent = 'Preparing photos…';
+				try {
+					log('downscaling photos to ≤1024px JPEG q=0.85...', 'info');
+					const photos = {
+						frontal: await blobToDownscaledDataUrl(state.images.frontal.blob),
+						left:    await blobToDownscaledDataUrl(state.images.left.blob),
+						right:   await blobToDownscaledDataUrl(state.images.right.blob),
+					};
+					const totalKb = Math.round(
+						(photos.frontal.length + photos.left.length + photos.right.length) / 1024,
+					);
+					log(`photos encoded (${totalKb} KB total base64). submitting...`, 'info');
+
+					// 1) Try the native three.ws reconstruction pipeline first.
+					//    Falls back to the in-browser editor path on 501 (provider
+					//    unconfigured) — that lets us ship the new path safely
+					//    even before REPLICATE_RECONSTRUCT_MODEL is populated.
+					submitBtn.textContent = 'Generating 3D model…';
+					const nativeRes = await fetch('/api/avatars/reconstruct', {
+						method: 'POST',
+						credentials: 'include',
+						headers: { 'content-type': 'application/json', ...(await csrfHeader()) },
+						body: JSON.stringify({
+							name: `Selfie ${new Date().toISOString().slice(0, 10)}`,
+							photos: [photos.frontal, photos.left, photos.right],
+							visibility: 'private',
+							params: { body_type: state.bodyType, avatar_type: state.style },
+						}),
+					});
+					if (nativeRes.status === 501) {
+						const why = await nativeRes.json().catch(() => ({}));
+						log(`native pipeline unavailable (${why?.error || '501'}); using editor path…`, 'info');
+					} else if (nativeRes.ok) {
+						const job = await nativeRes.json();
+						log(`✓ reconstruction job queued: ${job.jobId}`, 'ok');
+						const avatarId = await pollReconstructJob(job.jobId);
+						// Send to /creating (new isolated route) until the native
+						// pipeline is proven 100% end-to-end. /create is reserved
+						// for the shipped editor flow.
+						const creatingHref = `/creating?avatarId=${encodeURIComponent(avatarId)}`;
+						log(`✓ avatar materialized → /creating?avatarId=${avatarId}`, 'ok');
+						showResult(creatingHref, { native: true, avatarId });
+						submitBtn.textContent = 'Done ✓';
+						return;
+					} else {
+						const text = await nativeRes.text();
+						log(`native pipeline error ${nativeRes.status}: ${text.slice(0, 200)}; falling back…`, 'err');
+					}
+
+					// 2) Fallback: existing in-browser editor path.
+					submitBtn.textContent = 'Opening editor…';
+					const res = await fetch('/api/onboarding/avaturn-session', {
+						method: 'POST',
+						credentials: 'include',
+						headers: { 'content-type': 'application/json', ...(await csrfHeader()) },
+						body: JSON.stringify({
+							photos,
+							body_type: state.bodyType,
+							avatar_type: state.style,
+						}),
+					});
+					if (res.status === 501) {
+						// Editor fallback is not configured in this environment
+						// (AVATURN_API_KEY absent). The native pipeline above is the
+						// primary path; surface a clear, non-error message instead of
+						// throwing a raw HTTP 501 at the user.
+						const why = await res.json().catch(() => ({}));
+						log(`editor path unavailable (${why?.error || '501'}): avatar customization is temporarily unavailable in this environment.`, 'info');
+						submitBtn.disabled = false;
+						submitBtn.textContent = original;
+						return;
+					}
+					if (!res.ok) {
+						const text = await res.text();
+						throw new Error(`HTTP ${res.status}: ${text.slice(0, 240)}`);
+					}
+					const data = await res.json();
+					if (!data.session_url) throw new Error('response missing session_url');
+					log(`✓ session URL received`, 'ok');
+					log(data.session_url, 'ok');
+					showResult(data.session_url);
+					submitBtn.textContent = 'Submitted ✓';
+				} catch (err) {
+					log('submit failed: ' + err.message, 'err');
+					submitBtn.disabled = false;
+					submitBtn.textContent = original;
+				}
+			});
+
+			// Poll the regenerate-status endpoint until the reconstruct job either
+			// materializes the avatar (resultAvatarId set) or fails. Uses real
+			// exponential backoff capped at 8s between polls; gives up after ~5
+			// minutes (sub-60s is the Phase 1 verification target but Replicate
+			// cold-starts can occasionally exceed that).
+			async function pollReconstructJob(jobId) {
+				const start = Date.now();
+				const TIMEOUT_MS = 5 * 60 * 1000;
+				let delay = 1500;
+				for (;;) {
+					if (Date.now() - start > TIMEOUT_MS) {
+						throw new Error('reconstruct job timed out after 5 min');
+					}
+					const r = await fetch(
+						`/api/avatars/regenerate-status?jobId=${encodeURIComponent(jobId)}`,
+						{ credentials: 'include' },
+					);
+					if (!r.ok) {
+						const text = await r.text();
+						throw new Error(`status HTTP ${r.status}: ${text.slice(0, 200)}`);
+					}
+					const data = await r.json();
+					if (data.error) log(`provider note: ${data.error}`, 'info');
+					if (data.status === 'failed') {
+						throw new Error(`reconstruct failed: ${data.error || 'unknown'}`);
+					}
+					if (data.status === 'done' && data.resultAvatarId) {
+						return data.resultAvatarId;
+					}
+					await new Promise((r) => setTimeout(r, delay));
+					delay = Math.min(delay * 1.4, 8000);
+				}
+			}
+
+			function showResult(url, opts = {}) {
+				const card = $('#result-card');
+				card.classList.add('show');
+				$('#result-url').textContent = url;
+				const btn = $('#open-session-btn');
+				const heading = card.querySelector('h2');
+				const blurb = card.querySelector('div[style*="8a8d98"]');
+				if (opts.native) {
+					if (heading) heading.textContent = 'Your three.ws avatar is ready';
+					if (blurb) blurb.textContent = 'Reconstructed from your three selfies. Continue to mint it on-chain.';
+					btn.textContent = 'Mint as agent →';
+					btn.onclick = () => { window.location.href = url; };
+				} else {
+					if (heading) heading.textContent = 'three.ws Selfie session ready';
+					if (blurb) blurb.textContent = 'Open the editor to refine and export your avatar.';
+					btn.textContent = 'Open three.ws Selfie editor';
+					btn.onclick = () => openIframeModal(url);
+				}
+			}
+
+			function openIframeModal(url) {
+				$('#session-iframe').src = url;
+				$('#iframe-modal').classList.add('open');
+				log('opened three.ws Selfie editor iframe', 'info');
+			}
+			$('#modal-close').addEventListener('click', () => {
+				$('#iframe-modal').classList.remove('open');
+				$('#session-iframe').src = 'about:blank';
+				log('closed editor iframe', 'info');
+			});
+			$('#iframe-modal').addEventListener('click', (e) => {
+				if (e.target === $('#iframe-modal')) {
+					$('#iframe-modal').classList.remove('open');
+					$('#session-iframe').src = 'about:blank';
+				}
+			});
+
+			// ── Helpers ─────────────────────────────────────────────────────────
+			async function blobToDownscaledDataUrl(blob) {
+				const bitmap = await createImageBitmap(blob);
+				const max = 1024;
+				const scale = Math.min(1, max / Math.max(bitmap.width, bitmap.height));
+				const w = Math.round(bitmap.width * scale);
+				const h = Math.round(bitmap.height * scale);
+				const c = document.createElement('canvas');
+				c.width = w; c.height = h;
+				const ctx = c.getContext('2d');
+				ctx.drawImage(bitmap, 0, 0, w, h);
+				try { bitmap.close?.(); } catch (_) {}
+				return c.toDataURL('image/jpeg', 0.85);
+			}
+
+			// ── Avaturn export handler ───────────────────────────────────────────
+			// When the user finishes editing in the Avaturn iframe and taps Export,
+			// Avaturn posts a message: { source:'avaturn', eventName:'export', data:{ url, urlType } }
+			// We close the modal and show the "Mint as agent" CTA with the GLB URL.
+			window.addEventListener('message', (event) => {
+				if (!event.data || typeof event.data !== 'object') return;
+				if (event.data.source !== 'avaturn' || event.data.eventName !== 'export') return;
+				const glbUrl = event.data.data?.url;
+				if (!glbUrl) return;
+				log('Export received from Avaturn editor.', 'ok');
+				log('GLB URL: ' + glbUrl, 'ok');
+				// Close the iframe modal
+				$('#iframe-modal')?.classList.remove('open');
+				const iframeSrc = $('#session-iframe');
+				if (iframeSrc) iframeSrc.src = 'about:blank';
+				// Show mint CTA
+				showExportReady(glbUrl);
+			});
+
+			function showExportReady(glbUrl) {
+				const card = $('#result-card');
+				card.classList.add('show');
+				// Encode the GLB URL so /create can pre-fill it
+				const createHref = '/create?avatarUrl=' + encodeURIComponent(glbUrl);
+				card.innerHTML = `
+					<h2 style="margin:0 0 8px;font-size:17px;font-weight:600">Your avatar is ready</h2>
+					<p style="margin:0 0 16px;color:#8a8d98;font-size:14px;line-height:1.55">
+						Your 3D avatar was exported from the three.ws Selfie editor.<br>
+						Next: mint it on-chain as a three.ws agent with an ERC-8004 identity.
+					</p>
+					<div style="display:flex;gap:10px;flex-wrap:wrap">
+						<a href="${createHref}" class="submit" style="text-decoration:none;display:inline-flex;align-items:center;gap:6px">
+							Mint as agent →
+						</a>
+						<a href="${glbUrl}" target="_blank" rel="noopener"
+							class="submit" style="text-decoration:none;display:inline-flex;align-items:center;gap:6px;background:#202020;color:#eee">
+							Download GLB ↓
+						</a>
+					</div>
+				`;
+			}
+
+			log('demo ready. click a slot to begin.', 'ok');
+		</script>
+		<script src="/brand.js" defer></script>
+		<div id="footer-container"></div>
+		<script src="/footer.js"></script>
+	<!-- Runtime i18n: detects locale, swaps annotated copy, mounts <lang-switcher>. -->
+	<script type="module" src="/i18n.js"></script>
+</body>
+</html>

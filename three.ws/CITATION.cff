@@ -1,0 +1,18 @@
+cff-version: 1.2.0
+message: "If you use three.ws in research or a publication, please cite it as below."
+title: "three.ws: a browser platform for 3D AI agents"
+abstract: "Open-source platform for embodied 3D AI agents in the browser: text-to-3D generation, rigged avatar creation and animation retargeting, an embeddable agent-3d web component, and Model Context Protocol servers."
+type: software
+authors:
+  - name: "three.ws"
+    website: "https://three.ws"
+repository-code: "https://github.com/nirholas/three.ws"
+url: "https://three.ws"
+license: Apache-2.0
+keywords:
+  - three.js
+  - glTF
+  - text-to-3D
+  - avatars
+  - AI agents
+  - Model Context Protocol

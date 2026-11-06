@@ -1,0 +1,9 @@
+
+ RUN  v4.1.9 /workspaces/three.ws
+
+
+ Test Files  1 passed (1)
+      Tests  15 passed (15)
+   Start at  11:42:11
+   Duration  1.24s (transform 334ms, setup 0ms, import 1.02s, tests 20ms, environment 0ms)
+

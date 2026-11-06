@@ -1,0 +1,353 @@
+<!doctype html>
+<html lang="en">
+<head>
+	<style>/* three.ws hidden-guard — make the `hidden` attribute authoritative; see scripts/lib/hidden-guard.mjs */[hidden]{display:none!important}</style>
+	<script>/* three.ws theme boot — no-flash; runtime in /theme-switcher.js */(function(){try{var m=localStorage.getItem('twx_theme');var l=m==='auto'?(window.matchMedia&&window.matchMedia('(prefers-color-scheme: light)').matches):m==='light';document.documentElement.setAttribute('data-theme',l?'light':'dark');}catch(e){document.documentElement.setAttribute('data-theme','dark');}})();</script>
+	<meta charset="utf-8" />
+	<meta name="viewport" content="width=device-width,initial-scale=1" />
+	<title data-i18n="support.meta_title">Support — three.ws</title>
+	<meta name="description" content="Get help with three.ws and the x402 MCP server for IBM Granite. Report bugs, ask integration questions, reach support and security — GitHub Issues, Discussions, and email, all in one place."  data-i18n-attr="content:support.meta_description"/>
+	<link rel="canonical" href="https://three.ws/support" />
+
+	<meta property="og:type" content="website" />
+	<meta property="og:title" content="Support — three.ws"  data-i18n-attr="content:support.meta_og_title"/>
+	<meta property="og:description" content="Get help with three.ws and the x402 MCP server for IBM Granite. Bugs, integration questions, security — all the channels in one place."  data-i18n-attr="content:support.meta_og_description"/>
+	<meta property="og:url" content="https://three.ws/support" />
+	<meta property="og:image" content="https://three.ws/ibm-og.png" />
+	<meta property="og:site_name" content="three.ws" />
+	<meta name="twitter:card" content="summary_large_image" />
+	<meta name="twitter:title" content="Support — three.ws"  data-i18n-attr="content:support.meta_twitter_title"/>
+	<meta name="twitter:description" content="Get help with three.ws and the x402 MCP server for IBM Granite."  data-i18n-attr="content:support.meta_twitter_description"/>
+	<meta name="twitter:image" content="https://three.ws/ibm-og.png" />
+
+		<link rel="icon" href="/favicon.ico" sizes="any" />
+		<link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+		<link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png" />
+		<link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png" />
+		<link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+		<link rel="manifest" href="/manifest.webmanifest" />
+	<link rel="stylesheet" href="/ibm.css" />
+	<style>
+		/* Design tokens come from the shared system: /ibm.css */
+		* { box-sizing: border-box; margin: 0; padding: 0; }
+		html { scroll-behavior: smooth; }
+		body { font: 16px/1.6 -apple-system, system-ui, "Segoe UI", Roboto, sans-serif; color: var(--text); background: var(--bg); min-height: 100vh; -webkit-font-smoothing: antialiased; }
+		a { color: inherit; }
+
+		header { padding: 18px 24px; border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; position: sticky; top: 0; z-index: 30; background: rgba(7,7,7,0.82); backdrop-filter: blur(12px); }
+		header a.home { color: var(--text); text-decoration: none; font-weight: 650; font-size: 15px; letter-spacing: -0.01em; }
+		header a.home:hover { color: var(--brand-blue-light); }
+		header nav { display: flex; gap: 22px; align-items: center; }
+		header nav a { color: var(--muted); text-decoration: none; font-size: 14px; transition: color 0.15s; }
+		header nav a:hover { color: var(--text); }
+		header nav a:focus-visible, header a.home:focus-visible { outline: 2px solid var(--brand-blue-light); outline-offset: 3px; border-radius: 4px; }
+
+		main { max-width: 880px; margin: 0 auto; padding: 72px 24px 120px; }
+
+		.kicker { display: inline-flex; align-items: center; gap: 9px; font-size: 12px; font-weight: 600; color: var(--brand-blue-light); background: var(--brand-blue-dim); border: 1px solid rgba(120,169,255,0.22); border-radius: 99px; padding: 6px 13px; margin-bottom: 22px; }
+		.kicker .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--brand-blue); box-shadow: 0 0 10px var(--brand-blue); animation: pulse 2.4s ease-in-out infinite; }
+		@keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.4; } }
+
+		h1 { font-size: clamp(34px, 5.5vw, 52px); letter-spacing: -0.03em; line-height: 1.05; font-weight: 650; margin-bottom: 18px; }
+		h1 .g { background: linear-gradient(110deg, var(--brand-blue-light) 25%, var(--brand-blue) 80%); -webkit-background-clip: text; background-clip: text; color: transparent; }
+		.lede { font-size: clamp(16px, 2vw, 18.5px); color: var(--muted); line-height: 1.55; max-width: 640px; }
+		.lede strong { color: var(--text); font-weight: 500; }
+
+		section { margin-top: 64px; }
+		section > h2 { font-size: clamp(22px, 3.2vw, 28px); letter-spacing: -0.02em; line-height: 1.15; font-weight: 650; margin-bottom: 8px; }
+		section > .sub { color: var(--muted); font-size: 15.5px; margin-bottom: 26px; max-width: 620px; line-height: 1.55; }
+
+		/* Channel cards */
+		.channels { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+		.channel { display: flex; flex-direction: column; gap: 0; background: var(--panel); border: 1px solid var(--border); border-radius: 16px; padding: 22px 22px 20px; text-decoration: none; color: inherit; transition: border-color 0.18s, transform 0.18s, background 0.18s; position: relative; }
+		a.channel:hover, a.channel:focus-visible { border-color: rgba(120,169,255,0.45); transform: translateY(-2px); background: var(--panel2); }
+		a.channel:focus-visible { outline: 2px solid var(--brand-blue-light); outline-offset: 3px; }
+		.channel .top { display: flex; align-items: center; gap: 12px; margin-bottom: 12px; }
+		.channel .icon { width: 38px; height: 38px; border-radius: 10px; background: rgba(15,98,254,0.10); border: 1px solid rgba(120,169,255,0.25); display: flex; align-items: center; justify-content: center; flex: 0 0 auto; }
+		.channel .icon svg { width: 19px; height: 19px; }
+		.channel h3 { font-size: 16px; font-weight: 650; letter-spacing: -0.01em; }
+		.channel .addr { font-size: 12.5px; color: var(--brand-blue-light); font-family: var(--mono); margin-top: 1px; word-break: break-all; }
+		.channel p { font-size: 14px; color: var(--muted); line-height: 1.55; }
+		.channel .arrow { position: absolute; top: 22px; right: 22px; color: var(--faint); transition: transform 0.18s, color 0.18s; }
+		a.channel:hover .arrow, a.channel:focus-visible .arrow { color: var(--brand-blue-light); transform: translate(2px, -2px); }
+
+		/* Email row with copy */
+		.channel .emailrow { display: flex; align-items: center; gap: 8px; margin-top: 2px; }
+		.copy-btn { background: none; border: 1px solid var(--border); color: var(--muted); font-size: 11px; font-weight: 600; border-radius: 7px; padding: 3px 9px; cursor: pointer; transition: border-color 0.15s, color 0.15s, background 0.15s; white-space: nowrap; }
+		.copy-btn:hover { border-color: var(--border2); color: var(--text); }
+		.copy-btn:focus-visible { outline: 2px solid var(--brand-blue-light); outline-offset: 2px; }
+		.copy-btn.done { color: var(--green); border-color: rgba(66,190,101,0.4); }
+
+		/* Numbered steps */
+		.steps { display: grid; gap: 14px; }
+		.step { display: grid; grid-template-columns: auto 1fr; gap: 16px; align-items: start; background: var(--panel); border: 1px solid var(--border); border-radius: 14px; padding: 18px 20px; }
+		.step .n { font-family: var(--mono); font-size: 13px; font-weight: 700; color: var(--brand-blue-light); background: var(--brand-blue-dim); border: 1px solid rgba(120,169,255,0.25); border-radius: 50%; width: 28px; height: 28px; display: inline-flex; align-items: center; justify-content: center; flex: 0 0 auto; }
+		.step h3 { font-size: 15px; font-weight: 650; margin-bottom: 4px; letter-spacing: -0.01em; }
+		.step p { font-size: 14px; color: var(--muted); line-height: 1.55; }
+		.step p code, .step p a { font-family: var(--mono); font-size: 12.5px; }
+		.step a { color: var(--brand-blue-light); text-decoration: none; }
+		.step a:hover { text-decoration: underline; }
+		.step code { font-family: var(--mono); font-size: 12.5px; color: var(--brand-blue-light); background: var(--brand-blue-dim); padding: 1px 6px; border-radius: 5px; }
+
+		/* Checklist */
+		.checklist { list-style: none; display: grid; gap: 10px; background: var(--panel); border: 1px solid var(--border); border-radius: 14px; padding: 20px 22px; }
+		.checklist li { display: grid; grid-template-columns: auto 1fr; gap: 12px; align-items: start; font-size: 14.5px; color: var(--muted); line-height: 1.5; }
+		.checklist li b { color: var(--text); font-weight: 600; }
+		.checklist .tick { width: 18px; height: 18px; flex: 0 0 auto; margin-top: 2px; color: var(--brand-blue-light); }
+		.checklist code { font-family: var(--mono); font-size: 12.5px; color: var(--brand-blue-light); background: var(--brand-blue-dim); padding: 1px 6px; border-radius: 5px; }
+
+		/* Product callout */
+		.callout { background: linear-gradient(180deg, var(--brand-blue-dim), transparent 70%), var(--panel); border: 1px solid rgba(120,169,255,0.28); border-radius: 18px; padding: 28px 28px 26px; }
+		.callout .tag { display: inline-flex; align-items: center; gap: 8px; font-size: 12px; font-weight: 600; color: var(--brand-blue-light); background: rgba(15,98,254,0.12); border: 1px solid rgba(120,169,255,0.25); border-radius: 99px; padding: 5px 12px; margin-bottom: 14px; }
+		.callout h3 { font-size: 20px; font-weight: 650; letter-spacing: -0.02em; margin-bottom: 10px; }
+		.callout p { font-size: 15px; color: var(--muted); line-height: 1.6; margin-bottom: 18px; }
+		.callout p strong { color: var(--text); font-weight: 500; }
+		.callout .links { display: flex; flex-wrap: wrap; gap: 10px; }
+
+		.btn { display: inline-flex; align-items: center; gap: 8px; padding: 11px 18px; border-radius: 11px; border: 0; font-size: 14px; font-weight: 600; text-decoration: none; cursor: pointer; transition: filter 0.15s, transform 0.12s, background 0.15s; }
+		.btn:focus-visible { outline: 2px solid var(--brand-blue-light); outline-offset: 3px; }
+		.btn-primary { background: var(--brand-blue); color: #fff; }
+		.btn-primary:hover { filter: brightness(1.12); }
+		.btn-primary:active { transform: translateY(1px); }
+		.btn-sec { background: var(--panel); border: 1px solid var(--border); color: var(--text); }
+		.btn-sec:hover { background: var(--panel2); border-color: var(--border2); }
+		.btn svg { width: 16px; height: 16px; }
+
+		/* Expectations strip */
+		.expect { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1px; background: var(--border); border: 1px solid var(--border); border-radius: 14px; overflow: hidden; }
+		.expect .cell { background: var(--panel); padding: 18px 20px; }
+		.expect .k { font-size: 11.5px; text-transform: uppercase; letter-spacing: 0.07em; color: var(--muted); margin-bottom: 7px; }
+		.expect .v { font-size: 15px; font-weight: 600; color: var(--text); line-height: 1.4; }
+		.expect .v span { display: block; font-size: 12.5px; font-weight: 400; color: var(--faint); margin-top: 3px; }
+
+		footer { border-top: 1px solid var(--border); padding: 30px 24px 60px; text-align: center; color: var(--faint); font-size: 13px; margin-top: 80px; }
+		footer a { color: var(--muted); text-decoration: none; }
+		footer a:hover { color: var(--text); }
+		.disclaimer { max-width: 740px; margin: 16px auto 0; font-size: 11.5px; color: var(--faint); line-height: 1.55; }
+
+		@media (max-width: 720px) {
+			main { padding: 52px 20px 96px; }
+			.channels { grid-template-columns: 1fr; }
+			.expect { grid-template-columns: 1fr; }
+		}
+	</style>
+	<script type="application/ld+json">{"@context":"https://schema.org","@type":"WebPage","name":"Support — three.ws","description":"Support and help channels for three.ws and the x402 MCP server for IBM Granite.","url":"https://three.ws/support","isPartOf":{"@type":"WebSite","name":"three.ws","url":"https://three.ws"}}</script>
+
+	<meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1">
+	<meta property="og:locale" content="en_US">
+	<meta property="og:image:alt" content="Support — three.ws">
+	<meta name="twitter:site" content="@trythreews">
+</head>
+<body>
+	<header>
+		<a href="/" class="home" data-i18n="support.three_ws">three.ws</a>
+		<nav>
+			<a href="/discover" data-i18n="support.discover">Discover</a>
+			<a href="/docs" data-i18n="support.docs">Docs</a>
+			<a href="/ibm/hello" data-i18n="support.ibm_watsonx">IBM watsonx</a>
+			<a href="https://github.com/nirholas/three.ws" target="_blank" rel="noopener" data-i18n="support.github">GitHub</a>
+		</nav>
+	</header>
+
+	<main>
+		<span class="kicker" data-i18n-html="support.support_best_effort_usually_within_a_few"><span class="dot"></span> Support · best-effort, usually within a few business days</span>
+		<h1 data-i18n-html="support.how_can_we_help">How can we <span class="g">help?</span></h1>
+		<p class="lede" data-i18n-html="support.three_ws_is_an_open_source_3d_2">
+			three.ws is an open-source 3D AI agent platform, and home of the <strong>x402 MCP server for IBM Granite</strong>. Pick the channel that fits: bug reports and feature requests go to GitHub Issues, "how do I…" questions open a question there too, and anything private or account-specific goes to email. Security reports get their own address.
+		</p>
+
+		<!-- ── Channels ─────────────────────────────────────────── -->
+		<section aria-labelledby="channels-h">
+			<h2 id="channels-h" data-i18n="support.get_in_touch">Get in touch</h2>
+			<p class="sub" data-i18n="support.every_channel_below_is_monitored_by_the">Every channel below is monitored by the three.ws team.</p>
+			<div class="channels">
+				<a class="channel" href="https://github.com/nirholas/three.ws/issues/new" target="_blank" rel="noopener">
+					<svg class="arrow" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 17L17 7M7 7h10v10"/></svg>
+					<div class="top">
+						<span class="icon"><svg viewBox="0 0 24 24" fill="var(--brand-blue-light)" aria-hidden="true"><path d="M12 .3C5.4.3 0 5.7 0 12.3c0 5.3 3.4 9.8 8.2 11.4.6.1.8-.3.8-.6v-2.1c-3.3.7-4-1.6-4-1.6-.6-1.4-1.4-1.8-1.4-1.8-1.1-.7.1-.7.1-.7 1.2.1 1.9 1.2 1.9 1.2 1.1 1.8 2.9 1.3 3.6 1 .1-.8.4-1.3.8-1.6-2.7-.3-5.5-1.3-5.5-5.9 0-1.3.5-2.4 1.2-3.2-.1-.3-.5-1.5.1-3.2 0 0 1-.3 3.3 1.2 1-.3 2-.4 3-.4s2 .1 3 .4c2.3-1.5 3.3-1.2 3.3-1.2.7 1.7.2 2.9.1 3.2.8.8 1.2 1.9 1.2 3.2 0 4.6-2.8 5.6-5.5 5.9.4.4.8 1.1.8 2.2v3.3c0 .3.2.7.8.6 4.8-1.6 8.2-6.1 8.2-11.4C24 5.7 18.6.3 12 .3z"/></svg></span>
+						<div><h3 data-i18n="support.github_issues">GitHub Issues</h3><div class="addr">github.com/nirholas/three.ws</div></div>
+					</div>
+					<p data-i18n="support.report_a_reproducible_bug_a_crash_or">Report a reproducible bug, a crash, or unexpected tool output — or request a feature. Public and tracked to resolution.</p>
+				</a>
+
+				<a class="channel" href="https://github.com/nirholas/three.ws/issues/new?template=question.yml" target="_blank" rel="noopener">
+					<svg class="arrow" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 17L17 7M7 7h10v10"/></svg>
+					<div class="top">
+						<span class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="var(--brand-blue-light)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg></span>
+						<div><h3 data-i18n="support.questions_and_help">Questions &amp; help</h3><div class="addr">setup &amp; integration help</div></div>
+					</div>
+					<p data-i18n="support.ask_how_do_i_wire_this_into_2">Ask "how do I wire this into Claude / Cursor / my agent?" or compare approaches with the maintainers. Opens a question in the issue tracker.</p>
+				</a>
+
+				<div class="channel">
+					<div class="top">
+						<span class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="var(--brand-blue-light)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 4h16a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2z"/><path d="m22 7-10 6L2 7"/></svg></span>
+						<div><h3 data-i18n="support.email_support">Email support</h3><div class="addr">support@three.ws</div></div>
+					</div>
+					<p data-i18n="support.private_or_account_specific_help_billing_or">Private or account-specific help, billing, or anything you'd rather not post publicly.</p>
+					<div class="emailrow">
+						<a class="btn btn-sec" href="mailto:support@three.ws?subject=three.ws%20support" style="padding:8px 14px;font-size:13px" data-i18n="support.email_us">Email us</a>
+						<button class="copy-btn" type="button" data-copy="support@three.ws" aria-label="Copy support email address" data-i18n="support.copy_address" data-i18n-attr="aria-label:support.copy_support_email_address_arialabel">Copy address</button>
+					</div>
+				</div>
+
+				<div class="channel">
+					<div class="top">
+						<span class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="var(--brand-blue-light)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg></span>
+						<div><h3 data-i18n="support.security">Security</h3><div class="addr">security@three.ws</div></div>
+					</div>
+					<p data-i18n="support.report_a_vulnerability_privately_please_don">Report a vulnerability privately. Please don't open a public issue for anything exploitable — we prioritize these reports.</p>
+					<div class="emailrow">
+						<a class="btn btn-sec" href="mailto:security@three.ws?subject=Security%20report" style="padding:8px 14px;font-size:13px" data-i18n="support.report_privately">Report privately</a>
+						<button class="copy-btn" type="button" data-copy="security@three.ws" aria-label="Copy security email address" data-i18n="support.copy_address_2" data-i18n-attr="aria-label:support.copy_security_email_address_arialabel">Copy address</button>
+					</div>
+				</div>
+			</div>
+
+			<h3 id="directory-h" style="margin-top:32px;font-size:15px;color:var(--muted)" data-i18n="support.specialized_contacts">Specialized contacts</h3>
+			<p class="sub" style="margin-top:4px" data-i18n="support.route_your_message_to_the_right_team">Route your message to the right team — each address is monitored.</p>
+			<ul class="contact-directory" style="list-style:none;margin:14px 0 0;padding:0;display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:8px">
+				<li style="display:flex;justify-content:space-between;align-items:center;gap:12px;padding:11px 14px;border:1px solid var(--border);border-radius:10px;background:var(--panel)">
+					<span data-i18n-html="support.partnerships_three_ws_aws_marketplace_ibm_in"><a href="mailto:partnerships@three.ws">partnerships@three.ws</a><br><span style="font-size:12px;color:var(--muted)">AWS Marketplace, IBM, integrations &amp; private offers</span></span>
+					<button class="copy-btn" type="button" data-copy="partnerships@three.ws" aria-label="Copy partnerships email address" data-i18n="support.copy" data-i18n-attr="aria-label:support.copy_partnerships_email_addr_arialabel">Copy</button>
+				</li>
+				<li style="display:flex;justify-content:space-between;align-items:center;gap:12px;padding:11px 14px;border:1px solid var(--border);border-radius:10px;background:var(--panel)">
+					<span data-i18n-html="support.privacy_three_ws_data_privacy_requests_gdpr"><a href="mailto:privacy@three.ws">privacy@three.ws</a><br><span style="font-size:12px;color:var(--muted)">Data &amp; privacy requests (GDPR / CCPA)</span></span>
+					<button class="copy-btn" type="button" data-copy="privacy@three.ws" aria-label="Copy privacy email address" data-i18n="support.copy_2" data-i18n-attr="aria-label:support.copy_privacy_email_address_arialabel">Copy</button>
+				</li>
+				<li style="display:flex;justify-content:space-between;align-items:center;gap:12px;padding:11px 14px;border:1px solid var(--border);border-radius:10px;background:var(--panel)">
+					<span data-i18n-html="support.legal_three_ws_terms_eula_legal_notices"><a href="mailto:legal@three.ws">legal@three.ws</a><br><span style="font-size:12px;color:var(--muted)">Terms, EULA &amp; legal notices</span></span>
+					<button class="copy-btn" type="button" data-copy="legal@three.ws" aria-label="Copy legal email address" data-i18n="support.copy_3" data-i18n-attr="aria-label:support.copy_legal_email_address_arialabel">Copy</button>
+				</li>
+				<li style="display:flex;justify-content:space-between;align-items:center;gap:12px;padding:11px 14px;border:1px solid var(--border);border-radius:10px;background:var(--panel)">
+					<span data-i18n-html="support.dmca_three_ws_copyright_dmca_takedown_notice"><a href="mailto:dmca@three.ws">dmca@three.ws</a><br><span style="font-size:12px;color:var(--muted)">Copyright / DMCA takedown notices</span></span>
+					<button class="copy-btn" type="button" data-copy="dmca@three.ws" aria-label="Copy DMCA email address" data-i18n="support.copy_4" data-i18n-attr="aria-label:support.copy_dmca_email_address_arialabel">Copy</button>
+				</li>
+				<li style="display:flex;justify-content:space-between;align-items:center;gap:12px;padding:11px 14px;border:1px solid var(--border);border-radius:10px;background:var(--panel)">
+					<span data-i18n-html="support.abuse_three_ws_report_abuse_or_platform"><a href="mailto:abuse@three.ws">abuse@three.ws</a><br><span style="font-size:12px;color:var(--muted)">Report abuse or platform misuse</span></span>
+					<button class="copy-btn" type="button" data-copy="abuse@three.ws" aria-label="Copy abuse email address" data-i18n="support.copy_5" data-i18n-attr="aria-label:support.copy_abuse_email_address_arialabel">Copy</button>
+				</li>
+			</ul>
+		</section>
+
+		<!-- ── Response expectations ────────────────────────────── -->
+		<section aria-labelledby="expect-h">
+			<h2 id="expect-h" data-i18n="support.what_to_expect">What to expect</h2>
+			<p class="sub" data-i18n="support.three_ws_is_an_open_source_project">three.ws is an open-source project supported by its maintainers on a best-effort basis.</p>
+			<div class="expect">
+				<div class="cell"><div class="k">Response time</div><div class="v">A few business days<span data-i18n="support.security_reports_prioritized">Security reports prioritized</span></div></div>
+				<div class="cell"><div class="k">Languages</div><div class="v">English</div></div>
+				<div class="cell"><div class="k">Cost</div><div class="v">Free<span data-i18n="support.x402_tools_are_pay_per_call_in">x402 tools are pay-per-call in USDC</span></div></div>
+			</div>
+		</section>
+
+		<!-- ── Before you reach out ─────────────────────────────── -->
+		<section aria-labelledby="before-h">
+			<h2 id="before-h" data-i18n="support.before_you_open_an_issue">Before you open an issue</h2>
+			<p class="sub" data-i18n="support.a_few_minutes_here_usually_turns_three">A few minutes here usually turns three round-trips into one.</p>
+			<div class="steps">
+				<div class="step">
+					<span class="n">1</span>
+					<div>
+						<h3 data-i18n="support.check_your_environment_variables">Check your environment variables</h3>
+						<p data-i18n-html="support.most_it_won_t_start_reports_are">Most "it won't start" reports are a missing required var — <code>MCP_SVM_PAYMENT_ADDRESS</code>, <code>WATSONX_API_KEY</code>, and <code>WATSONX_PROJECT_ID</code> (or <code>WATSONX_SPACE_ID</code>). See the <a href="https://github.com/nirholas/three.ws/blob/main/packages/ibm-x402-mcp/README.md" target="_blank" rel="noopener">README</a>.</p>
+					</div>
+				</div>
+				<div class="step">
+					<span class="n">2</span>
+					<div>
+						<h3 data-i18n="support.reproduce_with_the_mcp_inspector">Reproduce with the MCP inspector</h3>
+						<p data-i18n-html="support.see_the_raw_tool_input_output">See the raw tool input/output: <code>npx -y @modelcontextprotocol/inspector npx -y @three-ws/ibm-x402-mcp</code></p>
+					</div>
+				</div>
+				<div class="step">
+					<span class="n">3</span>
+					<div>
+						<h3 data-i18n="support.verify_your_ibm_credentials_independently">Verify your IBM credentials independently</h3>
+						<p data-i18n-html="support.create_or_check_an_api_key_at">Create or check an API key at <a href="https://cloud.ibm.com/iam/apikeys" target="_blank" rel="noopener">cloud.ibm.com/iam/apikeys</a>, and confirm the project id under <em>watsonx.ai project → Manage → General</em>.</p>
+					</div>
+				</div>
+			</div>
+		</section>
+
+		<!-- ── What to include ──────────────────────────────────── -->
+		<section aria-labelledby="include-h">
+			<h2 id="include-h" data-i18n="support.what_to_include_in_a_bug_report">What to include in a bug report</h2>
+			<p class="sub" data-i18n="support.the_more_of_this_you_give_us">The more of this you give us up front, the faster we can reproduce.</p>
+			<ul class="checklist">
+				<li><svg class="tick" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg><span data-i18n-html="support.the_tool_you_called_or">The <b>tool</b> you called — <code>ibm_granite_chat</code>, <code>ibm_granite_code</code>, <code>ibm_granite_embed</code>, <code>ibm_granite_analyze</code>, or <code>ibm_granite_forecast</code>.</span></li>
+				<li><svg class="tick" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg><span data-i18n-html="support.your_package_version_and_node_version_this">Your <b>package version</b> and <b>Node version</b> (<code>node -v</code> — this server needs Node ≥ 20), plus your MCP client and OS.</span></li>
+				<li><svg class="tick" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg><span data-i18n-html="support.the_region_you_target_via_defaults_to">The <b>region</b> you target via <code>WATSONX_URL</code> (defaults to <code>us-south</code>) and the <b>full error text</b>.</span></li>
+				<li><svg class="tick" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg><span data-i18n-html="support.redact_secrets_never_paste_an_api_key"><b>Redact secrets.</b> Never paste an API key, private key, or wallet seed. A truncated public Solana address is fine. For payment issues, the public transaction signature helps.</span></li>
+			</ul>
+		</section>
+
+		<!-- ── Product callout ──────────────────────────────────── -->
+		<section aria-labelledby="product-h">
+			<h2 id="product-h" data-i18n="support.x402_mcp_for_ibm_granite">x402 MCP for IBM Granite</h2>
+			<p class="sub" data-i18n="support.pay_per_use_ibm_granite_chat_code">Pay-per-use IBM Granite — chat, code, embeddings, analysis, and time-series forecasting — settled in USDC on Solana. Listed on IBM Cloud Partner Center.</p>
+			<div class="callout">
+				<span class="tag" data-i18n-html="support.three_ws_ibm_x402_mcp"><span class="card-dot" style="width:7px;height:7px;border-radius:50%;background:var(--brand-blue);box-shadow:0 0 10px var(--brand-blue)"></span> @three-ws/ibm-x402-mcp</span>
+				<h3 data-i18n="support.dedicated_docs_support_for_the_mcp_server">Dedicated docs &amp; support for the MCP server</h3>
+				<p data-i18n-html="support.end_users_pay_usdc_on_solana_per">End users pay <strong>USDC on Solana</strong> per call — no IBM Cloud account required. Server operators supply IBM credentials and a receiving wallet. The full support guide covers payment vs. inference issues, scope, and how to tell a three.ws problem from an IBM platform problem.</p>
+				<div class="links">
+					<a class="btn btn-primary" href="https://github.com/nirholas/three.ws/blob/main/packages/ibm-x402-mcp/SUPPORT.md" target="_blank" rel="noopener">
+						Support guide
+						<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M5 12h14M13 5l7 7-7 7"/></svg>
+					</a>
+					<a class="btn btn-sec" href="https://www.npmjs.com/package/@three-ws/ibm-x402-mcp" target="_blank" rel="noopener" data-i18n="support.npm_package">npm package</a>
+					<a class="btn btn-sec" href="/ibm/hello" data-i18n="support.ibm_watsonx_demos">IBM watsonx demos</a>
+				</div>
+			</div>
+		</section>
+	</main>
+
+	<footer>
+		<a href="/" data-i18n="support.three_ws_2">three.ws</a> · <a href="/docs" data-i18n="support.docs_2">Docs</a> · <a href="/ibm/hello" data-i18n="support.ibm_watsonx_2">IBM watsonx</a> · <a href="https://github.com/nirholas/three.ws" target="_blank" rel="noopener" data-i18n="support.github_2">GitHub</a> · <a href="mailto:support@three.ws" data-i18n="support.support_three_ws">support@three.ws</a>
+		<p class="disclaimer" data-i18n-html="support.three_ws_is_an_independent_open_source">
+			three.ws is an independent, open-source project. The x402 MCP server integrates IBM Granite via watsonx.ai; it is not an IBM product and is not supported by IBM. For IBM watsonx.ai platform, Granite model, or IBM billing issues, contact <a href="https://cloud.ibm.com/unifieddeliveryportal" target="_blank" rel="noopener">IBM Cloud Support</a>. <em>Granite</em>, <em>watsonx</em>, and <em>watsonx.ai</em> are trademarks of IBM.
+		</p>
+	</footer>
+
+	<script type="module">
+		// Real clipboard copy with an inline confirmation — no fake timers driving UI,
+		// the "Copied" state reflects an actual successful clipboard write.
+		const REVERT_MS = 1600;
+		for (const btn of document.querySelectorAll('.copy-btn')) {
+			btn.addEventListener('click', async () => {
+				const value = btn.dataset.copy;
+				const original = btn.textContent;
+				try {
+					if (navigator.clipboard?.writeText) {
+						await navigator.clipboard.writeText(value);
+					} else {
+						const ta = document.createElement('textarea');
+						ta.value = value;
+						ta.style.position = 'fixed';
+						ta.style.opacity = '0';
+						document.body.appendChild(ta);
+						ta.select();
+						document.execCommand('copy');
+						ta.remove();
+					}
+					btn.textContent = 'Copied ✓';
+					btn.classList.add('done');
+				} catch {
+					// Clipboard blocked (permissions/insecure context) — fall back to the mailto.
+					window.location.href = 'mailto:' + value;
+					return;
+				}
+				window.setTimeout(() => {
+					btn.textContent = original;
+					btn.classList.remove('done');
+				}, REVERT_MS);
+			});
+		}
+	</script>
+	<script src="/brand.js" defer></script>
+	<div id="footer-container"></div>
+	<script src="/footer.js"></script>
+	<!-- Runtime i18n: detects locale, swaps annotated copy, mounts <lang-switcher>. -->
+	<script type="module" src="/i18n.js"></script>
+</body>
+</html>

@@ -1,0 +1,1090 @@
+#!/usr/bin/env node
+/**
+ * A real Home Assistant, on demand, for the home lane's live tests.
+ *
+ * Every live test in this lane needs the same thing: an instance that is
+ * onboarded, holds a long-lived token, and contains a house worth asserting on
+ * (floors, areas, a lock, scenes, the MCP server). Before this script each test
+ * and each developer built that by hand from the README, which is how six
+ * slightly different instances came to exist and how a version difference could
+ * hide as "works on my machine".
+ *
+ *   node scripts/home-test-instance.mjs --up --onboard --seed --json
+ *   eval "$(node scripts/home-test-instance.mjs --up --onboard --seed --env)"
+ *   node scripts/home-test-instance.mjs --down
+ *
+ * Flags combine in that order, so one command takes you from nothing to a
+ * seeded house and prints the URL and token. Every step is idempotent: running
+ * it twice is a no-op that reprints the same connection details.
+ *
+ * Safety, and read the second half of this before you type `--down`:
+ *
+ * The harness stamps every container it creates with a label and REFUSES to
+ * stop, restart or remove a container that does not carry it, so nothing else
+ * running on this machine (the voice lane's own Home Assistant, say) can be
+ * taken by a stray name. It also never touches a config directory outside the
+ * gitignored `.ha-config-*` prefix, because those directories hold real access
+ * tokens.
+ *
+ * That label says "this harness made it", NOT "you made it". Concurrent agents
+ * share this machine and all of them use this script, so a peer's house carries
+ * the same label yours does and the check above cannot tell them apart. The
+ * lane name is the only thing that separates two houses. Passing somebody
+ * else's `--name` to `--down` therefore destroys a house a live run may be
+ * inside, which is exactly what happened on 2026-09-09. `assertNotInUse` is the
+ * guard that now stands in front of that: a house handed out in the last half
+ * hour needs `--force`.
+ */
+
+import { spawn } from 'node:child_process';
+import fs from 'node:fs';
+import net from 'node:net';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+
+const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
+
+/** The label that marks a container as ours. Nothing without it is ever touched. */
+const LABEL = 'ws.three.home-test';
+/** How long after a run took a house it still counts as in use. See assertNotInUse. */
+const IN_USE_MS = 30 * 60 * 1000;
+const IMAGE = 'ghcr.io/home-assistant/home-assistant';
+const CLIENT_NAME = 'three.ws home lane';
+
+const USER = { name: 'Home Lane', username: 'threews', password: 'threews-home-lane' };
+
+/**
+ * The entry point lives at the bottom of this file, below every declaration it
+ * uses. A top-level call above a `class` declaration reads its binding in the
+ * temporal dead zone, which throws on every engine that checks it.
+ */
+async function main() {
+	const argv = process.argv.slice(2);
+	const opts = parseArgs(argv);
+
+	if (opts.help || !argv.length) {
+		usage();
+		process.exit(argv.length ? 0 : 1);
+	}
+
+	const instance = describeInstance(opts.name, opts.version);
+	log = opts.json || opts.env ? () => {} : (...args) => console.error(...args);
+	emit = (payload) => {
+		if (opts.json) console.log(JSON.stringify({ ok: true, ...payload }, null, '\t'));
+		// --env exists so the documented one-liner is literally true:
+		//   eval "$(node scripts/home-test-instance.mjs --up --onboard --seed --env)"
+		// The bare form already printed the two variables, but without `export`
+		// they land in the eval's own shell and vanish, which is the kind of
+		// almost-working instruction that sends someone back to building a house
+		// by hand. Progress goes to stderr either way, so stdout stays evaluable.
+		else if (opts.env) {
+			if (payload.baseUrl) console.log(`export HOME_ASSISTANT_URL=${shellQuote(payload.baseUrl)}`);
+			if (payload.token) console.log(`export HOME_ASSISTANT_TOKEN=${shellQuote(payload.token)}`);
+		} else if (payload.baseUrl) {
+			console.log(`HOME_ASSISTANT_URL=${payload.baseUrl}`);
+			if (payload.token) console.log(`HOME_ASSISTANT_TOKEN=${payload.token}`);
+		}
+	};
+
+	try {
+		// Several vitest forks reach for the same named instance at once, and two
+		// simultaneous `docker run --name` calls means one of them fails. The lock
+		// makes the second caller wait for the first to finish building the house
+		// and then reuse it, which is what "idempotent" has to mean under
+		// concurrency.
+		const state = await withLock(instance, async () => {
+			let current = readState(instance);
+
+			if (opts.down) {
+				const removed = await down(instance, current, { force: opts.force });
+				emit({ action: 'down', name: instance.name, ...removed });
+				return null;
+			}
+
+			// Stop and start keep the house: the config directory, the token and
+			// the seeded entities all survive, so a test can take the instance off
+			// the network and put it back without paying for another onboarding.
+			// That is the only honest way to exercise a home that stops answering.
+			if (opts.stop) current = await stop(instance, current);
+			if (opts.start) current = await start(instance, current);
+
+			if (opts.up) current = await up(instance, current, { seedNow: opts.seed });
+			if (!current) current = requireState(instance);
+
+			if (opts.onboard) current = await onboard(instance, current);
+			if (opts.seed) current = await seed(instance, current, { alreadyInConfig: Boolean(opts.up) });
+			return current;
+		});
+		if (!state) return;
+
+		// Stamp WHEN this house was last handed to somebody, so `--down` can tell
+		// a lane that finished hours ago from one a run is living inside right
+		// now. See `assertNotInUse`.
+		writeState(instance, { ...state, lastAcquiredAt: new Date().toISOString() });
+
+		emit({
+			action: 'ready',
+			name: instance.name,
+			version: state.version,
+			haVersion: state.haVersion || null,
+			container: instance.container,
+			port: state.port,
+			baseUrl: state.baseUrl,
+			token: state.token || null,
+			seeded: Boolean(state.seeded),
+			seed: state.seedResult || null,
+			configDir: path.relative(ROOT, instance.configDir),
+		});
+	} catch (err) {
+		if (opts.json) console.log(JSON.stringify({ ok: false, error: err.message }, null, '\t'));
+		// Under --env, stdout is being eval'd. A failure must leave it empty
+		// rather than feeding a shell half a sentence.
+
+		console.error(`home-test-instance: ${err.message}`);
+		process.exitCode = 1;
+	}
+}
+
+/** Progress goes to stderr so --json owns stdout. Bound by main(). */
+let log = () => {};
+let emit = () => {};
+
+// ---------------------------------------------------------------- lifecycle
+
+/**
+ * Start a container on a free port and wait until Home Assistant answers.
+ * Reuses a running instance rather than replacing it, so two tests that both
+ * ask for the same named instance share one house instead of racing.
+ */
+async function up(inst, state, { seedNow }) {
+	const existing = await inspect(inst.container);
+	if (existing?.running && state?.port) {
+		log(`[up] reusing ${inst.container} on :${state.port}`);
+		await waitForHomeAssistant(state.baseUrl);
+		return writeState(inst, { ...state, running: true });
+	}
+	if (existing && !existing.running) {
+		assertOurs(existing, inst.container);
+		await docker(['rm', '-f', inst.container]);
+	}
+
+	fs.mkdirSync(inst.configDir, { recursive: true });
+	// Writing configuration.yaml before the first boot is the difference between
+	// a 40s start and a 40s start plus a 40s restart. When --up and --seed are
+	// asked for together the demo house is therefore configured up front; a
+	// later standalone --seed appends and restarts instead.
+	writeConfiguration(inst, { demo: seedNow });
+
+	const port = await freePort();
+	log(`[up] starting ${inst.image} on :${port}`);
+	await docker([
+		'run', '-d',
+		'--name', inst.container,
+		'--label', `${LABEL}=1`,
+		'--label', `${LABEL}.name=${inst.name}`,
+		'-p', `127.0.0.1:${port}:8123`,
+		'-v', `${inst.configDir}:/config`,
+		'-e', 'TZ=UTC',
+		inst.image,
+	]);
+
+	const baseUrl = `http://127.0.0.1:${port}`;
+	const next = writeState(inst, { name: inst.name, version: inst.version, port, baseUrl, running: true, demoInConfig: Boolean(seedNow) });
+	const haVersion = await waitForHomeAssistant(baseUrl);
+	log(`[up] ${inst.container} is up, Home Assistant ${haVersion || 'unknown'}`);
+	return writeState(inst, { ...next, haVersion });
+}
+
+/**
+ * Remove the container and its config directory. Refuses anything it did not
+ * create, and reports honestly when there was nothing to remove.
+ */
+/**
+ * Take the house off the network without destroying it.
+ *
+ * `--down` removes the container AND the config directory, which throws away
+ * the access token and every seeded entity: recovering from it costs a full
+ * onboarding. A house that has stopped answering is a state the product has to
+ * render, so exercising it must not cost two minutes and a new token. Stopping
+ * the container is what actually happens to a real house whose power went out,
+ * and `--start` puts it back exactly as it was.
+ */
+async function stop(inst, state) {
+	const current = state || requireState(inst);
+	const existing = await inspect(inst.container);
+	if (!existing) throw new Error(`no container named "${inst.container}" to stop. Run --up first.`);
+	assertOurs(existing, inst.container);
+	if (existing.running) {
+		// Thirty seconds, not ten: Home Assistant flushes its recorder database on
+		// SIGTERM and a ten-second grace killed it (exit 137) every time, which
+		// risks the sqlite store the seeded house lives in.
+		await docker(['stop', '--time', '30', inst.container]);
+		log(`[stop] stopped ${inst.container}`);
+	} else {
+		log(`[stop] ${inst.container} was already stopped`);
+	}
+	return writeState(inst, { ...current, running: false });
+}
+
+/** Put a stopped house back on the same port, and wait until it answers. */
+async function start(inst, state) {
+	const current = state || requireState(inst);
+	const existing = await inspect(inst.container);
+	if (!existing) throw new Error(`no container named "${inst.container}" to start. Run --up first.`);
+	assertOurs(existing, inst.container);
+	if (!existing.running) {
+		await docker(['start', inst.container]);
+		log(`[start] started ${inst.container}`);
+	}
+	// Docker publishes the same port mapping it was created with, so the base
+	// URL in the state file is still the right one; what is not guaranteed is
+	// that Home Assistant is ready behind it yet.
+	await waitForHomeAssistant(current.baseUrl);
+	// Answering is not the same as running. Straight after a restart /api/config
+	// reports `state: NOT_RUNNING` for several seconds while components come
+	// back, and a caller that connected in that window would read a house with
+	// no entities in it and blame the product. Once there is a token to ask
+	// with, wait for the house to say it is running.
+	if (current.token) await waitForRunning(current.baseUrl, current.token);
+	return writeState(inst, { ...current, running: true });
+}
+
+async function down(inst, state, { force = false } = {}) {
+	const existing = await inspect(inst.container);
+	let removedContainer = false;
+	if (existing) {
+		assertOurs(existing, inst.container);
+		assertNotInUse(inst, state, { force });
+		await docker(['rm', '-f', inst.container]);
+		removedContainer = true;
+		log(`[down] removed ${inst.container}`);
+	}
+
+	let removedConfig = false;
+	const dir = inst.configDir;
+	if (fs.existsSync(dir)) {
+		if (!path.basename(dir).startsWith('.ha-config-') || path.dirname(dir) !== ROOT) {
+			throw new Error(`refusing to delete ${dir}: not a harness config directory`);
+		}
+		// Home Assistant runs as root in the container, so /config comes back
+		// owned by root and an ordinary rm cannot clear it. Hand ownership back
+		// through a throwaway container on the image we already have locally,
+		// then delete from here. A config directory left behind is not litter:
+		// it holds a working access token.
+		await docker([
+			'run', '--rm',
+			'-v', `${dir}:/target`,
+			'--entrypoint', 'chown',
+			inst.image,
+			'-R', `${process.getuid()}:${process.getgid()}`, '/target',
+		]).catch((err) => log(`[down] could not reclaim ownership of ${path.relative(ROOT, dir)}: ${err.message}`));
+		fs.rmSync(dir, { recursive: true, force: true });
+		removedConfig = true;
+		log(`[down] removed ${path.relative(ROOT, dir)}`);
+	}
+	if (!removedContainer && !removedConfig) log(`[down] nothing to remove for "${inst.name}"`);
+	return { removedContainer, removedConfig };
+}
+
+// ---------------------------------------------------------------- onboarding
+
+/**
+ * Walk Home Assistant's real onboarding API and mint a long-lived token.
+ *
+ * This is the flow the browser performs on a fresh install: create the owner,
+ * exchange the returned auth code for a session, finish the remaining steps,
+ * then ask the WebSocket API for a long-lived token. No file is edited to fake
+ * a user into existence.
+ */
+async function onboard(inst, state) {
+	if (state.token && (await tokenWorks(state.baseUrl, state.token))) {
+		log('[onboard] already onboarded, token still valid');
+		return state;
+	}
+
+	const clientId = `${state.baseUrl}/`;
+	// A finished instance unregisters its onboarding views, so on 2026.9 this
+	// answers 404 rather than listing four completed steps. That is the state a
+	// harness meets whenever a run was interrupted after the container came up
+	// but before the token was minted, or whenever a config directory outlived
+	// its state file, and it used to end the run with a raw
+	// "GET /api/onboarding returned 404" that reads like the instance is broken.
+	// No list means onboarding is over, which is exactly the case the owner-login
+	// path below already handles.
+	const steps = await json(`${state.baseUrl}/api/onboarding`, { optional: true });
+	const done = steps ? new Set(steps.filter((s) => s.done).map((s) => s.step)) : new Set(['user', 'core_config', 'analytics', 'integration']);
+
+	// An instance can be onboarded while the harness holds no token: an
+	// interrupted run, or a config directory that outlived its state file. The
+	// owner account is one this harness created and whose password it knows, so
+	// the recovery is a real login rather than a dead end.
+	let session;
+	if (done.has('user')) {
+		log('[onboard] already onboarded, signing in as the owner');
+		session = await exchangeCode(state.baseUrl, clientId, await login(state.baseUrl, clientId));
+	} else {
+		log('[onboard] creating the owner account');
+		const { auth_code: userCode } = await json(`${state.baseUrl}/api/onboarding/users`, {
+			method: 'POST',
+			body: { client_id: clientId, ...USER, language: 'en' },
+		});
+		session = await exchangeCode(state.baseUrl, clientId, userCode);
+	}
+
+	// core_config and analytics are separate steps and each has appeared and
+	// moved between releases, so a missing one is skipped rather than fatal.
+	for (const step of done.has('user') ? [] : ['core_config', 'analytics']) {
+		if (done.has(step)) continue;
+		await json(`${state.baseUrl}/api/onboarding/${step}`, {
+			method: 'POST',
+			token: session.access_token,
+			body: step === 'analytics' ? { preferences: { base: false } } : {},
+			optional: true,
+		});
+	}
+	if (!done.has('integration')) {
+		await json(`${state.baseUrl}/api/onboarding/integration`, {
+			method: 'POST',
+			token: session.access_token,
+			body: { client_id: clientId, redirect_uri: clientId },
+			optional: true,
+		});
+	}
+
+	log('[onboard] minting a long-lived access token');
+	const ws = await WsSession.open(state.baseUrl, session.access_token);
+	let token;
+	try {
+		token = await ws.send({
+			type: 'auth/long_lived_access_token',
+			client_name: `${CLIENT_NAME} ${Date.now()}`,
+			lifespan: 30,
+		});
+	} finally {
+		ws.close();
+	}
+
+	return writeState(inst, { ...state, token, haVersion: ws.haVersion || state.haVersion });
+}
+
+/**
+ * Home Assistant's real username/password login flow, which is what the login
+ * page performs. Returns the authorization code to exchange for a session.
+ */
+async function login(baseUrl, clientId) {
+	const flow = await json(`${baseUrl}/auth/login_flow`, {
+		method: 'POST',
+		body: { client_id: clientId, handler: ['homeassistant', null], redirect_uri: clientId, type: 'authorize' },
+	});
+	const result = await json(`${baseUrl}/auth/login_flow/${flow.flow_id}`, {
+		method: 'POST',
+		body: { client_id: clientId, username: USER.username, password: USER.password },
+	});
+	if (result?.type !== 'create_entry' || !result.result) {
+		throw new Error(`login as ${USER.username} did not produce an auth code: ${JSON.stringify(result).slice(0, 200)}`);
+	}
+	return result.result;
+}
+
+async function exchangeCode(baseUrl, clientId, code) {
+	const res = await fetch(`${baseUrl}/auth/token`, {
+		method: 'POST',
+		headers: { 'content-type': 'application/x-www-form-urlencoded' },
+		body: new URLSearchParams({ grant_type: 'authorization_code', code, client_id: clientId }),
+	});
+	if (!res.ok) throw new Error(`token exchange returned ${res.status}: ${await res.text()}`);
+	return res.json();
+}
+
+// ---------------------------------------------------------------- seeding
+
+/**
+ * Turn a bare instance into a house: demo entities, a floor, three areas with
+ * entities assigned, two scenes, the MCP server, and a lock exposed to Assist.
+ *
+ * Everything is created through the real APIs and everything is idempotent, so
+ * a second --seed finds what the first one made and changes nothing.
+ */
+async function seed(inst, state, { alreadyInConfig }) {
+	if (!state.token) throw new Error('seed needs a token: run --onboard first.');
+
+	if (!state.demoInConfig && !alreadyInConfig) {
+		log('[seed] enabling the demo integration and restarting');
+		writeConfiguration(inst, { demo: true });
+		const existing = await inspect(inst.container);
+		assertOurs(existing, inst.container);
+		await docker(['restart', inst.container]);
+		await waitForHomeAssistant(state.baseUrl);
+		state = writeState(inst, { ...state, demoInConfig: true });
+	}
+
+	const ws = await WsSession.open(state.baseUrl, state.token);
+	const created = { floors: 0, areas: 0, assigned: 0, scenes: 0, exposed: 0, mcp: false };
+	try {
+		await waitFor(
+			async () => {
+				const states = await ws.send({ type: 'get_states' });
+				return states.some((s) => s.entity_id.startsWith('light.')) && states.some((s) => s.entity_id.startsWith('lock.'));
+			},
+			{ timeout: 120_000, label: 'demo entities to appear' },
+		);
+
+		const floor = await ensureFloor(ws, 'Ground Floor');
+		created.floors = floor.created ? 1 : 0;
+
+		// Only entities that reached the ENTITY REGISTRY can hold an area, and the
+		// demo's locks never do: they carry no unique_id, so they exist as states
+		// and nothing more. Plan the rooms from the registry and let the states
+		// answer for everything else, rather than assigning an area to an entity
+		// that cannot have one and counting it as furnished.
+		const registry = await ws.send({ type: 'config/entity_registry/list' }).catch(() => []);
+		const states = await ws.send({ type: 'get_states' });
+		const registered = (domain) => registry.filter((e) => e.entity_id.startsWith(`${domain}.`)).map((e) => e.entity_id);
+		const byDomain = (domain) => states.filter((s) => s.entity_id.startsWith(`${domain}.`)).map((s) => s.entity_id);
+
+		const lights = registered('light');
+		const climate = registered('climate');
+		const covers = registered('cover');
+		const fans = registered('fan');
+		const switches = registered('switch');
+		const doorSensors = registered('binary_sensor');
+		const locks = byDomain('lock');
+
+		// A furnished house, not a demo of one. Every room gets light, and the
+		// rooms that should have something to secure get a cover or a door
+		// sensor, because a room graph whose security rollup is null everywhere
+		// proves nothing about the rollup. Entities come from whatever this
+		// release's demo actually registers, so a demo change shows up as fewer
+		// assignments rather than as a broken seed.
+		const plan = [
+			{ name: 'Living Room', entities: [lights[0], climate[0], covers[0], switches[0]] },
+			{ name: 'Kitchen', entities: [lights[1], covers[1], fans[0], doorSensors[0]] },
+			// The bedroom is deliberately left with nothing securable in it. A house
+			// where every room has a door is a house that cannot tell a real
+			// "nothing to secure here" apart from a false "all secure", and the
+			// room graph draws that distinction on purpose.
+			{ name: 'Bedroom', entities: [lights[2], climate[1], fans[1]] },
+			{ name: 'Front Door', entities: [lights[3], covers[2], doorSensors[1]] },
+		].map((room) => ({ ...room, entities: room.entities.filter(Boolean) }));
+
+		for (const room of plan) {
+			const area = await ensureArea(ws, room.name, floor.floor_id);
+			if (area.created) created.areas += 1;
+			for (const entityId of room.entities) {
+				// A demo entity with no unique_id never reaches the entity registry
+				// and cannot hold an area. Count what actually landed, so the seed
+				// report is a measurement rather than a count of attempts.
+				const assigned = await ws
+					.send({ type: 'config/entity_registry/update', entity_id: entityId, area_id: area.area_id })
+					.then(() => true)
+					.catch(() => false);
+				if (assigned) created.assigned += 1;
+				else created.unregistered = [...(created.unregistered || []), entityId];
+			}
+		}
+
+		// The two scenes every intent test in the lane resolves against. Bedtime
+		// deliberately touches the lock, because "good night locks the door" is
+		// the case where the confirmation gate has to fire on a macro.
+		const scenes = [
+			{ id: 'threews_bedtime', name: 'Bedtime', entities: sceneEntities({ lights: lights.slice(0, 2), off: true, lock: locks[0], lockState: 'locked' }) },
+			{ id: 'threews_away_mode', name: 'Away Mode', entities: sceneEntities({ lights, off: true, lock: locks[0], lockState: 'locked' }) },
+		];
+		for (const scene of scenes) {
+			const res = await fetch(`${state.baseUrl}/api/config/scene/config/${scene.id}`, {
+				method: 'POST',
+				headers: { authorization: `Bearer ${state.token}`, 'content-type': 'application/json' },
+				body: JSON.stringify({ id: scene.id, name: scene.name, entities: scene.entities }),
+			});
+			if (res.ok) created.scenes += 1;
+			else log(`[seed] scene ${scene.name} returned ${res.status}`);
+		}
+		await ws.send({ type: 'call_service', domain: 'scene', service: 'reload', service_data: {} }).catch(() => {});
+
+		// Expose the lock to Assist. This is the configuration that makes Home
+		// Assistant's own intent__HassTurnOff unlock a door, which is the finding
+		// the whole safety gate exists for: the lane must test against a house
+		// where that is actually reachable.
+		if (locks[0]) {
+			created.exposed = (await exposeToAssist(ws, [locks[0], ...lights.slice(0, 1)])) ? 1 : 0;
+			created.exposeCommand = ws.exposeCommand || null;
+		}
+
+		created.mcp = await ensureMcpServer(state);
+		created.entities = { lights: lights.length, locks: locks.length, climate: climate.length };
+		created.lock = locks[0] || null;
+		created.light = lights[0] || null;
+	} finally {
+		ws.close();
+	}
+
+	log(
+		`[seed] ${created.areas} areas created, ${created.assigned} entities assigned, ${created.scenes} scenes, mcp_server ${created.mcp ? 'enabled' : 'unavailable'}`,
+	);
+	return writeState(inst, { ...state, seeded: true, seedResult: created });
+}
+
+function sceneEntities({ lights = [], off = true, lock, lockState = 'locked' }) {
+	const entities = {};
+	for (const id of lights) entities[id] = off ? 'off' : 'on';
+	if (lock) entities[lock] = lockState;
+	return entities;
+}
+
+async function ensureFloor(ws, name) {
+	const floors = await ws.send({ type: 'config/floor_registry/list' }).catch(() => []);
+	const found = floors.find((f) => f.name === name);
+	if (found) return { ...found, created: false };
+	const made = await ws.send({ type: 'config/floor_registry/create', name, level: 0 });
+	return { ...made, created: true };
+}
+
+async function ensureArea(ws, name, floorId) {
+	const areas = await ws.send({ type: 'config/area_registry/list' });
+	const found = areas.find((a) => a.name === name);
+	if (found) {
+		if (floorId && found.floor_id !== floorId) {
+			await ws.send({ type: 'config/area_registry/update', area_id: found.area_id, floor_id: floorId }).catch(() => {});
+		}
+		return { ...found, created: false };
+	}
+	const made = await ws.send({ type: 'config/area_registry/create', name, ...(floorId ? { floor_id: floorId } : {}) });
+	if (floorId && !made.floor_id) {
+		await ws.send({ type: 'config/area_registry/update', area_id: made.area_id, floor_id: floorId }).catch(() => {});
+	}
+	return { ...made, created: true };
+}
+
+/**
+ * Set up the `mcp_server` integration through its real config flow. It is a
+ * config-entry integration with no YAML form, so this drives the same HTTP flow
+ * the Settings UI drives. Returns false when the release does not ship it,
+ * which is a supported outcome: the MCP channel is an upgrade, not a
+ * requirement.
+ */
+async function ensureMcpServer(state) {
+	const headers = { authorization: `Bearer ${state.token}`, 'content-type': 'application/json' };
+	const entries = await fetch(`${state.baseUrl}/api/config/config_entries/entry`, { headers })
+		.then((r) => (r.ok ? r.json() : []))
+		.catch(() => []);
+	if (entries.some((e) => e.domain === 'mcp_server')) return true;
+
+	const start = await fetch(`${state.baseUrl}/api/config/config_entries/flow`, {
+		method: 'POST',
+		headers,
+		body: JSON.stringify({ handler: 'mcp_server', show_advanced_options: false }),
+	});
+	if (!start.ok) return false;
+	const flow = await start.json();
+	if (flow.type === 'create_entry') return true;
+	if (!flow.flow_id) return false;
+
+	// The single step asks which LLM API to expose. Releases disagree on the
+	// shape: a single-value select in the release the integration landed in, a
+	// multi-select since. Read the flow's own schema rather than sniffing a
+	// version string, and send whichever shape this instance asked for.
+	const finish = await fetch(`${state.baseUrl}/api/config/config_entries/flow/${flow.flow_id}`, {
+		method: 'POST',
+		headers,
+		body: JSON.stringify({ llm_hass_api: llmApiValue(flow.data_schema) }),
+	});
+	if (!finish.ok) return false;
+	const result = await finish.json();
+	return result.type === 'create_entry';
+}
+
+/**
+ * "assist" in the shape this instance's config flow asks for.
+ *
+ * @param {Array} schema the flow's own data_schema
+ */
+function llmApiValue(schema) {
+	const field = (Array.isArray(schema) ? schema : []).find((f) => f.name === 'llm_hass_api');
+	const options = field?.selector?.select?.options || [];
+	const assist = options.find((o) => (o?.value ?? o) === 'assist');
+	const value = assist ? (assist.value ?? assist) : 'assist';
+	return field?.selector?.select?.multiple ? [value] : value;
+}
+
+/**
+ * Expose entities to Assist, which is what makes Home Assistant's own
+ * `intent__HassTurnOff` able to unlock a real door. The command was
+ * `homeassistant/expose_entity/set` when exposure settings landed and is
+ * `homeassistant/expose_entity` now, so ask the instance which one it answers
+ * to instead of branching on a version number.
+ */
+async function exposeToAssist(ws, entityIds) {
+	const ids = entityIds.filter(Boolean);
+	if (!ids.length) return false;
+	const candidates = ['homeassistant/expose_entity', 'homeassistant/expose_entity/set'];
+	for (const type of candidates) {
+		try {
+			await ws.send({ type, assistants: ['conversation'], entity_ids: ids, should_expose: true });
+			ws.exposeCommand = type;
+			return true;
+		} catch (err) {
+			if (!/unknown_command/.test(err.message)) throw err;
+		}
+	}
+	return false;
+}
+
+// ---------------------------------------------------------------- websocket
+
+/** A minimal authenticated Home Assistant WebSocket session. */
+class WsSession {
+	static async open(baseUrl, token) {
+		const url = `${baseUrl.replace(/^http/, 'ws')}/api/websocket`;
+		const socket = new WebSocket(url);
+		const session = new WsSession(socket);
+		await new Promise((resolve, reject) => {
+			const timer = setTimeout(() => reject(new Error(`websocket handshake to ${url} timed out`)), 30_000);
+			socket.onerror = () => {
+				clearTimeout(timer);
+				reject(new Error(`could not open ${url}`));
+			};
+			socket.onclose = () => {
+				clearTimeout(timer);
+				reject(new Error(`${url} closed during the handshake`));
+			};
+			socket.onmessage = (event) => {
+				const msg = JSON.parse(event.data);
+				if (msg.type === 'auth_required') {
+					session.haVersion = msg.ha_version || null;
+					socket.send(JSON.stringify({ type: 'auth', access_token: token }));
+					return;
+				}
+				if (msg.type === 'auth_ok') {
+					session.haVersion = msg.ha_version || session.haVersion;
+					clearTimeout(timer);
+					socket.onclose = null;
+					session.listen();
+					resolve();
+					return;
+				}
+				if (msg.type === 'auth_invalid') {
+					clearTimeout(timer);
+					reject(new Error('Home Assistant rejected the token.'));
+				}
+			};
+		});
+		return session;
+	}
+
+	constructor(socket) {
+		this.socket = socket;
+		this.nextId = 1;
+		this.pending = new Map();
+		this.haVersion = null;
+	}
+
+	listen() {
+		this.socket.onmessage = (event) => {
+			const msg = JSON.parse(event.data);
+			if (msg.type !== 'result') return;
+			const entry = this.pending.get(msg.id);
+			if (!entry) return;
+			this.pending.delete(msg.id);
+			if (msg.success) entry.resolve(msg.result);
+			else entry.reject(new Error(`${msg.error?.code || 'error'}: ${msg.error?.message || 'unknown'}`));
+		};
+		this.socket.onclose = () => {
+			for (const entry of this.pending.values()) entry.reject(new Error('websocket closed'));
+			this.pending.clear();
+		};
+	}
+
+	send(message) {
+		const id = this.nextId++;
+		return new Promise((resolve, reject) => {
+			const timer = setTimeout(() => {
+				this.pending.delete(id);
+				reject(new Error(`${message.type} timed out`));
+			}, 30_000);
+			this.pending.set(id, {
+				resolve: (value) => {
+					clearTimeout(timer);
+					resolve(value);
+				},
+				reject: (err) => {
+					clearTimeout(timer);
+					reject(err);
+				},
+			});
+			this.socket.send(JSON.stringify({ ...message, id }));
+		});
+	}
+
+	close() {
+		try {
+			this.socket.close();
+		} catch {
+			// A socket that is already gone needs no closing.
+		}
+	}
+}
+
+// ---------------------------------------------------------------- helpers
+
+/**
+ * Wait until Home Assistant is serving, whatever point in its life it is at.
+ *
+ * Readiness is asked in a way that does not depend on onboarding state, and
+ * that is the whole subtlety here. `/api/onboarding` answers 200 while the
+ * instance is fresh, and on 2026.9 it answers **404** once onboarding is
+ * finished, because the onboarding views are unregistered when they are done.
+ * A probe that only accepted 200 or 401 therefore worked exactly once per
+ * container: the first `--up` on a fresh instance passed, and every later call
+ * that reused or restarted that same instance sat for the full 180 seconds and
+ * reported a healthy house as a timeout. Measured on 2026.9.0: an onboarded
+ * instance answers `/` 200, `/api/` 401, `/manifest.json` 200,
+ * `/api/onboarding` 404.
+ *
+ * So: any answer from `/api/onboarding` other than a 5xx means the HTTP stack
+ * is up, and a 401 from `/api/` means the API layer is up. Either is proof the
+ * house is answering.
+ */
+async function waitForHomeAssistant(baseUrl) {
+	let version = null;
+	await waitFor(
+		async () => {
+			const onboarding = await fetch(`${baseUrl}/api/onboarding`, { signal: AbortSignal.timeout(4000) }).catch(() => null);
+			if (onboarding && onboarding.status < 500) return true;
+			const api = await fetch(`${baseUrl}/api/`, { signal: AbortSignal.timeout(4000) }).catch(() => null);
+			return Boolean(api && api.status === 401);
+		},
+		{ timeout: 180_000, label: `${baseUrl} to answer` },
+	);
+	const cfg = await fetch(`${baseUrl}/manifest.json`, { signal: AbortSignal.timeout(4000) }).catch(() => null);
+	if (cfg?.ok) {
+		const body = await cfg.json().catch(() => null);
+		version = body?.version || null;
+	}
+	return version;
+}
+
+/** Home Assistant reports its own lifecycle on /api/config; wait for RUNNING. */
+async function waitForRunning(baseUrl, token) {
+	await waitFor(
+		async () => {
+			const res = await fetch(`${baseUrl}/api/config`, {
+				headers: { authorization: `Bearer ${token}` },
+				signal: AbortSignal.timeout(4000),
+			}).catch(() => null);
+			if (!res?.ok) return false;
+			const body = await res.json().catch(() => null);
+			return body?.state === 'RUNNING';
+		},
+		{ timeout: 180_000, label: `${baseUrl} to finish starting` },
+	);
+}
+
+async function tokenWorks(baseUrl, token) {
+	const res = await fetch(`${baseUrl}/api/`, { headers: { authorization: `Bearer ${token}` } }).catch(() => null);
+	return Boolean(res?.ok);
+}
+
+/**
+ * Poll a condition to a deadline. Every wait in this harness is a wait for a
+ * condition, never a sleep for a guessed duration: a sleep is the seed of every
+ * flaky test this lane could grow.
+ */
+async function waitFor(condition, { timeout = 60_000, interval = 1000, label = 'condition' } = {}) {
+	const deadline = Date.now() + timeout;
+	let lastError = null;
+	while (Date.now() < deadline) {
+		try {
+			if (await condition()) return true;
+			lastError = null;
+		} catch (err) {
+			lastError = err;
+		}
+		await new Promise((r) => setTimeout(r, interval));
+	}
+	throw new Error(`timed out after ${Math.round(timeout / 1000)}s waiting for ${label}${lastError ? `: ${lastError.message}` : ''}`);
+}
+
+async function json(url, { method = 'GET', body, token, optional = false } = {}) {
+	const headers = {};
+	if (body) headers['content-type'] = 'application/json';
+	if (token) headers.authorization = `Bearer ${token}`;
+	const res = await fetch(url, { method, headers, body: body ? JSON.stringify(body) : undefined });
+	if (!res.ok) {
+		if (optional) return null;
+		throw new Error(`${method} ${new URL(url).pathname} returned ${res.status}: ${(await res.text()).slice(0, 200)}`);
+	}
+	const text = await res.text();
+	return text ? JSON.parse(text) : null;
+}
+
+function docker(args) {
+	return new Promise((resolve, reject) => {
+		const child = spawn('docker', args, { stdio: ['ignore', 'pipe', 'pipe'] });
+		let out = '';
+		let err = '';
+		child.stdout.on('data', (d) => (out += d));
+		child.stderr.on('data', (d) => (err += d));
+		child.on('error', (e) => reject(new Error(`docker is not usable: ${e.message}`)));
+		child.on('close', (code) => {
+			if (code === 0) resolve(out.trim());
+			else reject(new Error(`docker ${args[0]} failed: ${(err || out).trim().split('\n').slice(-3).join(' ')}`));
+		});
+	});
+}
+
+async function inspect(container) {
+	const out = await docker(['inspect', container]).catch(() => null);
+	if (!out) return null;
+	const [info] = JSON.parse(out);
+	return { running: Boolean(info?.State?.Running), labels: info?.Config?.Labels || {} };
+}
+
+/**
+ * The guard that makes this safe to run on a machine full of other people's
+ * Home Assistant containers. Nothing without our label is ever acted on.
+ */
+/**
+ * Refuse to tear down a lane that somebody is still using.
+ *
+ * The label check below answers "did this harness make it", which is NOT the
+ * same question as "is it mine". Every concurrent agent on this machine uses
+ * this same harness, so a peer's house carries the identical label and
+ * `--down --name <their lane>` sailed straight through it. That is not
+ * hypothetical: on 2026-09-09 it removed a peer's seeded house out from under a
+ * live run, and the label guard did exactly what it was written to do while it
+ * happened.
+ *
+ * A lane in use is a lane that was handed out recently, which the ready path
+ * records on every acquire. Tearing down your own finished lane still works
+ * with no ceremony, because a finished lane goes quiet; taking one that is
+ * still serving needs `--force` and says so.
+ */
+function assertNotInUse(inst, state, { force }) {
+	if (force) return;
+	const stamped = Date.parse(state?.lastAcquiredAt || '');
+	if (!Number.isFinite(stamped)) return;
+	const idleMs = Date.now() - stamped;
+	if (idleMs >= IN_USE_MS) return;
+	const mins = Math.max(1, Math.round(idleMs / 60_000));
+	throw new Error(
+		`refusing to remove "${inst.name}": a run took this house ${mins} minute(s) ago, and another agent on this machine may be inside it. Wait for it to go idle, or pass --force if you know it is yours.`,
+	);
+}
+
+function assertOurs(info, container) {
+	if (!info || info.labels?.[LABEL] !== '1') {
+		throw new Error(
+			`refusing to touch container "${container}": it was not created by this harness (missing ${LABEL} label). Pick another --name.`,
+		);
+	}
+}
+
+function freePort() {
+	return new Promise((resolve, reject) => {
+		const server = net.createServer();
+		server.unref();
+		server.on('error', reject);
+		server.listen(0, '127.0.0.1', () => {
+			const { port } = server.address();
+			server.close(() => resolve(port));
+		});
+	});
+}
+
+function writeConfiguration(inst, { demo }) {
+	// The three !include lines are not decoration. Home Assistant's scene, script
+	// and automation config APIs write to these files, and without the includes
+	// the write succeeds, the file appears, and no entity is ever created: a seed
+	// that reports two scenes and produces none. That is exactly the silent
+	// half-success this harness exists to stop.
+	const lines = [
+		'# Written by scripts/home-test-instance.mjs. Throwaway instance.',
+		'default_config:',
+		'logger:',
+		'  default: warning',
+		'scene: !include scenes.yaml',
+		'script: !include scripts.yaml',
+		'automation: !include automations.yaml',
+	];
+	if (demo) lines.push('demo:');
+	fs.writeFileSync(path.join(inst.configDir, 'configuration.yaml'), `${lines.join('\n')}\n`);
+	for (const store of ['scenes.yaml', 'scripts.yaml', 'automations.yaml']) {
+		const file = path.join(inst.configDir, store);
+		if (!fs.existsSync(file)) fs.writeFileSync(file, store === 'scripts.yaml' ? '{}\n' : '[]\n');
+	}
+}
+
+function describeInstance(name, version) {
+	const slug = String(name).replace(/[^a-z0-9-]/gi, '-').toLowerCase();
+	return {
+		name: slug,
+		version,
+		image: `${IMAGE}:${version}`,
+		container: `three-ws-home-test-${slug}`,
+		configDir: path.join(ROOT, `.ha-config-test-${slug}`),
+	};
+}
+
+/**
+ * An exclusive lock around one named instance, held for the whole up/onboard/
+ * seed sequence. `mkdir` is the atomic primitive here: it either creates the
+ * directory or fails, with no window between the two.
+ *
+ * The lock records WHO holds it, and that is the difference between a lock and
+ * a fifteen-minute outage. Callers of this harness kill it on their own
+ * timeouts (tests/_helpers/home-instance.js gives `--stop` 120 seconds), and a
+ * killed process never reaches the `finally` below, so the directory outlives
+ * it. Abandoning purely on age meant the next call on that lane sat in the wait
+ * loop below until the stale lock aged out, then died on ITS caller's timeout
+ * and left a fresh lock behind: one kill guaranteed the next several. It was
+ * seen as `home-test-instance timed out after 120s` on a `--stop` that takes
+ * seven seconds when it runs at all, which reads as a hung container and is a
+ * dead process's leftovers.
+ *
+ * So the holder writes its pid, and a waiter asks the operating system whether
+ * that process still exists. A dead holder's lock is reclaimed at once; a live
+ * holder's is waited on exactly as before. Signal 0 is the standard "is this
+ * pid alive" probe: it performs the permission check and delivers nothing.
+ */
+async function withLock(inst, fn) {
+	const lock = `${inst.configDir}.lock`;
+	const owner = path.join(lock, 'pid');
+	const deadline = Date.now() + 900_000;
+	for (;;) {
+		try {
+			fs.mkdirSync(lock);
+			fs.writeFileSync(owner, `${process.pid}\n`);
+			break;
+		} catch (err) {
+			if (err.code !== 'EEXIST') throw err;
+			const holder = lockHolder(owner);
+			// No pid file yet means the holder is between its mkdir and its write,
+			// which is microseconds; anything else is a lock whose owner is gone.
+			if (holder !== null && !isAlive(holder)) {
+				log(`[lock] reclaiming the lock on "${inst.name}" from pid ${holder}, which is no longer running`);
+				fs.rmSync(lock, { recursive: true, force: true });
+				continue;
+			}
+			// Belt and braces for the pre-pid window and for a lock written by an
+			// older copy of this script: nothing here outlasts a cold boot.
+			const age = Date.now() - (fs.statSync(lock).mtimeMs || 0);
+			if (age > 900_000) {
+				fs.rmSync(lock, { recursive: true, force: true });
+				continue;
+			}
+			if (Date.now() > deadline) throw new Error(`another run has held the lock on "${inst.name}" for 15 minutes`);
+			log(`[lock] waiting for pid ${holder ?? 'unknown'} to finish with "${inst.name}"`);
+			await new Promise((r) => setTimeout(r, 2000));
+		}
+	}
+	// SIGKILL cannot be caught, which is why the pid check above exists; SIGTERM
+	// and SIGINT can be, and releasing on them means the common case (a caller
+	// asking politely first, a developer pressing ctrl-c) leaves nothing behind.
+	const release = () => fs.rmSync(lock, { recursive: true, force: true });
+	const onSignal = (signal) => {
+		release();
+		process.exit(signal === 'SIGINT' ? 130 : 143);
+	};
+	process.once('SIGTERM', onSignal);
+	process.once('SIGINT', onSignal);
+	try {
+		return await fn();
+	} finally {
+		process.off('SIGTERM', onSignal);
+		process.off('SIGINT', onSignal);
+		release();
+	}
+}
+
+/** The pid inside a lock directory, or null when it has not been written yet. */
+function lockHolder(pidFile) {
+	try {
+		const pid = Number.parseInt(fs.readFileSync(pidFile, 'utf8').trim(), 10);
+		return Number.isInteger(pid) && pid > 0 ? pid : null;
+	} catch {
+		return null;
+	}
+}
+
+/** Whether a pid is a process this user could signal. Sends nothing. */
+function isAlive(pid) {
+	try {
+		process.kill(pid, 0);
+		return true;
+	} catch (err) {
+		// EPERM means it exists and belongs to somebody else, which still counts
+		// as held. Only ESRCH is proof that nothing is there.
+		return err.code === 'EPERM';
+	}
+}
+
+function statePath(inst) {
+	return path.join(inst.configDir, '.harness.json');
+}
+
+function readState(inst) {
+	try {
+		return JSON.parse(fs.readFileSync(statePath(inst), 'utf8'));
+	} catch {
+		return null;
+	}
+}
+
+function requireState(inst) {
+	const state = readState(inst);
+	if (!state) throw new Error(`no instance named "${inst.name}" is up. Run --up first.`);
+	return state;
+}
+
+function writeState(inst, state) {
+	fs.mkdirSync(inst.configDir, { recursive: true });
+	fs.writeFileSync(statePath(inst), `${JSON.stringify(state, null, '\t')}\n`);
+	return state;
+}
+
+function parseArgs(args) {
+	const out = { name: 'default', version: 'stable', json: false, env: false };
+	for (let i = 0; i < args.length; i += 1) {
+		const arg = args[i];
+		if (arg === '--up') out.up = true;
+		else if (arg === '--onboard') out.onboard = true;
+		else if (arg === '--seed') out.seed = true;
+		else if (arg === '--down') out.down = true;
+		else if (arg === '--stop') out.stop = true;
+		else if (arg === '--start') out.start = true;
+		else if (arg === '--json') out.json = true;
+		else if (arg === '--env') out.env = true;
+		else if (arg === '--force') out.force = true;
+		else if (arg === '--help' || arg === '-h') out.help = true;
+		else if (arg === '--name') out.name = args[++i];
+		else if (arg === '--version') out.version = args[++i];
+		else throw new Error(`unknown argument "${arg}"`);
+	}
+	return out;
+}
+
+/** Single-quote for a POSIX shell, so an eval'd value cannot become a command. */
+function shellQuote(value) {
+	return `'${String(value).replace(/'/g, `'\\''`)}'`;
+}
+
+function usage() {
+	console.log(`Usage: node scripts/home-test-instance.mjs [--up] [--onboard] [--seed] [--down] [options]
+
+  --up                start a container on a free port and wait for readiness
+  --onboard           complete onboarding and mint a long-lived access token
+  --seed              demo entities, a floor, areas, scenes, mcp_server, an exposed lock
+  --down              remove the container and its config directory
+  --force             with --down, remove a house even if a run took it recently
+  --stop              stop the container, keeping its config, token and entities
+  --start             start a stopped container and wait until it answers
+  --name <slug>       run more than one instance side by side (default: default)
+  --version <tag>     Home Assistant image tag (default: stable)
+  --json              machine-readable output for a test to consume
+  --env               'export VAR=...' lines, for eval in a shell
+
+Everything is idempotent. The usual call is:
+  node scripts/home-test-instance.mjs --up --onboard --seed --json`);
+}
+
+await main();

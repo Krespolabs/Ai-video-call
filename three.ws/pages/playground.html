@@ -1,0 +1,1420 @@
+<!doctype html>
+<html lang="en">
+	<head>
+		<script>/* three.ws theme boot — no-flash; runtime in /theme-switcher.js */(function(){try{var m=localStorage.getItem('twx_theme');var l=m==='auto'?(window.matchMedia&&window.matchMedia('(prefers-color-scheme: light)').matches):m==='light';document.documentElement.setAttribute('data-theme',l?'light':'dark');}catch(e){document.documentElement.setAttribute('data-theme','dark');}})();</script>
+		<meta charset="UTF-8" />
+		<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+		<title data-i18n="playground.meta_title">Playground · three.ws</title>
+		<link rel="icon" href="/favicon.ico" sizes="any" />
+		<link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+		<link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png" />
+		<link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png" />
+		<link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+		<link rel="manifest" href="/manifest.webmanifest" />
+		<link rel="stylesheet" href="/style.css" />
+		<link rel="stylesheet" href="/nav.css" />
+		<link rel="stylesheet" href="/footer.css" />
+		<link rel="stylesheet" href="/fonts/fonts.css" />
+		<link rel="stylesheet" href="/mobile.css" />
+		<script
+			type="module"
+			src="https://cdn.jsdelivr.net/npm/@google/model-viewer@4.4.0/dist/model-viewer.min.js"
+			integrity="sha384-wjsPzEO+lXOf7d9csIDfAQpPt2OKuUU3m0K9qsdKIuzX4N8czSF6hdh23eAbZa3p"
+			crossorigin="anonymous"
+		></script>
+		<script defer src="/footer-newsletter.js"></script>
+		<style>
+			:root {
+				--bg: var(--bg-0);
+				--panel: #111;
+				--panel-2: #161616;
+				--border: #1f1f1f;
+				--border-2: #2a2a2a;
+				--text: #fafafa;
+				--text-2: #a1a1aa;
+				--text-3: #52525b;
+				--accent: #ffffff;
+				--accent-dim: rgba(255, 255, 255, 0.1);
+				--success: var(--ink);
+				--err: var(--danger);
+			}
+
+			html,
+			body {
+				margin: 0;
+				background: var(--bg);
+				color: var(--text);
+				font-family: var(--font-body);
+				-webkit-font-smoothing: antialiased;
+			}
+			body {
+				display: flex;
+				flex-direction: column;
+				min-height: 100vh;
+			}
+			a {
+				color: inherit;
+			}
+
+			/* ── header ── */
+			.pg-header {
+				position: sticky;
+				top: 0;
+				z-index: 100;
+				display: flex;
+				align-items: center;
+				justify-content: space-between;
+				gap: 1rem;
+				padding: 0.75rem 1.618rem;
+				border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+				background: rgba(10, 10, 10, 0.9);
+				backdrop-filter: blur(14px);
+				-webkit-backdrop-filter: blur(14px);
+			}
+			.pg-header-left {
+				display: inline-flex;
+				align-items: center;
+				gap: 0;
+			}
+			.pg-header-logo {
+				height: 26px;
+				width: auto;
+				display: block;
+			}
+			.pg-header-nav {
+				display: flex;
+				align-items: center;
+				gap: 1.25rem;
+				margin-left: 1.5rem;
+			}
+			.pg-header-nav a {
+				color: rgba(255, 255, 255, 0.4);
+				text-decoration: none;
+				font-size: 0.8rem;
+				transition: color var(--duration-fast);
+			}
+			.pg-header-nav a:hover {
+				color: rgba(255, 255, 255, 0.85);
+			}
+			.pg-header-nav a.active {
+				color: rgba(255, 255, 255, 0.85);
+			}
+
+			/* ── layout ── */
+			.pg-body {
+				flex: 1;
+				display: grid;
+				grid-template-columns: 1fr 300px;
+				gap: 0;
+				min-height: 0;
+			}
+
+			/* ── viewer column ── */
+			.pg-viewer-col {
+				display: flex;
+				flex-direction: column;
+				padding: 1.5rem;
+				gap: 0.75rem;
+				border-right: 1px solid var(--border);
+			}
+			.pg-viewer-wrap {
+				position: relative;
+				flex: 1;
+				border-radius: 14px;
+				overflow: hidden;
+				border: 1px solid var(--border);
+				background:
+					radial-gradient(
+						ellipse at 50% 30%,
+						rgba(255, 255, 255, 0.03) 0%,
+						transparent 65%
+					),
+					var(--panel);
+				min-height: 420px;
+			}
+			.pg-viewer-wrap.drag-over {
+				border-color: var(--accent);
+				background:
+					radial-gradient(
+						ellipse at 50% 30%,
+						rgba(255, 255, 255, 0.08) 0%,
+						transparent 65%
+					),
+					var(--panel);
+			}
+			#viewer {
+				width: 100%;
+				height: 100%;
+				position: absolute;
+				inset: 0;
+				--poster-color: transparent;
+			}
+
+			/* drop overlay shown before any model loads */
+			.drop-overlay {
+				position: absolute;
+				inset: 0;
+				z-index: 10;
+				display: flex;
+				flex-direction: column;
+				align-items: center;
+				justify-content: center;
+				gap: 0.75rem;
+				pointer-events: none;
+				transition: opacity var(--duration-base);
+			}
+			.drop-overlay.hidden {
+				opacity: 0;
+				pointer-events: none;
+			}
+			.drop-icon {
+				width: 56px;
+				height: 56px;
+				border-radius: 14px;
+				border: 1.5px dashed var(--border-2);
+				display: flex;
+				align-items: center;
+				justify-content: center;
+				color: var(--text-3);
+			}
+			.drop-overlay p {
+				margin: 0;
+				font-size: 13px;
+				color: var(--text-3);
+				text-align: center;
+				line-height: 1.5;
+			}
+			.drop-overlay small {
+				display: block;
+				font-size: 11px;
+				color: var(--text-3);
+				opacity: 0.6;
+				margin-top: 0.1rem;
+			}
+
+			.pg-viewer-bar {
+				display: flex;
+				align-items: center;
+				gap: 0.5rem;
+				flex-wrap: wrap;
+			}
+			.pg-file-chip {
+				font-size: 12px;
+				color: var(--text-3);
+				background: var(--panel);
+				border: 1px solid var(--border);
+				border-radius: 6px;
+				padding: 0.3rem 0.6rem;
+				white-space: nowrap;
+				overflow: hidden;
+				text-overflow: ellipsis;
+				max-width: 220px;
+			}
+			.pg-file-chip.loaded {
+				color: var(--text-2);
+				border-color: var(--border-2);
+			}
+
+			/* ── controls column ── */
+			.pg-controls-col {
+				display: flex;
+				flex-direction: column;
+				overflow-y: auto;
+				padding: 1.25rem;
+				gap: 0;
+				scrollbar-width: thin;
+				scrollbar-color: var(--border) transparent;
+			}
+
+			.pg-section {
+				padding: 1rem 0;
+				border-bottom: 1px solid var(--border);
+			}
+			.pg-section:first-child {
+				padding-top: 0.25rem;
+			}
+			.pg-section:last-child {
+				border-bottom: none;
+			}
+
+			.pg-section-label {
+				font-size: 10px;
+				font-weight: 600;
+				letter-spacing: 0.08em;
+				text-transform: uppercase;
+				color: var(--text-3);
+				margin: 0 0 0.75rem;
+			}
+
+			/* upload */
+			.pg-upload-label {
+				display: flex;
+				align-items: center;
+				justify-content: center;
+				gap: 0.5rem;
+				padding: 0.65rem 1rem;
+				border-radius: 8px;
+				border: 1px dashed var(--border-2);
+				color: var(--text-2);
+				font-size: 12.5px;
+				cursor: pointer;
+				transition:
+					color var(--duration-fast),
+					border-color var(--duration-fast),
+					background var(--duration-fast);
+				width: 100%;
+				box-sizing: border-box;
+			}
+			.pg-upload-label:hover {
+				color: var(--text);
+				border-color: var(--text-3);
+				background: var(--panel-2);
+			}
+			/* Visually hidden, still in the tab order: display:none would strand
+			   keyboard users with no way to reach the upload control. */
+			#avatar-upload {
+				position: absolute;
+				width: 1px;
+				height: 1px;
+				padding: 0;
+				margin: -1px;
+				overflow: hidden;
+				clip: rect(0 0 0 0);
+				clip-path: inset(50%);
+				white-space: nowrap;
+				border: 0;
+			}
+
+			/* pills */
+			.pill-row {
+				display: flex;
+				gap: 0.35rem;
+				flex-wrap: wrap;
+			}
+			.pill {
+				padding: 0.35rem 0.75rem;
+				border-radius: 6px;
+				border: 1px solid var(--border-2);
+				background: transparent;
+				color: var(--text-2);
+				font-family: inherit;
+				font-size: 12px;
+				cursor: pointer;
+				transition:
+					color var(--duration-fast),
+					border-color var(--duration-fast),
+					background var(--duration-fast);
+			}
+			.pill:hover {
+				color: var(--text);
+				border-color: var(--text-3);
+			}
+			.pill.active {
+				background: var(--accent-dim);
+				border-color: var(--accent);
+				color: var(--accent);
+			}
+
+			/* sliders */
+			.pg-slider {
+				width: 100%;
+				height: 4px;
+				border-radius: 2px;
+				accent-color: var(--accent);
+				cursor: pointer;
+			}
+			.slider-row {
+				display: flex;
+				align-items: center;
+				gap: 0.75rem;
+			}
+			.slider-val {
+				font-size: 11px;
+				color: var(--text-3);
+				min-width: 28px;
+				text-align: right;
+				font-variant-numeric: tabular-nums;
+			}
+
+			/* toggle */
+			.toggle-row {
+				display: flex;
+				align-items: center;
+				justify-content: space-between;
+				gap: 0.75rem;
+				cursor: pointer;
+			}
+			.toggle-text {
+				font-size: 12.5px;
+				color: var(--text-2);
+			}
+			.toggle {
+				position: relative;
+				display: inline-block;
+				width: 36px;
+				height: 20px;
+				flex-shrink: 0;
+			}
+			.toggle input {
+				opacity: 0;
+				width: 0;
+				height: 0;
+			}
+			.toggle-slider {
+				position: absolute;
+				inset: 0;
+				background: var(--border-2);
+				border-radius: 20px;
+				cursor: pointer;
+				transition: background var(--duration-base);
+			}
+			.toggle-slider::before {
+				content: '';
+				position: absolute;
+				height: 14px;
+				width: 14px;
+				left: 3px;
+				top: 3px;
+				background: var(--text-2);
+				border-radius: 50%;
+				transition:
+					transform var(--duration-base),
+					background var(--duration-base);
+			}
+			.toggle input:checked + .toggle-slider {
+				background: var(--accent);
+			}
+			.toggle input:checked + .toggle-slider::before {
+				transform: translateX(16px);
+				background: #fff;
+			}
+
+			/* animations */
+			.anim-controls {
+				display: flex;
+				gap: 0.5rem;
+				align-items: center;
+			}
+			#anim-select {
+				flex: 1;
+				min-width: 0;
+				padding: 0.4rem 0.6rem;
+				border-radius: 8px;
+				border: 1px solid var(--border-2);
+				background: var(--panel-2);
+				color: var(--text);
+				font-family: inherit;
+				font-size: 12px;
+			}
+			#anim-select:focus {
+				outline: none;
+				border-color: var(--accent);
+			}
+			.anim-btn {
+				width: 32px;
+				height: 32px;
+				border-radius: 8px;
+				border: 1px solid var(--border-2);
+				background: var(--panel-2);
+				color: var(--text-2);
+				display: flex;
+				align-items: center;
+				justify-content: center;
+				cursor: pointer;
+				flex-shrink: 0;
+				transition:
+					color var(--duration-fast),
+					border-color var(--duration-fast),
+					background var(--duration-fast);
+			}
+			.anim-btn:hover {
+				color: var(--text);
+				border-color: var(--text-3);
+			}
+
+			/* model info */
+			.info-grid {
+				display: grid;
+				grid-template-columns: auto 1fr;
+				gap: 0.35rem 0.75rem;
+				margin: 0;
+			}
+			.info-grid dt {
+				font-size: 11.5px;
+				color: var(--text-3);
+			}
+			.info-grid dd {
+				font-size: 11.5px;
+				color: var(--text-2);
+				margin: 0;
+				font-variant-numeric: tabular-nums;
+			}
+
+			/* embed */
+			#embed-code {
+				width: 100%;
+				box-sizing: border-box;
+				height: 90px;
+				padding: 0.65rem;
+				border-radius: 8px;
+				border: 1px solid var(--border-2);
+				background: var(--panel-2);
+				color: var(--text-2);
+				font-family: var(--font-mono);
+				font-size: 10.5px;
+				resize: none;
+				line-height: 1.5;
+			}
+			#embed-code:focus {
+				outline: none;
+				border-color: var(--accent);
+			}
+			.embed-note {
+				font-size: 11px;
+				color: var(--text-3);
+				margin: 0.4rem 0 0;
+				line-height: 1.45;
+			}
+
+			/* buttons */
+			.pg-btn {
+				display: inline-flex;
+				align-items: center;
+				justify-content: center;
+				gap: 0.4rem;
+				padding: 0.5rem 0.85rem;
+				border-radius: 8px;
+				border: 1px solid var(--border-2);
+				background: var(--panel-2);
+				color: var(--text-2);
+				font-family: inherit;
+				font-size: 12px;
+				cursor: pointer;
+				transition:
+					color var(--duration-fast),
+					border-color var(--duration-fast),
+					background var(--duration-fast);
+				text-decoration: none;
+			}
+			.pg-btn:hover {
+				color: var(--text);
+				border-color: var(--text-3);
+			}
+			.pg-btn.accent {
+				background: var(--accent);
+				border-color: var(--accent);
+				color: var(--bg-0);
+				font-weight: 600;
+			}
+			.pg-btn.accent:hover {
+				background: #e0e0e0;
+				border-color: #e0e0e0;
+			}
+			.btn-row {
+				display: flex;
+				gap: 0.4rem;
+				flex-wrap: wrap;
+				margin-top: 0.6rem;
+			}
+
+			/* status */
+			#pg-status {
+				font-size: 11.5px;
+				color: var(--text-3);
+				min-height: 14px;
+				text-align: center;
+			}
+			#pg-status.ok {
+				color: var(--success);
+			}
+			#pg-status.err {
+				color: var(--err);
+			}
+
+			/* loading: scoped to the viewer so the controls stay usable while a model streams */
+			.loading-indicator {
+				display: none;
+				position: absolute;
+				inset: 0;
+				z-index: 20;
+				background:
+					linear-gradient(
+						100deg,
+						rgba(255, 255, 255, 0) 22%,
+						rgba(255, 255, 255, 0.05) 50%,
+						rgba(255, 255, 255, 0) 78%
+					),
+					rgba(10, 10, 10, 0.72);
+				background-size: 240% 100%;
+				backdrop-filter: blur(2px);
+				-webkit-backdrop-filter: blur(2px);
+				flex-direction: column;
+				align-items: center;
+				justify-content: center;
+				gap: 0.85rem;
+				animation: pgShimmer 1.4s ease-in-out infinite;
+			}
+			.loading-indicator.open {
+				display: flex;
+			}
+			.loading-label {
+				font-size: 11.5px;
+				color: var(--text-3);
+				letter-spacing: 0.04em;
+			}
+			.spinner {
+				width: 40px;
+				height: 40px;
+				border: 3px solid rgba(255, 255, 255, 0.08);
+				border-top-color: var(--accent);
+				border-radius: 50%;
+				animation: spin 0.85s linear infinite;
+			}
+			@keyframes spin {
+				to {
+					transform: rotate(360deg);
+				}
+			}
+			@keyframes pgShimmer {
+				0% {
+					background-position: 140% 0;
+				}
+				100% {
+					background-position: -40% 0;
+				}
+			}
+
+			/* viewer error state */
+			.pg-error {
+				display: none;
+				position: absolute;
+				inset: 0;
+				z-index: 30;
+				flex-direction: column;
+				align-items: center;
+				justify-content: center;
+				gap: 0.7rem;
+				padding: 1.5rem;
+				text-align: center;
+				background: rgba(10, 10, 10, 0.94);
+			}
+			.pg-error.open {
+				display: flex;
+			}
+			.pg-error-icon {
+				width: 44px;
+				height: 44px;
+				border-radius: 12px;
+				border: 1.5px solid var(--err);
+				color: var(--err);
+				display: flex;
+				align-items: center;
+				justify-content: center;
+			}
+			.pg-error-title {
+				margin: 0;
+				font-family: var(--font-body);
+				font-size: 14px;
+				font-weight: 600;
+				line-height: 1.3;
+				letter-spacing: 0;
+				text-transform: none;
+				color: var(--text);
+			}
+			.pg-error-msg {
+				margin: 0;
+				max-width: 36ch;
+				font-size: 12.5px;
+				line-height: 1.55;
+				color: var(--text-2);
+			}
+
+			/* page intro */
+			.pg-intro {
+				display: flex;
+				flex-direction: column;
+				gap: 0.3rem;
+			}
+			.pg-title {
+				margin: 0;
+				font-family: var(--font-display);
+				font-size: 1.35rem;
+				font-weight: 600;
+				line-height: 1.2;
+				letter-spacing: -0.01em;
+				color: var(--text);
+			}
+			.pg-lede {
+				margin: 0;
+				max-width: 66ch;
+				font-size: 12.5px;
+				line-height: 1.55;
+				color: var(--text-2);
+			}
+
+			/* focus: every interactive control shows where the keyboard is */
+			.pg-header-nav a:focus-visible,
+			.pill:focus-visible,
+			.pg-btn:focus-visible,
+			.anim-btn:focus-visible,
+			#anim-select:focus-visible,
+			#embed-code:focus-visible,
+			.pg-slider:focus-visible,
+			#avatar-upload:focus-visible + .pg-upload-label,
+			.toggle input:focus-visible + .toggle-slider {
+				outline: 2px solid var(--accent);
+				outline-offset: 2px;
+			}
+
+			@media (prefers-reduced-motion: reduce) {
+				.loading-indicator {
+					animation: none;
+				}
+				.spinner {
+					animation-duration: 2.4s;
+				}
+			}
+
+			/* responsive */
+			@media (max-width: 768px) {
+				.pg-body {
+					grid-template-columns: 1fr;
+				}
+				.pg-viewer-col {
+					border-right: none;
+					border-bottom: 1px solid var(--border);
+					padding: 1rem;
+				}
+				.pg-viewer-wrap {
+					min-height: 300px;
+				}
+				.pg-controls-col {
+					padding: 1rem;
+				}
+				.pg-title {
+					font-size: 1.15rem;
+				}
+				/* The nav scrolls rather than disappearing: hiding it stranded
+				   phone visitors with no way back to Discover, Create or Studio. */
+				.pg-header {
+					padding: 0.65rem 1rem;
+				}
+				.pg-header-left {
+					min-width: 0;
+					flex: 1;
+				}
+				.pg-header-nav {
+					margin-left: 0.9rem;
+					gap: 0.9rem;
+					overflow-x: auto;
+					scrollbar-width: none;
+					-webkit-overflow-scrolling: touch;
+				}
+				.pg-header-nav::-webkit-scrollbar {
+					display: none;
+				}
+				.pg-header-nav a {
+					white-space: nowrap;
+				}
+			}
+		</style>
+
+		<meta
+			name="description"
+			content="Sandbox for 3D scenes: drop in any .glb, play its animations, tune the lighting, and copy a paste-ready embed snippet."
+		 data-i18n-attr="content:playground.meta_description"/>
+		<link rel="canonical" href="https://three.ws/playground" />
+		<meta property="og:type" content="website" />
+		<meta property="og:site_name" content="three.ws" />
+		<meta property="og:title" content="Playground · three.ws"  data-i18n-attr="content:playground.meta_og_title"/>
+		<meta
+			property="og:description"
+			content="Sandbox for 3D scenes: drop in any .glb, play its animations, tune the lighting, and copy a paste-ready embed snippet."
+		 data-i18n-attr="content:playground.meta_og_description"/>
+		<meta property="og:url" content="https://three.ws/playground" />
+		<meta property="og:image" content="https://three.ws/api/page-og?s=labs&amp;t=Playground&amp;d=Sandbox+for+3D+scenes%3A+drop+in+any+.glb%2C+play+its+animations%2C+tune+the+lighting%2C+and+copy+a+paste-ready+embed+snippet.&amp;p=%2Fplayground" />
+		<meta property="og:image:width" content="1200" />
+		<meta property="og:image:height" content="630" />
+		<meta name="twitter:card" content="summary_large_image" />
+		<meta name="twitter:title" content="Playground · three.ws"  data-i18n-attr="content:playground.meta_twitter_title"/>
+		<meta
+			name="twitter:description"
+			content="Sandbox for 3D scenes: drop in any .glb, play its animations, tune the lighting, and copy a paste-ready embed snippet."
+		 data-i18n-attr="content:playground.meta_twitter_description"/>
+		<meta name="twitter:image" content="https://three.ws/api/page-og?s=labs&amp;t=Playground&amp;d=Sandbox+for+3D+scenes%3A+drop+in+any+.glb%2C+play+its+animations%2C+tune+the+lighting%2C+and+copy+a+paste-ready+embed+snippet.&amp;p=%2Fplayground" />
+		<script type="application/ld+json">
+			{
+				"@context": "https://schema.org",
+				"@type": "WebPage",
+				"name": "Playground",
+				"description": "Sandbox for 3D scenes: drop in any .glb, play its animations, tune the lighting, and copy a paste-ready embed snippet.",
+				"url": "https://three.ws/playground",
+				"isPartOf": { "@type": "WebSite", "name": "three.ws", "url": "https://three.ws" }
+			}
+		</script>
+	
+	<meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1">
+	<meta property="og:locale" content="en_US">
+	<meta property="og:image:alt" content="Playground — three.ws">
+	<meta name="twitter:site" content="@trythreews">
+	<script src="/model-viewer-meshopt.js"></script>
+</head>
+	<body>
+		<header class="pg-header">
+			<div class="pg-header-left">
+				<a href="/" aria-label="three.ws home" data-i18n-attr="aria-label:playground.three_ws_home_arialabel">
+					<img src="/three.svg" alt="three.ws" class="pg-header-logo" />
+				</a>
+				<nav class="pg-header-nav" aria-label="Primary">
+					<a href="/discover" data-i18n="playground.discover">Discover</a>
+					<a href="/create" data-i18n="playground.create">Create</a>
+					<a href="/studio" data-i18n="playground.studio">Studio</a>
+					<a href="/playground" class="active" data-i18n="playground.playground">Playground</a>
+				</nav>
+			</div>
+		</header>
+
+		<div class="pg-body">
+			<!-- viewer column -->
+			<div class="pg-viewer-col">
+				<div class="pg-intro">
+					<h1 class="pg-title" data-i18n="playground.h1">Playground</h1>
+					<p class="pg-lede" data-i18n="playground.lede">
+						Drop a .glb to see it render live: play its animations, tune the
+						lighting and background, then copy a paste-ready embed snippet.
+					</p>
+				</div>
+				<div class="pg-viewer-wrap" id="dropzone">
+					<!-- shown before a model is loaded -->
+					<div class="drop-overlay" id="drop-overlay">
+						<div class="drop-icon">
+							<svg
+								width="22"
+								height="22"
+								viewBox="0 0 24 24"
+								fill="none"
+								stroke="currentColor"
+								stroke-width="1.5"
+								stroke-linecap="round"
+								stroke-linejoin="round"
+							>
+								<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+								<polyline points="17 8 12 3 7 8" />
+								<line x1="12" y1="3" x2="12" y2="15" />
+							</svg>
+						</div>
+						<p data-i18n-html="playground.drop_a_glb_file_hereor_use_the">Drop a .glb file here<small>or use the upload button →</small></p>
+					</div>
+
+					<model-viewer
+						id="viewer"
+						src="/avatars/default.glb"
+						alt="A 3D avatar"
+						ar
+						ar-modes="webxr scene-viewer quick-look"
+						camera-controls
+						shadow-intensity="1"
+						environment-image="neutral"
+						exposure="1"
+						auto-rotate
+						autoplay
+					></model-viewer>
+
+					<div id="loading-indicator" class="loading-indicator">
+						<div class="spinner"></div>
+						<span class="loading-label" data-i18n="playground.loading_model">Loading model</span>
+					</div>
+
+					<div id="viewer-error" class="pg-error" role="alert">
+						<div class="pg-error-icon" aria-hidden="true">
+							<svg
+								width="20"
+								height="20"
+								viewBox="0 0 24 24"
+								fill="none"
+								stroke="currentColor"
+								stroke-width="1.6"
+								stroke-linecap="round"
+								stroke-linejoin="round"
+							>
+								<circle cx="12" cy="12" r="9" />
+								<line x1="12" y1="8" x2="12" y2="13" />
+								<line x1="12" y1="16.5" x2="12" y2="16.5" />
+							</svg>
+						</div>
+						<h2 class="pg-error-title" id="viewer-error-title" data-i18n="playground.error_title">
+							That model did not load
+						</h2>
+						<p class="pg-error-msg" id="viewer-error-msg" data-i18n="playground.error_msg">
+							The file may be corrupt, or the network dropped mid-download.
+						</p>
+						<div class="btn-row">
+							<button class="pg-btn accent" id="viewer-retry" data-i18n="playground.retry">Retry</button>
+							<button class="pg-btn" id="viewer-error-upload" data-i18n="playground.pick_a_file">Pick a .glb</button>
+						</div>
+					</div>
+				</div>
+
+				<div class="pg-viewer-bar">
+					<span id="file-chip" class="pg-file-chip loaded" data-i18n-owned="1">default.glb</span>
+					<div id="pg-status" role="status" aria-live="polite"></div>
+				</div>
+			</div>
+
+			<!-- controls column -->
+			<div class="pg-controls-col">
+				<!-- upload -->
+				<div class="pg-section">
+					<h2 class="pg-section-label" data-i18n="playground.section_model">Model</h2>
+					<input type="file" id="avatar-upload" accept=".glb" />
+					<label for="avatar-upload" class="pg-upload-label">
+						<svg
+							width="14"
+							height="14"
+							viewBox="0 0 24 24"
+							fill="none"
+							stroke="currentColor"
+							stroke-width="2"
+							stroke-linecap="round"
+							stroke-linejoin="round"
+						>
+							<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+							<polyline points="17 8 12 3 7 8" />
+							<line x1="12" y1="3" x2="12" y2="15" />
+						</svg>
+						<span data-i18n="playground.upload_glb_file">Upload .glb file</span>
+					</label>
+				</div>
+
+				<!-- animations -->
+				<div class="pg-section" id="anim-section" style="display: none">
+					<h2 class="pg-section-label" data-i18n="playground.animations">Animations</h2>
+					<div class="anim-controls">
+						<button
+							class="anim-btn"
+							id="anim-play-pause"
+							title="Play / Pause"
+							aria-label="Play or pause animation"
+						 data-i18n-attr="aria-label:playground.play_or_pause_animation_arialabel;title:playground.play_pause_title">
+							<svg
+								id="anim-icon-pause"
+								width="14"
+								height="14"
+								viewBox="0 0 24 24"
+								fill="currentColor"
+							>
+								<rect x="6" y="4" width="4" height="16" />
+								<rect x="14" y="4" width="4" height="16" />
+							</svg>
+							<svg
+								id="anim-icon-play"
+								width="14"
+								height="14"
+								viewBox="0 0 24 24"
+								fill="currentColor"
+								style="display: none"
+							>
+								<polygon points="5 3 19 12 5 21 5 3" />
+							</svg>
+						</button>
+						<select id="anim-select" aria-label="Select animation"></select>
+					</div>
+				</div>
+
+				<!-- environment -->
+				<div class="pg-section">
+					<h2 class="pg-section-label" data-i18n="playground.section_environment">Environment</h2>
+					<div class="pill-row">
+						<button class="pill active" data-env="neutral" data-i18n="playground.neutral">Neutral</button>
+						<button class="pill" data-env="legacy" data-i18n="playground.warm">Warm</button>
+						<button class="pill" data-env="dim" data-i18n="playground.dark">Dark</button>
+					</div>
+				</div>
+
+				<!-- background -->
+				<div class="pg-section">
+					<h2 class="pg-section-label" data-i18n="playground.section_background">Background</h2>
+					<div class="pill-row" id="bg-pills">
+						<button class="pill active" data-bg="#0f0f0f" data-i18n="playground.dark_2">Dark</button>
+						<button class="pill" data-bg="#1b1b1b" data-i18n="playground.midnight">Midnight</button>
+						<button class="pill" data-bg="#0d1a0d" data-i18n="playground.forest">Forest</button>
+						<button class="pill" data-bg="#1a0d0d" data-i18n="playground.ember">Ember</button>
+					</div>
+				</div>
+
+				<!-- rotation + shadow -->
+				<div class="pg-section">
+					<h2 class="pg-section-label" data-i18n="playground.section_controls">Controls</h2>
+					<label class="toggle-row" for="toggle-rotate" style="margin-bottom: 0.85rem">
+						<span class="toggle-text" data-i18n="playground.auto_rotate">Auto-rotate</span>
+						<span class="toggle">
+							<input type="checkbox" id="toggle-rotate" checked />
+							<span class="toggle-slider"></span>
+						</span>
+					</label>
+					<label class="toggle-row" for="toggle-shadow">
+						<span class="toggle-text" data-i18n="playground.shadow">Shadow</span>
+						<span class="toggle">
+							<input type="checkbox" id="toggle-shadow" checked />
+							<span class="toggle-slider"></span>
+						</span>
+					</label>
+				</div>
+
+				<!-- exposure -->
+				<div class="pg-section">
+					<h2 class="pg-section-label" data-i18n="playground.section_exposure">Exposure</h2>
+					<div class="slider-row">
+						<input
+							type="range"
+							class="pg-slider"
+							id="exposure-slider"
+							aria-label="Exposure"
+							data-i18n-attr="aria-label:playground.section_exposure"
+							min="0.2"
+							max="2.5"
+							step="0.05"
+							value="1"
+						/>
+						<span class="slider-val" id="exposure-val">1.0</span>
+					</div>
+				</div>
+
+				<!-- model info -->
+				<div class="pg-section" id="info-section" style="display: none">
+					<h2 class="pg-section-label" data-i18n="playground.section_model_info">Model info</h2>
+					<dl class="info-grid">
+						<dt data-i18n="playground.file">File</dt>
+						<dd id="info-filename" data-i18n-owned="1">default.glb</dd>
+						<dt data-i18n="playground.size">Size</dt>
+						<dd id="info-size" data-i18n-owned="1">Unknown</dd>
+						<dt data-i18n="playground.animations">Animations</dt>
+						<dd id="info-anims" data-i18n-owned="1">None</dd>
+					</dl>
+				</div>
+
+				<!-- embed -->
+				<div class="pg-section">
+					<h2 class="pg-section-label" data-i18n="playground.section_embed">Embed</h2>
+					<textarea
+						id="embed-code"
+						readonly
+						spellcheck="false"
+						aria-label="Embed snippet"
+						data-i18n-attr="aria-label:playground.embed_snippet_arialabel"
+					></textarea>
+					<p class="embed-note" id="embed-note"></p>
+					<div class="btn-row">
+						<button class="pg-btn accent" id="copy-embed" data-i18n="playground.copy_snippet">Copy snippet</button>
+						<button class="pg-btn" id="reset-btn" data-i18n="playground.reset">Reset</button>
+					</div>
+				</div>
+			</div>
+		</div>
+
+		<div id="footer-container"></div>
+		<script src="/footer.js"></script>
+
+		<script>
+			(() => {
+				const viewer = document.getElementById('viewer');
+				const upload = document.getElementById('avatar-upload');
+				const dropzone = document.getElementById('dropzone');
+				const dropOverlay = document.getElementById('drop-overlay');
+				const fileChip = document.getElementById('file-chip');
+				const statusEl = document.getElementById('pg-status');
+				const loading = document.getElementById('loading-indicator');
+				const errorBox = document.getElementById('viewer-error');
+				const errorTitle = document.getElementById('viewer-error-title');
+				const errorMsg = document.getElementById('viewer-error-msg');
+				const retryBtn = document.getElementById('viewer-retry');
+				const errorUpload = document.getElementById('viewer-error-upload');
+				const animSection = document.getElementById('anim-section');
+				const animSelect = document.getElementById('anim-select');
+				const animPlayPause = document.getElementById('anim-play-pause');
+				const animIconPause = document.getElementById('anim-icon-pause');
+				const animIconPlay = document.getElementById('anim-icon-play');
+				const infoSection = document.getElementById('info-section');
+				const infoFilename = document.getElementById('info-filename');
+				const infoSize = document.getElementById('info-size');
+				const infoAnims = document.getElementById('info-anims');
+				const embedCode = document.getElementById('embed-code');
+				const embedNote = document.getElementById('embed-note');
+				const copyEmbed = document.getElementById('copy-embed');
+				const resetBtn = document.getElementById('reset-btn');
+				const exposureSlider = document.getElementById('exposure-slider');
+				const exposureVal = document.getElementById('exposure-val');
+
+				const DEFAULT_SRC = '/avatars/default.glb';
+				const DEFAULT_NAME = 'default.glb';
+				// A cold model-viewer on a slow link needs a while; past this the
+				// spinner is lying and the visitor gets a way out instead.
+				const LOAD_TIMEOUT_MS = 25000;
+
+				let isPlaying = true;
+				let currentSrc = DEFAULT_SRC;
+				let currentFilename = DEFAULT_NAME;
+				let currentFileSize = null;
+				let currentIsLocal = false;
+				let statusTimer = null;
+				let loadTimer = null;
+				let settled = false;
+
+				/* ── status ── */
+				const setStatus = (msg, kind = '') => {
+					statusEl.textContent = msg || '';
+					statusEl.className = kind;
+					if (statusTimer) clearTimeout(statusTimer);
+					if (msg) statusTimer = setTimeout(() => setStatus(''), 4000);
+				};
+
+				/* ── loading + error overlays ── */
+				const showLoading = () => {
+					errorBox.classList.remove('open');
+					loading.classList.add('open');
+				};
+				const hideLoading = () => loading.classList.remove('open');
+
+				const showError = (title, message) => {
+					clearTimeout(loadTimer);
+					settled = true;
+					hideLoading();
+					errorTitle.textContent = title;
+					errorTitle.setAttribute('data-i18n-owned', '1');
+					errorMsg.textContent = message;
+					errorMsg.setAttribute('data-i18n-owned', '1');
+					errorBox.classList.add('open');
+					dropOverlay.classList.add('hidden');
+				};
+
+				const clearError = () => errorBox.classList.remove('open');
+
+				/* ── load model ── */
+				const onModelLoad = () => {
+					if (settled) return;
+					settled = true;
+					clearTimeout(loadTimer);
+					hideLoading();
+					clearError();
+					dropOverlay.classList.add('hidden');
+					viewer.setAttribute('alt', '3D preview of ' + currentFilename);
+					updateAnimations();
+					updateInfo();
+					updateEmbed();
+				};
+
+				const onModelError = () => {
+					showError(
+						'That model did not load',
+						currentIsLocal
+							? 'The .glb could not be parsed. Try re-exporting it as binary glTF, or load the sample model again.'
+							: 'The file could not be fetched. Check your connection, then retry.',
+					);
+				};
+
+				const watchLoad = () => {
+					clearTimeout(loadTimer);
+					loadTimer = setTimeout(() => {
+						if (settled) return;
+						if (!customElements.get('model-viewer')) {
+							showError(
+								'The 3D viewer did not start',
+								'The model-viewer runtime could not be fetched from the CDN. Reload the page, or try again on a network that allows it.',
+							);
+							return;
+						}
+						showError(
+							'This model is taking too long',
+							'The download stalled. Retry, or pick a smaller .glb from your machine.',
+						);
+					}, LOAD_TIMEOUT_MS);
+				};
+
+				const loadModel = (src, filename, fileSize) => {
+					settled = false;
+					currentSrc = src;
+					currentFilename = filename;
+					currentFileSize = fileSize || null;
+					currentIsLocal = src.startsWith('blob:');
+					showLoading();
+					watchLoad();
+					fileChip.textContent = filename;
+					fileChip.classList.add('loaded');
+					viewer.addEventListener('load', onModelLoad, { once: true });
+					viewer.addEventListener('error', onModelError, { once: true });
+					viewer.src = src;
+				};
+
+				retryBtn.addEventListener('click', () => {
+					clearError();
+					if (!customElements.get('model-viewer')) {
+						window.location.reload();
+						return;
+					}
+					viewer.removeAttribute('src');
+					if (currentIsLocal) {
+						// A blob that failed to parse will fail again; the sample model is
+						// the only retry from here that can actually succeed.
+						currentIsLocal = false;
+						loadModel(DEFAULT_SRC, DEFAULT_NAME, null);
+						return;
+					}
+					loadModel(currentSrc, currentFilename, currentFileSize);
+				});
+
+				errorUpload.addEventListener('click', () => {
+					clearError();
+					upload.click();
+				});
+
+				/* ── animations ── */
+				const updateAnimations = () => {
+					const anims = viewer.availableAnimations || [];
+					if (anims.length === 0) {
+						animSection.style.display = 'none';
+						return;
+					}
+					animSection.style.display = '';
+					// Built as DOM nodes: a clip name inside a caller-supplied .glb is
+					// untrusted text and must never be parsed as markup.
+					animSelect.replaceChildren(
+						...anims.map((a, idx) => new Option(a || 'Animation ' + (idx + 1), String(idx))),
+					);
+					isPlaying = true;
+					setAnimIcon(true);
+					viewer.animationName = anims[0];
+				};
+
+				const setAnimIcon = (playing) => {
+					animIconPause.style.display = playing ? '' : 'none';
+					animIconPlay.style.display = playing ? 'none' : '';
+				};
+
+				animPlayPause.addEventListener('click', () => {
+					if (isPlaying) {
+						viewer.pause();
+						isPlaying = false;
+					} else {
+						viewer.play();
+						isPlaying = true;
+					}
+					setAnimIcon(isPlaying);
+				});
+
+				animSelect.addEventListener('change', () => {
+					const anims = viewer.availableAnimations || [];
+					viewer.animationName = anims[Number(animSelect.value)] ?? anims[0];
+					if (!isPlaying) {
+						viewer.play();
+						isPlaying = true;
+						setAnimIcon(true);
+					}
+				});
+
+				/* ── model info ── */
+				const formatBytes = (b) => {
+					if (!b) return 'Unknown';
+					if (b < 1024) return b + ' B';
+					if (b < 1048576) return (b / 1024).toFixed(1) + ' KB';
+					return (b / 1048576).toFixed(2) + ' MB';
+				};
+
+				const updateInfo = () => {
+					const anims = viewer.availableAnimations || [];
+					infoFilename.textContent = currentFilename;
+					infoSize.textContent = formatBytes(currentFileSize);
+					infoAnims.textContent = anims.length === 0 ? 'None' : String(anims.length);
+					infoSection.style.display = '';
+				};
+
+				/* ── embed code ── */
+				const VIEWER_TAG =
+					'<script type="module" src="https://cdn.jsdelivr.net/npm/@google/model-viewer@4.4.0/dist/model-viewer.min.js" integrity="sha384-wjsPzEO+lXOf7d9csIDfAQpPt2OKuUU3m0K9qsdKIuzX4N8czSF6hdh23eAbZa3p" crossorigin="anonymous"><\/script>';
+
+				const snippetFor = (src) =>
+					VIEWER_TAG +
+					'\n<model-viewer\n  src="' +
+					src +
+					'"\n  alt="3D model"\n  camera-controls\n  auto-rotate\n  autoplay\n  style="width:500px;height:500px"\n></model-viewer>';
+
+				const updateEmbed = () => {
+					if (currentIsLocal) {
+						embedCode.value = snippetFor('https://your-host.example/model.glb');
+						embedNote.textContent =
+							'This file lives only in your browser. Upload the .glb to your own host and swap the src above.';
+					} else {
+						embedCode.value = snippetFor(window.location.origin + DEFAULT_SRC);
+						embedNote.textContent = '';
+					}
+				};
+
+				updateEmbed();
+
+				/* ── copy embed ── */
+				const legacyCopy = () => {
+					embedCode.focus();
+					embedCode.select();
+					try {
+						return document.execCommand('copy');
+					} catch {
+						return false;
+					}
+				};
+
+				copyEmbed.addEventListener('click', async () => {
+					let copied = false;
+					try {
+						await navigator.clipboard.writeText(embedCode.value);
+						copied = true;
+					} catch {
+						copied = legacyCopy();
+					}
+					if (copied) setStatus('Snippet copied.', 'ok');
+					else setStatus('Clipboard blocked. The snippet is selected: press Ctrl+C.', 'err');
+				});
+
+				/* ── reset ── */
+				resetBtn.addEventListener('click', () => {
+					upload.value = '';
+					animSection.style.display = 'none';
+					clearError();
+					viewer.removeAttribute('src');
+					loadModel(DEFAULT_SRC, DEFAULT_NAME, null);
+					setStatus('Back to the sample model.', 'ok');
+				});
+
+				/* ── file upload ── */
+				const MAX_UPLOAD_BYTES = 100 * 1024 * 1024; // 100 MB
+				const fmtMB = (b) => (b / 1024 / 1024).toFixed(1) + ' MB';
+
+				const handleFile = (file) => {
+					if (!file) return;
+					if (!file.name.toLowerCase().endsWith('.glb')) {
+						const ext = file.name.includes('.')
+							? file.name.split('.').pop().toLowerCase()
+							: 'that file type';
+						setStatus('Cannot load .' + ext + ': drop a binary glTF (.glb) instead.', 'err');
+						return;
+					}
+					if (file.size === 0) {
+						setStatus('That file is empty. Pick a valid .glb model.', 'err');
+						return;
+					}
+					if (file.size > MAX_UPLOAD_BYTES) {
+						setStatus(
+							'That model is ' +
+								fmtMB(file.size) +
+								'. Keep it under ' +
+								fmtMB(MAX_UPLOAD_BYTES) +
+								' so it loads smoothly.',
+							'err',
+						);
+						return;
+					}
+					loadModel(URL.createObjectURL(file), file.name, file.size);
+				};
+
+				upload.addEventListener('change', (e) => {
+					handleFile(e.target.files[0]);
+					// Reset so re-selecting the same file still fires `change`.
+					e.target.value = '';
+				});
+
+				/* ── drag & drop ── */
+				dropzone.addEventListener('dragover', (e) => {
+					e.preventDefault();
+					dropzone.classList.add('drag-over');
+					dropOverlay.classList.remove('hidden');
+				});
+				dropzone.addEventListener('dragleave', () => {
+					dropzone.classList.remove('drag-over');
+					if (settled) dropOverlay.classList.add('hidden');
+				});
+				dropzone.addEventListener('drop', (e) => {
+					e.preventDefault();
+					dropzone.classList.remove('drag-over');
+					if (settled) dropOverlay.classList.add('hidden');
+					handleFile(e.dataTransfer.files[0]);
+				});
+
+				/* ── environment presets ──
+				   Each preset owns both the image and its exposure baseline, and writes
+				   the slider back, so switching presets can never leave the scene lit
+				   by the previous preset's exposure. */
+				const ENVIRONMENTS = {
+					neutral: { image: 'neutral', exposure: '1.00' },
+					legacy: { image: 'legacy', exposure: '1.15' },
+					dim: { image: 'neutral', exposure: '0.35' },
+				};
+
+				const setExposure = (value) => {
+					exposureSlider.value = value;
+					exposureVal.textContent = Number(value).toFixed(2);
+					viewer.setAttribute('exposure', value);
+				};
+
+				document.querySelectorAll('[data-env]').forEach((btn) => {
+					btn.addEventListener('click', () => {
+						document
+							.querySelectorAll('[data-env]')
+							.forEach((b) => b.classList.remove('active'));
+						btn.classList.add('active');
+						const preset = ENVIRONMENTS[btn.dataset.env] || ENVIRONMENTS.neutral;
+						viewer.setAttribute('environment-image', preset.image);
+						setExposure(preset.exposure);
+					});
+				});
+
+				/* ── background pills ── */
+				document.querySelectorAll('[data-bg]').forEach((btn) => {
+					btn.addEventListener('click', () => {
+						document
+							.querySelectorAll('[data-bg]')
+							.forEach((b) => b.classList.remove('active'));
+						btn.classList.add('active');
+						document.querySelector('.pg-viewer-wrap').style.background =
+							'radial-gradient(ellipse at 50% 30%, rgba(255,255,255,0.03) 0%, transparent 65%), ' +
+							btn.dataset.bg;
+					});
+				});
+
+				/* ── auto-rotate toggle ── */
+				document.getElementById('toggle-rotate').addEventListener('change', function () {
+					if (this.checked) viewer.setAttribute('auto-rotate', '');
+					else viewer.removeAttribute('auto-rotate');
+				});
+
+				/* ── shadow toggle ── */
+				document.getElementById('toggle-shadow').addEventListener('change', function () {
+					viewer.setAttribute('shadow-intensity', this.checked ? '1' : '0');
+				});
+
+				/* ── exposure slider ── */
+				exposureSlider.addEventListener('input', () => {
+					const v = parseFloat(exposureSlider.value).toFixed(2);
+					exposureVal.textContent = v;
+					viewer.setAttribute('exposure', v);
+				});
+
+				/* ── initial load ──
+				   The markup ships src already set, so the element may finish before
+				   this runs. Adopt whatever state it is already in rather than waiting
+				   for an event that has been and gone. */
+				showLoading();
+				watchLoad();
+				viewer.addEventListener('load', onModelLoad, { once: true });
+				viewer.addEventListener('error', onModelError, { once: true });
+				customElements
+					.whenDefined('model-viewer')
+					.then(() => {
+						if (viewer.loaded) onModelLoad();
+					})
+					.catch(() => {});
+			})();
+		</script>
+
+		<script src="/brand.js" defer></script>
+		<!-- Runtime i18n: detects locale, swaps annotated copy, mounts <lang-switcher>. -->
+	<script type="module" src="/i18n.js"></script>
+</body>
+</html>

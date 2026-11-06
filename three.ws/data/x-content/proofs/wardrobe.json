@@ -1,0 +1,120 @@
+{
+	"id": "wardrobe",
+	"scenarioHash": "34570dc030f177f38049e1310a6ff7e9d8e9f06acef31466072bf61327940dc8",
+	"ranAt": "2026-09-29T07:32:09.251Z",
+	"target": {
+		"commit": "f2081d946",
+		"revision": "three-ws-api-00459-pxd"
+	},
+	"passed": true,
+	"steps": [
+		{
+			"index": 1,
+			"kind": "goto",
+			"target": "https://three.ws/wardrobe",
+			"detail": "loaded https://three.ws/wardrobe",
+			"ok": true,
+			"ms": 7839,
+			"frames": 0
+		},
+		{
+			"index": 2,
+			"kind": "scroll",
+			"target": "Search pieces",
+			"detail": "scrolled 461 px",
+			"ok": true,
+			"ms": 3990,
+			"frames": 27
+		},
+		{
+			"index": 3,
+			"kind": "read",
+			"target": "pieces",
+			"detail": "pieces = \"59\"",
+			"ok": true,
+			"ms": 3,
+			"frames": 0
+		},
+		{
+			"index": 4,
+			"kind": "hold",
+			"target": "1600",
+			"detail": "1600 ms",
+			"ok": true,
+			"ms": 7567,
+			"frames": 48
+		},
+		{
+			"index": 5,
+			"kind": "click",
+			"target": "Outerwear",
+			"detail": "clicked",
+			"ok": true,
+			"ms": 3857,
+			"frames": 21
+		},
+		{
+			"index": 6,
+			"kind": "hold",
+			"target": "1600",
+			"detail": "1600 ms",
+			"ok": true,
+			"ms": 8436,
+			"frames": 48
+		},
+		{
+			"index": 7,
+			"kind": "click",
+			"target": "3D",
+			"detail": "clicked",
+			"ok": true,
+			"ms": 5411,
+			"frames": 21
+		},
+		{
+			"index": 8,
+			"kind": "hold",
+			"target": "1500",
+			"detail": "1500 ms",
+			"ok": true,
+			"ms": 9565,
+			"frames": 45
+		},
+		{
+			"index": 9,
+			"kind": "drag",
+			"target": "0.16,0.62,0.42,0.62",
+			"detail": "dragged over 78 frames",
+			"ok": true,
+			"ms": 29152,
+			"frames": 90
+		},
+		{
+			"index": 10,
+			"kind": "hold",
+			"target": "2400",
+			"detail": "2400 ms",
+			"ok": true,
+			"ms": 15828,
+			"frames": 72
+		}
+	],
+	"facts": {
+		"pieces": "59"
+	},
+	"saw": [],
+	"responses": [],
+	"cuts": [],
+	"video": {
+		"path": "public/x-media/wardrobe/reel.mp4",
+		"sha256": "fbc61ea7434ef34593c67b6ff0cf5479219e394f8740df431145c1a56f21588e",
+		"frames": 372,
+		"motion": 0.461,
+		"durationSec": 12.4,
+		"width": 1080,
+		"height": 1080,
+		"fps": 30,
+		"videoCodec": "h264",
+		"pixFmt": "yuv420p"
+	}
+}

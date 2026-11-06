@@ -1,0 +1,1549 @@
+// GET /openapi.json — x402 OpenAPI discovery document
+// Preferred over /.well-known/x402 by x402scan and AgentCash (agentcash.dev).
+//
+// AgentCash's @agentcash/discovery validator reads payable operations from
+// here. For an operation's `x-payment-info` to parse, BOTH `price` and
+// `protocols` must be present (StructuredPaymentInfoSchema requires the pair) —
+// a structured `price` object with no sibling `protocols` is silently dropped,
+// reported as PRICE_MISSING_ON_PAID + PROTOCOLS_MISSING_ON_PAID. We advertise
+// only x402 because that is the rail this server actually settles (Base /
+// Arbitrum / Solana / BSC USDC via the facilitators in api/_lib/x402-spec.js).
+// MPP (Stripe/Tempo) is not implemented, so it is intentionally not advertised
+// — discovery must never point agents at a payment rail we cannot honor.
+
+import { env } from './_lib/env.js';
+import { cors, json, method, wrap } from './_lib/http.js';
+import { providerCatalog } from './v1/_providers.js';
+import { PAID_SERVICES } from './_lib/service-catalog/services/index.js';
+import { agentsV1Paths, AGENTS_V1_TAGS } from './_lib/agents-v1/openapi.js';
+
+// Single source of truth for the protocol list on every paid operation. Each
+// entry is one supported payment protocol; per-network payment lanes (Base /
+// Solana / Arbitrum / BSC USDC) are advertised at runtime in the 402 challenge
+// `accepts[]` array — see api/_lib/x402-spec.js `paymentRequirements()`.
+const X402_PROTOCOLS = [{ x402: {} }];
+
+// Every /api/x402/* operation is gated by payment, not by a credential: the
+// caller settles the 402 challenge in USDC and needs no key, token, or account.
+// OpenAPI spells that out as an explicit empty security list, and declaring it
+// beats omitting `security` twice over. An operation with no `security` inherits
+// the root-level list, which this document deliberately does not set, so
+// validators report undefined auth; and agent tooling that infers an auth mode
+// from the security list reads the omission as "unknown" rather than "public,
+// pay-per-call". Payment stays advertised where it belongs: each operation's
+// `x-payment-info` plus its documented 402 response.
+const PAYMENT_ONLY_SECURITY = [];
+
+// USDC atomics (6 decimals) → a decimal string, trimmed to the shortest
+// precision that round-trips (min 2 places) — mirrors the formatting already
+// used by hand-authored entries below ('0.001', '5.00', …).
+function formatUsd(atomics) {
+	const n = Number(atomics) / 1e6;
+	if (!Number.isFinite(n)) return '0.00';
+	let s = n.toFixed(6).replace(/0+$/, '').replace(/\.$/, '');
+	const [, dec = ''] = s.split('.');
+	if (!s.includes('.')) s += '.00';
+	else if (dec.length < 2) s += '0'.repeat(2 - dec.length);
+	return s;
+}
+
+// GET /api/v1/x/{provider}/{endpoint} paths, rendered live from the registry
+// (api/v1/_providers.js `providerCatalog()`) — never hand-enumerated, so this
+// document can never drift from the real aggregated endpoint surface no
+// matter which provider prompts have or haven't landed. See docs/api-
+// reference.md "Unified API — /api/v1/x aggregator" for the full billing-lane
+// writeup and the public storefront at /crypto-api.
+function aggregatorPaths() {
+	const paths = {};
+	for (const provider of providerCatalog()) {
+		for (const ep of provider.endpoints) {
+			const priceUsd = formatUsd(ep.price_usdc_atomics);
+			const billing =
+				'Billing lanes, in order: ' +
+				(ep.free
+					? `free tier (${ep.free.perMin}/min, ${ep.free.perDay}/day per IP, no credentials) → `
+					: '') +
+				`x402 pay-per-call ($${priceUsd} USDC via HTTP 402, no credentials) — or send your own upstream ` +
+				`key via BYOK, or authenticate with a three.ws API key / OAuth session / browser session for the plan lane.`;
+			const description = `${ep.summary} ${billing}`;
+
+			const operation = {
+				operationId: `v1_x_${provider.id}_${ep.id}`.replace(/[^a-zA-Z0-9_]/g, '_'),
+				summary: `${provider.name}: ${ep.summary}`,
+				description,
+				tags: ['Crypto API (aggregator)'],
+				// Free-tier endpoints declare `security: []` (explicitly public) and
+				// carry NO x-payment-info: discovery auditors (x402scan's crawler,
+				// @agentcash/discovery inferAuthMode) classify any operation with
+				// x-payment-info as "paid" and then require a 402 on a bare probe —
+				// but these answer a bare probe 200 from the free lane, so the paid
+				// classification got all 29 skipped as "no valid x402 response"
+				// during x402scan registration. Public + the billing prose above
+				// registers them as public endpoints; the x402 overage lane still
+				// exists at runtime and stays documented in `description`. Endpoints
+				// with no free tier ARE pay-first (bare probe → 402), so they keep
+				// structured x-payment-info (AgentCash) and the optional-auth modes.
+				...(ep.free
+					? { security: [] }
+					: {
+							security: [{}, { bearerAuth: [] }, { apiKeyAuth: [] }],
+							'x-payment-info': {
+								price: { mode: 'fixed', currency: 'USD', amount: priceUsd },
+								protocols: X402_PROTOCOLS,
+							},
+						}),
+				responses: {
+					200: { description: 'Normalized upstream response, wrapped as { data, _meta }' },
+					400: { description: 'Missing or invalid parameter' },
+					402: { description: 'Payment Required (x402) — no credentials and free quota (if any) exhausted' },
+					404: { description: 'Unknown provider/endpoint pair' },
+					429: { description: 'Rate limited' },
+				},
+			};
+
+			if (ep.method === 'POST') {
+				operation.requestBody = {
+					required: true,
+					content: {
+						'application/json': {
+							schema: {
+								type: 'object',
+								description: Object.entries(ep.params || {})
+									.map(([k, v]) => `${k}: ${v}`)
+									.join('; ') || 'Forwarded as-is to the upstream JSON body.',
+							},
+						},
+					},
+				};
+			} else {
+				operation.parameters = Object.entries(ep.params || {}).map(([name, desc]) => ({
+					name,
+					in: 'query',
+					required: typeof desc === 'string' && /\(required\)/.test(desc),
+					schema: { type: 'string' },
+					description: desc,
+				}));
+			}
+
+			paths[ep.path] = { [ep.method.toLowerCase()]: operation };
+		}
+	}
+	return paths;
+}
+
+// Every paid /api/x402/* operation, projected from the service catalog
+// (api/_lib/service-catalog/services/), which is already the written-once
+// source of truth the x402 discovery doc and the OKX storefront render from.
+//
+// Why this exists: the operations below used to be hand-authored one by one,
+// and 24 of the catalog's 75 live paid services ever got an entry. That is not
+// cosmetic. x402scan registers an origin by reading THIS document, and
+// AgentCash's validator reads payable operations from it too, so a service
+// missing here is a service neither directory can list no matter how valid its
+// live 402 challenge is (measured 2026-09-02: 52 live paid endpoints answered a
+// spec-valid 402 in production while being absent from both this document and
+// the x402scan origin listing).
+//
+// The projection is spread BEFORE the hand-authored paths, so any route with a
+// richer hand-written operation keeps it verbatim and this only fills the gaps.
+//
+// A service with `free: true` (a daily per-IP quota in front of the same x402
+// lane, e.g. the keyless x402-suite ports) used to be skipped here entirely,
+// so its route never appeared in this document at all. That is strictly worse
+// than the aggregator's own free-tier handling just above: a bare probe can
+// legitimately answer 200 while quota remains, so it keeps `security: []` and
+// no `x-payment-info` for the same reason given in aggregatorPaths() above
+// (x402scan's crawler classifies any x-payment-info operation as paid and
+// then requires a 402 on a bare probe), but it now gets a path entry, with
+// the free-then-paid billing lanes already spelled out in `service.description`.
+function catalogPaidPaths() {
+	const paths = {};
+	for (const service of PAID_SERVICES) {
+		if (service.status !== 'live') continue;
+		// Same gate the hand-authored permit2 entry below applies: the Permit2-only
+		// lane is unpayable without CDP credentials, so never advertise it then.
+		if (
+			service.acceptsBuilder === 'permit2-only' &&
+			!(env.CDP_API_KEY_ID && env.CDP_API_KEY_SECRET)
+		)
+			continue;
+
+		const operation = {
+			operationId: `x402_${service.slug.replace(/-/g, '_')}`,
+			security: service.free ? [] : PAYMENT_ONLY_SECURITY,
+			summary: `${service.free ? 'Free + paid' : 'Paid'}: ${service.title}`,
+			description: service.description,
+			responses: {
+				200: { description: `${service.serviceName} result JSON` },
+				400: { description: 'Validation error' },
+				402: { description: 'Payment Required (x402)' },
+			},
+			...(service.free
+				? {}
+				: {
+						'x-payment-info': {
+							price: { mode: 'fixed', currency: 'USD', amount: formatUsd(service.priceAtomics) },
+							protocols: X402_PROTOCOLS,
+						},
+					}),
+		};
+
+		if (service.method === 'POST') {
+			operation.requestBody = {
+				required: true,
+				content: {
+					'application/json': {
+						schema: service.inputSchema,
+						...(service.input !== undefined ? { example: service.input } : {}),
+					},
+				},
+			};
+		} else {
+			operation.parameters = queryParameters(service.inputSchema);
+		}
+
+		paths[service.path] = { [service.method.toLowerCase()]: operation };
+	}
+	return paths;
+}
+
+// A catalog descriptor's JSON Schema, flattened into OpenAPI query parameters.
+// The per-property `description` moves up to the parameter (where tooling shows
+// it) and the rest of the property schema rides along as the parameter schema,
+// so enums, formats and defaults survive into the document.
+function queryParameters(inputSchema) {
+	const properties = inputSchema?.properties || {};
+	const required = new Set(inputSchema?.required || []);
+	return Object.entries(properties).map(([name, propertySchema]) => {
+		const { description, ...schema } = propertySchema || {};
+		return {
+			name,
+			in: 'query',
+			required: required.has(name),
+			schema: Object.keys(schema).length ? schema : { type: 'string' },
+			...(description ? { description } : {}),
+		};
+	});
+}
+
+
+// Pure document builder, factored out so api/_lib/skill-md.js (the
+// /skill.md generator) can read the exact same paid-operation catalog this
+// endpoint serves, instead of re-deriving it or faking an HTTP round trip.
+export function buildOpenApiDoc(origin = env.APP_ORIGIN) {
+	return (
+		{
+			openapi: '3.1.0',
+			info: {
+				title: 'three.ws API',
+				version: '1.0.0',
+				description:
+					'API for 3D avatar management, AI agent identity, and MCP tool access.',
+				contact: {
+					email: 'support@three.ws',
+				},
+				// Proprietary, not an SPDX identifier, so this carries `url` rather
+				// than `license.identifier`. Generators that surface licensing (Redocly,
+				// Scalar, SDK codegen) otherwise render the API as unlicensed, which
+				// reads as "public domain" to anyone bundling our spec into a client.
+				license: {
+					name: 'Proprietary (all rights reserved)',
+					url: 'https://github.com/nirholas/three.ws/blob/main/LICENSE',
+				},
+				'x-guidance':
+					'Use POST /api/mcp to interact with the MCP server. Send a JSON-RPC 2.0 request body. ' +
+					'Authenticate with a Bearer access token obtained via OAuth 2.1 at ' +
+					origin +
+					'/oauth/authorize, or use a Bearer API key from the dashboard. ' +
+					'Available MCP tools: list_my_avatars, get_avatar, search_public_avatars, ' +
+					'render_avatar, delete_avatar, validate_model, inspect_model, optimize_model. ' +
+					'Paid REST endpoints under /api/x402/* settle in USDC over ' +
+					'x402 (HTTP 402); pay programmatically with @x402/fetch — no API key required. ' +
+					'GET /api/v1/x/{provider}/{endpoint} (tag "Crypto API (aggregator)" below) bundles ' +
+					'CoinGecko, DefiLlama, Jupiter, DexScreener, Solana RPC and more behind one bill — ' +
+					'free tier, BYOK, a three.ws plan, or x402, in that order. Storefront: ' +
+					origin +
+					'/crypto-api. Discovery: GET /api/v1/x.',
+			},
+			servers: [{ url: origin }],
+			tags: [
+				{
+					name: 'Crypto API (aggregator)',
+					description:
+						'Third-party crypto/DeFi/on-chain APIs re-offered as one bill under /api/v1/x — ' +
+						'rendered live from the provider registry (api/v1/_providers.js). See /crypto-api ' +
+						'and docs/api-reference.md § Unified API.',
+				},
+				...AGENTS_V1_TAGS,
+			],
+			components: {
+				securitySchemes: {
+					bearerAuth: {
+						type: 'http',
+						scheme: 'bearer',
+						description:
+							'Bearer token in the Authorization header. Obtain one via OAuth 2.1 at ' +
+							origin +
+							'/oauth/authorize, use an API key from the dashboard, or exchange a ' +
+							'wallet SIWX (CAIP-122) session for an access token.',
+					},
+					// Dashboard-issued API key, sent as `Authorization: Bearer <key>`.
+					// Declared as an apiKey scheme (in addition to bearerAuth) so agent
+					// tooling — which classifies an operation's auth mode from the
+					// security scheme `type` — recognizes these routes as key-protected
+					// rather than reporting "no auth mode". Functionally equivalent to a
+					// bearer token for programmatic callers that prefer a static key.
+					apiKeyAuth: {
+						type: 'apiKey',
+						in: 'header',
+						name: 'Authorization',
+						description:
+							'Dashboard API key sent as `Authorization: Bearer <key>`. Equivalent ' +
+							'to the OAuth bearer token; intended for programmatic agents.',
+					},
+				},
+			},
+			paths: {
+				// Rendered live from the provider registry — see aggregatorPaths()
+				// above. Spread first so a duplicate key below always wins (none
+				// today: aggregator paths live under /api/v1/x/*, hand-authored
+				// paths don't).
+				...aggregatorPaths(),
+				// Projected from the service catalog, spread before the hand-authored
+				// operations below so a richer hand-written entry always wins.
+				...catalogPaidPaths(),
+				...agentsV1Paths(),
+				'/api/mcp': {
+					post: {
+						operationId: 'mcp_call',
+						summary: 'MCP tool call',
+						description:
+							'JSON-RPC 2.0 request to the MCP server. Supports tools for 3D avatar management, model validation, inspection, and optimization.',
+						// Pay-first, credentials optional: the same shape the aggregator's
+						// paid lanes use above. A bare probe answers 402 with a full x402
+						// challenge, so a caller settles in USDC and needs no key, token,
+						// or account; a bearer token or API key is accepted but never
+						// required. Listing only the two credential schemes (no leading
+						// `{}`) reads to OpenAPI tooling as "auth is mandatory, pick one",
+						// which sends agents off to obtain a token they do not need.
+						security: [{}, { bearerAuth: [] }, { apiKeyAuth: [] }],
+						requestBody: {
+							required: true,
+							content: {
+								'application/json': {
+									schema: {
+										type: 'object',
+										required: ['jsonrpc', 'method'],
+										properties: {
+											jsonrpc: {
+												type: 'string',
+												enum: ['2.0'],
+											},
+											id: {
+												oneOf: [{ type: 'string' }, { type: 'number' }],
+											},
+											method: {
+												type: 'string',
+												description:
+													'MCP method name, e.g. "tools/call" or "initialize".',
+											},
+											params: {
+												type: 'object',
+												description: 'Method-specific parameters.',
+											},
+										},
+									},
+								},
+							},
+						},
+						responses: {
+							200: { description: 'JSON-RPC 2.0 response' },
+							401: { description: 'Unauthorized — missing or invalid token' },
+							402: { description: 'Payment Required' },
+							429: { description: 'Rate limited' },
+						},
+						'x-payment-info': {
+							price: {
+								mode: 'fixed',
+								currency: 'USD',
+								amount: '0.001',
+							},
+							protocols: X402_PROTOCOLS,
+						},
+					},
+					// Session teardown, part of the MCP Streamable HTTP transport and
+					// advertised in this route's own `allow` header. The server is
+					// stateless per request; the Mcp-Session-Id it issues on initialize
+					// only attributes calls to a client, so ending one answers 204. Any
+					// other id names a session this server never issued and gets the
+					// transport's 404 "start a new session" instead.
+					delete: {
+						operationId: 'mcp_terminate_session',
+						security: [],
+						summary: 'Terminate an MCP session',
+						description:
+							'Ends the caller\'s MCP session. This server handles every request statelessly, so no session state is held and a plain DELETE is a successful no-op.',
+						parameters: [
+							{
+								name: 'Mcp-Session-Id',
+								in: 'header',
+								required: false,
+								schema: { type: 'string' },
+								description:
+									'Session to end: the Mcp-Session-Id this server returned on initialize. Any other value names a session it does not hold.',
+							},
+						],
+						responses: {
+							204: { description: 'Session ended; no content' },
+							404: {
+								description:
+									'Unknown session: the supplied Mcp-Session-Id was never issued by this server, so the client should start a new session',
+							},
+						},
+					},
+				},
+				'/api/avatars': {
+					get: {
+						operationId: 'list_avatars',
+						summary: 'List my avatars',
+						security: [{ bearerAuth: [] }, { apiKeyAuth: [] }],
+						responses: {
+							200: { description: 'Array of avatar objects' },
+							401: { description: 'Unauthorized' },
+						},
+					},
+					post: {
+						operationId: 'create_avatar',
+						summary: 'Register an uploaded avatar',
+						security: [{ bearerAuth: [] }, { apiKeyAuth: [] }],
+						requestBody: {
+							required: true,
+							content: {
+								'application/json': {
+									schema: {
+										type: 'object',
+										required: ['storage_key', 'name', 'content_type'],
+										properties: {
+											storage_key: { type: 'string' },
+											name: { type: 'string', maxLength: 100 },
+											description: { type: 'string', maxLength: 500 },
+											content_type: {
+												type: 'string',
+												enum: ['model/gltf-binary', 'model/gltf+json'],
+											},
+											visibility: {
+												type: 'string',
+												enum: ['private', 'unlisted', 'public'],
+											},
+											tags: {
+												type: 'array',
+												items: { type: 'string' },
+											},
+										},
+									},
+								},
+							},
+						},
+						responses: {
+							201: { description: 'Avatar created' },
+							401: { description: 'Unauthorized' },
+						},
+					},
+				},
+				'/api/avatars/public': {
+					get: {
+						operationId: 'browse_public_avatars',
+						summary: 'Browse public avatars',
+						security: [],
+						parameters: [
+							{ name: 'q', in: 'query', schema: { type: 'string' } },
+							{
+								name: 'limit',
+								in: 'query',
+								schema: { type: 'integer', default: 20, maximum: 100 },
+							},
+							{ name: 'cursor', in: 'query', schema: { type: 'string' } },
+						],
+						responses: {
+							200: { description: 'Paginated list of public avatars' },
+							405: { description: 'Method not allowed (GET only)' },
+						},
+					},
+				},
+				'/api/agents': {
+					get: {
+						operationId: 'list_agents',
+						summary: 'List my agents',
+						security: [{ bearerAuth: [] }, { apiKeyAuth: [] }],
+						responses: {
+							200: { description: 'Array of agent identity objects' },
+							401: { description: 'Unauthorized' },
+						},
+					},
+				},
+				'/api/healthz': {
+					get: {
+						operationId: 'healthz',
+						summary: 'Service liveness',
+						description:
+							'Lightweight liveness probe with uptime + service version. No auth.',
+						security: [],
+						responses: {
+							200: { description: 'Health summary JSON' },
+							405: { description: 'Method not allowed (GET only)' },
+						},
+					},
+				},
+				'/api/pump/curve': {
+					get: {
+						operationId: 'pump_curve',
+						summary: 'Pump.fun bonding-curve snapshot',
+						description:
+							'Returns raw bonding-curve state, current spot price + market cap, and graduation progress for a Pump.fun token. Public, edge-cached for 10s.',
+						security: [],
+						parameters: [
+							{
+								name: 'mint',
+								in: 'query',
+								required: true,
+								schema: { type: 'string' },
+								description: 'Base58 SPL mint address',
+							},
+							{
+								name: 'network',
+								in: 'query',
+								schema: { type: 'string', enum: ['mainnet', 'devnet'] },
+							},
+						],
+						responses: {
+							200: { description: 'Bonding curve snapshot' },
+							400: { description: 'Bad mint' },
+							404: { description: 'No bonding curve for that mint' },
+						},
+					},
+				},
+				'/api/pump/quote-sdk': {
+					get: {
+						operationId: 'pump_quote_sdk',
+						summary: 'Pump.fun buy/sell quote (SDK-precise)',
+						description:
+							'Deterministic buy or sell quote computed via @nirholas/pump-sdk on the live bonding curve. Returns output amount, price impact %, and a market context block.',
+						security: [],
+						parameters: [
+							{
+								name: 'mint',
+								in: 'query',
+								required: true,
+								schema: { type: 'string' },
+							},
+							{
+								name: 'side',
+								in: 'query',
+								required: true,
+								schema: { type: 'string', enum: ['buy', 'sell'] },
+							},
+							{
+								name: 'amount',
+								in: 'query',
+								required: true,
+								schema: { type: 'number', minimum: 0 },
+								description:
+									'For buy: SOL. For sell: tokens (UI units, 6 decimals).',
+							},
+							{
+								name: 'network',
+								in: 'query',
+								schema: { type: 'string', enum: ['mainnet', 'devnet'] },
+							},
+						],
+						responses: {
+							200: {
+								description: 'Quote payload with input/output and priceImpactPct',
+							},
+							400: { description: 'Validation error' },
+							404: { description: 'No bonding curve for that mint' },
+						},
+					},
+				},
+				'/api/x402/agent-reputation': {
+					get: {
+						operationId: 'x402_agent_reputation',
+						security: PAYMENT_ONLY_SECURITY,
+						summary: 'Paid: Agent Reputation snapshot',
+						description:
+							"Pay $0.01 USDC to retrieve a three.ws agent's reputation snapshot synthesized from pump_agent_payments, distribute/buyback success history, and signed Solana memo attestations.",
+						parameters: [
+							{
+								name: 'agent_id',
+								in: 'query',
+								required: true,
+								schema: { type: 'string', format: 'uuid' },
+							},
+						],
+						responses: {
+							200: { description: 'Reputation snapshot JSON' },
+							400: { description: 'Missing or invalid agent_id' },
+							402: { description: 'Payment Required (x402)' },
+							404: { description: 'agent_id not found' },
+						},
+						'x-payment-info': {
+							price: { mode: 'fixed', currency: 'USD', amount: '0.01' },
+							protocols: X402_PROTOCOLS,
+						},
+					},
+				},
+				'/api/x402/onchain-identity-verify': {
+					get: {
+						operationId: 'x402_onchain_identity_verify',
+						security: PAYMENT_ONLY_SECURITY,
+						summary: 'Paid: Verify counterparty agent ownership claim',
+						description:
+							'Pay $0.005 USDC to verify whether a three.ws agent_id actually owns/deployed a given contract or mint on a given CAIP-2 chain, using the canonical meta.onchain unified index.',
+						parameters: [
+							{
+								name: 'agent_id',
+								in: 'query',
+								required: true,
+								schema: { type: 'string', format: 'uuid' },
+							},
+							{
+								name: 'chain',
+								in: 'query',
+								required: true,
+								schema: { type: 'string' },
+							},
+							{
+								name: 'contract_or_mint',
+								in: 'query',
+								required: true,
+								schema: { type: 'string' },
+							},
+						],
+						responses: {
+							200: { description: 'Verification result JSON' },
+							400: { description: 'Missing or invalid parameters' },
+							402: { description: 'Payment Required (x402)' },
+						},
+						'x-payment-info': {
+							price: { mode: 'fixed', currency: 'USD', amount: '0.005' },
+							protocols: X402_PROTOCOLS,
+						},
+					},
+				},
+				'/api/x402/pump-agent-audit': {
+					get: {
+						operationId: 'x402_pump_agent_audit',
+						security: PAYMENT_ONLY_SECURITY,
+						summary: 'Paid: Operational audit of a pump.fun agent-payments token',
+						description:
+							'Pay $0.02 USDC to retrieve a full operational audit of a pump.fun mint: USDC paid in, distinct payers, distribute/buyback success history, latest error reasons, and derived risk flags.',
+						parameters: [
+							{
+								name: 'mint',
+								in: 'query',
+								required: true,
+								schema: { type: 'string', minLength: 32, maxLength: 44 },
+							},
+						],
+						responses: {
+							200: { description: 'Audit JSON' },
+							400: { description: 'Missing or invalid mint' },
+							402: { description: 'Payment Required (x402)' },
+							404: { description: 'Mint not indexed' },
+						},
+						'x-payment-info': {
+							price: { mode: 'fixed', currency: 'USD', amount: '0.02' },
+							protocols: X402_PROTOCOLS,
+						},
+					},
+				},
+				'/api/x402/skill-marketplace': {
+					get: {
+						operationId: 'x402_skill_marketplace',
+						security: PAYMENT_ONLY_SECURITY,
+						summary: 'Paid: Browse the three.ws skill marketplace',
+						description:
+							'Pay $0.001 USDC to list active skill listings with prices across all three.ws agents. Optional skill filter returns the cheapest provider for that capability.',
+						parameters: [
+							{ name: 'skill', in: 'query', schema: { type: 'string' } },
+							{
+								name: 'limit',
+								in: 'query',
+								schema: { type: 'integer', minimum: 1, maximum: 200 },
+							},
+						],
+						responses: {
+							200: { description: 'Marketplace listings JSON' },
+							402: { description: 'Payment Required (x402)' },
+						},
+						'x-payment-info': {
+							price: { mode: 'fixed', currency: 'USD', amount: '0.001' },
+							protocols: X402_PROTOCOLS,
+						},
+					},
+				},
+				'/api/x402/symbol-availability': {
+					get: {
+						operationId: 'x402_symbol_availability',
+						security: PAYMENT_ONLY_SECURITY,
+						summary: 'Paid: Check pump.fun ticker collisions before launch',
+						description:
+							'Pay $0.001 USDC to check whether a candidate ticker collides with any three.ws-indexed pump.fun mint. Returns exact matches plus trigram-similar tickers and a recommendation.',
+						parameters: [
+							{
+								name: 'ticker',
+								in: 'query',
+								required: true,
+								schema: { type: 'string', minLength: 1, maxLength: 32 },
+							},
+							{
+								name: 'network',
+								in: 'query',
+								schema: { type: 'string', enum: ['mainnet', 'devnet'] },
+							},
+						],
+						responses: {
+							200: { description: 'Symbol availability JSON' },
+							400: { description: 'Missing or invalid ticker' },
+							402: { description: 'Payment Required (x402)' },
+						},
+						'x-payment-info': {
+							price: { mode: 'fixed', currency: 'USD', amount: '0.001' },
+							protocols: X402_PROTOCOLS,
+						},
+					},
+				},
+				'/api/x402/mint-to-mesh-batch': {
+					post: {
+						operationId: 'x402_mint_to_mesh_batch',
+						security: PAYMENT_ONLY_SECURITY,
+						summary: 'Paid: Batch 1–10 mints → themed binary glTF cubes',
+						description:
+							'Pay $0.05 USDC to resolve 1–10 Solana SPL mints to themed binary glTF cubes in a single call. Per-mint failures report ok:false instead of failing the whole batch.',
+						requestBody: {
+							required: true,
+							content: {
+								'application/json': {
+									schema: {
+										type: 'object',
+										required: ['mints'],
+										properties: {
+											mints: {
+												type: 'array',
+												minItems: 1,
+												maxItems: 10,
+												items: {
+													type: 'string',
+													minLength: 32,
+													maxLength: 44,
+												},
+											},
+										},
+									},
+								},
+							},
+						},
+						responses: {
+							200: { description: 'Batch mesh JSON' },
+							400: { description: 'Missing or invalid body' },
+							402: { description: 'Payment Required (x402)' },
+						},
+						'x-payment-info': {
+							price: { mode: 'fixed', currency: 'USD', amount: '0.05' },
+							protocols: X402_PROTOCOLS,
+						},
+					},
+				},
+				'/api/x402/model-check': {
+					get: {
+						operationId: 'x402_model_check',
+						security: PAYMENT_ONLY_SECURITY,
+						summary: 'Paid: glTF/GLB structural stats + optimization recommendations',
+						description:
+							'Pay $0.001 USDC to fetch a glTF/GLB model from a URL and return structural stats (vertex/triangle counts, materials, textures, animations, extensions) plus a prioritized list of optimization recommendations.',
+						parameters: [
+							{
+								name: 'url',
+								in: 'query',
+								required: true,
+								schema: { type: 'string', format: 'uri' },
+								description: 'Public HTTPS URL of a glTF/GLB model.',
+							},
+						],
+						responses: {
+							200: { description: 'Inspection + recommendation JSON' },
+							400: { description: 'Missing or invalid url' },
+							402: { description: 'Payment Required (x402)' },
+						},
+						'x-payment-info': {
+							price: { mode: 'fixed', currency: 'USD', amount: '0.001' },
+							protocols: X402_PROTOCOLS,
+						},
+					},
+				},
+				'/api/x402/mint-to-mesh': {
+					get: {
+						operationId: 'x402_mint_to_mesh',
+						security: PAYMENT_ONLY_SECURITY,
+						summary: 'Paid: Single Solana mint → themed binary glTF cube',
+						description:
+							'Pay $0.001 USDC to resolve a Solana fungible-token mint to a binary glTF (GLB) cube themed for that token. Color is hashed from the mint; the Metaplex JSON image, when present, is embedded as a baseColor texture.',
+						parameters: [
+							{
+								name: 'mint',
+								in: 'query',
+								required: true,
+								schema: { type: 'string', minLength: 32, maxLength: 44 },
+								description: 'Base58 SPL mint address on Solana mainnet.',
+							},
+						],
+						responses: {
+							200: { description: 'Themed GLB JSON envelope' },
+							400: { description: 'Missing or invalid mint' },
+							402: { description: 'Payment Required (x402)' },
+						},
+						'x-payment-info': {
+							price: { mode: 'fixed', currency: 'USD', amount: '0.001' },
+							protocols: X402_PROTOCOLS,
+						},
+					},
+				},
+				'/api/x402/forge': {
+					// Free discovery lane. The handler answers GET with the price
+					// catalog and input schema and never generates or charges, so an
+					// agent can read the tiers before committing USDC. Documenting only
+					// `post` hid that from every spec reader and made the free lane look
+					// like an undocumented side effect.
+					get: {
+						operationId: 'x402_forge_pricing',
+						security: [],
+						summary: 'Forge pricing and input schema (free, no payment)',
+						description:
+							'Free price/usage discovery for the Forge generation lane. Returns the per-tier USDC pricing, the accepted request body schema, and the free poll endpoint. No payment, no credentials, and no generation. POST the same path to actually generate.',
+						responses: {
+							200: {
+								description: 'Price catalog and input schema',
+								content: {
+									'application/json': {
+										schema: {
+											type: 'object',
+											required: ['route', 'method', 'input_schema', 'pricing_usdc'],
+											properties: {
+												route: { type: 'string' },
+												description: { type: 'string' },
+												method: { type: 'string', description: 'The verb that performs generation: POST.' },
+												input_schema: { type: 'object', description: 'JSON Schema for the POST request body.' },
+												poll: { type: 'string', description: 'Free endpoint for polling a job to completion.' },
+												pricing_usdc: {
+													type: 'array',
+													description: 'One entry per quality tier.',
+													items: {
+														type: 'object',
+														required: ['tier', 'price_usdc'],
+														properties: {
+															tier: { type: 'string', enum: ['draft', 'standard', 'high'] },
+															price_usdc: { type: 'string' },
+														},
+													},
+												},
+											},
+										},
+									},
+								},
+							},
+							400: { description: 'A ?job= query landed here; poll on GET /api/forge?job=<id> instead' },
+						},
+					},
+					post: {
+						operationId: 'x402_forge_generate',
+						security: PAYMENT_ONLY_SECURITY,
+						summary: 'Paid: text→3D / image→3D generation (returns a job token)',
+						description:
+							'Pay per quality tier in USDC ($0.05 draft / $0.15 standard / $0.50 high) to generate a 3D model. Submit a prompt for text→3D, or up to four public https reference views of one object for image→3D. Runs the FLUX→TRELLIS pipeline. The response returns a job token; poll it for FREE at GET /api/forge?job=<id> to retrieve the finished GLB URL. The 402 challenge quotes the exact price for the requested tier.',
+						requestBody: {
+							required: false,
+							content: {
+								'application/json': {
+									schema: {
+										type: 'object',
+										properties: {
+											prompt: {
+												type: 'string',
+												minLength: 3,
+												maxLength: 1000,
+												description: 'Describe one subject for text→3D. Omit when supplying image_urls.',
+											},
+											image_urls: {
+												type: 'array',
+												items: { type: 'string', format: 'uri' },
+												minItems: 1,
+												maxItems: 6,
+												description: 'Up to six public https reference views of one object for image→3D.',
+											},
+											tier: { type: 'string', enum: ['draft', 'standard', 'high'], default: 'standard' },
+											aspect_ratio: { type: 'string', enum: ['1:1', '4:3', '3:4', '16:9', '9:16'], default: '1:1' },
+										},
+									},
+								},
+							},
+						},
+						responses: {
+							200: {
+								description: 'Generation job accepted; poll poll_url for the GLB',
+								content: {
+									'application/json': {
+										schema: {
+											type: 'object',
+											required: ['job_id', 'status', 'poll_url'],
+											properties: {
+												job_id: { type: 'string' },
+												status: { type: 'string' },
+												poll_url: { type: 'string', description: 'Free, provider-aware status endpoint.' },
+												mode: { type: 'string', enum: ['text_to_3d', 'image_to_3d'] },
+												tier: { type: 'string' },
+												backend: { type: 'string' },
+												eta_seconds: { type: 'integer' },
+												price_usdc: { type: 'string' },
+											},
+										},
+									},
+								},
+							},
+							400: { description: 'Missing or invalid input' },
+							402: { description: 'Payment Required (x402)' },
+							503: { description: 'Generation backend not configured' },
+						},
+						'x-payment-info': {
+							price: { mode: 'fixed', currency: 'USD', amount: '0.15' },
+							protocols: X402_PROTOCOLS,
+						},
+					},
+				},
+				// Permit2 settlement runs exclusively through CDP's
+				// x402ExactPermit2Proxy, so without CDP credentials the route's 402
+				// carries an empty accepts[] — unpayable. Advertise it only when the
+				// lane is actually honorable (same principle as omitting MPP above).
+				...(env.CDP_API_KEY_ID && env.CDP_API_KEY_SECRET
+					? {
+							'/api/x402/permit2-paid-demo': {
+								get: {
+									operationId: 'x402_permit2_paid_demo',
+									security: PAYMENT_ONLY_SECURITY,
+									summary: 'Paid: Gasless Permit2 + EIP-2612 settlement demo',
+									description:
+										"Pay $0.001 USDC via the Permit2-only path so a wallet holding USDC but zero ETH can complete the flow. CDP's x402ExactPermit2Proxy submits the EIP-2612 permit + Permit2 transfer atomically; the response surfaces the on-chain tx hash and a Basescan link.",
+									parameters: [],
+									responses: {
+										200: { description: 'Settlement summary with tx hash' },
+										402: { description: 'Payment Required (x402)' },
+									},
+									'x-payment-info': {
+										price: { mode: 'fixed', currency: 'USD', amount: '0.001' },
+										protocols: X402_PROTOCOLS,
+									},
+								},
+							},
+						}
+					: {}),
+				'/api/x402/three-intel': {
+					get: {
+						operationId: 'x402_three_intel',
+						security: PAYMENT_ONLY_SECURITY,
+						summary: 'Paid: Live $THREE market intel from the Town Oracle',
+						description:
+							'Pay $0.01 USDC for live $THREE market intel: price, 24 h change, market cap, ' +
+							'liquidity, 24 h volume, and a bullish / bearish / neutral signal with a ' +
+							'two-sentence rationale. Powered by live DexScreener data — the same oracle ' +
+							'behind the paid intel kiosk in the $THREE town on three.ws/play.',
+						parameters: [],
+						responses: {
+							200: { description: '$THREE market intel JSON' },
+							402: { description: 'Payment Required (x402)' },
+						},
+						'x-payment-info': {
+							price: { mode: 'fixed', currency: 'USD', amount: '0.01' },
+							protocols: X402_PROTOCOLS,
+						},
+					},
+				},
+				'/api/x402/dance-tip': {
+					get: {
+						operationId: 'x402_dance_tip',
+						security: PAYMENT_ONLY_SECURITY,
+						summary: 'Paid: Tip a 3D dancer to perform a routine on the club stage',
+						description:
+							'Pay $0.001 USDC to tip a dancer to perform one routine on the three.ws 3D club stage. ' +
+							'Pick a stage slot (1–4) and a style: free-floor (rumba, silly, thriller, capoeira, hiphop) ' +
+							'or pole choreography (spin, climb, combo). Returns a performance ticket the /club page ' +
+							'consumes to spawn the dancer and play the routine.',
+						parameters: [
+							{
+								name: 'dancer',
+								in: 'query',
+								required: true,
+								schema: { type: 'string', enum: ['1', '2', '3', '4'] },
+								description: 'Stage slot — which of the four dancers performs.',
+							},
+							{
+								name: 'dance',
+								in: 'query',
+								required: true,
+								schema: {
+									type: 'string',
+									enum: [
+										'rumba',
+										'silly',
+										'thriller',
+										'capoeira',
+										'hiphop',
+										'spin',
+										'climb',
+										'combo',
+									],
+								},
+								description:
+									'Performance style. Free-floor styles (rumba, silly, thriller, capoeira, hiphop) play a single looped clip; pole-choreography styles (spin, climb, combo) chain a sequence of clips.',
+							},
+						],
+						responses: {
+							200: { description: 'Performance ticket JSON' },
+							400: { description: 'Missing or invalid parameters' },
+							402: { description: 'Payment Required (x402)' },
+						},
+						'x-payment-info': {
+							price: { mode: 'fixed', currency: 'USD', amount: '0.001' },
+							protocols: X402_PROTOCOLS,
+						},
+					},
+				},
+				'/api/x402/asset-download': {
+					get: {
+						operationId: 'x402_asset_download',
+						security: PAYMENT_ONLY_SECURITY,
+						summary: 'Paid: Unlock a 3D asset (GLB / avatar / accessory)',
+						description:
+							'Pay in USDC once to unlock a 3D asset hosted on R2. Wallets that already paid can re-download for free by signing in with SIWX (CAIP-122). Each asset has its own price and creator payout address; the response carries a short-lived presigned R2 URL.',
+						parameters: [
+							{
+								name: 'slug',
+								in: 'query',
+								required: true,
+								schema: { type: 'string', minLength: 1, maxLength: 128 },
+								description: 'Unique asset slug from the paid_assets catalog.',
+							},
+						],
+						responses: {
+							200: { description: 'Presigned R2 download URL' },
+							400: { description: 'Missing or invalid slug' },
+							402: { description: 'Payment Required (x402)' },
+							404: { description: 'Asset not found' },
+						},
+						'x-payment-info': {
+							// Per-asset pricing: the live 402 challenge reflects the exact
+							// USDC price of the requested asset's paid_assets row. Declared
+							// `dynamic` (the only non-fixed price mode discovery accepts —
+							// `variable` is not a recognized mode); bounds span the catalog.
+							price: { mode: 'dynamic', currency: 'USD', min: '0.01', max: '100.00' },
+							protocols: X402_PROTOCOLS,
+							note: 'Each asset declares its own USDC price; the live 402 challenge reflects the per-asset row.',
+						},
+					},
+				},
+				'/api/x402/pump-launch': {
+					post: {
+						operationId: 'x402_pump_launch',
+						security: PAYMENT_ONLY_SECURITY,
+						summary: 'Paid: Deploy a new pump.fun token in one call',
+						description:
+							'Pay $5.00 USDC to deploy a brand-new pump.fun token. Supply name + symbol and either a pre-pinned metadataUri or an imageUrl (the server pins the image + descriptor to pump.fun IPFS). The server fronts the SOL deploy cost and signs the create-coin tx, so the buyer needs no SOL and no account. Creator rewards accrue to any Solana wallet you nominate; an optional vanity prefix/suffix grinds a custom mint address. Returns mint + tx signature + pump.fun URL.',
+						requestBody: {
+							required: true,
+							content: {
+								'application/json': {
+									schema: {
+										type: 'object',
+										required: ['name', 'symbol'],
+										properties: {
+											name: { type: 'string', maxLength: 32 },
+											symbol: { type: 'string', maxLength: 10 },
+											metadataUri: {
+												type: 'string',
+												maxLength: 2048,
+												description:
+													'Pre-pinned metadata URI. Provide this or imageUrl.',
+											},
+											imageUrl: {
+												type: 'string',
+												maxLength: 2048,
+												description:
+													'Image URL to pin to pump.fun IPFS. Provide this or metadataUri.',
+											},
+											description: { type: 'string', maxLength: 2000 },
+											creator: {
+												type: 'string',
+												minLength: 32,
+												maxLength: 44,
+												description:
+													'Solana wallet that receives creator rewards.',
+											},
+											vanityPrefix: { type: 'string', maxLength: 5 },
+											vanitySuffix: { type: 'string', maxLength: 5 },
+										},
+									},
+								},
+							},
+						},
+						responses: {
+							200: { description: 'Deploy result: mint, tx signature, pump.fun URL' },
+							400: { description: 'Missing or invalid body' },
+							402: { description: 'Payment Required (x402)' },
+							503: { description: 'Launcher not configured' },
+						},
+						'x-payment-info': {
+							price: { mode: 'fixed', currency: 'USD', amount: '5.00' },
+							protocols: X402_PROTOCOLS,
+						},
+					},
+				},
+				'/api/x402/vanity': {
+					get: {
+						operationId: 'x402_vanity',
+						security: PAYMENT_ONLY_SECURITY,
+						summary: 'Paid: Grind a vanity Solana keypair',
+						description:
+							'Pay to generate a brand-new Solana keypair whose Base58 address starts with a chosen prefix and/or ends with a chosen suffix. Returns the public address and its secret key (Base58 + 64-byte array) so it imports into any Solana wallet. Ground fresh per request in a Rust/WASM ed25519 engine and never stored. Difficulty-tiered price ($0.01 for 1 char, $0.05 for 2, $0.25 for 3); combined pattern capped at 3 Base58 characters. Settlement runs only after a successful grind, so an exhausted budget costs nothing.',
+						parameters: [
+							{
+								name: 'prefix',
+								in: 'query',
+								schema: { type: 'string', maxLength: 3 },
+								description:
+									'Base58 characters the address must start with (excludes 0, O, I, l). Combined with suffix, max 3. Provide prefix and/or suffix.',
+							},
+							{
+								name: 'suffix',
+								in: 'query',
+								schema: { type: 'string', maxLength: 3 },
+								description:
+									'Base58 characters the address must end with. Combined with prefix, max 3.',
+							},
+							{
+								name: 'ignoreCase',
+								in: 'query',
+								schema: { type: 'string', enum: ['0', '1', 'true', 'false'] },
+								description:
+									'When 1/true, match case-insensitively (faster, less specific).',
+							},
+						],
+						responses: {
+							200: { description: 'Keypair JSON: address + secret key' },
+							400: { description: 'Missing prefix/suffix or pattern too long' },
+							402: { description: 'Payment Required (x402)' },
+						},
+						'x-payment-info': {
+							// Difficulty-tiered: $0.01 (1 char) → $0.25 (3 chars). The live
+							// 402 quotes the exact price for the requested pattern length.
+							price: { mode: 'dynamic', currency: 'USD', min: '0.01', max: '0.25' },
+							protocols: X402_PROTOCOLS,
+						},
+					},
+				},
+				'/api/x402/fact-check': {
+					post: {
+						operationId: 'x402_fact_check',
+						security: PAYMENT_ONLY_SECURITY,
+						summary: 'Paid: Real-time fact check with sourced verdict',
+						description:
+							'Pay $0.10 USDC to verify a factual claim. The server generates search queries, runs multi-source web search, extracts per-source stance with an LLM, computes a weighted verdict + confidence, and returns the supporting sources plus a SHA-256 attestation of the result.',
+						requestBody: {
+							required: true,
+							content: {
+								'application/json': {
+									schema: {
+										type: 'object',
+										required: ['claim'],
+										properties: {
+											claim: {
+												type: 'string',
+												minLength: 5,
+												maxLength: 1000,
+												description: 'The factual claim to verify.',
+											},
+											strictness: {
+												type: 'string',
+												enum: ['high', 'medium', 'low'],
+												default: 'medium',
+												description:
+													'high: penalizes low-authority sources. medium: default. low: accepts all sources equally.',
+											},
+										},
+									},
+								},
+							},
+						},
+						responses: {
+							200: {
+								description:
+									'Verdict JSON: verdict, confidence, claim, strictness, sources, costBreakdown, attestation',
+							},
+							400: { description: 'Missing or invalid claim' },
+							402: { description: 'Payment Required (x402)' },
+						},
+						'x-payment-info': {
+							price: { mode: 'fixed', currency: 'USD', amount: '0.10' },
+							protocols: X402_PROTOCOLS,
+						},
+					},
+				},
+				'/api/x402/tutor': {
+					post: {
+						operationId: 'x402_tutor',
+						security: PAYMENT_ONLY_SECURITY,
+						summary: 'Paid: Pay-as-you-learn tutor (one charge per answer)',
+						description:
+							'Pay $0.01 USDC per answered question. Returns a leveled explanation, key points, a worked example, and a follow-up, plus a running session tab so the UI can render a live itemized invoice. Pass a sessionId to accumulate a tab across questions.',
+						requestBody: {
+							required: true,
+							content: {
+								'application/json': {
+									schema: {
+										type: 'object',
+										required: ['question'],
+										properties: {
+											sessionId: {
+												type: 'string',
+												maxLength: 100,
+												description:
+													'Stable session identifier to accumulate a running tab. Omit to start a new session.',
+											},
+											question: {
+												type: 'string',
+												minLength: 5,
+												maxLength: 2000,
+												description: 'The question to be explained.',
+											},
+											context: {
+												type: 'string',
+												maxLength: 6000,
+												description:
+													'Optional code or context to ground the explanation.',
+											},
+											level: {
+												type: 'string',
+												enum: ['beginner', 'intermediate', 'expert'],
+												default: 'intermediate',
+												description:
+													'Target expertise level — controls depth and assumed background.',
+											},
+										},
+									},
+								},
+							},
+						},
+						responses: {
+							200: { description: 'Answer JSON with running session tab' },
+							400: { description: 'Missing or invalid question' },
+							402: { description: 'Payment Required (x402)' },
+						},
+						'x-payment-info': {
+							price: { mode: 'fixed', currency: 'USD', amount: '0.01' },
+							protocols: X402_PROTOCOLS,
+						},
+					},
+				},
+				'/api/x402/skill-call': {
+					get: {
+						operationId: 'x402_skill_call',
+						security: PAYMENT_ONLY_SECURITY,
+						summary: 'Paid: Invoke a marketplace skill (pay-per-call)',
+						description:
+							"Pay the per-call price of a marketplace skill in USDC (Base or Solana) and receive its executable payload: the tool schema and content the calling agent runs. Payment settles straight to the skill author's wallet. Per-call pricing — every invocation is a fresh payment.",
+						parameters: [
+							{
+								name: 'skill',
+								in: 'query',
+								required: true,
+								schema: { type: 'string', minLength: 1, maxLength: 128 },
+								description:
+									'Unique skill slug from the marketplace_skills catalog.',
+							},
+						],
+						responses: {
+							200: { description: 'Skill payload: tool schema + content' },
+							400: { description: 'Missing or invalid skill slug' },
+							402: { description: 'Payment Required (x402)' },
+							404: { description: 'Skill not found' },
+							409: { description: 'Skill not currently purchasable' },
+						},
+						'x-payment-info': {
+							// Per-skill pricing from marketplace_skills; the live 402
+							// challenge reflects the exact price of the requested skill.
+							// Bounds mirror the catalog's enforced range (price_per_call_usd
+							// is validated 0–10 in api/skills/index.js; free skills 409).
+							price: { mode: 'dynamic', currency: 'USD', min: '0.001', max: '10.00' },
+							protocols: X402_PROTOCOLS,
+							note: 'Per-call price is set per skill; the live 402 challenge reflects the exact skill price.',
+						},
+					},
+				},
+				'/api/x402/agent-bouncer': {
+					get: {
+						operationId: 'x402_agent_bouncer',
+						security: PAYMENT_ONLY_SECURITY,
+						summary: 'Paid: Admit/refuse a counterparty agent at the door',
+						description:
+							"Pay $0.01 USDC to run the Pole Club door check against a three.ws agent's Solana reputation: confirmed on-chain payments, distinct payers, failure rate, distribute/buyback follow-through, signed attestations, and Club ban/tip ledger. Returns an admit/refuse verdict with a door tier (newcomer / regular / trusted / vip). Vet before you pay, hire, or delegate.",
+						parameters: [
+							{
+								name: 'agent_id',
+								in: 'query',
+								required: true,
+								schema: { type: 'string', format: 'uuid' },
+							},
+							{
+								name: 'min_payments',
+								in: 'query',
+								required: false,
+								schema: { type: 'integer' },
+							},
+							{
+								name: 'min_distinct_payers',
+								in: 'query',
+								required: false,
+								schema: { type: 'integer' },
+							},
+							{
+								name: 'max_failure_rate',
+								in: 'query',
+								required: false,
+								schema: { type: 'number' },
+							},
+						],
+						responses: {
+							200: { description: 'Verdict JSON: admitted, tier, reasons, reputation' },
+							400: { description: 'Missing or invalid agent_id' },
+							402: { description: 'Payment Required (x402)' },
+							404: { description: 'agent_id not found' },
+						},
+						'x-payment-info': {
+							price: { mode: 'fixed', currency: 'USD', amount: '0.01' },
+							protocols: X402_PROTOCOLS,
+						},
+					},
+				},
+				'/api/x402/vanity-verifiable': {
+					get: {
+						operationId: 'x402_vanity_verifiable',
+						security: PAYMENT_ONLY_SECURITY,
+						summary: 'Paid: Provably-fair Solana vanity keypair + signed receipt',
+						description:
+							'Grind a fresh Solana keypair whose Base58 address matches a chosen prefix/suffix, with a commit–reveal receipt signed by the service key (published at /.well-known/three-vanity.json) so the buyer can prove the key was ground fresh and never kept. Pass sealTo=<X25519 pubkey> to ECIES-seal the secret. Difficulty-tiered $0.02–$0.40; combined pattern ≤3 Base58 chars; settlement runs only after a successful grind.',
+						parameters: [
+							{
+								name: 'prefix',
+								in: 'query',
+								required: false,
+								schema: { type: 'string', maxLength: 3 },
+								description: 'Base58 prefix the address must start with (excludes 0,O,I,l).',
+							},
+							{
+								name: 'suffix',
+								in: 'query',
+								required: false,
+								schema: { type: 'string', maxLength: 3 },
+								description: 'Base58 suffix the address must end with. Combined with prefix ≤3.',
+							},
+							{
+								name: 'sealTo',
+								in: 'query',
+								required: false,
+								schema: { type: 'string' },
+								description:
+									'Recommended. Your X25519 public key; when set the secret is sealed to it and omitted from the response.',
+							},
+						],
+						responses: {
+							200: { description: 'Keypair + signed grind receipt JSON' },
+							400: { description: 'Missing prefix/suffix or pattern too long' },
+							402: { description: 'Payment Required (x402)' },
+						},
+						'x-payment-info': {
+							price: { mode: 'dynamic', currency: 'USD', min: '0.02', max: '0.40' },
+							protocols: X402_PROTOCOLS,
+							note: 'Difficulty-tiered by pattern length; the live 402 challenge quotes the exact price.',
+						},
+					},
+				},
+				'/api/x402/crypto-intel': {
+					post: {
+						operationId: 'x402_crypto_intel',
+						security: PAYMENT_ONLY_SECURITY,
+						summary: 'Paid: Live crypto market signal (agent-to-agent intel)',
+						description:
+							'Pay $0.01 USDC per call for a live market signal (bullish / bearish / neutral) on a token with current price, 24h change, and a two-sentence rationale. Powered by CoinGecko live prices.',
+						requestBody: {
+							required: false,
+							content: {
+								'application/json': {
+									schema: {
+										type: 'object',
+										properties: {
+											topic: {
+												type: 'string',
+												default: 'sol',
+												description: 'Token ticker or CoinGecko id: btc, sol, eth, doge, …',
+											},
+										},
+									},
+								},
+							},
+						},
+						responses: {
+							200: { description: 'Signal JSON: signal, price_usd, change_24h, rationale, confidence' },
+							402: { description: 'Payment Required (x402)' },
+						},
+						'x-payment-info': {
+							price: { mode: 'fixed', currency: 'USD', amount: '0.01' },
+							protocols: X402_PROTOCOLS,
+						},
+					},
+				},
+				'/api/x402/cosmetic-purchase': {
+					get: {
+						operationId: 'x402_cosmetic_purchase',
+						security: PAYMENT_ONLY_SECURITY,
+						summary: 'Paid: Unlock a premium avatar cosmetic',
+						description:
+							'Pay once in USDC to unlock a premium avatar cosmetic (skin or emote) for an account, wearable across /play and /walk. Price varies by rarity ($0.25–$3.00). Wallets that already purchased re-confirm for free via SIWX (CAIP-122).',
+						parameters: [
+							{
+								name: 'id',
+								in: 'query',
+								required: true,
+								schema: { type: 'string', minLength: 1, maxLength: 64 },
+								description: 'Premium cosmetic id from /api/cosmetics/catalog.',
+							},
+							{
+								name: 'account',
+								in: 'query',
+								required: true,
+								schema: { type: 'string', minLength: 3, maxLength: 64 },
+								description: 'Solana wallet address or guest id (g_…) the cosmetic is granted to.',
+							},
+						],
+						responses: {
+							200: {
+								description: 'Ownership grant JSON',
+								content: {
+									'application/json': {
+										schema: {
+											type: 'object',
+											required: ['ok', 'id', 'name', 'slot', 'rarity', 'account', 'owned'],
+											properties: {
+												ok: { type: 'boolean' },
+												id: { type: 'string' },
+												name: { type: 'string' },
+												slot: { type: 'string' },
+												rarity: { type: 'string' },
+												account: { type: 'string' },
+												owned: { type: 'boolean' },
+												newlyOwned: { type: 'boolean' },
+												payer: { type: ['string', 'null'] },
+												network: { type: ['string', 'null'] },
+												amountAtomics: { type: ['string', 'null'] },
+												asset: { type: ['string', 'null'] },
+											},
+										},
+									},
+								},
+							},
+							400: { description: 'Missing or invalid id/account' },
+							402: { description: 'Payment Required (x402)' },
+							404: { description: 'Cosmetic not found' },
+						},
+						'x-payment-info': {
+							price: { mode: 'dynamic', currency: 'USD', min: '0.25', max: '3.00' },
+							protocols: X402_PROTOCOLS,
+							note: 'Per-rarity pricing; the live 402 challenge quotes the exact price for the cosmetic.',
+						},
+					},
+				},
+				'/api/x402/animation-download': {
+					get: {
+						operationId: 'x402_animation_download',
+						security: PAYMENT_ONLY_SECURITY,
+						summary: 'Paid: Unlock a 3D avatar animation (GLB)',
+						description:
+							'Pay once in USDC to unlock a 3D avatar animation (GLB). Each animation has its own price; the response carries a short-lived presigned URL the client fetches directly. Wallets that already paid re-download for free via SIWX.',
+						parameters: [
+							{
+								name: 'id',
+								in: 'query',
+								required: true,
+								schema: { type: 'string', format: 'uuid' },
+								description: 'Animation clip UUID from the marketplace animations feed (GET /api/marketplace/animations).',
+							},
+						],
+						responses: {
+							200: {
+								description: 'Presigned download URL JSON',
+								content: {
+									'application/json': {
+										schema: {
+											type: 'object',
+											required: ['ok', 'id', 'name', 'mimeType', 'downloadUrl', 'expiresAt'],
+											properties: {
+												ok: { type: 'boolean' },
+												id: { type: 'string', format: 'uuid' },
+												slug: { type: 'string' },
+												name: { type: 'string' },
+												mimeType: { type: 'string' },
+												sizeBytes: { type: 'integer', minimum: 0 },
+												expiresAt: { type: 'string', format: 'date-time' },
+												downloadUrl: { type: 'string', format: 'uri' },
+											},
+										},
+									},
+								},
+							},
+							400: { description: 'Missing or invalid id' },
+							402: { description: 'Payment Required (x402)' },
+							404: { description: 'Animation not found' },
+						},
+						'x-payment-info': {
+							price: { mode: 'dynamic', currency: 'USD', min: '0.001', max: '10.00' },
+							protocols: X402_PROTOCOLS,
+							note: 'Per-animation pricing; the live 402 challenge quotes the exact price.',
+						},
+					},
+				},
+				'/api/x402/club-cover': {
+					get: {
+						operationId: 'x402_club_cover',
+						security: PAYMENT_ONLY_SECURITY,
+						summary: 'Paid: Pole Club cover charge (24h entry token)',
+						description:
+							'Pay $0.01 USDC to access the three.ws Pole Club. Once payment settles the caller receives an entry token granting access to the live club scene for 24 hours.',
+						parameters: [],
+						responses: {
+							200: { description: 'Entry token JSON with expiry' },
+							402: { description: 'Payment Required (x402)' },
+							403: { description: 'Caller is banned from the club' },
+						},
+						'x-payment-info': {
+							price: { mode: 'fixed', currency: 'USD', amount: '0.01' },
+							protocols: X402_PROTOCOLS,
+						},
+					},
+				},
+			},
+		}
+	);
+}
+
+export default wrap(async (req, res) => {
+	if (cors(req, res, { methods: 'GET,OPTIONS', origins: '*' })) return;
+	if (!method(req, res, ['GET'])) return;
+
+	return json(res, 200, buildOpenApiDoc(env.APP_ORIGIN), { 'cache-control': 'public, max-age=300' });
+});

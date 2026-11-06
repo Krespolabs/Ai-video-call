@@ -1,0 +1,2676 @@
+<!doctype html>
+<html lang="en">
+	<head>
+		<script>/* three.ws theme boot — no-flash; runtime in /theme-switcher.js */(function(){try{var m=localStorage.getItem('twx_theme');var l=m==='auto'?(window.matchMedia&&window.matchMedia('(prefers-color-scheme: light)').matches):m==='light';document.documentElement.setAttribute('data-theme',l?'light':'dark');}catch(e){document.documentElement.setAttribute('data-theme','dark');}})();</script>
+		<meta charset="utf-8" />
+		<title data-i18n="agent_edit.meta_title">Edit Agent — three.ws</title>
+		<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+		<meta name="theme-color" content="#000000" />
+
+		<meta property="og:type" content="website">
+		<meta property="og:url" content="https://three.ws/agent-edit">
+		<meta property="og:title" content="Edit Agent — three.ws" data-i18n-attr="content:agent_edit.meta_og_title">
+		<meta property="og:image" content="https://three.ws/og-image.png">
+		<meta property="og:image:width" content="1200">
+		<meta property="og:image:height" content="630">
+		<meta name="twitter:card" content="summary_large_image">
+		<meta name="twitter:image" content="https://three.ws/og-image.png">
+
+		<link rel="icon" href="/favicon.ico" sizes="any" />
+		<link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+		<link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png" />
+		<link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png" />
+		<link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+		<link rel="manifest" href="/manifest.webmanifest" />
+		<link rel="stylesheet" href="/style.css" />
+		<link rel="stylesheet" href="/fonts/fonts.css" />
+		<link rel="stylesheet" href="/src/pump/launch-token-modal.css" />
+		<link rel="stylesheet" href="/brain-ownership.css" />
+		<style>
+			body {
+				overflow: hidden;
+				height: 100svh;
+				display: flex;
+				flex-direction: column;
+			}
+
+			.edit-header {
+				display: flex;
+				align-items: center;
+				gap: 1rem;
+				padding: 0.875rem 1.618rem;
+				border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+				flex-shrink: 0;
+			}
+			.edit-header a {
+				color: rgba(255, 255, 255, 0.4);
+				text-decoration: none;
+				font-size: 0.764rem;
+			}
+			.edit-header a:hover {
+				color: rgba(255, 255, 255, 0.8);
+			}
+			.edit-header-title {
+				flex: 1;
+				font-size: 0.875rem;
+				font-weight: 500;
+				color: rgba(255, 255, 255, 0.75);
+				margin: 0;
+			}
+
+			/* ── Unified two-column layout ── */
+			.unified-layout {
+				flex: 1;
+				min-height: 0;
+				display: grid;
+				grid-template-columns: 360px 1fr;
+				overflow: hidden;
+			}
+
+			/* Left column: sticky 3D viewer */
+			.preview-col {
+				display: flex;
+				flex-direction: column;
+				overflow: hidden;
+				border-right: 1px solid rgba(255, 255, 255, 0.06);
+				background: #070707;
+				position: relative;
+			}
+
+			.outfit-preview {
+				flex: 1;
+				min-height: 0;
+				background: #070707;
+				overflow: hidden;
+				position: relative;
+			}
+			.outfit-preview agent-3d {
+				width: 100%;
+				height: 100%;
+				display: block;
+			}
+
+			.preview-actions {
+				display: flex;
+				gap: 0.5rem;
+				padding: 0.75rem;
+				border-top: 1px solid rgba(255, 255, 255, 0.06);
+				flex-shrink: 0;
+			}
+			.preview-no-avatar {
+				flex: 1;
+				display: flex;
+				align-items: center;
+				justify-content: center;
+				flex-direction: column;
+				gap: 0.75rem;
+				color: rgba(255,255,255,0.2);
+				font-size: 0.764rem;
+				text-align: center;
+				padding: 2rem;
+			}
+			.preview-no-avatar-icon {
+				font-size: 2.5rem;
+				line-height: 1;
+				opacity: 0.3;
+			}
+
+			/* Right column: scrollable all sections */
+			.content-col {
+				overflow-y: auto;
+				display: flex;
+				flex-direction: column;
+				min-height: 0;
+			}
+
+			/* Sticky in-page nav */
+			.section-nav {
+				position: sticky;
+				top: 0;
+				z-index: 50;
+				background: rgba(6, 6, 6, 0.92);
+				backdrop-filter: blur(12px);
+				-webkit-backdrop-filter: blur(12px);
+				border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+				display: flex;
+				align-items: center;
+				padding: 0 1rem;
+				flex-shrink: 0;
+				gap: 0;
+				overflow-x: auto;
+			}
+			.section-nav::-webkit-scrollbar { display: none; }
+			.snav-link {
+				font-size: 0.764rem;
+				font-weight: 500;
+				color: rgba(255, 255, 255, 0.42);
+				text-decoration: none;
+				padding: 0.618rem 0.75rem;
+				border-bottom: 2px solid transparent;
+				transition: color var(--duration-fast), border-color var(--duration-fast);
+				white-space: nowrap;
+				flex-shrink: 0;
+			}
+			.snav-link:hover { color: rgba(255, 255, 255, 0.85); }
+			.snav-link.active { color: #fff; border-bottom-color: #3b82f6; }
+
+			/* Edit sections */
+			.edit-section {
+				border-bottom: 1px solid rgba(255, 255, 255, 0.07);
+			}
+			.edit-section-label {
+				font-size: 0.618rem;
+				text-transform: uppercase;
+				letter-spacing: 0.12em;
+				font-weight: 700;
+				color: rgba(255, 255, 255, 0.25);
+				padding: 1.5rem 1.5rem 0;
+			}
+
+			/* Each panel is a visible section */
+			.edit-panel {
+				display: flex;
+				flex-direction: column;
+				gap: 1rem;
+				padding: 1.25rem 1.5rem 1.5rem;
+				border-top: 1px solid rgba(255, 255, 255, 0.04);
+			}
+			.edit-section > .edit-panel:first-of-type { border-top: none; }
+
+			.subsection-title {
+				font-size: 0.875rem;
+				font-weight: 600;
+				color: rgba(255, 255, 255, 0.72);
+				flex-shrink: 0;
+			}
+
+			/* Form primitives */
+			.form-group {
+				display: flex;
+				flex-direction: column;
+				gap: 0.5rem;
+			}
+			.form-label {
+				font-size: 0.764rem;
+				color: rgba(255, 255, 255, 0.5);
+				font-weight: 500;
+			}
+			.form-input,
+			.form-textarea {
+				background: rgba(255, 255, 255, 0.04);
+				border: 1px solid rgba(255, 255, 255, 0.1);
+				border-radius: 8px;
+				color: rgba(255, 255, 255, 0.9);
+				font: 0.875rem/1.5 inherit;
+				padding: 0.618rem 0.875rem;
+				width: 100%;
+				box-sizing: border-box;
+				outline: none;
+				transition: border-color var(--duration-fast);
+			}
+			.form-input:focus,
+			.form-textarea:focus {
+				border-color: rgba(59, 130, 246, 0.5);
+			}
+			.form-textarea {
+				resize: vertical;
+				min-height: 90px;
+			}
+			.form-actions {
+				display: flex;
+				align-items: center;
+				gap: 1rem;
+				margin-top: 0.25rem;
+				flex-wrap: wrap;
+			}
+			.btn-primary {
+				background: #3b82f6;
+				border: 0;
+				border-radius: 8px;
+				color: #fff;
+				cursor: pointer;
+				font: 0.875rem/1 inherit;
+				padding: 0.618rem 1.25rem;
+				font-weight: 500;
+				flex-shrink: 0;
+			}
+			.btn-primary:hover {
+				background: #2563eb;
+			}
+			.btn-primary:disabled {
+				opacity: 0.5;
+				cursor: default;
+			}
+			.form-status {
+				font-size: 0.764rem;
+				color: rgba(255, 255, 255, 0.4);
+			}
+			.form-status.ok {
+				color: #86efac;
+			}
+			.form-status.err {
+				color: #fca5a5;
+			}
+
+			/* Outfit controls inline (no inner scroll, just block) */
+			.outfit-controls-inline {
+				display: flex;
+				flex-direction: column;
+				gap: 0;
+			}
+			.outfit-header {
+				display: flex;
+				align-items: center;
+				justify-content: space-between;
+				margin-bottom: 0.75rem;
+				margin-top: 0.75rem;
+			}
+			.outfit-header:first-child { margin-top: 0; }
+			.outfit-title {
+				font-size: 0.764rem;
+				color: rgba(255, 255, 255, 0.35);
+				text-transform: uppercase;
+				letter-spacing: 0.08em;
+				font-weight: 500;
+				margin: 0;
+			}
+			.btn-reset-all {
+				background: transparent;
+				border: 1px solid rgba(255, 255, 255, 0.12);
+				border-radius: 6px;
+				color: rgba(255, 255, 255, 0.4);
+				cursor: pointer;
+				font: 0.618rem/1 inherit;
+				padding: 0.382rem 0.75rem;
+			}
+			.btn-reset-all:hover {
+				color: rgba(255, 255, 255, 0.8);
+				border-color: rgba(255, 255, 255, 0.25);
+			}
+
+			.mat-card {
+				background: rgba(255, 255, 255, 0.03);
+				border: 1px solid rgba(255, 255, 255, 0.07);
+				border-radius: 10px;
+				margin-bottom: 0.75rem;
+				overflow: hidden;
+			}
+			.mat-card-header {
+				display: flex;
+				align-items: center;
+				gap: 0.75rem;
+				padding: 0.75rem 1rem;
+				cursor: pointer;
+				user-select: none;
+			}
+			.mat-card-header:hover {
+				background: rgba(255, 255, 255, 0.03);
+			}
+			.mat-card-chevron {
+				color: rgba(255, 255, 255, 0.25);
+				font-size: 0.618rem;
+				transition: transform var(--duration-base);
+				margin-left: auto;
+			}
+			.mat-card.open .mat-card-chevron {
+				transform: rotate(90deg);
+			}
+			.mat-card-name {
+				font-size: 0.875rem;
+				color: rgba(255, 255, 255, 0.8);
+				font-weight: 500;
+			}
+			.mat-card-swatch {
+				width: 16px;
+				height: 16px;
+				border-radius: 4px;
+				border: 1px solid rgba(255, 255, 255, 0.15);
+				flex-shrink: 0;
+			}
+			.mat-card-modified {
+				font-size: 0.618rem;
+				color: #93c5fd;
+				margin-left: 0;
+			}
+			.mat-card-body {
+				display: none;
+				padding: 0 1rem 1rem;
+			}
+			.mat-card.open .mat-card-body {
+				display: block;
+			}
+
+			.mat-row {
+				display: grid;
+				grid-template-columns: 100px 1fr auto;
+				align-items: center;
+				gap: 0.75rem;
+				margin-bottom: 0.618rem;
+			}
+			.mat-row-label {
+				font-size: 0.764rem;
+				color: rgba(255, 255, 255, 0.4);
+			}
+			.mat-row input[type='color'] {
+				-webkit-appearance: none;
+				width: 100%;
+				height: 28px;
+				border-radius: 6px;
+				border: 1px solid rgba(255, 255, 255, 0.12);
+				padding: 0;
+				cursor: pointer;
+				background: transparent;
+			}
+			.mat-row input[type='color']::-webkit-color-swatch-wrapper {
+				padding: 2px;
+			}
+			.mat-row input[type='color']::-webkit-color-swatch {
+				border-radius: 4px;
+				border: none;
+			}
+			.mat-row input[type='range'] {
+				width: 100%;
+				accent-color: #3b82f6;
+			}
+			.mat-row-val {
+				font-size: 0.618rem;
+				color: rgba(255, 255, 255, 0.35);
+				min-width: 30px;
+				text-align: right;
+			}
+			.mat-card-footer {
+				display: flex;
+				justify-content: flex-end;
+				padding-top: 0.5rem;
+			}
+			.btn-reset-mat {
+				background: transparent;
+				border: 0;
+				color: rgba(255, 255, 255, 0.3);
+				cursor: pointer;
+				font: 0.618rem/1 inherit;
+				padding: 0.25rem 0;
+			}
+			.btn-reset-mat:hover {
+				color: rgba(255, 255, 255, 0.7);
+			}
+
+			.outfit-status-bar {
+				position: fixed;
+				bottom: 1rem;
+				right: 1.5rem;
+				display: flex;
+				align-items: center;
+				gap: 0.5rem;
+				z-index: 100;
+			}
+			.outfit-status {
+				font-size: 0.618rem;
+				color: rgba(255, 255, 255, 0.25);
+				pointer-events: none;
+			}
+			.outfit-status.saving {
+				color: rgba(255, 255, 255, 0.4);
+			}
+			.outfit-status.saved {
+				color: #86efac;
+			}
+			.outfit-status.err {
+				color: #fca5a5;
+			}
+			.outfit-cancel-btn {
+				font-size: 0.618rem;
+				padding: 0.15rem 0.5rem;
+				border: 1px solid rgba(255, 255, 255, 0.2);
+				border-radius: 4px;
+				background: transparent;
+				color: rgba(255, 255, 255, 0.5);
+				cursor: pointer;
+				transition: color var(--duration-fast), border-color var(--duration-fast);
+			}
+			.outfit-cancel-btn:hover {
+				color: #fca5a5;
+				border-color: #fca5a5;
+			}
+
+			.loading-msg,
+			.error-msg {
+				flex: 1;
+				display: flex;
+				align-items: center;
+				justify-content: center;
+				color: rgba(255, 255, 255, 0.3);
+				font-size: 0.875rem;
+				min-height: 120px;
+			}
+			.error-msg {
+				color: #fca5a5;
+			}
+			.no-avatar-msg {
+				padding: 2rem;
+				color: rgba(255, 255, 255, 0.3);
+				font-size: 0.764rem;
+				text-align: center;
+			}
+			.no-named-mats {
+				color: rgba(255, 255, 255, 0.3);
+				font-size: 0.764rem;
+				padding: 1rem 0;
+			}
+
+			.avatar-picker-list {
+				display: grid;
+				grid-template-columns: repeat(auto-fill, minmax(110px, 1fr));
+				gap: 0.75rem;
+			}
+			.avatar-tile {
+				position: relative;
+				background: rgba(255, 255, 255, 0.04);
+				border: 1px solid rgba(255, 255, 255, 0.1);
+				border-radius: 10px;
+				padding: 0.5rem;
+				cursor: pointer;
+				font-family: inherit;
+				color: rgba(255, 255, 255, 0.85);
+				display: flex;
+				flex-direction: column;
+				gap: 0.382rem;
+				align-items: stretch;
+				transition: border-color var(--duration-fast), transform var(--duration-instant);
+			}
+			.avatar-tile:hover { border-color: rgba(59, 130, 246, 0.5); }
+			.avatar-tile:active { transform: scale(0.98); }
+			.avatar-tile.current { border-color: #3b82f6; background: rgba(59, 130, 246, 0.08); }
+			.avatar-tile img {
+				width: 100%;
+				aspect-ratio: 1 / 1;
+				object-fit: cover;
+				border-radius: 6px;
+				background: #0b0b0b;
+			}
+			.avatar-tile-ph {
+				width: 100%;
+				aspect-ratio: 1 / 1;
+				display: flex;
+				align-items: center;
+				justify-content: center;
+				background: #0b0b0b;
+				border-radius: 6px;
+				color: rgba(255, 255, 255, 0.3);
+				font-size: 0.764rem;
+			}
+			.avatar-tile-name {
+				font-size: 0.764rem;
+				color: rgba(255, 255, 255, 0.7);
+				text-align: left;
+				overflow: hidden;
+				text-overflow: ellipsis;
+				white-space: nowrap;
+			}
+			.avatar-tile-badge {
+				position: absolute;
+				top: 0.382rem;
+				right: 0.382rem;
+				background: #3b82f6;
+				color: #fff;
+				font-size: 0.55rem;
+				text-transform: uppercase;
+				letter-spacing: 0.04em;
+				padding: 0.15rem 0.382rem;
+				border-radius: 4px;
+			}
+			.avatar-create-tile {
+				border-style: dashed;
+				border-color: rgba(147, 197, 253, 0.4);
+				background: rgba(59, 130, 246, 0.04);
+				color: rgba(147, 197, 253, 0.85);
+			}
+			.avatar-create-tile:hover {
+				border-color: rgba(147, 197, 253, 0.85);
+				background: rgba(59, 130, 246, 0.10);
+			}
+			.avatar-create-icon {
+				font-size: 1.75rem;
+				font-weight: 300;
+				color: rgba(147, 197, 253, 0.85);
+			}
+			.avatar-create-menu {
+				position: absolute;
+				z-index: 1000;
+				min-width: 220px;
+				background: #0e0e0e;
+				border: 1px solid rgba(255, 255, 255, 0.12);
+				border-radius: 8px;
+				padding: 0.382rem;
+				box-shadow: 0 10px 30px rgba(0, 0, 0, 0.45);
+				display: flex;
+				flex-direction: column;
+				gap: 0.15rem;
+			}
+			.avatar-create-menu button[role="menuitem"] {
+				display: flex;
+				flex-direction: column;
+				gap: 0.15rem;
+				text-align: left;
+				padding: 0.5rem 0.75rem;
+				background: transparent;
+				border: 0;
+				color: #eaeaf0;
+				cursor: pointer;
+				border-radius: 6px;
+				font-family: inherit;
+			}
+			.avatar-create-menu button[role="menuitem"]:hover {
+				background: rgba(255, 255, 255, 0.06);
+			}
+			.avatar-create-menu .acm-title { font-size: 0.875rem; }
+			.avatar-create-menu .acm-sub { font-size: 0.7rem; color: rgba(255, 255, 255, 0.5); }
+
+			.anims-picker-grid {
+				display: grid;
+				grid-template-columns: repeat(auto-fill, minmax(90px, 1fr));
+				gap: 0.5rem;
+			}
+			.anim-tile {
+				position: relative;
+				background: rgba(255, 255, 255, 0.04);
+				border: 1px solid rgba(255, 255, 255, 0.1);
+				border-radius: 8px;
+				padding: 0.5rem 0.382rem;
+				cursor: pointer;
+				font-family: inherit;
+				color: rgba(255, 255, 255, 0.85);
+				display: flex;
+				flex-direction: column;
+				gap: 0.15rem;
+				align-items: center;
+				text-align: center;
+				transition: border-color var(--duration-fast), background var(--duration-fast), transform var(--duration-instant);
+			}
+			.anim-tile:hover { border-color: rgba(59, 130, 246, 0.5); }
+			.anim-tile:active { transform: scale(0.97); }
+			.anim-tile.selected {
+				border-color: #3b82f6;
+				background: rgba(59, 130, 246, 0.12);
+			}
+			.anim-tile-icon {
+				font-size: 1.4rem;
+				line-height: 1;
+				margin-bottom: 0.15rem;
+			}
+			.anim-tile-name {
+				font-size: 0.7rem;
+				color: rgba(255, 255, 255, 0.7);
+				overflow: hidden;
+				text-overflow: ellipsis;
+				white-space: nowrap;
+				max-width: 100%;
+			}
+			.anim-tile-check {
+				position: absolute;
+				top: 0.25rem;
+				right: 0.25rem;
+				width: 14px;
+				height: 14px;
+				border-radius: 50%;
+				background: #3b82f6;
+				color: #fff;
+				font-size: 0.55rem;
+				display: flex;
+				align-items: center;
+				justify-content: center;
+				opacity: 0;
+				transition: opacity var(--duration-fast);
+			}
+			.anim-tile.selected .anim-tile-check { opacity: 1; }
+
+			.anim-graph-rows {
+				display: grid;
+				grid-template-columns: 1fr;
+				gap: 0.5rem;
+			}
+			.anim-graph-row {
+				display: grid;
+				grid-template-columns: 80px 1fr 80px;
+				align-items: center;
+				gap: 0.75rem;
+				background: rgba(255, 255, 255, 0.04);
+				border: 1px solid rgba(255, 255, 255, 0.08);
+				border-radius: 8px;
+				padding: 0.5rem 0.75rem;
+			}
+			.anim-graph-row-label {
+				font-size: 0.764rem;
+				color: rgba(255, 255, 255, 0.8);
+				text-transform: capitalize;
+			}
+			.anim-graph-row-meta {
+				font-size: 0.618rem;
+				color: rgba(255, 255, 255, 0.4);
+				text-align: right;
+			}
+			.anim-graph-row select {
+				background: rgba(0, 0, 0, 0.3);
+				border: 1px solid rgba(255, 255, 255, 0.12);
+				border-radius: 6px;
+				color: rgba(255, 255, 255, 0.85);
+				padding: 0.382rem 0.5rem;
+				font-family: inherit;
+				font-size: 0.764rem;
+				width: 100%;
+			}
+			.anim-graph-row select:focus {
+				border-color: rgba(59, 130, 246, 0.55);
+				outline: none;
+			}
+
+			.skill-price-row {
+				display: flex;
+				align-items: center;
+				gap: 1rem;
+				margin-bottom: 0.5rem;
+			}
+			.skill-name {
+				flex: 1;
+				font-size: 0.875rem;
+				color: rgba(255, 255, 255, 0.7);
+			}
+			.skill-pricing-controls {
+				display: flex;
+				align-items: center;
+				gap: 1rem;
+			}
+			.plan-skills-checklist {
+				display: flex;
+				flex-direction: column;
+				gap: 0.15rem;
+				max-height: 180px;
+				overflow-y: auto;
+				padding: 0.5rem;
+				border: 1px solid rgba(255, 255, 255, 0.08);
+				border-radius: 6px;
+				background: rgba(255, 255, 255, 0.02);
+			}
+			.plan-skill-check {
+				display: flex;
+				align-items: center;
+				gap: 0.5rem;
+				font-size: 0.764rem;
+				color: rgba(255, 255, 255, 0.7);
+				padding: 0.25rem 0.3rem;
+				border-radius: 4px;
+				cursor: pointer;
+				transition: background var(--duration-fast) var(--ease-standard);
+			}
+			.plan-skill-check:hover {
+				background: rgba(255, 255, 255, 0.04);
+			}
+			.plan-skill-check input {
+				accent-color: #a4f0bc;
+				cursor: pointer;
+				flex-shrink: 0;
+			}
+			.plan-skills-empty {
+				font-size: 0.7rem;
+				color: rgba(255, 255, 255, 0.4);
+			}
+			.toggle-switch {
+				position: relative;
+				display: inline-block;
+				width: 34px;
+				height: 20px;
+			}
+			.toggle-switch input {
+				opacity: 0;
+				width: 0;
+				height: 0;
+			}
+			.slider {
+				position: absolute;
+				cursor: pointer;
+				top: 0;
+				left: 0;
+				right: 0;
+				bottom: 0;
+				background-color: #404040;
+				transition: var(--duration-slow);
+				border-radius: 20px;
+			}
+			.slider:before {
+				position: absolute;
+				content: "";
+				height: 12px;
+				width: 12px;
+				left: 4px;
+				bottom: 4px;
+				background-color: white;
+				transition: var(--duration-slow);
+				border-radius: 50%;
+			}
+			input:checked + .slider {
+				background-color: #3b82f6;
+			}
+			input:checked + .slider:before {
+				transform: translateX(14px);
+			}
+			.price-input-wrapper {
+				display: flex;
+				align-items: center;
+				gap: 0.5rem;
+			}
+			.price-input {
+				background: rgba(255, 255, 255, 0.04);
+				border: 1px solid rgba(255, 255, 255, 0.1);
+				border-radius: 6px;
+				color: rgba(255, 255, 255, 0.9);
+				font: 0.875rem/1.5 inherit;
+				padding: 0.382rem 0.618rem;
+				width: 80px;
+				box-sizing: border-box;
+				outline: none;
+			}
+			.price-input-wrapper span {
+				font-size: 0.764rem;
+				color: rgba(255, 255, 255, 0.4);
+			}
+
+			/* ── Shared building blocks ── */
+			.card {
+				background: rgba(255, 255, 255, 0.03);
+				border: 1px solid rgba(255, 255, 255, 0.07);
+				border-radius: 10px;
+				padding: 1rem 1.25rem;
+			}
+			.card-title {
+				font-size: 0.764rem;
+				color: rgba(255, 255, 255, 0.45);
+				text-transform: uppercase;
+				letter-spacing: 0.08em;
+				font-weight: 500;
+				margin-bottom: 0.382rem;
+			}
+			.card-sub { font-size: 0.875rem; color: rgba(255, 255, 255, 0.85); }
+			.card-row { display: flex; align-items: center; gap: 1.25rem; flex-wrap: wrap; }
+			.card-actions { display: flex; gap: 0.5rem; flex-wrap: wrap; align-items: center; margin-left: auto; }
+			.mono { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 0.764rem; word-break: break-all; }
+			.hint { font-size: 0.764rem; color: rgba(255, 255, 255, 0.45); margin: 0 0 0.75rem; }
+			.muted { font-size: 0.764rem; color: rgba(255, 255, 255, 0.35); padding: 0.5rem 0; }
+
+			.btn-ghost {
+				background: transparent;
+				border: 1px solid rgba(255, 255, 255, 0.14);
+				border-radius: 6px;
+				color: rgba(255, 255, 255, 0.7);
+				cursor: pointer;
+				font: 0.764rem/1 inherit;
+				padding: 0.5rem 0.875rem;
+				text-decoration: none;
+				display: inline-flex;
+				align-items: center;
+			}
+			.btn-ghost:hover { color: #fff; border-color: rgba(255, 255, 255, 0.3); }
+			.btn-ghost.danger { color: #fca5a5; border-color: rgba(252, 165, 165, 0.3); }
+			.btn-ghost.danger:hover { border-color: rgba(252, 165, 165, 0.6); }
+			.btn-danger {
+				background: #dc2626;
+				border: 0;
+				border-radius: 8px;
+				color: #fff;
+				cursor: pointer;
+				font: 0.875rem/1 inherit;
+				padding: 0.618rem 1.25rem;
+				font-weight: 500;
+			}
+			.btn-danger:disabled { opacity: 0.4; cursor: not-allowed; background: #6b1f1f; }
+			.btn-danger:not(:disabled):hover { background: #b91c1c; }
+
+			.metric-label { font-size: 0.618rem; color: rgba(255, 255, 255, 0.4); text-transform: uppercase; letter-spacing: 0.08em; }
+			.metric-value { font-size: 1.25rem; color: rgba(255, 255, 255, 0.95); font-weight: 500; margin-top: 0.2rem; }
+			.metric-card {
+				background: rgba(255, 255, 255, 0.03);
+				border: 1px solid rgba(255, 255, 255, 0.07);
+				border-radius: 10px;
+				padding: 0.875rem 1rem;
+			}
+			.metrics-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 0.75rem; }
+
+			/* Voice */
+			.voice-list {
+				display: grid;
+				grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+				gap: 0.5rem;
+				max-height: 340px;
+				overflow-y: auto;
+				border: 1px solid rgba(255, 255, 255, 0.06);
+				border-radius: 10px;
+				padding: 0.5rem;
+				background: rgba(0, 0, 0, 0.2);
+			}
+			.voice-tile {
+				display: flex;
+				align-items: center;
+				justify-content: space-between;
+				gap: 0.5rem;
+				background: rgba(255, 255, 255, 0.04);
+				border: 1px solid rgba(255, 255, 255, 0.08);
+				border-radius: 8px;
+				padding: 0.5rem 0.618rem;
+				font: 0.764rem/1.3 inherit;
+				color: rgba(255, 255, 255, 0.85);
+				cursor: pointer;
+				text-align: left;
+				transition: border-color var(--duration-fast);
+			}
+			.voice-tile:hover { border-color: rgba(59, 130, 246, 0.5); }
+			.voice-tile.current { border-color: #3b82f6; background: rgba(59, 130, 246, 0.08); }
+			.voice-tile-name { display: flex; flex-direction: column; gap: 2px; min-width: 0; flex: 1; }
+			.voice-tile-meta { font-size: 0.618rem; color: rgba(255, 255, 255, 0.4); }
+			.voice-tile-play { background: transparent; border: 0; color: rgba(255, 255, 255, 0.6); font-size: 1rem; cursor: pointer; padding: 0 0.25rem; }
+			.voice-tile-play:hover { color: #fff; }
+			.voice-tune-grid { display: grid; grid-template-columns: max-content 1fr; gap: 0.5rem 0.85rem; align-items: center; margin-bottom: 0.85rem; }
+			.voice-tune-grid .form-label { margin: 0; display: flex; justify-content: space-between; gap: 0.5rem; }
+			.voice-tune-grid input[type="range"] { width: 100%; accent-color: #3b82f6; cursor: pointer; }
+			.voice-range-val { font-variant-numeric: tabular-nums; color: rgba(255, 255, 255, 0.55); font-weight: 400; }
+			.voice-check { grid-column: 1 / -1; display: flex; align-items: center; gap: 0.5rem; font-size: 0.82rem; color: rgba(255, 255, 255, 0.75); cursor: pointer; }
+			.voice-check input { accent-color: #3b82f6; }
+			.voice-tile-play.playing { color: var(--danger); }
+			.voice-unconfigured {
+				display: flex; flex-direction: column; align-items: center; gap: 0.75rem;
+				padding: 2rem 1.5rem; text-align: center;
+			}
+			.voice-unconfigured-icon { font-size: 2rem; line-height: 1; }
+			.voice-unconfigured-title { font-size: 0.875rem; font-weight: 600; color: var(--ink); }
+			.voice-unconfigured-body { font-size: 0.764rem; color: var(--ink-dim); margin: 0; max-width: 340px; line-height: 1.5; }
+			.voice-unconfigured-body code { font-family: var(--font-mono); font-size: 0.73rem; background: var(--surface-3); padding: 1px 5px; border-radius: 4px; }
+
+			/* Memories */
+			.mem-list { display: flex; flex-direction: column; gap: 0.5rem; }
+			.mem-item {
+				background: rgba(255, 255, 255, 0.03);
+				border: 1px solid rgba(255, 255, 255, 0.07);
+				border-radius: 8px;
+				padding: 0.75rem 0.875rem;
+				display: flex;
+				gap: 0.75rem;
+				align-items: flex-start;
+			}
+			/* Arrived here from an autopilot receipt's provenance chip: mark the
+			   memory that was cited so the link lands on something visible. */
+			.mem-item.mem-cited {
+				border-color: rgba(120, 200, 140, 0.55);
+				box-shadow: 0 0 0 1px rgba(120, 200, 140, 0.25);
+				animation: mem-cited-in 1.4s ease-out;
+			}
+			@keyframes mem-cited-in {
+				0%, 45% { background: rgba(120, 200, 140, 0.16); }
+				100% { background: rgba(255, 255, 255, 0.03); }
+			}
+			@media (prefers-reduced-motion: reduce) { .mem-item.mem-cited { animation: none; } }
+			.mem-item-body { flex: 1; min-width: 0; }
+			.mem-item-type { font-size: 0.618rem; color: #93c5fd; text-transform: uppercase; letter-spacing: 0.08em; font-weight: 500; margin-bottom: 0.25rem; }
+			.mem-item-content { font-size: 0.875rem; color: rgba(255, 255, 255, 0.85); white-space: pre-wrap; word-break: break-word; }
+			.mem-item-tags { font-size: 0.618rem; color: rgba(255, 255, 255, 0.4); margin-top: 0.25rem; }
+			.mem-item-actions { display: flex; align-items: center; gap: 0.5rem; flex-shrink: 0; }
+			.mem-vis-toggle {
+				background: transparent;
+				border: 1px solid rgba(255, 255, 255, 0.12);
+				color: rgba(255, 255, 255, 0.45);
+				font-size: 0.618rem;
+				font-family: inherit;
+				letter-spacing: 0.03em;
+				padding: 0.2rem 0.5rem;
+				border-radius: 999px;
+				cursor: pointer;
+				white-space: nowrap;
+				transition: color var(--duration-fast), border-color var(--duration-fast), background var(--duration-fast);
+			}
+			.mem-vis-toggle:hover { color: rgba(255, 255, 255, 0.8); border-color: rgba(255, 255, 255, 0.25); }
+			.mem-vis-toggle:focus-visible { outline: 2px solid rgba(255, 215, 0, 0.5); outline-offset: 1px; }
+			.mem-vis-toggle.is-public {
+				color: #ffd700;
+				border-color: rgba(255, 215, 0, 0.4);
+				background: rgba(255, 215, 0, 0.08);
+			}
+			.mem-vis-toggle:disabled { opacity: 0.5; cursor: progress; }
+
+			/* Dreams */
+			.tab-badge {
+				display: inline-flex; align-items: center; justify-content: center;
+				min-width: 1.05rem; height: 1.05rem; padding: 0 0.3rem; margin-left: 0.4rem;
+				font-size: 0.6rem; font-weight: 700; line-height: 1; border-radius: 999px;
+				background: linear-gradient(135deg, var(--accent-violet-strong), #7c3aed); color: #fff; vertical-align: middle;
+			}
+			.dreams-head { display: flex; gap: 1rem; align-items: flex-start; justify-content: space-between; }
+			.dreams-meta { font-size: 0.7rem; color: rgba(255,255,255,0.45); margin-top: 0.5rem; min-height: 1em; }
+			.dreams-meta .dot { color: var(--accent-violet-strong); }
+			.dreams-reflect-btn { white-space: nowrap; flex-shrink: 0; display: inline-flex; align-items: center; gap: 0.45rem; }
+			.dreams-reflect-btn[disabled] { opacity: 0.6; cursor: progress; }
+			.dreams-reflect-btn.is-dreaming .dreams-reflect-label::after {
+				content: ''; display: inline-block; width: 0.5rem; height: 0.5rem; margin-left: 0.4rem;
+				border-radius: 50%; background: var(--accent-violet-strong); animation: dream-pulse 1.1s ease-in-out infinite;
+			}
+			@keyframes dream-pulse { 0%,100%{ opacity:0.25; transform:scale(0.7);} 50%{ opacity:1; transform:scale(1);} }
+			@media (prefers-reduced-motion: reduce) { .dreams-reflect-btn.is-dreaming .dreams-reflect-label::after { animation: none; } }
+
+			.dreams-list { display: flex; flex-direction: column; gap: 0.875rem; }
+			.dream-card {
+				position: relative; background: rgba(167, 139, 250, 0.05);
+				border: 1px solid rgba(167, 139, 250, 0.18); border-radius: 12px;
+				padding: 1rem 1.1rem; transition: border-color var(--duration-base), transform var(--duration-base), opacity var(--duration-base);
+			}
+			.dream-card:hover { border-color: rgba(167, 139, 250, 0.4); }
+			.dream-card.leaving { opacity: 0; transform: translateY(-6px); }
+			.dream-card.entering { animation: dream-in 0.45s ease both; }
+			@keyframes dream-in { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+			@media (prefers-reduced-motion: reduce) { .dream-card.entering { animation: none; } }
+			.dream-kind {
+				display: inline-flex; align-items: center; gap: 0.35rem; font-size: 0.6rem;
+				text-transform: uppercase; letter-spacing: 0.09em; font-weight: 600;
+				color: var(--accent-violet); padding: 0.18rem 0.5rem; border-radius: 999px;
+				background: rgba(167, 139, 250, 0.12); border: 1px solid rgba(167, 139, 250, 0.25);
+			}
+			.dream-kind.kind-question { color: #fcd34d; background: rgba(252, 211, 77, 0.1); border-color: rgba(252, 211, 77, 0.3); }
+			.dream-statement { font-size: 0.95rem; color: rgba(255,255,255,0.92); line-height: 1.45; margin: 0.6rem 0 0.4rem; }
+			.dream-rationale { font-size: 0.8rem; color: rgba(255,255,255,0.55); line-height: 1.5; margin: 0 0 0.6rem; }
+			.dream-conf { display: inline-flex; align-items: center; gap: 0.45rem; font-size: 0.65rem; color: rgba(255,255,255,0.5); margin-bottom: 0.5rem; }
+			.dream-conf-bar { width: 64px; height: 4px; border-radius: 999px; background: rgba(255,255,255,0.1); overflow: hidden; }
+			.dream-conf-fill { height: 100%; background: linear-gradient(90deg, #7c3aed, var(--accent-violet-strong)); border-radius: 999px; }
+			.dream-prop { font-size: 0.68rem; color: rgba(255,255,255,0.5); margin-bottom: 0.6rem; display: flex; flex-wrap: wrap; gap: 0.35rem; align-items: center; }
+			.dream-prop .pill { background: rgba(255,255,255,0.06); border-radius: 999px; padding: 0.12rem 0.5rem; color: rgba(255,255,255,0.7); }
+			.dream-sources { margin: 0.4rem 0 0.7rem; }
+			.dream-sources-label { font-size: 0.6rem; text-transform: uppercase; letter-spacing: 0.08em; color: rgba(255,255,255,0.35); margin-bottom: 0.35rem; }
+			.dream-src {
+				display: block; width: 100%; text-align: left; cursor: pointer; font-family: inherit;
+				background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08);
+				border-radius: 8px; padding: 0.4rem 0.55rem; margin-bottom: 0.3rem;
+				color: rgba(255,255,255,0.7); font-size: 0.72rem; line-height: 1.4;
+				transition: border-color var(--duration-fast), background var(--duration-fast);
+			}
+			.dream-src:hover { border-color: rgba(167,139,250,0.35); background: rgba(167,139,250,0.06); }
+			.dream-src:focus-visible { outline: 2px solid rgba(167,139,250,0.6); outline-offset: 1px; }
+			.dream-src .src-type { color: #93c5fd; font-size: 0.6rem; text-transform: uppercase; letter-spacing: 0.06em; margin-right: 0.4rem; }
+			.dream-src.forgotten { opacity: 0.5; font-style: italic; cursor: default; }
+			.dream-actions { display: flex; gap: 0.5rem; flex-wrap: wrap; align-items: center; margin-top: 0.6rem; }
+			.dream-accept, .dream-reject { font-family: inherit; font-size: 0.75rem; font-weight: 500; cursor: pointer; border-radius: 8px; padding: 0.45rem 0.85rem; transition: all var(--duration-fast); }
+			.dream-accept { background: rgba(167,139,250,0.18); border: 1px solid rgba(167,139,250,0.45); color: #ddd6fe; }
+			.dream-accept:hover { background: rgba(167,139,250,0.3); border-color: rgba(167,139,250,0.7); }
+			.dream-reject { background: transparent; border: 1px solid rgba(255,255,255,0.14); color: rgba(255,255,255,0.55); }
+			.dream-reject:hover { border-color: rgba(252,165,165,0.5); color: #fca5a5; }
+			.dream-accept:focus-visible, .dream-reject:focus-visible, .dream-answer-send:focus-visible { outline: 2px solid rgba(167,139,250,0.6); outline-offset: 1px; }
+			.dream-accept:disabled, .dream-reject:disabled { opacity: 0.5; cursor: progress; }
+			.dream-answer { display: flex; gap: 0.5rem; margin-top: 0.5rem; width: 100%; }
+			.dream-answer input { flex: 1; }
+			.dream-answer-send { font-family: inherit; font-size: 0.75rem; cursor: pointer; border-radius: 8px; padding: 0.45rem 0.85rem; background: rgba(252,211,77,0.16); border: 1px solid rgba(252,211,77,0.4); color: #fde68a; }
+			.dream-answer-send:hover { background: rgba(252,211,77,0.26); }
+			.dream-card-status { font-size: 0.72rem; margin-top: 0.5rem; min-height: 1em; }
+			.dream-card-status.err { color: #fca5a5; }
+			.dream-card-status.ok { color: #86efac; }
+			.link-btn { background: none; border: none; color: var(--accent-violet-strong); cursor: pointer; font-family: inherit; font-size: inherit; text-decoration: underline; padding: 0; }
+			.link-btn:hover { color: var(--accent-violet); }
+			.link-btn:focus-visible { outline: 2px solid rgba(167,139,250,0.6); outline-offset: 2px; }
+
+			.dreams-empty { text-align: center; padding: 2.5rem 1rem; color: rgba(255,255,255,0.5); }
+			.dreams-empty .moon { font-size: 2rem; display: block; margin-bottom: 0.6rem; }
+			.dreams-empty .lead { color: rgba(255,255,255,0.75); font-size: 0.9rem; margin-bottom: 0.3rem; }
+			.dream-skel { height: 92px; border-radius: 12px; background: linear-gradient(90deg, rgba(255,255,255,0.03), rgba(255,255,255,0.07), rgba(255,255,255,0.03)); background-size: 200% 100%; animation: dream-shimmer 1.3s linear infinite; }
+			@keyframes dream-shimmer { from { background-position: 200% 0; } to { background-position: -200% 0; } }
+			@media (prefers-reduced-motion: reduce) { .dream-skel { animation: none; } }
+
+			.dreams-journal { margin-top: 1.25rem; border-top: 1px solid rgba(255,255,255,0.07); padding-top: 1rem; }
+			.dreams-journal-toggle { background: none; border: none; color: rgba(255,255,255,0.6); font-family: inherit; font-size: 0.8rem; cursor: pointer; padding: 0.25rem 0; display: inline-flex; align-items: center; gap: 0.4rem; }
+			.dreams-journal-toggle:hover { color: rgba(255,255,255,0.85); }
+			.dreams-journal-toggle:focus-visible { outline: 2px solid rgba(167,139,250,0.6); outline-offset: 2px; }
+			.dreams-journal-caret { transition: transform var(--duration-base); display: inline-block; }
+			.dreams-journal-toggle[aria-expanded="true"] .dreams-journal-caret { transform: rotate(90deg); }
+			.dreams-journal-list { margin-top: 0.75rem; display: flex; flex-direction: column; gap: 0.5rem; }
+			.journal-item { font-size: 0.78rem; color: rgba(255,255,255,0.6); padding: 0.55rem 0.7rem; border-radius: 8px; border: 1px solid rgba(255,255,255,0.06); background: rgba(255,255,255,0.02); display: flex; gap: 0.6rem; align-items: baseline; }
+			.journal-item .jstatus { font-size: 0.6rem; text-transform: uppercase; letter-spacing: 0.06em; flex-shrink: 0; }
+			.journal-item .jstatus.accepted { color: #86efac; }
+			.journal-item .jstatus.rejected { color: #fca5a5; }
+			.journal-item .jtext { color: rgba(255,255,255,0.75); }
+
+			/* Chip list */
+			.chip-list { display: flex; flex-wrap: wrap; gap: 0.5rem; }
+			.chip {
+				display: inline-flex;
+				align-items: center;
+				gap: 0.382rem;
+				background: rgba(255, 255, 255, 0.05);
+				border: 1px solid rgba(255, 255, 255, 0.1);
+				border-radius: 999px;
+				padding: 0.382rem 0.75rem;
+				font-size: 0.764rem;
+				color: rgba(255, 255, 255, 0.85);
+			}
+			.chip-remove { background: transparent; border: 0; color: rgba(255, 255, 255, 0.4); cursor: pointer; font-size: 0.875rem; padding: 0 0 0 0.25rem; line-height: 1; }
+			.chip-remove:hover { color: #fca5a5; }
+			.chip-builtin { opacity: 0.7; }
+
+			/* Wallet */
+			.wallet-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 0.875rem; }
+			.modal {
+				position: fixed;
+				inset: 0;
+				background: rgba(0, 0, 0, 0.65);
+				display: flex;
+				align-items: center;
+				justify-content: center;
+				z-index: 1000;
+				padding: 1rem;
+			}
+			.modal[hidden] { display: none !important; }
+			.modal-card { background: #101010; border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 12px; padding: 1.5rem; width: 100%; max-width: 400px; }
+			.modal-title { font-size: 1rem; font-weight: 500; color: #fff; margin-bottom: 1rem; }
+			.qr-wrap { display: flex; justify-content: center; margin: 0.5rem 0; }
+			.qr-wrap img { background: #fff; padding: 0.5rem; border-radius: 8px; width: 200px; height: 200px; }
+
+			/* X / Social */
+			.trigger-list { display: flex; flex-direction: column; gap: 0.5rem; }
+			.trigger-item { background: rgba(255, 255, 255, 0.03); border: 1px solid rgba(255, 255, 255, 0.07); border-radius: 8px; padding: 0.75rem 0.875rem; }
+			.trigger-item-head { display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.382rem; }
+			.trigger-item-kind { font-size: 0.764rem; color: rgba(255, 255, 255, 0.85); font-weight: 500; flex: 1; }
+			.trigger-item-body { display: flex; gap: 0.5rem; flex-wrap: wrap; align-items: center; font-size: 0.764rem; color: rgba(255, 255, 255, 0.6); }
+			.trigger-item-body input,
+			.trigger-item-body select {
+				background: rgba(255, 255, 255, 0.05);
+				border: 1px solid rgba(255, 255, 255, 0.1);
+				border-radius: 6px;
+				color: #fff;
+				font: inherit;
+				font-size: 0.764rem;
+				padding: 0.3rem 0.5rem;
+				width: auto;
+			}
+			.decision-item-reply { font-size: 0.764rem; color: rgba(255, 255, 255, 0.6); margin-top: 0.382rem; }
+			.decision-item-media { max-width: 64px; max-height: 64px; border-radius: 6px; object-fit: cover; margin-top: 0.382rem; display: block; }
+			.decision-badge { font-size: 0.618rem; text-transform: uppercase; letter-spacing: 0.06em; font-weight: 700; padding: 0.15rem 0.5rem; border-radius: 999px; }
+			.decision-badge.reply { background: rgba(34, 197, 94, 0.15); color: var(--success); }
+			.decision-badge.skip, .decision-badge.paused, .decision-badge.pending { background: rgba(255, 255, 255, 0.08); color: rgba(255, 255, 255, 0.55); }
+			.decision-badge.rate_limited, .decision-badge.budget { background: rgba(251, 191, 36, 0.15); color: var(--warn); }
+			.decision-badge.unsafe, .decision-badge.error { background: rgba(239, 68, 68, 0.15); color: var(--danger); }
+			.decision-item-meta { font-size: 0.764rem; color: rgba(255, 255, 255, 0.4); }
+
+			/* Analytics */
+			.bar-chart {
+				display: flex;
+				align-items: flex-end;
+				gap: 2px;
+				height: 100px;
+				padding: 0.5rem;
+				background: rgba(0, 0, 0, 0.2);
+				border: 1px solid rgba(255, 255, 255, 0.06);
+				border-radius: 8px;
+			}
+			.bar-chart-col { flex: 1; background: linear-gradient(180deg, #3b82f6 0%, #1e3a8a 100%); border-radius: 2px 2px 0 0; min-height: 2px; }
+			.bar-chart-col[data-value='0'] { background: rgba(255, 255, 255, 0.06); }
+			.pay-list { display: flex; flex-direction: column; gap: 0.382rem; }
+			.pay-item { display: flex; justify-content: space-between; gap: 0.5rem; background: rgba(255, 255, 255, 0.03); border: 1px solid rgba(255, 255, 255, 0.06); border-radius: 6px; padding: 0.5rem 0.75rem; font-size: 0.764rem; color: rgba(255, 255, 255, 0.75); }
+			.pay-amount { font-weight: 500; color: #86efac; }
+			.pay-amount.out { color: #fca5a5; }
+
+			/* Embed */
+			.embed-preview {
+				background: rgba(0, 0, 0, 0.3);
+				border: 1px solid rgba(255, 255, 255, 0.06);
+				border-radius: 10px;
+				padding: 0.5rem;
+				overflow: auto;
+				max-height: 600px;
+			}
+			.embed-preview iframe { border: 0; border-radius: 6px; background: #000; display: block; max-width: 100%; }
+
+			/* Widgets */
+			.widget-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 0.75rem; }
+			.widget-card { background: rgba(255, 255, 255, 0.03); border: 1px solid rgba(255, 255, 255, 0.07); border-radius: 10px; padding: 0.875rem; }
+			.widget-card-type { display: inline-block; font-size: 0.618rem; color: #93c5fd; background: rgba(59, 130, 246, 0.1); padding: 0.2rem 0.5rem; border-radius: 4px; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 0.5rem; }
+			.widget-card-name { font-size: 0.875rem; font-weight: 500; color: rgba(255, 255, 255, 0.9); margin-bottom: 0.5rem; }
+			.widget-card-meta { font-size: 0.618rem; color: rgba(255, 255, 255, 0.4); margin-bottom: 0.5rem; }
+
+			/* Studio */
+			.studio-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 0.75rem; }
+			.studio-tile {
+				display: block;
+				background: rgba(255, 255, 255, 0.03);
+				border: 1px solid rgba(255, 255, 255, 0.07);
+				border-radius: 10px;
+				padding: 1rem;
+				color: inherit;
+				text-decoration: none;
+				transition: border-color var(--duration-fast), transform var(--duration-instant);
+			}
+			.studio-tile:hover { border-color: rgba(59, 130, 246, 0.5); transform: translateY(-1px); }
+			.studio-tile-title { font-size: 0.875rem; font-weight: 500; color: rgba(255, 255, 255, 0.9); margin-bottom: 0.382rem; }
+			.studio-tile-desc { font-size: 0.764rem; color: rgba(255, 255, 255, 0.5); line-height: 1.4; }
+
+			/* Danger */
+			.danger-card { border-color: rgba(220, 38, 38, 0.3); }
+
+			/* Accessibility */
+			.btn-primary:focus-visible,
+			.btn-ghost:focus-visible,
+			.btn-danger:focus-visible,
+			.btn-reset-all:focus-visible,
+			.btn-reset-mat:focus-visible,
+			.mat-card-header:focus-visible {
+				outline: 2px solid rgba(147, 197, 253, 0.7);
+				outline-offset: 2px;
+			}
+			.skip-link {
+				position: absolute;
+				left: -9999px;
+				top: 0;
+				background: #000;
+				color: #fff;
+				padding: 0.5rem 1rem;
+				z-index: 10000;
+				text-decoration: none;
+			}
+			.skip-link:focus { left: 0.5rem; top: 0.5rem; }
+
+			/* Mobile */
+			@media (max-width: 800px) {
+				body { overflow: auto; height: auto; }
+				.unified-layout {
+					grid-template-columns: 1fr;
+					overflow: visible;
+				}
+				.preview-col {
+					height: 300px;
+					border-right: 0;
+					border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+					flex-shrink: 0;
+				}
+				.content-col { overflow-y: visible; }
+				.section-nav { overflow-x: auto; }
+				.edit-panel { padding: 1rem 1rem 1.25rem; }
+			}
+		</style>
+			<link rel="stylesheet" href="/nav.css" />
+			<link rel="stylesheet" href="/footer.css" />
+			<link rel="stylesheet" href="/mobile.css" />
+			<script defer src="/footer-newsletter.js"></script>
+	</head>
+	<body>
+		<header><div id="nav-container"></div></header>
+		<script src="/nav.js"></script>
+
+		<a href="#main" class="skip-link" data-i18n="agent_edit.skip_to_main_content">Skip to main content</a>
+		<header class="edit-header">
+			<a id="back-link" href="/" aria-label="Back to agent page" data-i18n="agent_edit.agent" data-i18n-attr="aria-label:agent_edit.back_to_agent_page_arialabel">← Agent</a>
+			<h1 class="edit-header-title" id="agent-title" data-i18n="agent_edit.edit_agent">Edit Agent</h1>
+		</header>
+
+		<div class="unified-layout">
+
+			<!-- ── Left column: persistent 3D preview ── -->
+			<aside class="preview-col" aria-label="Agent 3D preview">
+				<div class="outfit-preview" id="outfit-preview">
+					<div class="preview-no-avatar" id="preview-placeholder">
+						<div class="preview-no-avatar-icon">🤖</div>
+						<div>Add an avatar in the Outfit section</div>
+					</div>
+				</div>
+				<div class="preview-actions" id="preview-actions" style="display:none">
+					<a id="preview-view-link" class="btn-ghost" target="_blank" rel="noopener" style="flex:1;justify-content:center;font-size:0.764rem" data-i18n="agent_edit.view_agent">View agent →</a>
+					<a id="preview-chat-link" class="btn-ghost" target="_blank" rel="noopener" style="flex:1;justify-content:center;font-size:0.764rem" data-i18n="agent_edit.talk_to_agent">Talk to agent</a>
+				</div>
+			</aside>
+
+			<!-- ── Right column: all edit sections ── -->
+			<main id="main" class="content-col">
+				<div id="loading" class="loading-msg" role="status" aria-live="polite">Loading…</div>
+				<div id="error" class="error-msg" style="display: none" role="alert"></div>
+
+				<!-- Sticky section nav -->
+				<nav class="section-nav" id="section-nav" aria-label="Jump to section" hidden>
+					<a class="snav-link" href="#section-identity" data-i18n="agent_edit.identity">Identity</a>
+					<a class="snav-link" href="#section-brain" data-i18n="agent_edit.brain">Brain</a>
+					<a class="snav-link" href="#section-distribute" data-i18n="agent_edit.distribute">Distribute</a>
+					<a class="snav-link" href="#section-money" data-i18n="agent_edit.money">Money</a>
+					<a class="snav-link" href="#section-alpha-hunt" data-i18n="agent_edit.alpha_hunt">Alpha Hunt</a>
+					<a class="snav-link" href="#section-launcher" data-i18n="agent_edit.launcher">Launcher</a>
+					<a class="snav-link" href="#section-auto-claim" data-i18n="agent_edit.auto_claim">Auto-Claim</a>
+					<a class="snav-link" href="#section-market-maker" data-i18n="agent_edit.market_maker">Market Maker</a>
+					<a class="snav-link" href="#section-advanced" data-i18n="agent_edit.advanced">Advanced</a>
+				</nav>
+
+				<!-- ═══════════════════════════════════════
+				     IDENTITY
+				═══════════════════════════════════════ -->
+				<div class="edit-section" id="section-identity">
+					<div class="edit-section-label">Identity</div>
+
+					<!-- Persona -->
+					<section class="edit-panel" id="panel-persona" role="region" aria-label="Persona">
+						<div class="subsection-title">Persona</div>
+						<div class="form-group">
+							<label class="form-label" for="f-name" data-i18n="agent_edit.name">Name</label>
+							<input class="form-input" id="f-name" type="text" maxlength="100" />
+						</div>
+						<div class="form-group">
+							<label class="form-label" for="f-desc" data-i18n="agent_edit.description">Description</label>
+							<textarea class="form-textarea" id="f-desc" rows="4" maxlength="500"></textarea>
+						</div>
+						<div class="form-actions">
+							<button class="btn-primary" id="persona-save" data-i18n="agent_edit.save">Save</button>
+							<span class="form-status" id="persona-status" role="status" aria-live="polite"></span>
+						</div>
+					</section>
+
+					<!-- Outfit (controls; 3D preview is in the left column) -->
+					<section class="edit-panel" id="panel-outfit" role="region" aria-label="Outfit">
+						<div class="subsection-title">Outfit</div>
+						<div class="outfit-controls-inline" id="outfit-controls">
+							<div class="outfit-header">
+								<h2 class="outfit-title" data-i18n="agent_edit.avatar">Avatar</h2>
+								<a class="btn-reset-all" href="/dashboard/avatars" aria-label="Create or manage avatars in the dashboard" data-i18n="agent_edit.manage_in_dashboard" data-i18n-attr="aria-label:agent_edit.create_or_manage_avatars_in_arialabel">Manage in dashboard ›</a>
+							</div>
+							<p style="font-size:0.764rem;color:rgba(255,255,255,0.4);margin:0 0 0.75rem" data-i18n="agent_edit.pick_which_3d_avatar_represents_this_agent">
+								Pick which 3D avatar represents this agent. The preview updates on save.
+							</p>
+							<div id="avatar-picker-list" class="avatar-picker-list">
+								<div class="no-named-mats">Loading avatars…</div>
+							</div>
+
+							<div class="outfit-header">
+								<h2 class="outfit-title" data-i18n="agent_edit.animations">Animations</h2>
+								<button type="button" class="btn-reset-all" id="anims-save" disabled data-i18n="agent_edit.save_selection">Save selection</button>
+							</div>
+							<p style="font-size:0.764rem;color:rgba(255,255,255,0.4);margin:0 0 0.75rem" data-i18n="agent_edit.pick_which_clips_from_the_three_ws">
+								Pick which clips from the three.ws animation library this agent can play.
+							</p>
+							<div id="anims-picker-grid" class="anims-picker-grid">
+								<div class="no-named-mats">Loading animations…</div>
+							</div>
+							<span class="form-status" id="anims-status" role="status" aria-live="polite"></span>
+
+							<div class="outfit-header">
+								<h2 class="outfit-title" data-i18n="agent_edit.animation_states">Animation states</h2>
+								<button type="button" class="btn-reset-all" id="anim-graph-save" disabled data-i18n="agent_edit.save_states">Save states</button>
+							</div>
+							<p style="font-size:0.764rem;color:rgba(255,255,255,0.4);margin:0 0 0.75rem" data-i18n="agent_edit.pick_which_clip_plays_in_each_behaviour">
+								Pick which clip plays in each behaviour state. The avatar crossfades between states as it speaks, walks, and reacts.
+							</p>
+							<div id="anim-graph-rows" class="anim-graph-rows"></div>
+							<span class="form-status" id="anim-graph-status" role="status" aria-live="polite"></span>
+
+							<div class="outfit-header">
+								<h2 class="outfit-title" data-i18n="agent_edit.gesture_slots">Gesture slots</h2>
+								<button type="button" class="btn-reset-all" id="anim-slots-save" disabled data-i18n="agent_edit.save_gestures">Save gestures</button>
+							</div>
+							<p style="font-size:0.764rem;color:rgba(255,255,255,0.4);margin:0 0 0.75rem" data-i18n="agent_edit.slots_are_the_gestures_your_agent_plays">
+								Slots are the gestures your agent plays on its own: it nods when a model loads, looks down while it reads data, celebrates a win. Re-point any of them at a different clip. <a href="/gestures" target="_blank" rel="noopener">Preview every gesture</a>.
+							</p>
+							<div id="anim-slots-rows" class="anim-graph-rows"></div>
+							<span class="form-status" id="anim-slots-status" role="status" aria-live="polite"></span>
+
+							<div class="outfit-header">
+								<h2 class="outfit-title" data-i18n="agent_edit.mood_embodiment">Mood &amp; embodiment</h2>
+							</div>
+							<p style="font-size:0.764rem;color:rgba(255,255,255,0.4);margin:0 0 0.75rem" data-i18n="agent_edit.your_agent_carries_a_real_emotional_state">
+								Your agent carries a real emotional state derived from its memory, conversations, dreams, and actions — expressed continuously through the avatar's face and posture.
+							</p>
+							<div id="mood-inspector-host" class="mood-inspector-host"></div>
+						</div>
+					</section>
+
+					<!-- Voice -->
+					<section class="edit-panel" id="panel-voice" role="region" aria-label="Voice">
+						<div class="subsection-title">Voice</div>
+						<div class="card">
+							<div class="card-row">
+								<div>
+									<div class="card-title">Current voice</div>
+									<div class="card-sub" id="voice-current">Loading…</div>
+								</div>
+								<div class="card-actions">
+									<button class="btn-ghost" id="voice-preview-btn" hidden data-i18n="agent_edit.preview">Preview</button>
+									<button class="btn-ghost danger" id="voice-remove-btn" hidden data-i18n="agent_edit.remove">Remove</button>
+								</div>
+							</div>
+						</div>
+
+						<div class="form-group">
+							<label class="form-label" data-i18n="agent_edit.pick_an_elevenlabs_voice">Pick an ElevenLabs voice</label>
+							<input class="form-input" id="voice-filter" type="search" placeholder="Filter voices by name…" />
+							<div id="voice-list" class="voice-list"><div class="muted">Loading voices…</div></div>
+						</div>
+
+						<div class="form-group" id="voice-tune" hidden>
+							<label class="form-label" data-i18n="agent_edit.fine_tune_delivery">Fine-tune delivery</label>
+							<p class="hint" data-i18n="agent_edit.applied_whenever_this_agent_speaks_with_its">Applied whenever this agent speaks with its ElevenLabs voice.</p>
+							<div class="voice-tune-grid">
+								<label class="form-label" for="voice-model" data-i18n="agent_edit.model">Model</label>
+								<select class="form-input" id="voice-model"></select>
+
+								<label class="form-label" for="voice-stability" data-i18n-html="agent_edit.stability_0_50">Stability
+									<span class="voice-range-val" id="voice-stability-val">0.50</span></label>
+								<input type="range" id="voice-stability" min="0" max="1" step="0.05" value="0.5" />
+
+								<label class="form-label" for="voice-similarity" data-i18n-html="agent_edit.similarity_0_75">Similarity
+									<span class="voice-range-val" id="voice-similarity-val">0.75</span></label>
+								<input type="range" id="voice-similarity" min="0" max="1" step="0.05" value="0.75" />
+
+								<label class="form-label" for="voice-style" data-i18n-html="agent_edit.style_0_50">Style
+									<span class="voice-range-val" id="voice-style-val">0.50</span></label>
+								<input type="range" id="voice-style" min="0" max="1" step="0.05" value="0.5" />
+
+								<label class="voice-check" for="voice-speaker-boost">
+									<input type="checkbox" id="voice-speaker-boost" checked /> Speaker boost
+								</label>
+							</div>
+							<div class="form-actions">
+								<input class="form-input" id="voice-test-text" type="text" maxlength="200"
+									placeholder="Type a line to test…" value="Hi! This is how I sound." style="max-width:280px" />
+								<button class="btn-ghost" id="voice-test-btn" data-i18n="agent_edit.test_voice">Test voice</button>
+								<button class="btn-primary" id="voice-save-settings-btn" data-i18n="agent_edit.save_settings">Save settings</button>
+								<span class="form-status" id="voice-settings-status" role="status" aria-live="polite"></span>
+							</div>
+						</div>
+
+						<div class="form-group">
+							<label class="form-label" data-i18n="agent_edit.or_clone_your_own_voice">Or clone your own voice</label>
+							<p class="hint" data-i18n="agent_edit.upload_at_least_30_seconds_of_clean">Upload at least 30 seconds of clean speech (mp3/wav/m4a, max 10 MB). 3 clones per day.</p>
+							<div class="form-actions">
+								<input type="file" id="voice-clone-file" accept="audio/*" hidden />
+								<button class="btn-primary" id="voice-clone-btn" data-i18n="agent_edit.upload_clone">Upload &amp; clone</button>
+								<input class="form-input" id="voice-clone-name" type="text" placeholder="Clone name (optional)" style="max-width:240px" />
+								<span class="form-status" id="voice-status" role="status" aria-live="polite"></span>
+							</div>
+						</div>
+					</section>
+				</div><!-- /section-identity -->
+
+				<!-- ═══════════════════════════════════════
+				     BRAIN
+				═══════════════════════════════════════ -->
+				<div class="edit-section" id="section-brain">
+					<div class="edit-section-label">Brain</div>
+
+					<!-- Brain Studio -->
+					<section class="edit-panel" id="panel-brain" role="region" aria-label="Brain Studio">
+						<div class="subsection-title">Brain Studio</div>
+						<div id="brain-studio-host">
+							<div class="loading-msg" style="min-height:80px" role="status" aria-live="polite">Loading the Brain Studio…</div>
+						</div>
+					</section>
+
+					<!-- Knowledge -->
+					<section class="edit-panel" id="panel-knowledge" role="region" aria-label="Knowledge">
+						<div class="subsection-title">Knowledge</div>
+						<p class="hint" data-i18n="agent_edit.persistent_memories_the_agent_will_recall_ad">Persistent memories the agent will recall. Add facts, preferences, references, and project context.</p>
+
+						<div class="form-group">
+							<label class="form-label" for="mem-type" data-i18n="agent_edit.type">Type</label>
+							<select class="form-input" id="mem-type">
+								<option value="reference" data-i18n="agent_edit.reference">Reference</option>
+								<option value="user" data-i18n="agent_edit.user">User</option>
+								<option value="feedback" data-i18n="agent_edit.feedback">Feedback</option>
+								<option value="project" data-i18n="agent_edit.project">Project</option>
+							</select>
+						</div>
+						<div class="form-group">
+							<label class="form-label" for="mem-content" data-i18n="agent_edit.content">Content</label>
+							<textarea class="form-textarea" id="mem-content" rows="3" maxlength="4000" placeholder="Bug reports are tracked in Linear project INGEST…"></textarea>
+						</div>
+						<div class="form-group">
+							<label class="form-label" for="mem-tags" data-i18n="agent_edit.tags_comma_separated">Tags (comma-separated)</label>
+							<input class="form-input" id="mem-tags" type="text" placeholder="incidents, observability" />
+						</div>
+						<div class="form-actions">
+							<button class="btn-primary" id="mem-add-btn" data-i18n="agent_edit.add_memory">Add memory</button>
+							<span class="form-status" id="mem-status" role="status" aria-live="polite"></span>
+						</div>
+
+						<div class="form-group" style="margin-top:0.5rem">
+							<label class="form-label" data-i18n="agent_edit.seed_from_a_url">Seed from a URL</label>
+							<p class="hint" data-i18n="agent_edit.fetch_a_web_page_and_import_key">Fetch a web page and import key facts as memories.</p>
+							<div class="form-actions">
+								<input class="form-input" id="mem-seed-url" type="url" placeholder="https://…" style="flex:1" />
+								<button class="btn-ghost" id="mem-seed-btn" data-i18n="agent_edit.seed">Seed</button>
+							</div>
+						</div>
+
+						<div class="form-group" style="margin-top:0.5rem">
+							<label class="form-label" data-i18n="agent_edit.existing_memories">Existing memories</label>
+							<div id="mem-list" class="mem-list"><div class="muted">Loading…</div></div>
+						</div>
+					</section>
+
+					<!-- Mind Palace -->
+					<section class="edit-panel" id="panel-mind" role="region" aria-label="Mind Palace">
+						<div class="subsection-title">Mind Palace</div>
+						<div class="mind-tab-intro">
+							<p class="hint" style="margin:0 0 .75rem" data-i18n-html="agent_edit.walk_through_your_agent_s_mind_every">Walk through your agent's mind. Every memory is an object you can see, search, and shape. <a id="mind-fullscreen-link" target="_blank" rel="noopener" style="color:#9ad0ff">Open full-screen ↗</a></p>
+						</div>
+						<div id="mind-palace-host" style="position:relative;width:100%;height:min(560px,65vh);min-height:380px"></div>
+					</section>
+
+					<!-- Ownership -->
+					<section class="edit-panel" id="panel-ownership" role="region" aria-label="Ownership">
+						<div class="subsection-title">Ownership</div>
+						<div id="brain-ownership-host">
+							<div class="loading-msg" style="min-height:60px" role="status" aria-live="polite">Loading brain ownership…</div>
+						</div>
+					</section>
+
+					<!-- Dreams -->
+					<section class="edit-panel" id="panel-dreams" role="region" aria-label="Dreams">
+						<div class="subsection-title">Dreams <span class="tab-badge" id="dreams-tab-badge" hidden aria-hidden="true">0</span></div>
+						<div class="dreams-head">
+							<div>
+								<p class="hint" style="margin:0" data-i18n-html="agent_edit.while_you_re_away_your_agent_reflects">While you're away, your agent <strong>reflects</strong> — it reads its own memories and actions and consolidates them into higher-order insights. Review each below: accept one and it becomes a real, higher-salience memory; reject it and your agent learns the synthesis was wrong.</p>
+								<div class="dreams-meta" id="dreams-meta" aria-live="polite"></div>
+							</div>
+							<button class="btn-ghost dreams-reflect-btn" id="dreams-reflect-btn" title="Run a reflection pass now" data-i18n-html="agent_edit.reflect_now" data-i18n-attr="title:agent_edit.run_a_reflection_pass_now_title">
+								<span class="dreams-reflect-label">Reflect now</span>
+							</button>
+						</div>
+
+						<div id="dreams-list" class="dreams-list" aria-live="polite"><div class="muted">Loading…</div></div>
+
+						<div class="dreams-journal" id="dreams-journal" hidden>
+							<button class="dreams-journal-toggle" id="dreams-journal-toggle" aria-expanded="false" aria-controls="dreams-journal-list" data-i18n-html="agent_edit.dream_journal">
+								<span class="dreams-journal-caret" aria-hidden="true">▸</span> Dream journal <span class="muted" id="dreams-journal-count"></span>
+							</button>
+							<div id="dreams-journal-list" class="dreams-journal-list" hidden></div>
+						</div>
+					</section>
+
+					<!-- Skills -->
+					<section class="edit-panel" id="panel-skills" role="region" aria-label="Skills">
+						<div class="subsection-title">Skills</div>
+						<p class="hint" data-i18n="agent_edit.skills_the_agent_exposes_built_ins_greet">Skills the agent exposes. Built-ins (greet, present-model, validate-model, remember, think) are always available. Add custom skills below.</p>
+
+						<div class="form-group">
+							<label class="form-label" data-i18n="agent_edit.active_skills">Active skills</label>
+							<div id="skills-list" class="chip-list"><div class="muted">Loading…</div></div>
+						</div>
+
+						<div class="form-group">
+							<label class="form-label" for="skill-add-input" data-i18n="agent_edit.add_a_skill">Add a skill</label>
+							<div class="form-actions">
+								<input class="form-input" id="skill-add-input" type="text" placeholder="skill-slug (e.g. translate-text)" list="skills-marketplace" style="flex:1" />
+								<datalist id="skills-marketplace"></datalist>
+								<button class="btn-primary" id="skill-add-btn" data-i18n="agent_edit.add">Add</button>
+							</div>
+							<p class="hint" data-i18n-html="agent_edit.browse_the_marketplace_for_community_skills">Browse the marketplace for community skills: <a href="/marketplace" target="_blank" rel="noopener" style="color:#93c5fd">marketplace ›</a></p>
+						</div>
+
+						<div class="form-actions">
+							<button class="btn-primary" id="skills-save" data-i18n="agent_edit.save_skills">Save skills</button>
+							<span class="form-status" id="skills-status" role="status" aria-live="polite"></span>
+						</div>
+					</section>
+
+					<!-- Autopilot -->
+					<section class="edit-panel" id="panel-autopilot" role="region" aria-label="Autopilot">
+						<div class="subsection-title">Autopilot</div>
+						<div class="form-group">
+							<label class="form-label" for="f-strategy" data-i18n="agent_edit.trading_strategy">Trading Strategy</label>
+							<textarea class="form-textarea" id="f-strategy" rows="6" placeholder="Define your agent's trading strategy here..."></textarea>
+						</div>
+						<div class="form-actions">
+							<button class="btn-primary" id="autopilot-save" data-i18n="agent_edit.save_strategy">Save Strategy</button>
+							<span class="form-status" id="autopilot-status" role="status" aria-live="polite"></span>
+						</div>
+						<div id="autopilot-mind" style="margin-top:0.75rem">
+							<div class="apm-skel" style="height:90px;border-radius:12px"></div>
+						</div>
+					</section>
+				</div><!-- /section-brain -->
+
+				<!-- ═══════════════════════════════════════
+				     DISTRIBUTE
+				═══════════════════════════════════════ -->
+				<div class="edit-section" id="section-distribute">
+					<div class="edit-section-label">Distribute</div>
+
+					<!-- Publish -->
+					<section class="edit-panel" id="panel-publish" role="region" aria-label="Publish">
+						<div class="subsection-title">Publish</div>
+						<div class="form-group">
+							<label class="form-label" for="f-category" data-i18n="agent_edit.category">Category</label>
+							<select class="form-input" id="f-category">
+								<option value="" data-i18n="agent_edit.select">— Select —</option>
+								<option value="academic" data-i18n="agent_edit.academic">Academic</option>
+								<option value="career" data-i18n="agent_edit.career">Career</option>
+								<option value="copywriting" data-i18n="agent_edit.copywriting">Copywriting</option>
+								<option value="design" data-i18n="agent_edit.design">Design</option>
+								<option value="education" data-i18n="agent_edit.education">Education</option>
+								<option value="emotions" data-i18n="agent_edit.emotions">Emotions</option>
+								<option value="entertainment" data-i18n="agent_edit.entertainment">Entertainment</option>
+								<option value="finance" data-i18n="agent_edit.finance">Finance</option>
+								<option value="games" data-i18n="agent_edit.games">Games</option>
+								<option value="general" data-i18n="agent_edit.general">General</option>
+								<option value="life" data-i18n="agent_edit.life">Life</option>
+								<option value="marketing" data-i18n="agent_edit.marketing">Marketing</option>
+								<option value="office" data-i18n="agent_edit.office">Office</option>
+								<option value="programming" data-i18n="agent_edit.programming">Programming</option>
+								<option value="translation" data-i18n="agent_edit.translation">Translation</option>
+							</select>
+						</div>
+						<div class="form-group">
+							<label class="form-label" for="f-tags" data-i18n="agent_edit.tags_comma_separated_max_12">Tags (comma-separated, max 12)</label>
+							<input class="form-input" id="f-tags" type="text" placeholder="thesis, polishing, academic-writing" />
+						</div>
+						<div class="form-group">
+							<label class="form-label" for="f-prompt" data-i18n="agent_edit.agent_profile_system_prompt">Agent Profile (system prompt)</label>
+							<textarea class="form-textarea" id="f-prompt" rows="8" maxlength="16000" placeholder="You are a professor of computer science…"></textarea>
+						</div>
+						<div class="form-group">
+							<label class="form-label" for="f-greeting" data-i18n="agent_edit.greeting_demo_first_message">Greeting (demo first message)</label>
+							<textarea class="form-textarea" id="f-greeting" rows="3" maxlength="1000" placeholder="Hello! I am your computer science thesis polishing assistant…"></textarea>
+						</div>
+						<div class="form-group">
+							<label class="form-label" for="f-changelog" data-i18n="agent_edit.changelog_optional_for_this_version">Changelog (optional, for this version)</label>
+							<input class="form-input" id="f-changelog" type="text" maxlength="1000" placeholder="Initial publish" />
+						</div>
+						<div class="form-actions">
+							<button class="btn-primary" id="publish-save" data-i18n="agent_edit.publish_to_marketplace">Publish to Marketplace</button>
+							<a id="publish-view" target="_blank" rel="noopener" style="font-size:0.764rem;color:rgba(255,255,255,0.55);" hidden data-i18n="agent_edit.view_on_marketplace">View on marketplace ›</a>
+							<span class="form-status" id="publish-status" role="status" aria-live="polite"></span>
+						</div>
+					</section>
+
+					<!-- Embed -->
+					<section class="edit-panel" id="panel-embed" role="region" aria-label="Embed">
+						<div class="subsection-title">Embed</div>
+						<p class="hint" data-i18n="agent_edit.drop_your_agent_on_any_website_notion">Drop your agent on any website, Notion page, or Discord channel.</p>
+
+						<div class="form-group">
+							<label class="form-label" for="embed-size" data-i18n="agent_edit.preview_size">Preview size</label>
+							<select class="form-input" id="embed-size" style="max-width:220px">
+								<option value="420x520" data-i18n="agent_edit.small_420_520">Small (420×520)</option>
+								<option value="560x680" selected data-i18n="agent_edit.medium_560_680">Medium (560×680)</option>
+								<option value="800x900" data-i18n="agent_edit.large_800_900">Large (800×900)</option>
+								<option value="100%x600" data-i18n="agent_edit.full_width_600">Full width (×600)</option>
+							</select>
+						</div>
+						<div class="form-group">
+							<label class="form-label" data-i18n="agent_edit.live_preview">Live preview</label>
+							<div id="embed-preview" class="embed-preview"></div>
+						</div>
+						<div class="form-group">
+							<label class="form-label" for="embed-iframe-code" data-i18n="agent_edit.iframe_snippet">Iframe snippet</label>
+							<textarea class="form-input mono" id="embed-iframe-code" rows="3" readonly></textarea>
+							<div class="form-actions"><button class="btn-ghost" data-copy="#embed-iframe-code" data-i18n="agent_edit.copy">Copy</button></div>
+						</div>
+						<div class="form-group">
+							<label class="form-label" for="embed-link" data-i18n="agent_edit.direct_link">Direct link</label>
+							<input class="form-input mono" id="embed-link" type="text" readonly />
+							<div class="form-actions"><button class="btn-ghost" data-copy="#embed-link" data-i18n="agent_edit.copy_2">Copy</button> <a class="btn-ghost" id="embed-open" target="_blank" rel="noopener" data-i18n="agent_edit.open_in_new_tab">Open in new tab ›</a></div>
+						</div>
+						<div class="form-group">
+							<label class="form-label" for="embed-oembed" data-i18n="agent_edit.oembed_discovery_url">oEmbed discovery URL</label>
+							<input class="form-input mono" id="embed-oembed" type="text" readonly />
+							<div class="form-actions"><button class="btn-ghost" data-copy="#embed-oembed" data-i18n="agent_edit.copy_3">Copy</button></div>
+						</div>
+						<div class="form-group">
+							<label class="form-label" data-i18n="agent_edit.embed_policy">Embed policy</label>
+							<p class="hint" data-i18n="agent_edit.restrict_which_sites_and_surfaces_may_embed">Restrict which sites and surfaces may embed this agent.</p>
+							<label class="form-label" for="embed-allowed-origins" data-i18n="agent_edit.allowed_origins_one_per_line_for_any">Allowed origins (one per line, * for any)</label>
+							<textarea class="form-input mono" id="embed-allowed-origins" rows="3" placeholder="https://example.com&#10;https://*.mysite.com"></textarea>
+							<div class="form-actions">
+								<button class="btn-primary" id="embed-policy-save" data-i18n="agent_edit.save_policy">Save policy</button>
+								<button class="btn-ghost" id="embed-policy-clear" data-i18n="agent_edit.clear_policy">Clear policy</button>
+								<span class="form-status" id="embed-policy-status" role="status" aria-live="polite"></span>
+							</div>
+						</div>
+					</section>
+
+					<!-- Widgets -->
+					<section class="edit-panel" id="panel-widgets" role="region" aria-label="Widgets">
+						<div class="subsection-title">Widgets</div>
+						<p class="hint" data-i18n="agent_edit.widgets_are_reusable_embeds_turntable_talkin">Widgets are reusable embeds (turntable, talking-agent, gallery) you can paste anywhere.</p>
+
+						<div class="form-group">
+							<label class="form-label" data-i18n="agent_edit.create_a_widget_for_this_agent_s">Create a widget for this agent's avatar</label>
+							<div class="form-actions">
+								<select class="form-input" id="widget-new-type" style="max-width:220px">
+									<option value="talking-agent" data-i18n="agent_edit.talking_agent">Talking agent</option>
+									<option value="turntable" data-i18n="agent_edit.turntable">Turntable</option>
+									<option value="animation-gallery" data-i18n="agent_edit.animation_gallery">Animation gallery</option>
+									<option value="passport" data-i18n="agent_edit.passport">Passport</option>
+									<option value="hotspot-tour" data-i18n="agent_edit.hotspot_tour">Hotspot tour</option>
+								</select>
+								<input class="form-input" id="widget-new-name" type="text" placeholder="Widget name" style="flex:1" />
+								<button class="btn-primary" id="widget-new-btn" data-i18n="agent_edit.create">Create</button>
+							</div>
+							<span class="form-status" id="widget-status" role="status" aria-live="polite"></span>
+						</div>
+
+						<div class="form-group" style="margin-top:0.5rem">
+							<label class="form-label" data-i18n="agent_edit.your_widgets">Your widgets</label>
+							<div id="widgets-list" class="widget-list"><div class="muted">Loading…</div></div>
+						</div>
+					</section>
+
+					<!-- Social -->
+					<section class="edit-panel" id="panel-social" role="region" aria-label="Social">
+						<div class="subsection-title">Social</div>
+						<div class="card">
+							<div class="card-row">
+								<div>
+									<div class="card-title">X (Twitter)</div>
+									<div class="card-sub" id="x-status">Loading…</div>
+								</div>
+								<div class="card-actions">
+									<button class="btn-primary" id="x-connect-btn" hidden data-i18n="agent_edit.connect_x">Connect X</button>
+									<button class="btn-ghost danger" id="x-disconnect-btn" hidden data-i18n="agent_edit.disconnect">Disconnect</button>
+								</div>
+							</div>
+						</div>
+
+						<div class="form-group">
+							<label class="form-label" for="x-username" data-i18n="agent_edit.agent_s_x_handle_public_optional">Agent's X handle (public, optional)</label>
+							<div class="form-actions">
+								<input class="form-input" id="x-username" type="text" placeholder="@handle" style="flex:1" />
+								<button class="btn-ghost" id="x-username-save" data-i18n="agent_edit.save_handle">Save handle</button>
+							</div>
+						</div>
+
+						<div class="form-group">
+							<label class="form-label" data-i18n="agent_edit.scheduled_posts">Scheduled posts</label>
+							<p class="hint" data-i18n="agent_edit.triggers_run_on_cron_and_post_automatically">Triggers run on cron and post automatically.</p>
+							<div id="x-triggers-list" class="trigger-list"><div class="muted">Loading…</div></div>
+							<div class="form-actions" style="margin-top:.5rem">
+								<select class="form-input" id="x-trigger-kind" style="max-width:220px">
+									<option value="daily_persona" data-i18n="agent_edit.daily_persona_post">Daily persona post</option>
+									<option value="weekly_digest" data-i18n="agent_edit.weekly_digest">Weekly digest</option>
+									<option value="price_milestone" data-i18n="agent_edit.price_milestone">Price milestone</option>
+									<option value="payment_received" data-i18n="agent_edit.payment_received">Payment received</option>
+								</select>
+								<button class="btn-primary" id="x-trigger-add" data-i18n="agent_edit.add_trigger">Add trigger</button>
+							</div>
+						</div>
+
+						<div class="form-group">
+							<label class="form-label" data-i18n="agent_edit.post_now">Post now</label>
+							<textarea class="form-textarea" id="x-post-text" rows="3" maxlength="280" placeholder="Compose a tweet (max 280 chars)…"></textarea>
+							<div class="form-actions">
+								<button class="btn-primary" id="x-post-btn" data-i18n="agent_edit.post_to_x">Post to X</button>
+								<span class="form-status" id="x-post-status" role="status" aria-live="polite"></span>
+							</div>
+						</div>
+
+						<div class="form-group" id="mention-replies-group">
+							<label class="form-label" data-i18n="agent_edit.answer_mentions">Answer mentions</label>
+							<p class="hint" data-i18n="agent_edit.answer_mentions_hint">When someone tags this agent on X, it can read the mention and reply in its own voice. Dry run records what it would say without posting anything.</p>
+
+							<div class="card" id="mention-access-card">
+								<div class="card-row">
+									<div>
+										<div class="card-title" data-i18n="agent_edit.mention_access">Mention access</div>
+										<div class="card-sub" id="mention-access-status" role="status" aria-live="polite">Loading…</div>
+									</div>
+									<div class="card-actions">
+										<a class="btn-primary" id="mention-connect-link" hidden data-i18n="agent_edit.connect_x">Connect X</a>
+										<a class="btn-ghost" id="mention-reconnect-link" hidden data-i18n="agent_edit.reconnect_x">Reconnect X</a>
+									</div>
+								</div>
+							</div>
+
+							<div id="mention-settings-fields" hidden>
+								<div class="form-actions" style="margin-top:0.75rem">
+									<label style="display:inline-flex;align-items:center;gap:0.5rem;font-size:0.764rem;color:rgba(255,255,255,0.75)">
+										<input type="checkbox" id="mention-enabled" />
+										<span data-i18n="agent_edit.enable_mention_replies">Answer mentions</span>
+									</label>
+									<label style="display:inline-flex;align-items:center;gap:0.5rem;font-size:0.764rem;color:rgba(255,255,255,0.75)" title="Record what the agent would reply without posting it.">
+										<input type="checkbox" id="mention-dry-run" />
+										<span data-i18n="agent_edit.dry_run">Dry run</span>
+									</label>
+								</div>
+
+								<div class="form-group" style="margin-top:0.75rem">
+									<label class="form-label" for="mention-daily-cap" data-i18n="agent_edit.daily_cap">Daily cap</label>
+									<input class="form-input" id="mention-daily-cap" type="number" min="0" max="50" style="max-width:140px" />
+								</div>
+
+								<div class="form-group">
+									<label class="form-label" data-i18n="agent_edit.allowed_intents">What it may do when it replies</label>
+									<div id="mention-intents" class="form-actions"></div>
+								</div>
+
+								<div class="form-actions">
+									<button class="btn-primary" id="mention-save-btn" data-i18n="agent_edit.save_policy">Save policy</button>
+									<span class="form-status" id="mention-save-status" role="status" aria-live="polite"></span>
+								</div>
+							</div>
+
+							<div class="form-group" style="margin-top:1rem">
+								<label class="form-label" data-i18n="agent_edit.recent_mention_decisions">Recent mention decisions</label>
+								<p class="hint" data-i18n="agent_edit.recent_mention_decisions_hint">The last 20 mentions this agent read and what it decided to do.</p>
+								<div id="mention-decisions-list" class="trigger-list"><div class="muted">Loading…</div></div>
+							</div>
+						</div>
+					</section>
+				</div><!-- /section-distribute -->
+
+				<!-- ═══════════════════════════════════════
+				     MONEY
+				═══════════════════════════════════════ -->
+				<div class="edit-section" id="section-money">
+					<div class="edit-section-label">Money</div>
+
+					<!-- Monetization -->
+					<section class="edit-panel" id="panel-monetization" role="region" aria-label="Monetization">
+						<div class="subsection-title">Monetization</div>
+						<div class="form-group" id="launch-token-group">
+							<label class="form-label" data-i18n="agent_edit.agent_token">Agent Token</label>
+							<p class="hint" data-i18n="agent_edit.launch_a_pump_fun_community_token_tied">Launch a pump.fun community token tied to this agent. Buyers help fund the token, fees route to the agent.</p>
+							<div id="launch-token-state" class="muted">Loading…</div>
+						</div>
+						<div class="form-group">
+							<label class="form-label" data-i18n="agent_edit.skill_prices">Skill Prices</label>
+							<p class="hint" data-i18n="agent_edit.set_a_price_for_your_skills_to">Set a price for your skills to be used by other agents. Leave blank for free skills. Prices are set in USDC (a $1 digital dollar) on Solana.</p>
+							<div id="skill-prices-list">
+								<div class="muted">Loading skills…</div>
+							</div>
+						</div>
+						<div class="form-actions">
+							<button class="btn-primary" id="monetization-save" data-i18n="agent_edit.save_prices">Save Prices</button>
+							<span class="form-status" id="monetization-status" role="status" aria-live="polite"></span>
+						</div>
+
+						<!-- Subscription Plans -->
+						<div class="form-group" style="margin-top:1rem;border-top:1px solid rgba(255,255,255,0.08);padding-top:1.25rem">
+							<label class="form-label" data-i18n="agent_edit.subscription_plans">Subscription Plans</label>
+							<p class="hint" data-i18n="agent_edit.offer_recurring_access_to_your_agent_s">Offer recurring access to your agent's skills. Subscribers pay a fixed USDC amount monthly or weekly. Up to 3 active plans.</p>
+							<div id="subscription-plans-list" style="display:flex;flex-direction:column;gap:0.5rem;margin-bottom:0.75rem">
+								<div class="muted">Loading plans…</div>
+							</div>
+							<button class="btn-ghost" id="show-create-plan-btn" style="align-self:flex-start" data-i18n="agent_edit.new_plan">+ New Plan</button>
+						</div>
+
+						<!-- Plan editor (hidden until triggered) -->
+						<div id="plan-editor" style="display:none;margin-top:1rem;padding:1rem;border:1px solid rgba(255,255,255,0.12);border-radius:8px;background:rgba(255,255,255,0.03)">
+							<input type="hidden" id="plan-editor-id">
+							<div style="display:grid;grid-template-columns:1fr 1fr;gap:0.75rem;margin-bottom:0.75rem">
+								<div class="form-group" style="margin:0">
+									<label class="form-label" style="font-size:0.764rem" for="plan-name-input" data-i18n="agent_edit.plan_name">Plan Name</label>
+									<input class="form-input" id="plan-name-input" type="text" placeholder="e.g. Pro" maxlength="80">
+								</div>
+								<div class="form-group" style="margin:0">
+									<label class="form-label" style="font-size:0.764rem" for="plan-interval-input" data-i18n="agent_edit.billing">Billing</label>
+									<select class="form-input" id="plan-interval-input">
+										<option value="monthly" data-i18n="agent_edit.monthly">Monthly</option>
+										<option value="weekly" data-i18n="agent_edit.weekly">Weekly</option>
+									</select>
+								</div>
+							</div>
+							<div class="form-group" style="margin-bottom:0.75rem">
+								<label class="form-label" style="font-size:0.764rem" for="plan-price-input" data-i18n="agent_edit.price_usd">Price (USD)</label>
+								<input class="form-input" id="plan-price-input" type="number" min="0.99" max="999" step="0.01" placeholder="9.99" style="max-width:140px">
+							</div>
+							<div class="form-group" style="margin-bottom:0.75rem">
+								<label class="form-label" style="font-size:0.764rem" for="plan-perks-input" data-i18n="agent_edit.perks_one_per_line">Perks (one per line)</label>
+								<textarea class="form-textarea" id="plan-perks-input" rows="3" placeholder="Unlimited API calls&#10;Priority queue&#10;Early access to new skills" style="font-size:0.764rem"></textarea>
+							</div>
+							<div class="form-group" style="margin-bottom:0.75rem">
+								<label class="form-label" style="font-size:0.764rem" data-i18n="agent_edit.included_skills">Included Skills</label>
+								<p style="font-size:0.7rem;color:rgba(255,255,255,0.4);margin:-0.25rem 0 0.4rem" data-i18n="agent_edit.subscribers_get_unlimited_access_to_the_skil">Subscribers get unlimited access to the skills you tick here.</p>
+								<div id="plan-skills-checklist" class="plan-skills-checklist" role="group" aria-label="Skills included in this plan">
+									<span class="muted" style="font-size:0.7rem" data-i18n="agent_edit.loading_skills">Loading skills…</span>
+								</div>
+							</div>
+							<div class="form-group" style="margin-bottom:0.75rem;flex-direction:row;align-items:center;justify-content:space-between;gap:0.75rem">
+								<div>
+									<label class="form-label" style="font-size:0.764rem;margin:0" for="plan-active-input" data-i18n="agent_edit.active">Active</label>
+									<p style="font-size:0.7rem;color:rgba(255,255,255,0.4);margin:0.15rem 0 0" data-i18n="agent_edit.inactive_plans_are_hidden_from_subscribers">Inactive plans are hidden from subscribers.</p>
+								</div>
+								<label class="toggle-switch" title="Toggle whether this plan is offered to subscribers" data-i18n-attr="title:agent_edit.toggle_whether_this_plan_is_title">
+									<input type="checkbox" id="plan-active-input" checked>
+									<span class="slider"></span>
+								</label>
+							</div>
+							<div style="display:flex;gap:0.5rem;align-items:center">
+								<button class="btn-primary" id="plan-save-btn" style="font-size:0.764rem;padding:0.4rem 0.9rem" data-i18n="agent_edit.save_plan">Save Plan</button>
+								<button class="btn-ghost" id="plan-cancel-btn" style="font-size:0.764rem;padding:0.4rem 0.9rem" data-i18n="agent_edit.cancel">Cancel</button>
+								<span class="form-status" id="plan-status" role="status" aria-live="polite" style="font-size:0.764rem"></span>
+							</div>
+						</div>
+					</section>
+
+					<!-- Wallet -->
+					<section class="edit-panel" id="panel-wallet" role="region" aria-label="Wallet">
+						<div class="subsection-title">Wallet</div>
+						<div class="wallet-grid">
+							<div class="card">
+								<div class="card-title">Solana wallet</div>
+								<div class="card-sub mono" id="wallet-sol-address">—</div>
+								<div class="card-row" style="margin-top:.618rem">
+									<div>
+										<div class="metric-label">SOL</div>
+										<div class="metric-value" id="wallet-sol-balance">—</div>
+									</div>
+									<div>
+										<div class="metric-label">USDC</div>
+										<div class="metric-value" id="wallet-usdc-balance">—</div>
+									</div>
+									<div>
+										<div class="metric-label">Total</div>
+										<div class="metric-value" id="wallet-total-usd">—</div>
+									</div>
+								</div>
+								<div class="card-actions" style="margin-top:.875rem">
+									<button class="btn-primary" id="wallet-send-btn" data-i18n="agent_edit.send">Send</button>
+									<button class="btn-ghost" id="wallet-fund-btn" data-i18n="agent_edit.fund">Fund</button>
+									<button class="btn-ghost" id="wallet-copy-sol" data-i18n="agent_edit.copy_address">Copy address</button>
+									<a class="btn-ghost" id="wallet-explorer" target="_blank" rel="noopener" data-i18n="agent_edit.explorer">Explorer ›</a>
+								</div>
+							</div>
+
+							<div class="card">
+								<div class="card-title">Base wallet</div>
+								<div class="card-sub mono" id="wallet-evm-address">Not linked.</div>
+								<div class="card-row" style="margin-top:.618rem">
+									<div>
+										<div class="metric-label">Chain</div>
+										<div class="metric-value" id="wallet-evm-chain">—</div>
+									</div>
+								</div>
+								<div class="card-actions" style="margin-top:.875rem">
+									<button class="btn-ghost" id="wallet-evm-copy" data-i18n="agent_edit.copy_address_2">Copy address</button>
+									<a class="btn-ghost" id="wallet-evm-explorer" target="_blank" rel="noopener" hidden data-i18n="agent_edit.explorer_2">Explorer ›</a>
+								</div>
+							</div>
+
+							<div class="card">
+								<div class="card-title">On-chain identity</div>
+								<div class="card-sub" id="wallet-identity">Loading…</div>
+							</div>
+
+							<div class="card">
+								<div class="card-title">Recent activity</div>
+								<div class="card-sub" id="wallet-activity">Loading…</div>
+							</div>
+						</div>
+
+						<!-- Send modal -->
+						<div id="send-modal" class="modal" hidden>
+							<div class="modal-card">
+								<div class="modal-title">Send from agent wallet</div>
+								<div class="form-group">
+									<label class="form-label" for="send-asset" data-i18n="agent_edit.asset">Asset</label>
+									<select class="form-input" id="send-asset">
+										<option value="usdc" data-i18n="agent_edit.usdc_solana">USDC (Solana)</option>
+										<option value="sol" data-i18n="agent_edit.sol">SOL</option>
+									</select>
+								</div>
+								<div class="form-group">
+									<label class="form-label" for="send-to" data-i18n="agent_edit.recipient_address">Recipient address</label>
+									<input class="form-input" id="send-to" type="text" placeholder="Solana address" />
+								</div>
+								<div class="form-group">
+									<label class="form-label" for="send-amount" data-i18n="agent_edit.amount">Amount</label>
+									<input class="form-input" id="send-amount" type="number" min="0" step="0.000001" placeholder="0.00" />
+								</div>
+								<div class="form-actions">
+									<button class="btn-primary" id="send-confirm" data-i18n="agent_edit.send_2">Send</button>
+									<button class="btn-ghost" id="send-cancel" data-i18n="agent_edit.cancel_2">Cancel</button>
+									<span class="form-status" id="send-status" role="status" aria-live="polite"></span>
+								</div>
+							</div>
+						</div>
+
+						<!-- Fund modal -->
+						<div id="fund-modal" class="modal" hidden>
+							<div class="modal-card">
+								<div class="modal-title">Fund this agent</div>
+								<p class="hint" data-i18n="agent_edit.send_sol_or_usdc_solana_to_the">Send SOL or USDC (Solana) to the address below.</p>
+								<div class="qr-wrap"><img id="fund-qr" alt="Wallet QR code" /></div>
+								<div class="card-sub mono" id="fund-address">—</div>
+								<div class="form-actions">
+									<button class="btn-ghost" id="fund-copy" data-i18n="agent_edit.copy_address_3">Copy address</button>
+									<button class="btn-ghost" id="fund-close" data-i18n="agent_edit.close">Close</button>
+								</div>
+							</div>
+						</div>
+					</section>
+
+					<!-- Analytics -->
+					<section class="edit-panel" id="panel-analytics" role="region" aria-label="Analytics">
+						<div class="subsection-title">Analytics</div>
+						<div class="metrics-grid">
+							<div class="metric-card">
+								<div class="metric-label">LLM calls (this month)</div>
+								<div class="metric-value" id="m-llm-month">—</div>
+							</div>
+							<div class="metric-card">
+								<div class="metric-label">LLM calls (30d)</div>
+								<div class="metric-value" id="m-llm-30d">—</div>
+							</div>
+							<div class="metric-card">
+								<div class="metric-label">Earnings received</div>
+								<div class="metric-value" id="m-earn-in">—</div>
+							</div>
+							<div class="metric-card">
+								<div class="metric-label">Spend (paid to others)</div>
+								<div class="metric-value" id="m-earn-out">—</div>
+							</div>
+						</div>
+
+						<div class="form-group" style="margin-top:0.5rem">
+							<label class="form-label" data-i18n="agent_edit.calls_per_day_30_days">Calls per day (30 days)</label>
+							<div id="m-chart" class="bar-chart"><div class="muted">Loading…</div></div>
+						</div>
+						<div class="form-group">
+							<label class="form-label" data-i18n="agent_edit.recent_payments_received">Recent payments received</label>
+							<div id="m-pay-in" class="pay-list"><div class="muted">Loading…</div></div>
+						</div>
+						<div class="form-group">
+							<label class="form-label" data-i18n="agent_edit.recent_payments_sent">Recent payments sent</label>
+							<div id="m-pay-out" class="pay-list"><div class="muted">Loading…</div></div>
+						</div>
+					</section>
+				</div><!-- /section-money -->
+
+				<!-- ═══════════════════════════════════════
+				     ALPHA HUNT
+				═══════════════════════════════════════ -->
+				<div class="edit-section" id="section-alpha-hunt">
+					<div class="edit-section-label">Alpha Hunt</div>
+
+					<section class="edit-panel" id="panel-alpha-hunt" role="region" aria-label="Alpha Hunt">
+						<div class="subsection-title">Alpha Hunt</div>
+						<p class="hint" data-i18n="agent_edit.find_undervalued_gems_using_smart_money_sign">Find undervalued gems using smart-money signals and organic growth patterns</p>
+
+						<div class="form-group">
+							<label class="form-label" for="alpha-trigger" data-i18n="agent_edit.trigger">Trigger</label>
+							<select class="form-input" id="alpha-trigger" disabled>
+								<option value="alpha_hunt" data-i18n="agent_edit.alpha_hunt_2">Alpha Hunt</option>
+							</select>
+							<p class="hint" style="margin-top:0.382rem" data-i18n="agent_edit.strategy_trigger_alpha_hunt_mode_scans_conti">Strategy trigger — alpha hunt mode scans continuously for qualifying tokens.</p>
+						</div>
+						<div class="form-group">
+							<label class="form-label" for="alpha-min-smart-money" data-i18n="agent_edit.min_smart_money_wallets">Min Smart Money Wallets</label>
+							<input class="form-input" id="alpha-min-smart-money" type="number" min="0" step="1" placeholder="e.g. 2" />
+							<p class="hint" style="margin-top:0.382rem" data-i18n="agent_edit.proven_wallets_that_must_be_buying">Proven wallets that must be buying</p>
+						</div>
+						<div class="form-group">
+							<label class="form-label" for="alpha-min-quality" data-i18n="agent_edit.min_quality_score">Min Quality Score</label>
+							<input class="form-input" id="alpha-min-quality" type="number" min="0" max="100" step="1" placeholder="e.g. 60" />
+						</div>
+						<div class="form-group">
+							<label class="form-label" for="alpha-min-organic" data-i18n="agent_edit.min_organic_score">Min Organic Score</label>
+							<input class="form-input" id="alpha-min-organic" type="number" min="0" max="100" step="1" placeholder="e.g. 50" />
+							<p class="hint" style="margin-top:0.382rem" data-i18n="agent_edit.filters_coordinated_bot_driven_launches">Filters coordinated/bot-driven launches</p>
+						</div>
+						<div class="form-group">
+							<label class="form-label" for="alpha-max-mcap" data-i18n="agent_edit.max_market_cap_usd">Max Market Cap (USD)</label>
+							<input class="form-input" id="alpha-max-mcap" type="number" min="0" step="100" placeholder="e.g. 5000" />
+							<p class="hint" style="margin-top:0.382rem" data-i18n="agent_edit.only_hunt_below_this_cap">Only hunt below this cap</p>
+						</div>
+						<div class="form-group">
+							<label class="form-label" for="alpha-keywords" data-i18n="agent_edit.narrative_keywords">Narrative Keywords</label>
+							<input class="form-input" id="alpha-keywords" type="text" placeholder="ai, dog, meme" />
+							<p class="hint" style="margin-top:0.382rem" data-i18n="agent_edit.comma_separated_any_keyword_match_triggers_c">Comma-separated — any keyword match triggers consideration</p>
+						</div>
+						<div class="form-group">
+							<label class="form-label" for="alpha-budget-sol" data-i18n="agent_edit.buy_budget_sol">Buy Budget (SOL)</label>
+							<input class="form-input" id="alpha-budget-sol" type="number" min="0" step="0.01" placeholder="e.g. 0.1" />
+						</div>
+						<div class="form-group">
+							<label class="form-label" for="alpha-take-profit-pct" data-i18n="agent_edit.take_profit">Take Profit (%)</label>
+							<input class="form-input" id="alpha-take-profit-pct" type="number" min="0" step="1" placeholder="e.g. 200" />
+						</div>
+						<div class="form-group">
+							<label class="form-label" for="alpha-stop-loss-pct" data-i18n="agent_edit.stop_loss">Stop Loss (%)</label>
+							<input class="form-input" id="alpha-stop-loss-pct" type="number" min="0" max="100" step="1" placeholder="e.g. 30" />
+						</div>
+						<div class="form-group">
+							<label class="form-label" for="alpha-mev-tip" data-i18n="agent_edit.mev_tip">MEV Tip</label>
+							<select class="form-input" id="alpha-mev-tip">
+								<option value="off" data-i18n="agent_edit.off">Off</option>
+								<option value="economy" data-i18n="agent_edit.economy">Economy</option>
+								<option value="turbo" data-i18n="agent_edit.turbo">Turbo</option>
+							</select>
+						</div>
+						<div class="form-actions">
+							<button class="btn-primary" id="alpha-hunt-save" data-i18n="agent_edit.save_2">Save</button>
+							<span class="form-status" id="alpha-hunt-status" role="status" aria-live="polite"></span>
+						</div>
+					</section>
+				</div><!-- /section-alpha-hunt -->
+
+				<!-- ═══════════════════════════════════════
+				     LAUNCHER
+				═══════════════════════════════════════ -->
+				<div class="edit-section" id="section-launcher">
+					<div class="edit-section-label">Launcher</div>
+
+					<section class="edit-panel" id="panel-launcher-schedule" role="region" aria-label="Launch Schedule">
+						<div class="subsection-title">Launch Schedule</div>
+						<p class="hint" data-i18n="agent_edit.autonomously_launch_coins_on_pump_fun_on">Autonomously launch coins on pump.fun on a schedule or on demand</p>
+
+						<div class="form-group">
+							<label class="form-label" style="display:flex;align-items:center;justify-content:space-between">
+								Enable Launcher
+								<label class="toggle-switch" title="Enable or disable the coin launcher" data-i18n-attr="title:agent_edit.enable_or_disable_the_coin_l_title">
+									<input type="checkbox" id="launcher-enabled">
+									<span class="slider"></span>
+								</label>
+							</label>
+						</div>
+						<div class="form-group">
+							<label class="form-label" for="launcher-network" data-i18n="agent_edit.network">Network</label>
+							<select class="form-input" id="launcher-network">
+								<option value="mainnet" data-i18n="agent_edit.mainnet">Mainnet</option>
+								<option value="devnet" data-i18n="agent_edit.devnet">Devnet</option>
+							</select>
+						</div>
+						<div class="form-group">
+							<label class="form-label" for="launcher-interval-hours" data-i18n="agent_edit.launch_every_hours">Launch Every (hours)</label>
+							<input class="form-input" id="launcher-interval-hours" type="number" min="1" step="1" placeholder="e.g. 24" />
+							<p class="hint" style="margin-top:0.382rem" data-i18n="agent_edit.leave_blank_for_manual_only">Leave blank for manual-only</p>
+						</div>
+						<div class="form-group">
+							<label class="form-label" for="launcher-max-launches" data-i18n="agent_edit.max_total_launches">Max Total Launches</label>
+							<input class="form-input" id="launcher-max-launches" type="number" min="0" step="1" placeholder="Unlimited" />
+						</div>
+					</section>
+
+					<section class="edit-panel" id="panel-launcher-metadata" role="region" aria-label="Token Metadata">
+						<div class="subsection-title">Token Metadata</div>
+
+						<div class="form-group">
+							<label class="form-label" for="launcher-name-template" data-i18n="agent_edit.token_name_template">Token Name Template</label>
+							<input class="form-input" id="launcher-name-template" type="text" placeholder="Agent Coin {{seq}}" />
+							<p class="hint" style="margin-top:0.382rem">{{seq}} = launch number, {{timestamp}} = Unix time</p>
+						</div>
+						<div class="form-group">
+							<label class="form-label" for="launcher-symbol" data-i18n="agent_edit.symbol">Symbol</label>
+							<input class="form-input" id="launcher-symbol" type="text" maxlength="10" placeholder="AGNT" />
+						</div>
+						<div class="form-group">
+							<label class="form-label" for="launcher-description" data-i18n="agent_edit.description_2">Description</label>
+							<textarea class="form-textarea" id="launcher-description" rows="3"></textarea>
+						</div>
+						<div class="form-group">
+							<label class="form-label" for="launcher-image-url" data-i18n="agent_edit.image_url">Image URL</label>
+							<input class="form-input" id="launcher-image-url" type="url" placeholder="https://…" />
+						</div>
+						<div class="form-group">
+							<label class="form-label" for="launcher-twitter" data-i18n="agent_edit.twitter">Twitter</label>
+							<input class="form-input" id="launcher-twitter" type="text" placeholder="https://twitter.com/…" />
+						</div>
+						<div class="form-group">
+							<label class="form-label" for="launcher-telegram" data-i18n="agent_edit.telegram">Telegram</label>
+							<input class="form-input" id="launcher-telegram" type="text" placeholder="https://t.me/…" />
+						</div>
+						<div class="form-group">
+							<label class="form-label" for="launcher-website" data-i18n="agent_edit.website">Website</label>
+							<input class="form-input" id="launcher-website" type="url" placeholder="https://…" />
+						</div>
+						<div class="form-group">
+							<label class="form-label" for="launcher-initial-buy" data-i18n="agent_edit.initial_dev_buy_sol">Initial Dev Buy (SOL)</label>
+							<input class="form-input" id="launcher-initial-buy" type="number" min="0" step="0.01" placeholder="0" />
+						</div>
+						<div class="form-actions">
+							<button class="btn-primary" id="launcher-save" data-i18n="agent_edit.save_3">Save</button>
+							<span class="form-status" id="launcher-status" role="status" aria-live="polite"></span>
+						</div>
+					</section>
+
+					<section class="edit-panel" id="panel-launched-coins" role="region" aria-label="Launched Coins">
+						<div class="subsection-title">Launched Coins</div>
+						<div id="launched-coins-table-wrap">
+							<div class="muted">Loading…</div>
+						</div>
+					</section>
+				</div><!-- /section-launcher -->
+
+				<!-- ═══════════════════════════════════════
+				     AUTO-CLAIM
+				═══════════════════════════════════════ -->
+				<div class="edit-section" id="section-auto-claim">
+					<div class="edit-section-label">Auto-Claim</div>
+
+					<section class="edit-panel" id="panel-auto-claim" role="region" aria-label="Creator Auto-Claim">
+						<div class="subsection-title">Creator Auto-Claim</div>
+						<p class="hint" data-i18n="agent_edit.automatically_claim_creator_fees_when_your_l">Automatically claim creator fees when your launched coins become runners</p>
+
+						<div class="form-group">
+							<label class="form-label" style="display:flex;align-items:center;justify-content:space-between">
+								Enable Auto-Claim
+								<label class="toggle-switch" title="Enable or disable automatic fee claiming" data-i18n-attr="title:agent_edit.enable_or_disable_automatic_title">
+									<input type="checkbox" id="auto-claim-enabled">
+									<span class="slider"></span>
+								</label>
+							</label>
+						</div>
+						<div class="form-group">
+							<label class="form-label" for="auto-claim-threshold" data-i18n="agent_edit.claim_threshold_sol">Claim Threshold (SOL)</label>
+							<input class="form-input" id="auto-claim-threshold" type="number" min="0" step="0.1" placeholder="0.5" />
+						</div>
+						<div class="form-group">
+							<label class="form-label" for="auto-claim-reinvest" data-i18n-html="agent_edit.reinvest_of_claimed_fees_0">
+								Reinvest % of Claimed Fees
+								<span id="auto-claim-reinvest-val" style="color:rgba(255,255,255,0.55);font-weight:400;margin-left:0.5rem">0%</span>
+							</label>
+							<input type="range" id="auto-claim-reinvest" min="0" max="100" step="1" value="0" style="width:100%;accent-color:#3b82f6" />
+							<p class="hint" style="margin-top:0.5rem" data-i18n="agent_edit.reinvested_fees_go_back_into_the_sniper">Reinvested fees go back into the sniper buy budget. Remaining goes to your agent wallet.</p>
+						</div>
+						<div class="form-actions">
+							<button class="btn-primary" id="auto-claim-save" data-i18n="agent_edit.save_4">Save</button>
+							<span class="form-status" id="auto-claim-status" role="status" aria-live="polite"></span>
+						</div>
+					</section>
+
+					<section class="edit-panel" id="panel-claimable-fees" role="region" aria-label="Claimable Fees">
+						<div class="subsection-title">Your Claimable Fees</div>
+						<div id="claimable-fees-table-wrap">
+							<div class="muted">Loading…</div>
+						</div>
+					</section>
+				</div><!-- /section-auto-claim -->
+
+				<!-- ═══════════════════════════════════════
+				     MARKET MAKER
+				═══════════════════════════════════════ -->
+				<div class="edit-section" id="section-market-maker">
+					<div class="edit-section-label">Market Maker</div>
+
+					<section class="edit-panel" id="panel-market-maker-add" role="region" aria-label="Add Market">
+						<div class="subsection-title">Market Maker</div>
+						<p class="hint" data-i18n="agent_edit.provide_liquidity_and_capture_spread_using_j">Provide liquidity and capture spread using Jito-accelerated execution</p>
+
+						<div class="form-group">
+							<label class="form-label" for="mm-mint" data-i18n="agent_edit.coin_mint">Coin Mint</label>
+							<input class="form-input" id="mm-mint" type="text" placeholder="Paste pump.fun mint address" />
+						</div>
+						<div class="form-group">
+							<label class="form-label" for="mm-symbol" data-i18n="agent_edit.symbol_2">Symbol</label>
+							<input class="form-input" id="mm-symbol" type="text" placeholder="e.g. PEPE" />
+						</div>
+						<div class="form-group">
+							<label class="form-label" for="mm-spread" data-i18n-html="agent_edit.spread_0_50">
+								Spread
+								<span id="mm-spread-val" style="color:rgba(255,255,255,0.55);font-weight:400;margin-left:0.5rem">0.50%</span>
+							</label>
+							<input type="range" id="mm-spread" min="50" max="2000" step="10" value="100" style="width:100%;accent-color:#3b82f6" />
+						</div>
+						<div class="form-group">
+							<label class="form-label" for="mm-order-size" data-i18n="agent_edit.order_size_sol">Order Size (SOL)</label>
+							<input class="form-input" id="mm-order-size" type="number" min="0" step="0.01" placeholder="0.05" />
+						</div>
+						<div class="form-group">
+							<label class="form-label" for="mm-max-inventory" data-i18n="agent_edit.max_inventory_sol">Max Inventory (SOL)</label>
+							<input class="form-input" id="mm-max-inventory" type="number" min="0" step="0.1" placeholder="1.0" />
+						</div>
+						<div class="form-group">
+							<label class="form-label" for="mm-rebalance" data-i18n="agent_edit.rebalance_every">Rebalance Every</label>
+							<select class="form-input" id="mm-rebalance">
+								<option value="5" data-i18n="agent_edit.5s">5s</option>
+								<option value="10" data-i18n="agent_edit.10s">10s</option>
+								<option value="30" selected data-i18n="agent_edit.30s">30s</option>
+								<option value="60" data-i18n="agent_edit.60s">60s</option>
+							</select>
+						</div>
+						<div class="form-group">
+							<label class="form-label" for="mm-mev-tip" data-i18n="agent_edit.mev_tip_2">MEV Tip</label>
+							<select class="form-input" id="mm-mev-tip">
+								<option value="off" data-i18n="agent_edit.off_2">Off</option>
+								<option value="economy" data-i18n="agent_edit.economy_2">Economy</option>
+								<option value="turbo" data-i18n="agent_edit.turbo_2">Turbo</option>
+							</select>
+						</div>
+						<div class="form-actions">
+							<button class="btn-primary" id="mm-add-market" data-i18n="agent_edit.add_market">Add Market</button>
+							<span class="form-status" id="mm-add-status" role="status" aria-live="polite"></span>
+						</div>
+					</section>
+
+					<section class="edit-panel" id="panel-active-markets" role="region" aria-label="Active Markets">
+						<div class="subsection-title">Active Markets</div>
+						<div id="active-markets-table-wrap">
+							<div class="muted">Loading…</div>
+						</div>
+					</section>
+				</div><!-- /section-market-maker -->
+
+				<!-- ═══════════════════════════════════════
+				     ADVANCED
+				═══════════════════════════════════════ -->
+				<div class="edit-section" id="section-advanced">
+					<div class="edit-section-label">Advanced</div>
+
+					<!-- Studio -->
+					<section class="edit-panel" id="panel-studio" role="region" aria-label="Studio">
+						<div class="subsection-title">Studio</div>
+						<p class="hint" data-i18n="agent_edit.power_user_tools_for_tuning_the_avatar">Power-user tools for tuning the avatar, animations, and blockchain identity.</p>
+						<div class="studio-grid">
+							<a class="studio-tile" id="studio-playground" target="_blank" rel="noopener">
+								<div class="studio-tile-title">3D Playground</div>
+								<div class="studio-tile-desc">Inspect the avatar in a freeform Three.js scene.</div>
+							</a>
+							<a class="studio-tile" id="studio-avatar" target="_blank" rel="noopener">
+								<div class="studio-tile-title">Avatar studio</div>
+								<div class="studio-tile-desc">Customize materials, animations, and metadata.</div>
+							</a>
+							<a class="studio-tile" id="studio-marketplace" href="/marketplace" target="_blank" rel="noopener">
+								<div class="studio-tile-title">Marketplace</div>
+								<div class="studio-tile-desc">Browse and remix published agents.</div>
+							</a>
+							<a class="studio-tile" id="studio-dashboard" href="/dashboard/" target="_blank" rel="noopener">
+								<div class="studio-tile-title">Creator dashboard</div>
+								<div class="studio-tile-desc">All your agents, avatars, widgets, and revenue.</div>
+							</a>
+							<a class="studio-tile" id="studio-public" target="_blank" rel="noopener">
+								<div class="studio-tile-title">Public agent page</div>
+								<div class="studio-tile-desc">See your agent the way visitors do.</div>
+							</a>
+							<a class="studio-tile" id="studio-manifest" target="_blank" rel="noopener">
+								<div class="studio-tile-title">Agent manifest (JSON)</div>
+								<div class="studio-tile-desc">Canonical machine-readable agent spec.</div>
+							</a>
+						</div>
+						<div class="form-group" style="margin-top:1rem">
+							<label class="form-label" data-i18n="agent_edit.animations_2">Animations</label>
+							<div id="studio-animations" class="chip-list"><div class="muted">None.</div></div>
+						</div>
+					</section>
+
+					<!-- Danger zone -->
+					<section class="edit-panel" id="panel-danger" role="region" aria-label="Danger zone">
+						<div class="subsection-title" style="color:#fca5a5">Danger zone</div>
+						<div class="card danger-card">
+							<div class="card-title">Delete this agent</div>
+							<p class="hint" data-i18n="agent_edit.soft_deletes_the_agent_removes_all_memories">Soft-deletes the agent, removes all memories, and unlists it from your dashboard. Wallet keys stay encrypted in cold storage. This cannot be undone from the UI.</p>
+							<div class="form-group">
+								<label class="form-label" for="danger-confirm" data-i18n="agent_edit.type_the_agent_s_name_to_confirm">Type the agent's name to confirm:</label>
+								<input class="form-input" id="danger-confirm" type="text" autocomplete="off" />
+							</div>
+							<div class="form-actions">
+								<button class="btn-danger" id="danger-delete-btn" disabled data-i18n="agent_edit.delete_agent">Delete agent</button>
+								<span class="form-status" id="danger-status" role="status" aria-live="polite"></span>
+							</div>
+						</div>
+					</section>
+				</div><!-- /section-advanced -->
+
+			</main>
+		</div><!-- /unified-layout -->
+
+		<div class="outfit-status-bar">
+			<div class="outfit-status" id="outfit-status" role="status" aria-live="polite"></div>
+			<button type="button" id="outfit-cancel" class="outfit-cancel-btn" hidden aria-label="Cancel upload" data-i18n="agent_edit.cancel_3" data-i18n-attr="aria-label:agent_edit.cancel_upload_arialabel">Cancel</button>
+		</div>
+
+		<script type="module" src="/src/agent-edit.js"></script>
+
+		<script type="module">
+		// ── New capability sections: Alpha Hunt, Launcher, Auto-Claim, Market Maker ──
+
+		const params = new URLSearchParams(location.search);
+		const agentId = params.get('id') || params.get('agentId');
+
+		// ── Helpers ──
+		function setStatus(el, msg, type) {
+			el.textContent = msg;
+			el.className = 'form-status' + (type ? ' ' + type : '');
+		}
+
+		async function apiFetch(url, opts) {
+			const res = await fetch(url, opts);
+			const json = await res.json().catch(() => ({}));
+			if (!res.ok) throw new Error(json.error || json.message || `HTTP ${res.status}`);
+			return json;
+		}
+
+		// ── Spread slider display ──
+		const mmSpread = document.getElementById('mm-spread');
+		const mmSpreadVal = document.getElementById('mm-spread-val');
+		if (mmSpread) {
+			const updateSpread = () => {
+				mmSpreadVal.textContent = (mmSpread.value / 100).toFixed(2) + '%';
+			};
+			mmSpread.addEventListener('input', updateSpread);
+			updateSpread();
+		}
+
+		// ── Reinvest slider display ──
+		const reinvestSlider = document.getElementById('auto-claim-reinvest');
+		const reinvestVal = document.getElementById('auto-claim-reinvest-val');
+		if (reinvestSlider) {
+			const updateReinvest = () => {
+				reinvestVal.textContent = reinvestSlider.value + '%';
+			};
+			reinvestSlider.addEventListener('input', updateReinvest);
+		}
+
+		// ── ALPHA HUNT ──
+		async function loadAlphaHunt() {
+			if (!agentId) return;
+			try {
+				const data = await apiFetch(`/api/sniper/strategy?agentId=${encodeURIComponent(agentId)}`);
+				const cfg = data.strategy || data;
+				if (cfg.alpha_min_smart_money != null) document.getElementById('alpha-min-smart-money').value = cfg.alpha_min_smart_money;
+				if (cfg.alpha_min_quality_score != null) document.getElementById('alpha-min-quality').value = cfg.alpha_min_quality_score;
+				if (cfg.alpha_min_organic_score != null) document.getElementById('alpha-min-organic').value = cfg.alpha_min_organic_score;
+				if (cfg.alpha_max_mcap_usd != null) document.getElementById('alpha-max-mcap').value = cfg.alpha_max_mcap_usd;
+				if (cfg.alpha_narrative_keywords) document.getElementById('alpha-keywords').value = Array.isArray(cfg.alpha_narrative_keywords) ? cfg.alpha_narrative_keywords.join(', ') : cfg.alpha_narrative_keywords;
+				if (cfg.budget_sol != null) document.getElementById('alpha-budget-sol').value = cfg.budget_sol;
+				if (cfg.take_profit_pct != null) document.getElementById('alpha-take-profit-pct').value = cfg.take_profit_pct;
+				if (cfg.stop_loss_pct != null) document.getElementById('alpha-stop-loss-pct').value = cfg.stop_loss_pct;
+				if (cfg.mev_tip) document.getElementById('alpha-mev-tip').value = cfg.mev_tip;
+			} catch (_) { /* no existing config */ }
+		}
+
+		const alphaHuntSaveBtn = document.getElementById('alpha-hunt-save');
+		if (alphaHuntSaveBtn) {
+			loadAlphaHunt();
+			alphaHuntSaveBtn.addEventListener('click', async () => {
+				const statusEl = document.getElementById('alpha-hunt-status');
+				alphaHuntSaveBtn.disabled = true;
+				setStatus(statusEl, 'Saving…', '');
+				try {
+					const keywords = document.getElementById('alpha-keywords').value
+						.split(',').map(k => k.trim()).filter(Boolean);
+					await apiFetch('/api/sniper/strategy', {
+						method: 'POST',
+						headers: { 'Content-Type': 'application/json' },
+						body: JSON.stringify({
+							agentId,
+							trigger: 'alpha_hunt',
+							alpha_min_smart_money: Number(document.getElementById('alpha-min-smart-money').value) || undefined,
+							alpha_min_quality_score: Number(document.getElementById('alpha-min-quality').value) || undefined,
+							alpha_min_organic_score: Number(document.getElementById('alpha-min-organic').value) || undefined,
+							alpha_max_mcap_usd: Number(document.getElementById('alpha-max-mcap').value) || undefined,
+							alpha_narrative_keywords: keywords.length ? keywords : undefined,
+							budget_sol: Number(document.getElementById('alpha-budget-sol').value) || undefined,
+							take_profit_pct: Number(document.getElementById('alpha-take-profit-pct').value) || undefined,
+							stop_loss_pct: Number(document.getElementById('alpha-stop-loss-pct').value) || undefined,
+							mev_tip: document.getElementById('alpha-mev-tip').value,
+						}),
+					});
+					setStatus(statusEl, 'Saved', 'ok');
+				} catch (err) {
+					setStatus(statusEl, err.message, 'err');
+				} finally {
+					alphaHuntSaveBtn.disabled = false;
+				}
+			});
+		}
+
+		// ── LAUNCHER ──
+		async function loadLauncher() {
+			if (!agentId) return;
+			try {
+				const data = await apiFetch(`/api/agent/launcher?agentId=${encodeURIComponent(agentId)}`);
+				const cfg = data.config || data;
+				document.getElementById('launcher-enabled').checked = !!cfg.enabled;
+				if (cfg.network) document.getElementById('launcher-network').value = cfg.network;
+				if (cfg.interval_hours != null) document.getElementById('launcher-interval-hours').value = cfg.interval_hours;
+				if (cfg.max_launches != null) document.getElementById('launcher-max-launches').value = cfg.max_launches;
+				if (cfg.name_template) document.getElementById('launcher-name-template').value = cfg.name_template;
+				if (cfg.symbol) document.getElementById('launcher-symbol').value = cfg.symbol;
+				if (cfg.description) document.getElementById('launcher-description').value = cfg.description;
+				if (cfg.image_url) document.getElementById('launcher-image-url').value = cfg.image_url;
+				if (cfg.twitter) document.getElementById('launcher-twitter').value = cfg.twitter;
+				if (cfg.telegram) document.getElementById('launcher-telegram').value = cfg.telegram;
+				if (cfg.website) document.getElementById('launcher-website').value = cfg.website;
+				if (cfg.initial_buy_sol != null) document.getElementById('launcher-initial-buy').value = cfg.initial_buy_sol;
+			} catch (_) { /* no existing config */ }
+			renderLaunchedCoinsTable();
+		}
+
+		async function renderLaunchedCoinsTable() {
+			const wrap = document.getElementById('launched-coins-table-wrap');
+			if (!wrap || !agentId) return;
+			try {
+				const data = await apiFetch(`/api/agent/launcher?agentId=${encodeURIComponent(agentId)}&launches=1`);
+				const coins = data.launches || [];
+				if (!coins.length) {
+					wrap.innerHTML = '<div class="muted">No coins launched yet.</div>';
+					return;
+				}
+				wrap.innerHTML = `<table class="data-table" style="width:100%;border-collapse:collapse;font-size:0.764rem">
+					<thead>
+						<tr style="border-bottom:1px solid rgba(255,255,255,0.08)">
+							<th style="text-align:left;padding:0.5rem 0.75rem;color:rgba(255,255,255,0.4);font-weight:500">Symbol</th>
+							<th style="text-align:left;padding:0.5rem 0.75rem;color:rgba(255,255,255,0.4);font-weight:500">Name</th>
+							<th style="text-align:left;padding:0.5rem 0.75rem;color:rgba(255,255,255,0.4);font-weight:500">Mint</th>
+							<th style="text-align:left;padding:0.5rem 0.75rem;color:rgba(255,255,255,0.4);font-weight:500">Launched</th>
+							<th style="text-align:right;padding:0.5rem 0.75rem;color:rgba(255,255,255,0.4);font-weight:500">P&amp;L</th>
+							<th style="text-align:left;padding:0.5rem 0.75rem;color:rgba(255,255,255,0.4);font-weight:500">Status</th>
+						</tr>
+					</thead>
+					<tbody>
+						${coins.map(c => `
+						<tr style="border-bottom:1px solid rgba(255,255,255,0.04)">
+							<td style="padding:0.5rem 0.75rem;color:rgba(255,255,255,0.85)">${esc(c.symbol)}</td>
+							<td style="padding:0.5rem 0.75rem;color:rgba(255,255,255,0.7)">${esc(c.name)}</td>
+							<td style="padding:0.5rem 0.75rem;font-family:ui-monospace,monospace;font-size:0.618rem;color:rgba(255,255,255,0.5)">${esc(c.mint ? c.mint.slice(0,8) + '…' : '—')}</td>
+							<td style="padding:0.5rem 0.75rem;color:rgba(255,255,255,0.5)">${c.launched_at ? new Date(c.launched_at).toLocaleDateString() : '—'}</td>
+							<td style="padding:0.5rem 0.75rem;text-align:right;color:${c.pnl_sol >= 0 ? '#86efac' : '#fca5a5'}">${c.pnl_sol != null ? (c.pnl_sol >= 0 ? '+' : '') + c.pnl_sol.toFixed(3) + ' SOL' : '—'}</td>
+							<td style="padding:0.5rem 0.75rem;color:rgba(255,255,255,0.55)">${esc(c.status || '—')}</td>
+						</tr>`).join('')}
+					</tbody>
+				</table>`;
+			} catch (_) {
+				wrap.innerHTML = '<div class="muted">Unable to load launched coins.</div>';
+			}
+		}
+
+		const launcherSaveBtn = document.getElementById('launcher-save');
+		if (launcherSaveBtn) {
+			loadLauncher();
+			launcherSaveBtn.addEventListener('click', async () => {
+				const statusEl = document.getElementById('launcher-status');
+				launcherSaveBtn.disabled = true;
+				setStatus(statusEl, 'Saving…', '');
+				try {
+					await apiFetch('/api/agent/launcher', {
+						method: 'POST',
+						headers: { 'Content-Type': 'application/json' },
+						body: JSON.stringify({
+							agentId,
+							enabled: document.getElementById('launcher-enabled').checked,
+							network: document.getElementById('launcher-network').value,
+							interval_hours: Number(document.getElementById('launcher-interval-hours').value) || null,
+							max_launches: Number(document.getElementById('launcher-max-launches').value) || null,
+							name_template: document.getElementById('launcher-name-template').value,
+							symbol: document.getElementById('launcher-symbol').value,
+							description: document.getElementById('launcher-description').value,
+							image_url: document.getElementById('launcher-image-url').value,
+							twitter: document.getElementById('launcher-twitter').value,
+							telegram: document.getElementById('launcher-telegram').value,
+							website: document.getElementById('launcher-website').value,
+							initial_buy_sol: Number(document.getElementById('launcher-initial-buy').value) || 0,
+						}),
+					});
+					setStatus(statusEl, 'Saved', 'ok');
+				} catch (err) {
+					setStatus(statusEl, err.message, 'err');
+				} finally {
+					launcherSaveBtn.disabled = false;
+				}
+			});
+		}
+
+		// ── AUTO-CLAIM ──
+		async function loadAutoClaim() {
+			if (!agentId) return;
+			try {
+				const data = await apiFetch(`/api/agent/launcher?agentId=${encodeURIComponent(agentId)}`);
+				const cfg = data.config || data;
+				document.getElementById('auto-claim-enabled').checked = !!cfg.auto_claim_enabled;
+				if (cfg.auto_claim_threshold_sol != null) document.getElementById('auto-claim-threshold').value = cfg.auto_claim_threshold_sol;
+				if (cfg.auto_claim_reinvest_pct != null) {
+					document.getElementById('auto-claim-reinvest').value = cfg.auto_claim_reinvest_pct;
+					document.getElementById('auto-claim-reinvest-val').textContent = cfg.auto_claim_reinvest_pct + '%';
+				}
+			} catch (_) { /* no existing config */ }
+			renderClaimableFeesTable();
+		}
+
+		async function renderClaimableFeesTable() {
+			const wrap = document.getElementById('claimable-fees-table-wrap');
+			if (!wrap || !agentId) return;
+			try {
+				const data = await apiFetch(`/api/agent/launcher?agentId=${encodeURIComponent(agentId)}&fees=1`);
+				const fees = data.claimable_fees || [];
+				if (!fees.length) {
+					wrap.innerHTML = '<div class="muted">No claimable fees. Launched coins will appear here as they earn creator fees.</div>';
+					return;
+				}
+				wrap.innerHTML = `<table class="data-table" style="width:100%;border-collapse:collapse;font-size:0.764rem">
+					<thead>
+						<tr style="border-bottom:1px solid rgba(255,255,255,0.08)">
+							<th style="text-align:left;padding:0.5rem 0.75rem;color:rgba(255,255,255,0.4);font-weight:500">Symbol</th>
+							<th style="text-align:right;padding:0.5rem 0.75rem;color:rgba(255,255,255,0.4);font-weight:500">Claimable SOL</th>
+							<th style="text-align:left;padding:0.5rem 0.75rem;color:rgba(255,255,255,0.4);font-weight:500">Last Claimed</th>
+							<th style="text-align:left;padding:0.5rem 0.75rem;color:rgba(255,255,255,0.4);font-weight:500">Status</th>
+						</tr>
+					</thead>
+					<tbody>
+						${fees.map(f => `
+						<tr style="border-bottom:1px solid rgba(255,255,255,0.04)">
+							<td style="padding:0.5rem 0.75rem;color:rgba(255,255,255,0.85)">${esc(f.symbol)}</td>
+							<td style="padding:0.5rem 0.75rem;text-align:right;color:#86efac">${f.claimable_sol != null ? f.claimable_sol.toFixed(4) : '—'}</td>
+							<td style="padding:0.5rem 0.75rem;color:rgba(255,255,255,0.5)">${f.last_claimed_at ? new Date(f.last_claimed_at).toLocaleDateString() : 'Never'}</td>
+							<td style="padding:0.5rem 0.75rem;color:rgba(255,255,255,0.55)">${esc(f.status || '—')}</td>
+						</tr>`).join('')}
+					</tbody>
+				</table>`;
+			} catch (_) {
+				wrap.innerHTML = '<div class="muted">Unable to load claimable fees.</div>';
+			}
+		}
+
+		const autoClaimSaveBtn = document.getElementById('auto-claim-save');
+		if (autoClaimSaveBtn) {
+			loadAutoClaim();
+			autoClaimSaveBtn.addEventListener('click', async () => {
+				const statusEl = document.getElementById('auto-claim-status');
+				autoClaimSaveBtn.disabled = true;
+				setStatus(statusEl, 'Saving…', '');
+				try {
+					await apiFetch('/api/agent/launcher', {
+						method: 'POST',
+						headers: { 'Content-Type': 'application/json' },
+						body: JSON.stringify({
+							agentId,
+							auto_claim_enabled: document.getElementById('auto-claim-enabled').checked,
+							auto_claim_threshold_sol: Number(document.getElementById('auto-claim-threshold').value) || 0.5,
+							auto_claim_reinvest_pct: Number(document.getElementById('auto-claim-reinvest').value) || 0,
+						}),
+					});
+					setStatus(statusEl, 'Saved', 'ok');
+				} catch (err) {
+					setStatus(statusEl, err.message, 'err');
+				} finally {
+					autoClaimSaveBtn.disabled = false;
+				}
+			});
+		}
+
+		// ── MARKET MAKER ──
+		async function loadActiveMarkets() {
+			const wrap = document.getElementById('active-markets-table-wrap');
+			if (!wrap || !agentId) return;
+			try {
+				const data = await apiFetch(`/api/agent/market-maker?agentId=${encodeURIComponent(agentId)}`);
+				const markets = data.markets || [];
+				if (!markets.length) {
+					wrap.innerHTML = '<div class="muted">No active markets. Add one above.</div>';
+					return;
+				}
+				wrap.innerHTML = `<table class="data-table" style="width:100%;border-collapse:collapse;font-size:0.764rem">
+					<thead>
+						<tr style="border-bottom:1px solid rgba(255,255,255,0.08)">
+							<th style="text-align:left;padding:0.5rem 0.75rem;color:rgba(255,255,255,0.4);font-weight:500">Symbol</th>
+							<th style="text-align:left;padding:0.5rem 0.75rem;color:rgba(255,255,255,0.4);font-weight:500">Spread</th>
+							<th style="text-align:right;padding:0.5rem 0.75rem;color:rgba(255,255,255,0.4);font-weight:500">Inventory</th>
+							<th style="text-align:right;padding:0.5rem 0.75rem;color:rgba(255,255,255,0.4);font-weight:500">Volume</th>
+							<th style="text-align:right;padding:0.5rem 0.75rem;color:rgba(255,255,255,0.4);font-weight:500">P&amp;L</th>
+							<th style="text-align:left;padding:0.5rem 0.75rem;color:rgba(255,255,255,0.4);font-weight:500">Status</th>
+						</tr>
+					</thead>
+					<tbody>
+						${markets.map(m => `
+						<tr style="border-bottom:1px solid rgba(255,255,255,0.04)">
+							<td style="padding:0.5rem 0.75rem;color:rgba(255,255,255,0.85)">${esc(m.symbol)}</td>
+							<td style="padding:0.5rem 0.75rem;color:rgba(255,255,255,0.7)">${m.spread_bps != null ? (m.spread_bps / 100).toFixed(2) + '%' : '—'}</td>
+							<td style="padding:0.5rem 0.75rem;text-align:right;color:rgba(255,255,255,0.7)">${m.inventory_sol != null ? m.inventory_sol.toFixed(3) + ' SOL' : '—'}</td>
+							<td style="padding:0.5rem 0.75rem;text-align:right;color:rgba(255,255,255,0.55)">${m.volume_sol != null ? m.volume_sol.toFixed(3) + ' SOL' : '—'}</td>
+							<td style="padding:0.5rem 0.75rem;text-align:right;color:${(m.pnl_sol || 0) >= 0 ? '#86efac' : '#fca5a5'}">${m.pnl_sol != null ? (m.pnl_sol >= 0 ? '+' : '') + m.pnl_sol.toFixed(3) + ' SOL' : '—'}</td>
+							<td style="padding:0.5rem 0.75rem">
+								<label class="toggle-switch" title="Enable or disable this market" style="vertical-align:middle">
+									<input type="checkbox" data-mm-id="${esc(m.id)}" class="mm-market-toggle" ${m.enabled ? 'checked' : ''}>
+									<span class="slider"></span>
+								</label>
+							</td>
+						</tr>`).join('')}
+					</tbody>
+				</table>`;
+
+				wrap.querySelectorAll('.mm-market-toggle').forEach(toggle => {
+					toggle.addEventListener('change', async () => {
+						try {
+							await apiFetch('/api/agent/market-maker', {
+								method: 'POST',
+								headers: { 'Content-Type': 'application/json' },
+								body: JSON.stringify({ agentId, id: toggle.dataset.mmId, enabled: toggle.checked }),
+							});
+						} catch (err) {
+							toggle.checked = !toggle.checked;
+						}
+					});
+				});
+			} catch (_) {
+				wrap.innerHTML = '<div class="muted">Unable to load active markets.</div>';
+			}
+		}
+
+		const mmAddBtn = document.getElementById('mm-add-market');
+		if (mmAddBtn) {
+			loadActiveMarkets();
+			mmAddBtn.addEventListener('click', async () => {
+				const statusEl = document.getElementById('mm-add-status');
+				mmAddBtn.disabled = true;
+				setStatus(statusEl, 'Adding…', '');
+				try {
+					await apiFetch('/api/agent/market-maker', {
+						method: 'POST',
+						headers: { 'Content-Type': 'application/json' },
+						body: JSON.stringify({
+							agentId,
+							mint: document.getElementById('mm-mint').value.trim(),
+							symbol: document.getElementById('mm-symbol').value.trim(),
+							spread_bps: Number(document.getElementById('mm-spread').value),
+							order_size_sol: Number(document.getElementById('mm-order-size').value) || 0.05,
+							max_inventory_sol: Number(document.getElementById('mm-max-inventory').value) || 1.0,
+							rebalance_seconds: Number(document.getElementById('mm-rebalance').value),
+							mev_tip: document.getElementById('mm-mev-tip').value,
+							enabled: true,
+						}),
+					});
+					setStatus(statusEl, 'Market added', 'ok');
+					document.getElementById('mm-mint').value = '';
+					document.getElementById('mm-symbol').value = '';
+					loadActiveMarkets();
+				} catch (err) {
+					setStatus(statusEl, err.message, 'err');
+				} finally {
+					mmAddBtn.disabled = false;
+				}
+			});
+		}
+
+		// ── XSS-safe escaper ──
+		function esc(str) {
+			return String(str ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+		}
+		</script>
+
+		<div id="footer-container"></div>
+		<script src="/footer.js"></script>
+	<script src="/brand.js" defer></script>
+	<!-- Runtime i18n: detects locale, swaps annotated copy, mounts <lang-switcher>. -->
+	<script type="module" src="/i18n.js"></script>
+</body>
+</html>

@@ -1,0 +1,642 @@
+<!doctype html>
+<html lang="en">
+<head>
+	<style>/* three.ws hidden-guard — make the `hidden` attribute authoritative; see scripts/lib/hidden-guard.mjs */[hidden]{display:none!important}</style>
+	<script>/* three.ws theme boot — no-flash; runtime in /theme-switcher.js */(function(){try{var m=localStorage.getItem('twx_theme');var l=m==='auto'?(window.matchMedia&&window.matchMedia('(prefers-color-scheme: light)').matches):m==='light';document.documentElement.setAttribute('data-theme',l?'light':'dark');}catch(e){document.documentElement.setAttribute('data-theme','dark');}})();</script>
+	<meta charset="utf-8" />
+	<meta name="viewport" content="width=device-width, initial-scale=1" />
+	<title data-i18n="agent_economy.meta_title">Agent Economy: two AI agents paying each other in real SOL</title>
+	<meta name="description" content="Watch two 3D AI agents transact on-chain. Agent A buys data from Agent B. Real SOL. Real Solana transaction. Live now."  data-i18n-attr="content:agent_economy.meta_description"/>
+	<meta property="og:type" content="website" />
+	<meta property="og:site_name" content="three.ws" />
+	<meta property="og:url" content="https://three.ws/agent-economy" />
+	<meta property="og:title" content="Agent Economy: two AI agents paying each other in real SOL"  data-i18n-attr="content:agent_economy.meta_og_title"/>
+	<meta property="og:description" content="Watch two 3D AI agents transact on-chain. Agent A buys data from Agent B. Real SOL. Real Solana transaction. Live now."  data-i18n-attr="content:agent_economy.meta_og_description"/>
+	<meta property="og:image" content="https://three.ws/api/page-og?s=crypto&amp;t=Agent+Economy%3A+Live+Demo&amp;d=Watch+two+3D+AI+agents+transact+on-chain.+Agent+A+buys+data+from+Agent+B%3A+real+SOL%2C+real+Solana+transaction%2C+live.&amp;p=%2Fagent-economy" />
+	<meta property="og:image:width" content="1200" />
+	<meta property="og:image:height" content="630" />
+	<meta name="twitter:card" content="summary_large_image" />
+	<meta name="twitter:site" content="@trythreews" />
+	<meta name="twitter:title" content="Agent Economy: two AI agents paying each other in real SOL"  data-i18n-attr="content:agent_economy.meta_twitter_title"/>
+	<meta name="twitter:description" content="Watch two 3D AI agents transact on-chain. Agent A buys data from Agent B. Real SOL. Real Solana transaction. Live now."  data-i18n-attr="content:agent_economy.meta_twitter_description"/>
+	<meta name="twitter:image" content="https://three.ws/api/page-og?s=crypto&amp;t=Agent+Economy%3A+Live+Demo&amp;d=Watch+two+3D+AI+agents+transact+on-chain.+Agent+A+buys+data+from+Agent+B%3A+real+SOL%2C+real+Solana+transaction%2C+live.&amp;p=%2Fagent-economy" />
+		<link rel="icon" href="/favicon.ico" sizes="any" />
+		<link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+		<link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png" />
+		<link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png" />
+		<link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+		<link rel="manifest" href="/manifest.webmanifest" />
+	<style>
+		:root {
+			--bg:        #060606;
+			--panel:     #0c0c0c;
+			--panel2:    #111111;
+			--border:    #1c1c1c;
+			--border-hi: #282828;
+			--text:      #dde2f0;
+			--muted:     #5c6180;
+			--dim:       #373737;
+			--green:     #22d17a;
+			--green-g:   rgba(34,209,122,.15);
+			--blue:      #4e8cff;
+			--blue-g:    rgba(78,140,255,.12);
+			--purple:    var(--accent);
+			--purple-g:  var(--surface-2);
+			--sol:       #9945ff;
+			--amber:     #f7a035;
+		}
+		*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+		html, body { height: 100%; overflow: hidden; background: var(--bg); color: var(--text); font: 13px/1.5 -apple-system, system-ui, "Segoe UI", Roboto, sans-serif; }
+
+		/* ── Layout ──────────────────────────────────────────────────── */
+		#root {
+			display: grid;
+			grid-template-columns: 1fr 340px 1fr;
+			grid-template-rows: 1fr auto;
+			height: 100vh;
+			gap: 0;
+		}
+
+		/* ── Avatar columns ───────────────────────────────────────────── */
+		.av-col {
+			position: relative;
+			overflow: hidden;
+			display: flex;
+			flex-direction: column;
+			align-items: center;
+			justify-content: center;
+		}
+		.av-col::before {
+			content: '';
+			position: absolute;
+			inset: 0;
+			pointer-events: none;
+			z-index: 1;
+		}
+		#col-buyer::before  { background: radial-gradient(ellipse 70% 55% at 50% 80%, rgba(78,140,255,.07), transparent 70%); }
+		#col-seller::before { background: radial-gradient(ellipse 70% 55% at 50% 80%, rgba(157,124,255,.07), transparent 70%); }
+
+		.av-frame {
+			position: absolute;
+			inset: 0;
+			width: 100%;
+			height: 100%;
+			border: none;
+			display: block;
+		}
+
+		/* Agent label */
+		.av-label {
+			position: absolute;
+			bottom: 20px;
+			left: 50%;
+			transform: translateX(-50%);
+			z-index: 10;
+			background: rgba(10,11,18,.82);
+			border: 1px solid var(--border-hi);
+			border-radius: 10px;
+			padding: 8px 14px;
+			text-align: center;
+			white-space: nowrap;
+			backdrop-filter: blur(8px);
+		}
+		.av-label-name { font-size: 13px; font-weight: 700; letter-spacing: -.01em; }
+		.av-label-role { font-size: 10px; color: var(--muted); letter-spacing: .06em; text-transform: uppercase; margin-top: 1px; }
+		.av-label-addr { font-size: 9.5px; color: var(--dim); margin-top: 3px; font-family: "SF Mono", "Fira Code", monospace; }
+		.av-label-addr a { color: inherit; text-decoration: none; }
+		.av-label-addr a:hover { color: var(--text); text-decoration: underline; }
+		#col-buyer  .av-label-name { color: var(--blue); }
+		#col-seller .av-label-name { color: var(--purple); }
+
+		/* Speech bubble */
+		.av-speech {
+			position: absolute;
+			top: 18px;
+			left: 50%;
+			transform: translateX(-50%);
+			z-index: 10;
+			background: rgba(10,11,18,.88);
+			border: 1px solid var(--border-hi);
+			border-radius: 12px;
+			padding: 10px 14px;
+			max-width: calc(100% - 32px);
+			min-width: 200px;
+			font-size: 12px;
+			line-height: 1.5;
+			color: var(--text);
+			opacity: 0;
+			transition: opacity .3s ease;
+			pointer-events: none;
+			backdrop-filter: blur(10px);
+			text-align: center;
+		}
+		.av-speech.visible { opacity: 1; }
+		.av-speech::after {
+			content: '';
+			position: absolute;
+			bottom: -7px;
+			left: 50%;
+			transform: translateX(-50%);
+			width: 13px;
+			height: 7px;
+			background: inherit;
+			clip-path: polygon(0 0, 100% 0, 50% 100%);
+		}
+
+		/* ── Center column ────────────────────────────────────────────── */
+		#center {
+			display: flex;
+			flex-direction: column;
+			border-left: 1px solid var(--border);
+			border-right: 1px solid var(--border);
+			background: linear-gradient(180deg, #080808, var(--bg));
+			overflow: hidden;
+		}
+
+		/* Header */
+		#center-head {
+			padding: 14px 16px 12px;
+			border-bottom: 1px solid var(--border);
+			flex-shrink: 0;
+		}
+		#center-head h1 {
+			font-size: 13px;
+			font-weight: 700;
+			letter-spacing: -.01em;
+			color: var(--text);
+			display: flex;
+			align-items: center;
+			gap: 7px;
+		}
+		.live-dot {
+			width: 7px; height: 7px;
+			border-radius: 50%;
+			background: var(--green);
+			box-shadow: 0 0 6px var(--green);
+			animation: pulse 1.8s ease-in-out infinite;
+		}
+		@keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.4} }
+		#center-sub {
+			font-size: 10.5px;
+			color: var(--muted);
+			margin-top: 3px;
+			letter-spacing: .02em;
+		}
+
+		/* Service catalog */
+		#catalog {
+			padding: 12px;
+			border-bottom: 1px solid var(--border);
+			flex-shrink: 0;
+		}
+		#catalog-label {
+			font-size: 9.5px;
+			font-weight: 700;
+			text-transform: uppercase;
+			letter-spacing: .1em;
+			color: var(--muted);
+			margin-bottom: 8px;
+		}
+		.svc-btn {
+			width: 100%;
+			display: flex;
+			align-items: center;
+			justify-content: space-between;
+			background: var(--panel);
+			border: 1px solid var(--border);
+			border-radius: 8px;
+			padding: 9px 11px;
+			cursor: pointer;
+			margin-bottom: 6px;
+			color: var(--text);
+			font: inherit;
+			font-size: 12px;
+			transition: border-color .15s, background .15s;
+			gap: 8px;
+		}
+		.svc-btn:last-child { margin-bottom: 0; }
+		.svc-btn:hover:not(:disabled) {
+			border-color: var(--border-hi);
+			background: var(--panel2);
+		}
+		.svc-btn:active:not(:disabled) { transform: translateY(1px); }
+		.svc-btn:disabled { opacity: .45; cursor: not-allowed; }
+		.svc-btn-left { display: flex; flex-direction: column; gap: 1px; text-align: left; }
+		.svc-btn-name { font-weight: 600; font-size: 12px; }
+		.svc-btn-tag  { font-size: 10px; color: var(--muted); }
+		.svc-btn-price {
+			font-size: 11px;
+			font-weight: 600;
+			color: var(--green);
+			white-space: nowrap;
+			font-family: "SF Mono", "Fira Code", monospace;
+			flex-shrink: 0;
+		}
+
+		/* Topic input */
+		#topic-wrap {
+			padding: 0 12px 10px;
+			border-bottom: 1px solid var(--border);
+			flex-shrink: 0;
+		}
+		#topic {
+			width: 100%;
+			background: var(--panel);
+			border: 1px solid var(--border);
+			border-radius: 7px;
+			padding: 7px 10px;
+			font: 12px/1.4 -apple-system, system-ui, "Segoe UI", Roboto, sans-serif;
+			color: var(--text);
+			outline: none;
+			transition: border-color .15s;
+		}
+		#topic:focus { border-color: var(--border-hi); }
+		#topic::placeholder { color: var(--muted); }
+
+		/* One focus treatment for every interactive element on the page. Keyboard
+		   users could previously tab through the catalog, the fund button, and the
+		   footer with no visible position at all. */
+		:focus-visible { outline: 2px solid var(--blue); outline-offset: 2px; border-radius: 6px; }
+		#topic:focus-visible { outline-offset: 1px; }
+
+		/* Label kept for screen readers only: the field's purpose is carried
+		   visually by its placeholder and by the catalog above it. */
+		.sr-only {
+			position: absolute;
+			width: 1px; height: 1px;
+			padding: 0; margin: -1px;
+			overflow: hidden;
+			clip: rect(0 0 0 0);
+			clip-path: inset(50%);
+			white-space: nowrap;
+			border: 0;
+		}
+
+		/* Transaction feed */
+		#feed {
+			flex: 1;
+			overflow-y: auto;
+			padding: 10px 12px;
+			scrollbar-width: thin;
+			scrollbar-color: rgba(255,255,255,.07) transparent;
+		}
+		#feed::-webkit-scrollbar { width: 3px; }
+		#feed::-webkit-scrollbar-thumb { background: rgba(255,255,255,.07); border-radius: 2px; }
+
+		#feed-empty {
+			display: flex;
+			flex-direction: column;
+			align-items: center;
+			justify-content: center;
+			height: 100%;
+			text-align: center;
+			color: var(--muted);
+			font-size: 11px;
+			gap: 6px;
+		}
+		#feed-empty svg { opacity: .25; }
+
+		.tx-item {
+			display: flex;
+			gap: 9px;
+			padding: 9px 10px;
+			border-radius: 8px;
+			background: var(--panel);
+			border: 1px solid var(--border);
+			margin-bottom: 6px;
+			animation: slideIn .25s ease;
+		}
+		@keyframes slideIn { from { opacity:0; transform:translateY(-6px) } to { opacity:1; transform:none } }
+		.tx-icon {
+			width: 28px; height: 28px;
+			border-radius: 7px;
+			display: flex; align-items: center; justify-content: center;
+			font-size: 14px;
+			flex-shrink: 0;
+		}
+		.tx-pay  .tx-icon { background: var(--blue-g); }
+		.tx-recv .tx-icon { background: var(--purple-g); }
+		.tx-data .tx-icon { background: var(--green-g); }
+		.tx-body { flex: 1; min-width: 0; }
+		.tx-title { font-size: 11.5px; font-weight: 600; }
+		.tx-pay  .tx-title { color: var(--blue); }
+		.tx-recv .tx-title { color: var(--purple); }
+		.tx-data .tx-title { color: var(--green); }
+		.tx-sub { font-size: 10px; color: var(--muted); margin-top: 2px; line-height: 1.45; overflow: hidden; }
+		.tx-sub a { color: var(--muted); text-decoration: none; }
+		.tx-sub a:hover { color: var(--text); text-decoration: underline; }
+		.tx-mono { font-family: "SF Mono", "Fira Code", monospace; font-size: 9.5px; }
+		.tx-time { font-size: 9.5px; color: var(--dim); flex-shrink: 0; align-self: flex-start; padding-top: 1px; }
+
+		/* Status bar */
+		#status-bar {
+			padding: 9px 12px;
+			border-top: 1px solid var(--border);
+			font-size: 10.5px;
+			color: var(--muted);
+			flex-shrink: 0;
+			display: flex;
+			align-items: center;
+			gap: 6px;
+		}
+		#status-text { flex: 1; }
+		#tx-count { color: var(--dim); font-size: 10px; }
+
+		/* Bottom bar */
+		#bottom-bar {
+			grid-column: 1 / -1;
+			display: flex;
+			align-items: center;
+			justify-content: center;
+			gap: 16px;
+			padding: 8px 20px;
+			border-top: 1px solid var(--border);
+			background: var(--panel);
+			font-size: 10.5px;
+			color: var(--muted);
+		}
+		#bottom-bar a { color: var(--muted); text-decoration: none; }
+		#bottom-bar a:hover { color: var(--text); }
+		#bottom-bar .sep { opacity: .25; }
+
+		/* Loading overlay on avatars */
+		.av-loading {
+			position: absolute;
+			inset: 0;
+			display: flex;
+			align-items: center;
+			justify-content: center;
+			z-index: 5;
+			background: var(--bg);
+			transition: opacity .4s ease;
+		}
+		.av-loading.gone { opacity: 0; pointer-events: none; }
+		.av-spinner {
+			width: 20px; height: 20px;
+			border: 2px solid rgba(255,255,255,.08);
+			border-top-color: rgba(255,255,255,.3);
+			border-radius: 50%;
+			animation: spin .7s linear infinite;
+		}
+		@keyframes spin { to { transform: rotate(360deg) } }
+
+		/* Paying flash overlay */
+		.av-col.paying { animation: payFlash .5s ease; }
+		@keyframes payFlash { 0%{box-shadow:inset 0 0 0 2px transparent} 30%{box-shadow:inset 0 0 0 2px var(--blue)} 100%{box-shadow:inset 0 0 0 2px transparent} }
+		.av-col.receiving { animation: recvFlash .5s ease .2s; }
+		@keyframes recvFlash { 0%{box-shadow:inset 0 0 0 2px transparent} 30%{box-shadow:inset 0 0 0 2px var(--purple)} 100%{box-shadow:inset 0 0 0 2px transparent} }
+
+		/* ── Payment particle ────────────────────────────────────────────── */
+		#root { position: relative; }
+		.pay-particle {
+			position: absolute;
+			width: 14px; height: 14px;
+			border-radius: 50%;
+			background: var(--blue);
+			box-shadow: 0 0 16px 4px var(--blue), 0 0 32px 8px rgba(78,140,255,.4);
+			pointer-events: none;
+			z-index: 200;
+			transform: translate(-50%, -50%);
+		}
+		@keyframes particleArc {
+			0%   { transform: translate(-50%,-50%) translate(0,0);             opacity:1; }
+			40%  { transform: translate(-50%,-50%) translate(var(--tx-half),-70px); opacity:1; }
+			80%  { transform: translate(-50%,-50%) translate(var(--tx-full),8px); opacity:1; }
+			100% { transform: translate(-50%,-50%) translate(var(--tx-full),0);  opacity:0; }
+		}
+		.pay-particle.arc { animation: particleArc .85s cubic-bezier(.2,.8,.4,1) forwards; }
+
+		/* ── Wallet balance chip ─────────────────────────────────────────── */
+		.av-label-bal {
+			font-size: 10.5px;
+			font-weight: 600;
+			margin-top: 4px;
+			font-family: "SF Mono","Fira Code",monospace;
+			letter-spacing: -.01em;
+		}
+		.bal-funded { color: var(--green); }
+		.bal-empty  { color: var(--amber); }
+		.bal-unknown { color: var(--dim); }
+		.bal-spin {
+			display: inline-block;
+			width: 8px; height: 8px;
+			border: 1px solid currentColor;
+			border-top-color: transparent;
+			border-radius: 50%;
+			animation: spin .6s linear infinite;
+			vertical-align: middle;
+			margin-right: 3px;
+		}
+
+		/* Fund alert banner */
+		#fund-alert {
+			margin: 0 12px 8px;
+			padding: 9px 11px;
+			border-radius: 8px;
+			background: rgba(247,160,53,.07);
+			border: 1px solid rgba(247,160,53,.2);
+			font-size: 10.5px;
+			color: var(--amber);
+			line-height: 1.5;
+			display: none;
+		}
+		#fund-alert strong { color: var(--warn, #fbbf24); }
+		#fund-alert a { color: var(--amber); }
+		#fund-alert .fund-addr {
+			font-family: "SF Mono","Fira Code",monospace;
+			font-size: 9.5px;
+			word-break: break-all;
+			margin-top: 4px;
+			color: var(--text);
+			display: block;
+		}
+		#fund-alert.visible { display: block; }
+
+		/* The buttons the page injects at runtime: "Add funds" in the fund banner
+		   and in the feed's insufficient-balance row, "Retry" in the wallet-status
+		   notice, "Try again" on a failed request. They shipped with no styles at
+		   all, so they rendered as default OS buttons on a black panel. */
+		.fund-alert-btn,
+		.tx-add-funds-btn,
+		.tx-retry-btn {
+			display: inline-flex;
+			align-items: center;
+			gap: 4px;
+			margin-top: 7px;
+			padding: 5px 10px;
+			border-radius: 7px;
+			border: 1px solid rgba(247,160,53,.45);
+			background: rgba(247,160,53,.12);
+			color: var(--amber);
+			font: inherit;
+			font-size: 10.5px;
+			font-weight: 600;
+			cursor: pointer;
+			transition: background .15s, border-color .15s, transform .1s;
+		}
+		.fund-alert-btn:hover,
+		.tx-add-funds-btn:hover,
+		.tx-retry-btn:hover { background: rgba(247,160,53,.22); border-color: rgba(247,160,53,.7); }
+		.fund-alert-btn:active,
+		.tx-add-funds-btn:active,
+		.tx-retry-btn:active { transform: translateY(1px); }
+
+		/* Responsive.
+		   Both agents stay on screen on narrow viewports. Hiding the buyer used to
+		   leave a page about two agents transacting showing one, and it broke the
+		   payment arc outright: the particle measures the buyer column, and a
+		   display:none column measures zero, so the payment flew out of the corner
+		   of the screen instead of between the agents. */
+		@media (max-width: 700px) {
+			#root { grid-template-columns: 1fr 1fr; grid-template-rows: 38vh minmax(0, 1fr) auto; }
+			#col-buyer  { grid-column: 1; grid-row: 1; }
+			#col-seller { grid-column: 2; grid-row: 1; border-left: 1px solid var(--border); }
+			#center { grid-column: 1 / -1; grid-row: 2; border-left: none; border-right: none; border-top: 1px solid var(--border); }
+			#bottom-bar { grid-row: 3; }
+
+			/* The center column is taller than its row once the catalog, the fund
+			   banner and the topic field stack up, and it used to clip the overflow:
+			   at 320px the transaction feed and the status bar (the entire output of
+			   this page) were cut off with no way to scroll to them. Scroll the
+			   column instead, and keep the feed a readable height inside it. */
+			#center { overflow-y: auto; overscroll-behavior: contain; }
+			#feed { flex: 1 0 auto; min-height: 140px; overflow-y: visible; }
+			#status-bar { position: sticky; bottom: 0; background: var(--bg); }
+
+			/* Half-width columns cannot hold the desktop chrome: let the label wrap
+			   and drop the bubble's desktop min-width so neither is clipped. */
+			.av-label { padding: 6px 9px; bottom: 10px; white-space: normal; max-width: calc(100% - 12px); }
+			.av-label-name { font-size: 12px; }
+			.av-label-addr { word-break: break-all; }
+			.av-speech { min-width: 0; max-width: calc(100% - 16px); top: 10px; padding: 8px 10px; font-size: 11px; }
+			/* The floating language switcher is fixed to the bottom-right corner and
+			   sat directly on top of these links. Reserve its height so every footer
+			   link stays clickable. */
+			#bottom-bar { flex-wrap: wrap; gap: 8px; row-gap: 4px; padding: 8px 12px 54px; }
+		}
+
+		/* Phone widths: 38vh of avatars leaves the catalog and feed fighting over
+		   what's left, so give the agents a little less room. */
+		@media (max-width: 480px) {
+			#root { grid-template-rows: 30vh minmax(0, 1fr) auto; }
+		}
+
+		/* Noscript */
+		noscript > div { position: fixed; inset: 0; z-index: 9999; display: flex; align-items: center; justify-content: center; padding: 24px; background: var(--bg); text-align: center; }
+	</style>
+
+	<link rel="canonical" href="https://three.ws/agent-economy">
+	<script type="application/ld+json">{"@context":"https://schema.org","@type":"WebPage","name":"Agent Economy: Live Demo","description":"Watch two 3D AI agents transact on-chain. Agent A buys data from Agent B: real SOL, real Solana transaction, live.","url":"https://three.ws/agent-economy","isPartOf":{"@type":"WebSite","name":"three.ws","url":"https://three.ws"}}</script>
+
+	<meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1">
+	<meta property="og:locale" content="en_US">
+	<meta property="og:image:alt" content="Agent Economy: Live Demo on three.ws">
+</head>
+<body>
+	<noscript>
+		<div>
+			<div>
+				<h1 style="font-size:24px;font-weight:600;color:#fff;margin-bottom:10px">Agent Economy</h1>
+				<p style="color:#5c6180;max-width:400px;margin:0 auto 20px">Two 3D AI agents transacting on-chain. This interactive demo requires JavaScript.</p>
+				<a href="/docs" style="display:inline-block;padding:10px 18px;border-radius:8px;background:#4e8cff;color:#fff;text-decoration:none;font-size:14px">Read the docs</a>
+			</div>
+		</div>
+	</noscript>
+
+	<div id="root">
+		<!-- Agent A — Nova (buyer) -->
+		<div class="av-col" id="col-buyer">
+			<div class="av-loading" id="loading-buyer"><div class="av-spinner"></div></div>
+			<iframe id="frame-buyer" class="av-frame" title="Nova — AI Agent (Buyer)" allow="autoplay; microphone" loading="lazy"></iframe>
+			<div class="av-speech" id="speech-buyer"></div>
+			<div class="av-label">
+				<div class="av-label-name">Nova</div>
+				<div class="av-label-role">Buyer Agent</div>
+				<div class="av-label-addr" id="buyer-addr">—</div>
+				<div class="av-label-bal bal-unknown" id="buyer-bal" aria-live="polite" aria-atomic="true" aria-label="Nova wallet balance"><span class="bal-spin"></span></div>
+			</div>
+		</div>
+
+		<!-- Center: service catalog + tx feed -->
+		<div id="center">
+			<div id="center-head">
+				<h1 data-i18n-html="agent_economy.agent_economy"><span class="live-dot"></span> Agent Economy</h1>
+				<div id="center-sub">Agents paying agents · Real SOL · Solana mainnet</div>
+			</div>
+
+			<div id="fund-alert" role="status" aria-live="polite" aria-atomic="true"></div>
+
+			<div id="catalog">
+				<div id="catalog-label">Services offered by Oracle</div>
+				<button class="svc-btn" type="button" data-service="market-analysis" aria-label="Buy Market Analysis from Oracle for $0.001, live sentiment and trend read" data-i18n-attr="aria-label:agent_economy.buy_market_analysis_from_ora_arialabel">
+					<div class="svc-btn-left">
+						<span class="svc-btn-name">Market Analysis</span>
+						<span class="svc-btn-tag">Live sentiment + trend read</span>
+					</div>
+					<span class="svc-btn-price">$0.001</span>
+				</button>
+				<button class="svc-btn" type="button" data-service="onchain-insight" aria-label="Buy On-Chain Insight from Oracle for $0.002, wallet activity and holder data" data-i18n-attr="aria-label:agent_economy.buy_on_chain_insight_from_or_arialabel">
+					<div class="svc-btn-left">
+						<span class="svc-btn-name">On-Chain Insight</span>
+						<span class="svc-btn-tag">Wallet activity + holder data</span>
+					</div>
+					<span class="svc-btn-price">$0.002</span>
+				</button>
+				<button class="svc-btn" type="button" data-service="risk-score" aria-label="Buy Risk Score from Oracle for $0.003, AI-generated protocol rating" data-i18n-attr="aria-label:agent_economy.buy_risk_score_from_oracle_f_arialabel">
+					<div class="svc-btn-left">
+						<span class="svc-btn-name">Risk Score</span>
+						<span class="svc-btn-tag">AI-generated protocol rating</span>
+					</div>
+					<span class="svc-btn-price">$0.003</span>
+				</button>
+			</div>
+
+			<div id="topic-wrap">
+				<label class="sr-only" for="topic">Topic for the requested service (optional)</label>
+				<input id="topic" type="text" placeholder="Topic (optional), e.g. Solana or $THREE" maxlength="120" autocomplete="off" spellcheck="false" />
+			</div>
+
+			<div id="feed">
+				<div id="feed-empty">
+					<svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" aria-hidden="true" focusable="false">
+						<polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/>
+					</svg>
+					<span data-i18n="agent_economy.pick_a_service_above_to_watch_the">Pick a service above to watch the agents transact</span>
+				</div>
+			</div>
+
+			<div id="status-bar">
+				<span id="status-text" data-i18n="agent_economy.ready_select_a_service_to_start">Ready. Select a service to start.</span>
+				<span id="tx-count"></span>
+			</div>
+		</div>
+
+		<!-- Agent B — Oracle (seller) -->
+		<div class="av-col" id="col-seller">
+			<div class="av-loading" id="loading-seller"><div class="av-spinner"></div></div>
+			<iframe id="frame-seller" class="av-frame" title="Oracle — AI Agent (Seller)" allow="autoplay; microphone" loading="lazy"></iframe>
+			<div class="av-speech" id="speech-seller"></div>
+			<div class="av-label">
+				<div class="av-label-name">Oracle</div>
+				<div class="av-label-role">Data Seller Agent</div>
+				<div class="av-label-addr" id="seller-addr">—</div>
+				<div class="av-label-bal bal-unknown" id="seller-bal" aria-live="polite" aria-atomic="true" aria-label="Oracle wallet balance"><span class="bal-spin"></span></div>
+			</div>
+		</div>
+
+		<div id="bottom-bar">
+			<a href="/galaxy" data-i18n="agent_economy.galaxy_showcase">Galaxy showcase</a>
+			<span class="sep">·</span>
+			<a href="/x402" data-i18n="agent_economy.x402_bazaar">x402 Bazaar</a>
+			<span class="sep">·</span>
+			<a href="https://three.ws" target="_blank" rel="noopener" data-i18n="agent_economy.three_ws">three.ws</a>
+			<span class="sep">·</span>
+			<span data-i18n="agent_economy.agent_to_agent_value_transfer_solana">Agent-to-agent value transfer · Solana</span>
+		</div>
+	</div>
+
+	<script type="module" src="/src/agent-economy.js"></script>
+	<!-- Runtime i18n: detects locale, swaps annotated copy, mounts <lang-switcher>. -->
+	<script type="module" src="/i18n.js"></script>
+</body>
+</html>

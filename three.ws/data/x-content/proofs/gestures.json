@@ -1,0 +1,160 @@
+{
+	"id": "gestures",
+	"scenarioHash": "f4815aa3ad9c49b4370ab438cd303bf20bd85a3fc364744c0e3b0ed1db7865c1",
+	"ranAt": "2026-09-29T10:22:42.123Z",
+	"target": {
+		"commit": "f2081d946",
+		"revision": "three-ws-api-00460-4j6"
+	},
+	"passed": true,
+	"steps": [
+		{
+			"index": 1,
+			"kind": "goto",
+			"target": "https://three.ws/gestures",
+			"detail": "loaded https://three.ws/gestures",
+			"ok": true,
+			"ms": 6923,
+			"frames": 0
+		},
+		{
+			"index": 2,
+			"kind": "read",
+			"target": "slots",
+			"detail": "slots = \"19\"",
+			"ok": true,
+			"ms": 2,
+			"frames": 0
+		},
+		{
+			"index": 3,
+			"kind": "scroll",
+			"target": "The slot vocabulary",
+			"detail": "scrolled 469 px",
+			"ok": true,
+			"ms": 3800,
+			"frames": 27
+		},
+		{
+			"index": 4,
+			"kind": "click",
+			"target": "[data-role=\"grid\"] [data-slot=\"wave\"]",
+			"detail": "clicked",
+			"ok": true,
+			"ms": 8811,
+			"frames": 21
+		},
+		{
+			"index": 5,
+			"kind": "expect",
+			"target": "Wave · wave",
+			"detail": "appeared after 0.0 s",
+			"ok": true,
+			"ms": 24,
+			"frames": 0
+		},
+		{
+			"index": 6,
+			"kind": "hold",
+			"target": "2600",
+			"detail": "2600 ms",
+			"ok": true,
+			"ms": 32303,
+			"frames": 78
+		},
+		{
+			"index": 7,
+			"kind": "scroll",
+			"target": "300",
+			"detail": "scrolled 300 px",
+			"ok": true,
+			"ms": 11151,
+			"frames": 21
+		},
+		{
+			"index": 8,
+			"kind": "click",
+			"target": "[data-role=\"grid\"] [data-slot=\"celebrate\"]",
+			"detail": "clicked",
+			"ok": true,
+			"ms": 12156,
+			"frames": 21
+		},
+		{
+			"index": 9,
+			"kind": "expect",
+			"target": "Celebrate · celebrate",
+			"detail": "appeared after 0.0 s",
+			"ok": true,
+			"ms": 31,
+			"frames": 0
+		},
+		{
+			"index": 10,
+			"kind": "hold",
+			"target": "2600",
+			"detail": "2600 ms",
+			"ok": true,
+			"ms": 32796,
+			"frames": 78
+		},
+		{
+			"index": 11,
+			"kind": "scroll",
+			"target": "610",
+			"detail": "scrolled 610 px",
+			"ok": true,
+			"ms": 10628,
+			"frames": 27
+		},
+		{
+			"index": 12,
+			"kind": "click",
+			"target": "[data-role=\"grid\"] [data-slot=\"dance\"]",
+			"detail": "clicked",
+			"ok": true,
+			"ms": 6988,
+			"frames": 21
+		},
+		{
+			"index": 13,
+			"kind": "expect",
+			"target": "Rumba · rumba",
+			"detail": "appeared after 0.1 s",
+			"ok": true,
+			"ms": 127,
+			"frames": 0
+		},
+		{
+			"index": 14,
+			"kind": "hold",
+			"target": "4000",
+			"detail": "4000 ms",
+			"ok": true,
+			"ms": 46284,
+			"frames": 120
+		}
+	],
+	"facts": {
+		"slots": "19"
+	},
+	"saw": [
+		"Wave · wave",
+		"Celebrate · celebrate",
+		"Rumba · rumba"
+	],
+	"responses": [],
+	"cuts": [],
+	"video": {
+		"path": "public/x-media/gestures/reel.mp4",
+		"sha256": "ec44d568ecaab78cb7b984f5eb55fc2539f8954f8a344e9ba94a9c3f645a10f3",
+		"frames": 414,
+		"motion": 1,
+		"durationSec": 13.8,
+		"width": 1280,
+		"height": 720,
+		"fps": 30,
+		"videoCodec": "h264",
+		"pixFmt": "yuv420p"
+	}
+}

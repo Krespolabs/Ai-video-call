@@ -1,0 +1,47 @@
+{
+	"title": "Northwind Goods — store tour",
+	"tracks": [{ "id": "full", "title": "Full tour" }],
+	"sections": [
+		{ "id": "store", "title": "The store", "intro": "Welcome to Northwind Goods — let me show you around." }
+	],
+	"stops": [
+		{
+			"path": "/examples/shopify-storefront",
+			"section": "store",
+			"title": "Welcome",
+			"highlight": true,
+			"narration": "This is Northwind Goods — small-batch homeware, made by hand. Hit this button any time to browse the whole collection.",
+			"targets": ["a.cta"]
+		},
+		{
+			"path": "/examples/shopify-storefront",
+			"section": "store",
+			"title": "Featured products",
+			"highlight": true,
+			"narration": "These are the pieces everyone is loving right now. The pour-over set and the oak board restock every week.",
+			"targets": ["#featured .grid"]
+		},
+		{
+			"path": "/examples/shopify-storefront",
+			"section": "store",
+			"title": "Our story",
+			"narration": "Everything here comes from eleven independent Pacific Northwest workshops — fair rates, no rushed seasons.",
+			"targets": ["#story .copy"]
+		},
+		{
+			"path": "/examples/shopify-storefront",
+			"section": "store",
+			"title": "Reviews",
+			"highlight": true,
+			"narration": "Two thousand three hundred reviews, four point nine average. The throw blanket reviews are basically love letters.",
+			"targets": ["#reviews .reviews"]
+		},
+		{
+			"path": "/examples/shopify-storefront",
+			"section": "store",
+			"title": "Shipping & returns",
+			"narration": "Orders ship in forty-eight hours, returns are free for sixty days, and every piece carries a lifetime repair promise.",
+			"targets": ["#policies .policies"]
+		}
+	]
+}

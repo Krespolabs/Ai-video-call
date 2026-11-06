@@ -1,0 +1,356 @@
+<!doctype html>
+<html lang="en">
+	<head>
+		<script>
+			/* three.ws theme boot (no-flash); runtime in /theme-switcher.js */ (function () {
+				try {
+					var m = localStorage.getItem('twx_theme');
+					var l =
+						m === 'auto'
+							? window.matchMedia &&
+								window.matchMedia('(prefers-color-scheme: light)').matches
+							: m === 'light';
+					document.documentElement.setAttribute('data-theme', l ? 'light' : 'dark');
+				} catch (e) {
+					document.documentElement.setAttribute('data-theme', 'dark');
+				}
+			})();
+		</script>
+		<meta charset="utf-8" />
+		<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+		<title data-i18n="receipts.page_title">Receipt Vault · three.ws</title>
+		<meta
+			name="description"
+			data-i18n-attr="content:receipts.meta_desc"
+			content="Every x402 payment you ever made to three.ws, retrievable forever. Connect a Solana or EVM wallet, sign one message, and get back your signed proof-of-purchase receipts: endpoint, network, settlement tx, and the full artifact as JSON or CSV."
+		/>
+		<meta property="og:type" content="website" />
+		<meta property="og:site_name" content="three.ws" />
+		<meta property="og:url" content="https://three.ws/receipts" />
+		<meta property="og:title" content="Receipt Vault · three.ws" data-i18n-attr="content:receipts.share_title" />
+		<meta
+			property="og:description"
+			data-i18n-attr="content:receipts.og_desc"
+			content="Connect a wallet, sign one message, and retrieve every signed x402 receipt three.ws ever issued you: proof of purchase for every paid API call, exportable as JSON or CSV."
+		/>
+		<meta
+			property="og:image"
+			content="https://three.ws/api/page-og?s=crypto&amp;t=Receipt+Vault&amp;d=Every+x402+payment+you+ever+made+to+three.ws%2C+retrievable+forever.+Connect+a+Solana+or+EVM+wallet%2C+sign+one+read-only+message%2C+and+get+back+every+signed&amp;p=%2Freceipts"
+		/>
+		<meta property="og:image:width" content="1200" />
+		<meta property="og:image:height" content="630" />
+		<meta name="twitter:card" content="summary_large_image" />
+		<meta name="twitter:site" content="@trythreews" />
+		<meta name="twitter:title" content="Receipt Vault · three.ws" data-i18n-attr="content:receipts.share_title" />
+		<meta
+			name="twitter:description"
+			data-i18n-attr="content:receipts.twitter_desc"
+			content="Retrieve every signed x402 receipt three.ws ever issued to your wallet. Proof of purchase, exportable, explorer-verifiable."
+		/>
+		<meta
+			name="twitter:image"
+			content="https://three.ws/api/page-og?s=crypto&amp;t=Receipt+Vault&amp;d=Every+x402+payment+you+ever+made+to+three.ws%2C+retrievable+forever.+Connect+a+Solana+or+EVM+wallet%2C+sign+one+read-only+message%2C+and+get+back+every+signed&amp;p=%2Freceipts"
+		/>
+		<meta name="theme-color" content="#0a0a0a" />
+		<link rel="icon" href="/favicon.ico" sizes="any" />
+		<link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+		<link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+		<link rel="manifest" href="/manifest.webmanifest" />
+		<link rel="stylesheet" href="/fonts/fonts.css" />
+		<link rel="stylesheet" href="/nav.css" />
+		<link rel="stylesheet" href="/src/ui-juice.css" />
+		<link rel="stylesheet" href="/src/receipts.css" />
+		<link rel="stylesheet" href="/footer.css" />
+		<script defer src="/footer-newsletter.js"></script>
+		<link rel="canonical" href="https://three.ws/receipts" />
+		<script type="application/ld+json">
+			{
+				"@context": "https://schema.org",
+				"@type": "WebPage",
+				"name": "Receipt Vault",
+				"description": "Retrieve every signed x402 receipt three.ws ever issued to your wallet: proof of purchase for every paid API call, exportable as JSON or CSV.",
+				"url": "https://three.ws/receipts",
+				"isPartOf": { "@type": "WebSite", "name": "three.ws", "url": "https://three.ws" }
+			}
+		</script>
+		<meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1" />
+		<meta property="og:locale" content="en_US" />
+		<meta property="og:image:alt" content="Receipt Vault · three.ws" />
+	</head>
+	<body>
+		<header><div id="nav-container"></div></header>
+		<script src="/nav.js"></script>
+
+		<main class="rc-shell">
+			<div class="rc-glow" aria-hidden="true"></div>
+
+			<!-- hero -->
+			<section class="rc-hero">
+				<p class="rc-kicker" data-i18n="receipts.kicker">Proof of purchase, forever</p>
+				<h1 class="rc-title" data-i18n-html="receipts.title">Receipt <em>Vault</em></h1>
+				<p class="rc-sub" data-i18n-html="receipts.sub">
+					Every paid x402 call you make to three.ws issues a signed receipt, and we
+					keep a durable copy. Lost the original payment-response header? Connect
+					your wallet, sign one read-only message, and pull back every receipt ever
+					issued to it. This is the buyer's side of the ledger: every receipt here is
+					something <strong>you</strong> bought.
+				</p>
+			</section>
+
+			<!-- tab bar: what three.ws billed you vs what your agents spent elsewhere -->
+			<div class="rc-tabs" role="tablist" aria-label="Receipt direction">
+				<button type="button" class="rc-tab" id="rc-tab-inbound" role="tab" aria-selected="true" aria-controls="rc-panel-inbound">
+					<span data-i18n="receipts.tab_inbound">Inbound</span>
+					<span class="rc-tab-sub" data-i18n="receipts.tab_inbound_sub">What three.ws billed you</span>
+				</button>
+				<button type="button" class="rc-tab" id="rc-tab-outbound" role="tab" aria-selected="false" aria-controls="rc-panel-outbound">
+					<span data-i18n="receipts.tab_outbound">Outbound</span>
+					<span class="rc-tab-sub" data-i18n="receipts.tab_outbound_sub">What your agents spent elsewhere</span>
+				</button>
+			</div>
+
+			<div id="rc-panel-inbound" role="tabpanel" aria-labelledby="rc-tab-inbound">
+			<!-- signed-out state -->
+			<section class="rc-signin" id="rc-signin" aria-label="Connect a wallet">
+				<h2 data-i18n="receipts.signin_h">Prove your wallet, get your receipts</h2>
+				<p class="rc-signin-copy" data-i18n="receipts.signin_copy">
+					Sign a plain-text message stating your address and a timestamp. The
+					signature authorizes a read of your own receipts and nothing else: no
+					transaction, no approval, no fee. It expires after 5 minutes.
+				</p>
+				<div class="rc-connect-row">
+					<button
+						type="button"
+						class="rc-btn rc-btn-primary"
+						id="rc-connect-solana"
+						data-label="Connect Solana wallet"
+					>
+						<span class="rc-btn-label" data-i18n="receipts.connect_solana">Connect Solana wallet</span>
+					</button>
+					<button
+						type="button"
+						class="rc-btn rc-btn-secondary"
+						id="rc-connect-evm"
+						data-label="Connect EVM wallet"
+					>
+						<span class="rc-btn-label" data-i18n="receipts.connect_evm">Connect EVM wallet</span>
+					</button>
+				</div>
+				<p class="rc-signin-error" id="rc-signin-error" role="alert" hidden></p>
+				<p class="rc-signin-note" data-i18n-html="receipts.signin_note">
+					Works with Phantom, Backpack, and Solflare on Solana, and MetaMask or any
+					injected wallet on EVM chains. Receipts are signed by three.ws under the
+					x402 Offer &amp; Receipt extension, so third parties can verify them
+					without trusting us. Never made a paid call? Start at the
+					<a href="/x402">x402 endpoint catalog</a>.
+				</p>
+			</section>
+
+			<!-- signed-in vault -->
+			<section id="rc-vault" aria-label="Your receipts" hidden>
+				<div class="rc-vault-head">
+					<span class="rc-wallet">
+						<span class="rc-wallet-net" id="rc-wallet-net"></span>
+						<span class="rc-wallet-addr" id="rc-wallet-addr"></span>
+					</span>
+					<span class="rc-vault-tools">
+						<button type="button" class="rc-tool" id="rc-refresh" title="Re-fetch receipts" data-i18n="receipts.refresh_btn" data-i18n-attr="title:receipts.refresh_title">
+							Refresh
+						</button>
+						<button
+							type="button"
+							class="rc-tool"
+							id="rc-export"
+							title="Export the visible receipts as CSV"
+							data-i18n="receipts.export_btn"
+							data-i18n-attr="title:receipts.export_title"
+						>
+							Export CSV
+						</button>
+						<button type="button" class="rc-tool" id="rc-disconnect" title="Forget this session" data-i18n="receipts.disconnect_btn" data-i18n-attr="title:receipts.disconnect_title">
+							Disconnect
+						</button>
+					</span>
+				</div>
+
+				<div class="rc-kpis" aria-label="Summary">
+					<div class="rc-kpi rc-kpi-hero">
+						<span class="rc-kpi-label" data-i18n="receipts.kpi_spend">Total spend</span>
+						<span class="rc-kpi-val" id="rc-k-spend">·</span>
+						<span class="rc-kpi-sub" id="rc-k-spend-note">USDC settled</span>
+					</div>
+					<div class="rc-kpi">
+						<span class="rc-kpi-label" data-i18n="receipts.kpi_receipts">Receipts</span>
+						<span class="rc-kpi-val" id="rc-k-total">·</span>
+					</div>
+					<div class="rc-kpi">
+						<span class="rc-kpi-label" data-i18n="receipts.kpi_endpoints">Endpoints used</span>
+						<span class="rc-kpi-val" id="rc-k-endpoints">·</span>
+					</div>
+					<div class="rc-kpi">
+						<span class="rc-kpi-label" data-i18n="receipts.kpi_networks">Networks</span>
+						<span class="rc-kpi-val" id="rc-k-networks">·</span>
+					</div>
+					<div class="rc-kpi">
+						<span class="rc-kpi-label" data-i18n="receipts.kpi_last">Last purchase</span>
+						<span class="rc-kpi-val" id="rc-k-last">·</span>
+					</div>
+				</div>
+
+				<div class="rc-search-wrap">
+					<label class="rc-search-label" for="rc-search" data-i18n="receipts.search_label">Filter loaded receipts</label>
+					<input
+						type="search"
+						class="rc-search"
+						id="rc-search"
+						placeholder="Filter by endpoint, network, or tx hash"
+						data-i18n-attr="placeholder:receipts.search_placeholder"
+					/>
+				</div>
+
+				<div class="rc-list" id="rc-list" aria-live="polite"></div>
+
+				<div class="rc-more-wrap" id="rc-more-wrap" hidden>
+					<p class="rc-shown" id="rc-shown"></p>
+					<button type="button" class="rc-btn rc-btn-secondary rc-more" id="rc-more">
+						<span class="rc-btn-label" data-i18n="receipts.load_more">Load 200 more</span>
+					</button>
+				</div>
+
+				<div class="rc-empty" id="rc-empty" hidden>
+					<h3 id="rc-empty-title"></h3>
+					<p id="rc-empty-body"></p>
+				</div>
+
+				<div class="rc-load-error" id="rc-load-error" role="alert" hidden>
+					<h3 data-i18n="receipts.load_error_h">Could not load your receipts</h3>
+					<p id="rc-load-error-msg"></p>
+					<button type="button" class="rc-tool" id="rc-retry" data-i18n="receipts.retry_btn">Retry</button>
+				</div>
+
+				<p class="rc-fineprint rc-hint" data-i18n-html="receipts.fineprint">
+					<kbd>/</kbd> search · <kbd>e</kbd> export CSV. Each receipt is a signed
+					artifact (JWS) from the x402 Offer &amp; Receipt extension; the JSON
+					download includes the signature so anyone can verify it against the
+					three.ws issuer key. Some receipts omit the on-chain tx hash by design
+					for privacy. The API behind this page is
+					<code>GET /api/x402/my-receipts</code>, documented in the
+					<a href="/docs/api-reference">API reference</a>.
+				</p>
+			</section>
+			</div>
+
+			<div id="rc-panel-outbound" role="tabpanel" aria-labelledby="rc-tab-outbound" hidden>
+				<!-- signed-out state: account session, not a wallet signature -->
+				<section class="rc-signin" id="ob-signin" aria-label="Sign in to view outbound spend">
+					<h2 data-i18n="receipts.ob_signin_h">Sign in to see what your agents spent</h2>
+					<p class="rc-signin-copy" data-i18n="receipts.ob_signin_copy">
+						Outbound receipts are account-scoped: they show what your Agent Payment
+						Sessions spent at other, external x402 merchants. Sign in to view them.
+					</p>
+					<div class="rc-connect-row">
+						<a href="/login?r=/receipts" class="rc-btn rc-btn-primary" id="ob-signin-link" style="text-decoration:none">
+							<span class="rc-btn-label" data-i18n="receipts.ob_signin_btn">Sign in →</span>
+						</a>
+					</div>
+					<p class="rc-signin-note" data-i18n-html="receipts.ob_signin_note">
+						Never run a Payment Session yet? Fund one from
+						<a href="/payments">the Payment Sessions dashboard</a> and hand its token
+						to an agent, or read the
+						<a href="/docs/tutorials/agent-spending-envelope">spending envelope guide</a>.
+					</p>
+				</section>
+
+				<!-- signed-in vault -->
+				<section id="ob-vault" aria-label="What your agents spent elsewhere" hidden>
+					<div class="rc-vault-head">
+						<span class="rc-wallet" id="ob-vault-label" data-i18n="receipts.ob_vault_label">Outbound spend, across every Payment Session</span>
+						<span class="rc-vault-tools">
+							<select class="rc-tool" id="ob-filter-network" title="Filter by network" data-i18n-attr="title:receipts.ob_filter_network_title">
+								<option value="" data-i18n="receipts.ob_filter_all">All networks</option>
+								<option value="solana">Solana</option>
+								<option value="base">Base</option>
+							</select>
+							<button type="button" class="rc-tool" id="ob-refresh" title="Re-fetch outbound receipts" data-i18n="receipts.refresh_btn" data-i18n-attr="title:receipts.refresh_title">
+								Refresh
+							</button>
+							<button type="button" class="rc-tool" id="ob-export" title="Export the visible outbound receipts as CSV" data-i18n="receipts.export_btn" data-i18n-attr="title:receipts.export_title">
+								Export CSV
+							</button>
+						</span>
+					</div>
+
+					<div class="rc-kpis" aria-label="Summary">
+						<div class="rc-kpi rc-kpi-hero">
+							<span class="rc-kpi-label" data-i18n="receipts.ob_kpi_spend">Total spend</span>
+							<span class="rc-kpi-val" id="ob-k-spend">·</span>
+							<span class="rc-kpi-sub" data-i18n="receipts.ob_kpi_spend_note">as reported by settlement</span>
+						</div>
+						<div class="rc-kpi">
+							<span class="rc-kpi-label" data-i18n="receipts.ob_kpi_payments">Payments</span>
+							<span class="rc-kpi-val" id="ob-k-total">·</span>
+						</div>
+						<div class="rc-kpi">
+							<span class="rc-kpi-label" data-i18n="receipts.ob_kpi_verified">Verified on-chain</span>
+							<span class="rc-kpi-val" id="ob-k-verified">·</span>
+						</div>
+						<div class="rc-kpi">
+							<span class="rc-kpi-label" data-i18n="receipts.ob_kpi_merchants">Merchants</span>
+							<span class="rc-kpi-val" id="ob-k-merchants">·</span>
+						</div>
+					</div>
+
+					<div class="rc-search-wrap">
+						<label class="rc-search-label" for="ob-search" data-i18n="receipts.ob_search_label">Filter loaded receipts</label>
+						<input
+							type="search"
+							class="rc-search"
+							id="ob-search"
+							placeholder="Filter by merchant host or tx hash"
+							data-i18n-attr="placeholder:receipts.ob_search_placeholder"
+						/>
+					</div>
+
+					<div class="rc-list" id="ob-list" aria-live="polite"></div>
+
+					<div class="rc-more-wrap" id="ob-more-wrap" hidden>
+						<p class="rc-shown" id="ob-shown"></p>
+						<button type="button" class="rc-btn rc-btn-secondary rc-more" id="ob-more">
+							<span class="rc-btn-label" data-i18n="receipts.ob_load_more">Load more</span>
+						</button>
+					</div>
+
+					<div class="rc-empty" id="ob-empty" hidden>
+						<h3 id="ob-empty-title"></h3>
+						<p id="ob-empty-body"></p>
+					</div>
+
+					<div class="rc-load-error" id="ob-load-error" role="alert" hidden>
+						<h3 data-i18n="receipts.load_error_h">Could not load your outbound receipts</h3>
+						<p id="ob-load-error-msg"></p>
+						<button type="button" class="rc-tool" id="ob-retry" data-i18n="receipts.retry_btn">Retry</button>
+					</div>
+
+					<p class="rc-fineprint rc-hint" data-i18n-html="receipts.ob_fineprint">
+						<kbd>e</kbd> export CSV. "Verified on-chain" reads the settlement
+						transaction's own token-balance change on Solana, independent of
+						whatever the merchant's response claimed; resolved once per payment
+						and cached. Base-network payments show the reported figures only.
+						The API behind this tab is
+						<code>GET /api/x402/outbound-receipts</code>, documented in the
+						<a href="/docs/api-reference">API reference</a>.
+					</p>
+				</section>
+			</div>
+		</main>
+
+		<div class="rc-toast" id="rc-toast" role="status" aria-live="polite" hidden></div>
+
+		<script type="module" src="/src/receipts.js"></script>
+		<script type="module" src="/src/receipts-outbound.js"></script>
+		<script src="/brand.js" defer></script>
+		<div id="footer-container"></div>
+		<script src="/footer.js"></script>
+		<script type="module" src="/i18n.js"></script>
+	</body>
+</html>

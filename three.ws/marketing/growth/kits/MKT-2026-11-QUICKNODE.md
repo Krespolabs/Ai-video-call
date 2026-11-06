@@ -1,0 +1,140 @@
+# MKT-2026-11-QUICKNODE: how the production RPC path fails over without losing the user
+
+**Kit status:** copy complete, verified 2026-09-17. Not blocked on engineering. campaigns.csv status
+`awaiting_outreach`: the spotlight email and field note are ready and unsent, and the program contact's
+name is not recorded in the repo.
+
+## At a glance
+
+| Field | Value |
+|---|---|
+| Campaign id | `MKT-2026-11-QUICKNODE` |
+| Publish date | 2026-11-17 |
+| Summary | A candid field note: how a metered Quicknode reserve silently became the Solana RPC primary, and the four rules that now keep a multi-provider failover chain honest |
+| Audience | Solana developers |
+| Primary channel | Quicknode community or blog (Feature Friday or founder spotlight) |
+| Secondary channels | X, GitHub Discussions, three.ws news |
+| Proof | https://three.ws/docs/solana |
+| Tracked links | X `https://three.ws/docs/solana?utm_source=x&utm_medium=social&utm_campaign=mkt-2026-11-quicknode&utm_content=anchor`; GitHub `...utm_source=github&utm_medium=community&...&utm_content=discussion`; partner email `...utm_source=quicknode&utm_medium=email&...&utm_content=field-note` |
+| The single CTA | Read the field note and test the open implementation |
+| Partner ask | Founder spotlight or co-authored technical post |
+| KPI | doc reads, repo visits, and partner placement |
+
+## Audit: what already exists
+
+| Channel | Existing asset | State | How this kit uses it |
+|---|---|---|---|
+| Partner ask (primary route) | [marketing/partner-packets/quicknode-spotlight-ask.md](../../partner-packets/quicknode-spotlight-ask.md) | Ready | Is the partner message, with one refresh below |
+| Field note | [marketing/partner-packets/quicknode-rpc-failover-field-note.md](../../partner-packets/quicknode-rpc-failover-field-note.md) | Ready; one sentence now stale (below) | Attachment and the source for every post |
+| Program membership graphics | [marketing/quicknode/](../../quicknode/) | Exist | Not used; this is a technical beat, not a membership beat |
+| Media | [partner-packets/images/docs-solana-failover.png](../../partner-packets/images/docs-solana-failover.png) | Exists | Anchor image |
+| X, GitHub Discussions, news | none | Missing | Written below |
+
+**Stale sentence to fix before sending the field note:** it says the recovery-probe change from commit
+`ac1ba86ad` is "not yet deployed". On 2026-09-17 that commit is an ancestor of the live commit
+`477eb6f8c` from `/api/version`, so it has shipped. Change the sentence to "deployed" with the date of the
+deploy that carried it.
+
+## X
+
+**Media:** `marketing/partner-packets/images/docs-solana-failover.png`.
+**Alt text:** three.ws Solana docs explaining never to name the same endpoint as both primary and reserve,
+followed by the cooldown table for failing RPC endpoints.
+
+**Anchor** (170 weighted characters):
+
+```text
+We once set our metered @Quicknode reserve as the Solana RPC primary too. The chain keeps the first copy of a URL, so the reserve took every call: https://three.ws/docs/solana?utm_source=x&utm_medium=social&utm_campaign=mkt-2026-11-quicknode&utm_content=anchor
+```
+
+This is a correction lead (voice contract pattern 3). The tag is defensible: the Quicknode endpoint is a
+real rung in the production chain. The post does not blame Quicknode; the misconfiguration was ours.
+
+**Thread (optional):**
+
+2/ (210)
+```text
+The fix was a rule, not code: a reserve URL appears in the reserve list and nowhere else. Then we sized the bench to the failure: 6h on quota, 30m on a bad key, 10m on a 429, 2m on a 5xx, 30s on a network blip.
+```
+
+3/ (192)
+```text
+A 403 is not always a bad key. Some providers refuse one call shape and serve the rest, so now only that method is demoted on that endpoint, for 15 minutes, instead of benching the whole lane.
+```
+
+4/
+```text
+When every lane fails, the last good answer for the same read is served with an x-solana-rpc-stale header carrying its age, instead of an error. The code: https://github.com/nirholas/three.ws/blob/main/api/_lib/solana/connection.js
+```
+
+## GitHub Discussions (category: Show and tell)
+
+**Title:** Field note: running a Solana RPC failover chain in production
+
+```text
+We wrote up what running a multi-provider Solana RPC failover chain in production taught us, including the day our metered reserve quietly became the primary.
+
+Four rules we now hold:
+1. Dedupe order is policy. The chain keeps the first copy of a URL, so a reserve must appear in the reserve list and nowhere else.
+2. Size the bench to the failure: 6 hours on quota exhaustion, 30 minutes on a bad key, 10 minutes on a 429, 2 minutes on a provider 5xx, 30 seconds on a network error.
+3. A 403 can be one method, not the lane: demote that method on that endpoint for 15 minutes.
+4. Breakers are fleet-wide, so a new instance inherits "this lane is out of quota" instead of paying to learn it.
+
+Docs: https://three.ws/docs/solana?utm_source=github&utm_medium=community&utm_campaign=mkt-2026-11-quicknode&utm_content=discussion
+Code: api/_lib/solana/connection.js
+
+If you run more than one RPC provider, what cooldowns do you use, and what did you get wrong first?
+```
+
+## three.ws news blurb
+
+We published a field note on how three.ws keeps Solana RPC calls alive across several providers, starting
+with the misconfiguration that turned our metered reserve into the primary. It covers dedupe order,
+cooldowns sized to each failure class, per-method demotion for call-shape errors, and fleet-wide breakers,
+with links to the open code. Read it in the Solana docs: https://three.ws/docs/solana.
+
+## Partner message
+
+Send the email in [marketing/partner-packets/quicknode-spotlight-ask.md](../../partner-packets/quicknode-spotlight-ask.md)
+as a reply in the existing Quicknode Startup Program thread, with the field note attached. Refresh before
+sending:
+
+1. Fill `[program contact first name]` and `[Owner name]` from the real thread; neither is in the repo.
+2. Its two proposed Fridays (2026-10-16, 2026-10-23) precede this campaign's date. Replace them with two
+   Fridays after sending, for example 2026-11-20 and 2026-12-04, and confirm both are free.
+3. Fix the stale "not yet deployed" sentence in the field note (above).
+4. Swap the docs link in the email for the tracked
+   `https://three.ws/docs/solana?utm_source=quicknode&utm_medium=email&utm_campaign=mkt-2026-11-quicknode&utm_content=field-note`.
+
+If no thread exists in the owner's inbox, the packet names the public routes:
+`https://www.quicknode.com/contact-us` and the Quicknode Discord.
+
+## T+7 result fields
+
+| Field | Source |
+|---|---|
+| Doc reads | web analytics, `/docs/solana` sessions with `utm_campaign=mkt-2026-11-quicknode` |
+| Repo visits | GitHub Insights traffic for the week |
+| Discussion replies | the Show and tell thread |
+| Partner placement | Feature Friday slot, blog post URL, or "no response" |
+
+## Claims check
+
+| Claim | Proof | Verified |
+|---|---|---|
+| Production named the metered reserve as primary until 2026-07-28; `-32003` daily cap | [docs/solana.md](../../../docs/solana.md) line 71 | 2026-09-17 |
+| Chain dedupes by URL and keeps the first occurrence | same doc; `solanaRpcEndpoints()` in `api/_lib/solana/connection.js` | 2026-09-17 |
+| Cooldowns 6h, 30m, 10m, 2m, 30s | `QUOTA_COOLDOWN_MS`, `AUTH_COOLDOWN_MS`, `RATE_LIMIT_COOLDOWN_MS`, `SERVER_COOLDOWN_MS`, `NETWORK_COOLDOWN_MS` in `connection.js` | 2026-09-17 |
+| Per-method demotion for 15 minutes | `METHOD_DEMOTION_MS = 15 * 60_000` in `connection.js` | 2026-09-17 |
+| Last good answer served with `x-solana-rpc-stale` | `connection.js` around line 340 | 2026-09-17 |
+| Fleet-wide breakers | field note source table; `rpcLaneHealth()` comment in `connection.js` | repo |
+| Member of the Quicknode Startup Program; Quicknode is a rung, not the whole chain | [docs/partners.md](../../../docs/partners.md) | repo |
+| Recovery-probe commit `ac1ba86ad` is deployed | `git merge-base --is-ancestor ac1ba86ad 477eb6f8c` succeeds; `/api/version` commit `477eb6f8c` | 2026-09-17 |
+
+Dropped: the point-in-time "all lanes cooling" health reading from 2026-09-16 (a snapshot, not a claim to
+repeat publicly), and request volume through Quicknode (not measured in the repo).
+
+## Owner does
+
+Reply in the existing Quicknode Startup Program thread with the refreshed email and field note, then post
+the X anchor with the docs image.

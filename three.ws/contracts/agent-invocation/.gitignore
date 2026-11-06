@@ -1,0 +1,11 @@
+# Build output
+/target
+.anchor
+test-ledger
+
+# Never commit keypairs / authority secrets. The program + deploy-authority
+# keypairs live in ~/.config/solana and a secret manager — see DEPLOYMENT.md.
+*-keypair.json
+*program*.json
+*deployer*.json
+*authority*.json

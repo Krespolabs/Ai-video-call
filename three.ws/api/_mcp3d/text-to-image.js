@@ -1,0 +1,940 @@
+// Text → image helper for the 3D Studio MCP.
+//
+// Provider selection (free lanes first, per platform policy; first that serves wins):
+//   1. NVIDIA_API_KEY set       → FLUX.1-schnell on NVIDIA NIM (free, ~1–2s)
+//   2. GOOGLE_CLOUD_PROJECT set → Vertex AI Imagen 3 (high quality, free with GCP credits)
+//   3. REPLICATE_API_TOKEN set  → flux-schnell via Replicate (paid backstop, $0.003/image)
+//   + LIVEPEER_FEDERATION_ENABLED → federated Livepeer network lane (Phase 4
+//     compute federation, dark by default; inserted after the free lanes and
+//     before the paid Replicate backstop, see api/_providers/livepeer.js)
+//
+// The image-to-3D backend (TRELLIS / Hunyuan3D / TripoSR) reconstructs a
+// textured GLB from the generated image. Both steps share the same call site.
+//
+//   NVIDIA_API_KEY          — nvapi key from build.nvidia.com (enables the free NIM lane)
+//   GOOGLE_CLOUD_PROJECT    — GCP project id (enables Vertex AI Imagen path)
+//   VERTEX_IMAGEN_MODEL     — override Imagen model (default: imagen-3.0-generate-001)
+//   REPLICATE_API_TOKEN     — paid backstop when the free lanes are absent or down
+//   REPLICATE_TXT2IMG_MODEL — optional Replicate model override
+//
+// NIM lane: black-forest-labs/flux.1-schnell — Apache-2.0, commercial-OK, served
+// free on the NVIDIA NIM catalog as base64 JPEG (no poll; returns inline).
+// Replicate backstop: black-forest-labs/flux-schnell — same family, $0.003/run.
+
+import { markProviderCooldown, providersInCooldown, AUTH_COOLDOWN_SECONDS } from '../_lib/provider-health.js';
+import { fetchUpstream } from '../_lib/upstream-fetch.js';
+import { reserveProviderRateSlot, SCALE_LIMITS } from '../_lib/forge-scale.js';
+import { persistImageBase64, persistImageBytes, looksLikeImageBytes } from '../_lib/image-persist.js';
+
+const REPLICATE_BASE = 'https://api.replicate.com/v1';
+const DEFAULT_TXT2IMG_MODEL = 'black-forest-labs/flux-schnell';
+
+// `Prefer: wait` asks Replicate to hold the create request open until the
+// prediction finishes, but it only waits ~60s and, under load or with a cold
+// model, returns the prediction still `starting`/`processing` and output-less.
+// flux-schnell finishes in a few seconds, so we poll the prediction's status
+// URL to a terminal state rather than dead-ending the FREE, never-fail text→3D
+// lane on a transient "did not complete (status: starting)". Bounded so a truly
+// stuck prediction still fails over instead of stalling the serverless budget.
+const REPLICATE_POLL_TIMEOUT_MS = 45_000;
+const REPLICATE_POLL_INTERVAL_MS = 1_500;
+const REPLICATE_TERMINAL_STATUSES = new Set(['succeeded', 'failed', 'canceled']);
+
+// Poll a Replicate prediction's `get` URL until it reaches a terminal state.
+// Returns the final prediction object on success; throws on a failed/canceled
+// prediction; returns the last seen object (caller surfaces a clear error) when
+// the poll budget is exhausted. A transient poll blip is retried within budget,
+// never fatal — the prediction keeps running upstream regardless.
+async function pollReplicatePrediction(getUrl, token, { timeoutMs = REPLICATE_POLL_TIMEOUT_MS } = {}) {
+	const deadline = Date.now() + Math.min(REPLICATE_POLL_TIMEOUT_MS, Math.max(1_000, timeoutMs));
+	let last = null;
+	while (Date.now() < deadline) {
+		await sleep(REPLICATE_POLL_INTERVAL_MS);
+		let res;
+		try {
+			res = await fetch(getUrl, {
+				headers: { authorization: `Bearer ${token}`, accept: 'application/json' },
+				signal: AbortSignal.timeout(15_000),
+			});
+		} catch {
+			continue;
+		}
+		const data = await res.json().catch(() => ({}));
+		if (!res.ok) continue;
+		last = data;
+		if (data.status === 'succeeded') return data;
+		if (data.status === 'failed' || data.status === 'canceled') {
+			const reason = data.error ? `: ${String(data.error).slice(0, 160)}` : '';
+			throw new Error(`text-to-image ${data.status}${reason}`);
+		}
+	}
+	return last;
+}
+
+// Circuit-breaker key + window for the free NIM FLUX synthesis lane. When NVCF
+// times out / errors, one slow window otherwise makes every text→image caller
+// (forge text→3D, avatar generation, studio) re-pay the full NIM timeout before
+// failing over. A short cooldown — recorded on a health failure, checked before
+// the lane runs — lets callers skip a degraded NIM lane and go straight to the
+// next configured provider; it expires on its own so a recovered lane is retried
+// promptly. Best-effort via the shared cache: a miss just means "not cooling".
+const NIM_FLUX_COOLDOWN_KEY = 'forge-nim-flux';
+const NIM_FLUX_COOLDOWN_SECONDS = 60;
+
+// Same breaker, but for the Vertex image lane and the two HF-routed providers,
+// keyed on an auth/billing fault (401/402/403) rather than a transient one: a
+// dunning hold or an exhausted credit balance will not clear itself in 60s, so
+// marking it 'health'-length just burns the full request timeout again on the
+// very next call. AUTH_COOLDOWN_SECONDS (5 min) matches the same breaker
+// already used for Vertex in forge-quality-gate.js and for every LLM lane in
+// chat.js/concierge.js. VERTEX_IMAGE_COOLDOWN_KEY is exported so
+// forge-reference-image.js's own, separate Vertex-reference attempt shares the
+// same breaker: one 403 should silence Vertex for both call sites, not just
+// this one.
+export const VERTEX_IMAGE_COOLDOWN_KEY = 'forge-vertex-image';
+const HF_IMAGE_COOLDOWN_PREFIX = 'forge-hf-image-';
+function isAuthFault(err) {
+	const status = err?.providerStatus;
+	return status === 401 || status === 402 || status === 403;
+}
+
+// Whether a thrown nimFluxImage error means the lane itself is degraded (timeout,
+// unreachable, throttle, or 5xx) — worth a cooldown — as opposed to a 4xx client
+// fault (bad input / key), which a cooldown would wrongly punish a healthy lane for.
+function isNimLaneDegraded(err) {
+	if (err?.code === 'provider_unreachable' || err?.code === 'rate_limited') return true;
+	const status = err?.providerStatus;
+	return typeof status === 'number' && status >= 500;
+}
+
+// NVIDIA NIM FLUX.1-schnell — synchronous genai invoke (no 202/poll), returns
+// { artifacts: [{ base64, finishReason }] }. flux-schnell is the fast 4-step
+// distilled model, so a tight per-attempt timeout is safe: a hung free lane must
+// hand off to the paid lanes, never stall the whole text→3D pipeline.
+// FLUX.1-dev, not schnell. On 2026-08-27 the schnell endpoint stopped
+// answering at all (every call hung to the client timeout for hours) while
+// flux.1-dev on the same gateway served a real 1024x1024 image in ~5 s. dev
+// is guidance-trained: it wants steps >= 5 (the endpoint 422s below that) and
+// accepts a cfg_scale, both of which schnell refused.
+const NIM_FLUX_URL = 'https://ai.api.nvidia.com/v1/genai/black-forest-labs/flux.1-dev';
+const NIM_FLUX_MODEL = 'black-forest-labs/flux.1-dev';
+const NIM_FLUX_STEPS = 20;
+const NIM_FLUX_CFG_SCALE = 3.5;
+const NIM_TIMEOUT_MS = 60_000;
+
+// NVCF fronts the free NIM lane with a gateway that answers a cold model or a
+// momentary capacity/routing blip with a transient 502/503/504 that returns
+// FAST (not the slow-job path — that comes back 200/202). The TRELLIS provider
+// already retries these once and it measurably keeps the free lane from
+// dead-ending straight to the (often equally throttled) paid backstop and
+// surfacing to the user as a hard 502; mirror that here. A genuine socket/DNS
+// blip (non-timeout network error) gets the same single retry. A real *timeout*
+// is deliberately NOT retried: the request already burned the full window, so a
+// second attempt would just double the wait before failover (the same reasoning
+// that makes the TRELLIS submit timeout terminal). Bounded to one extra attempt
+// so a genuinely-down gateway still hands off fast.
+// ── Ladder budget ─────────────────────────────────────────────────────────
+// Every lane below is bounded on its own (Vertex 90s, NIM 60s, Replicate 45s
+// of polling), but the LADDER never was: a stalled leading lane burned its
+// full window, then the next lane burned its own, and the caller's socket
+// (ChatGPT Actions allow ~45s, the OKX/MCP clients 90s) was long gone before a
+// job even existed. Measured on 2026-08-25: text submits hung 95s+ with no
+// answer, or took 156s to say "busy", while image submits answered in 3.7s.
+//
+// The ladder now shares ONE budget (TEXT_TO_IMAGE_BUDGET_MS, default 60s, or
+// the caller's `budgetMs`). Each lane gets min(its own ceiling, what is left),
+// and while a fallback lane still remains the current lane is capped at
+// max(a quarter of the budget, 60% of what is left) so a stalled leader hands
+// off with real time to spare. A lane with under a tenth of the budget left is
+// skipped, and an exhausted ladder surfaces a retryable rate_limited error the
+// forge boundary already maps to a fast 429 with a Retry-After.
+// Vertex's own ceiling lives in vertex-imagen.js (90s); mirrored here so the
+// ladder math can cap it without importing the lane eagerly.
+const VERTEX_LANE_CEILING_MS = 90_000;
+const DEFAULT_BUDGET_MS = 60_000;
+export function ladderBudgetMs(override) {
+	const env = Number(readEnv('TEXT_TO_IMAGE_BUDGET_MS'));
+	const chosen = Number(override) || (Number.isFinite(env) && env > 0 ? env : DEFAULT_BUDGET_MS);
+	return Math.max(5_000, chosen);
+}
+// Pure: how long the current lane may run. `budgetMs` is the ladder total,
+// `remainingMs` what is left of it, `laneRemains` whether a fallback follows.
+export function laneTimeoutMs(ownCeilingMs, { budgetMs, remainingMs, laneRemains }) {
+	if (remainingMs <= 0) return 0;
+	let cap = remainingMs;
+	if (laneRemains) cap = Math.min(remainingMs, Math.max(budgetMs * 0.25, remainingMs * 0.6));
+	return Math.max(0, Math.min(ownCeilingMs, Math.floor(cap)));
+}
+function budgetExhausted(budgetMs) {
+	return Object.assign(
+		new Error('Image generation is taking longer than usual, please retry in a few seconds.'),
+		{ code: 'rate_limited', queued: true, retryAfter: 15, budgetMs },
+	);
+}
+
+const NIM_GATEWAY_RETRY_STATUSES = new Set([502, 503, 504]);
+const NIM_MAX_ATTEMPTS = 2;
+const NIM_RETRY_DELAY_MS = 1_200;
+const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
+// FLUX wants explicit pixel dimensions (multiples of 64). Map the caller's
+// aspect ratio to a sensible ~1MP size; anything unmapped falls back to square.
+const NIM_DIMENSIONS = {
+	'1:1': [1024, 1024],
+	'16:9': [1344, 768],
+	'9:16': [768, 1344],
+	'4:3': [1024, 768],
+	'3:4': [768, 1024],
+	'3:2': [1216, 832],
+	'2:3': [832, 1216],
+};
+
+function readEnv(name) {
+	if (typeof process !== 'undefined' && process.env && process.env[name]) return process.env[name];
+	return null;
+}
+
+// Explicit on/off gate for the Vertex image lane, independent of
+// GOOGLE_CLOUD_PROJECT (which Vertex Claude and the workers also need — too blunt
+// to double as this lane's switch). Unset ⇒ today's behavior: the lane is active
+// whenever the project is set. Set VERTEX_IMAGEN_ENABLED to 0/false/no/off to
+// force the lane off without unsetting the shared GCP project; anything else
+// (1/true/…) keeps it on.
+function vertexImagenEnabled() {
+	const raw = readEnv('VERTEX_IMAGEN_ENABLED');
+	if (raw == null) return true; // unset ⇒ preserve current behavior
+	return !/^(0|false|no|off)$/i.test(String(raw).trim());
+}
+
+// Record which provider actually served an image so spend attribution and
+// debugging work (the forge job also persists result.model as text_to_image_model).
+function logImageProvider(result) {
+	if (result?.model) console.log(`[text-to-image] served by ${result.model}`);
+	return result;
+}
+
+// Pull the first https image URL out of Replicate's `output`, which flux models
+// emit as an array of URLs (sometimes a bare string for single-image models).
+function extractImageUrl(output) {
+	if (!output) return null;
+	if (typeof output === 'string') return /^https?:\/\//.test(output) ? output : null;
+	if (Array.isArray(output)) {
+		for (const v of output) if (typeof v === 'string' && /^https?:\/\//.test(v)) return v;
+	}
+	if (typeof output === 'object') {
+		for (const k of ['image', 'url', 'output']) {
+			if (typeof output[k] === 'string' && /^https?:\/\//.test(output[k])) return output[k];
+		}
+	}
+	return null;
+}
+
+// Best-effort retry hint (in seconds) for a throttled request. Prefers the
+// standard Retry-After header; falls back to the "resets in ~Ns" phrasing
+// Replicate uses in its throttle message. Defaults to a short, sane backoff.
+function parseRetryAfter(headers, message) {
+	const header = headers?.get?.('retry-after');
+	const fromHeader = header ? Number.parseInt(header, 10) : NaN;
+	if (Number.isFinite(fromHeader) && fromHeader > 0) return fromHeader;
+	const m = /resets in ~?(\d+)\s*s/i.exec(message || '');
+	if (m) return Number.parseInt(m[1], 10);
+	return 10;
+}
+
+// ── Hugging Face routed providers ──────────────────────────────────────────
+// HF's own inference backend deprecated every text-to-image model (410 on
+// FLUX and SDXL, verified 2026-08-27), but the same HF_TOKEN routes to the
+// inference providers HF fronts, billed through the HF account the 3D lane
+// already uses. Two independent providers, two rungs: a fal-ai outage does
+// not take nscale with it. Both serve FLUX.1-schnell in 2-5 s.
+const HF_ROUTER = 'https://router.huggingface.co';
+const HF_IMAGE_TIMEOUT_MS = 45_000;
+const HF_IMAGE_PROVIDERS = Object.freeze([
+	{
+		id: 'fal-ai',
+		model: 'hf/fal-ai/flux-schnell',
+		url: `${HF_ROUTER}/fal-ai/fal-ai/flux/schnell`,
+		body: (prompt, width, height, seed) => ({
+			prompt,
+			image_size: { width, height },
+			num_inference_steps: 4,
+			num_images: 1,
+			...(Number.isInteger(seed) ? { seed } : {}),
+		}),
+		// fal answers with a hosted URL; the bytes are fetched and persisted so the
+		// reference image lives on our storage like every other lane's.
+		extract: async (data, signal) => {
+			const url = data?.images?.[0]?.url;
+			if (!url || !/^https:\/\//.test(url)) throw new Error('fal-ai returned no image url');
+			// The caller's signal cancels an abandoned request, but it does not bound
+			// a hosted URL that accepts the connection and then stalls, so the
+			// download carries its own deadline and one retry on top.
+			const res = await fetchUpstream(
+				url,
+				{ signal },
+				{ name: 'fal:image-download', timeoutMs: 30_000, attempts: 2 },
+			);
+			return Buffer.from(await res.arrayBuffer());
+		},
+	},
+	{
+		id: 'nscale',
+		model: 'hf/nscale/flux-schnell',
+		url: `${HF_ROUTER}/nscale/v1/images/generations`,
+		body: (prompt, width, height, seed) => ({
+			model: 'black-forest-labs/FLUX.1-schnell',
+			prompt,
+			n: 1,
+			size: `${width}x${height}`,
+			response_format: 'b64_json',
+			...(Number.isInteger(seed) ? { seed } : {}),
+		}),
+		extract: async (data) => {
+			const b64 = data?.data?.[0]?.b64_json;
+			if (!b64) throw new Error('nscale returned no image');
+			return Buffer.from(b64, 'base64');
+		},
+	},
+]);
+
+async function hfRoutedImage(provider, prompt, aspectRatio, seed, { timeoutMs = HF_IMAGE_TIMEOUT_MS } = {}) {
+	const token = readEnv('HF_TOKEN');
+	const [width, height] = NIM_DIMENSIONS[aspectRatio] || NIM_DIMENSIONS['1:1'];
+	const signal = AbortSignal.timeout(Math.max(1_000, Math.min(HF_IMAGE_TIMEOUT_MS, timeoutMs)));
+	let res;
+	try {
+		res = await fetch(provider.url, {
+			method: 'POST',
+			headers: { authorization: `Bearer ${token}`, 'content-type': 'application/json', accept: 'application/json' },
+			body: JSON.stringify(provider.body(prompt, width, height, seed)),
+			signal,
+		});
+	} catch (err) {
+		const aborted = err?.name === 'AbortError' || err?.name === 'TimeoutError';
+		throw Object.assign(new Error(aborted ? `hf ${provider.id} timed out` : `hf ${provider.id} unreachable: ${err?.message}`), {
+			code: aborted ? 'rate_limited' : 'provider_unreachable',
+		});
+	}
+	if (!res.ok) {
+		const detail = await res.text().catch(() => '');
+		const err = new Error(`hf ${provider.id} returned ${res.status}: ${detail.slice(0, 160)}`);
+		err.providerStatus = res.status;
+		if (res.status === 429 || res.status === 402) err.code = 'rate_limited';
+		throw err;
+	}
+	const bytes = await provider.extract(await res.json(), signal);
+	if (!looksLikeImageBytes(bytes)) throw new Error(`hf ${provider.id} returned a non-image body`);
+	return { imageUrl: await persistImageBytes(bytes), model: provider.model };
+}
+
+// ── Pollinations (keyless) ─────────────────────────────────────────────────
+// The last free rung. No key, no account, a real FLUX image in ~2-3 s, lower
+// fidelity than the keyed lanes, which is why it sits behind them. It exists
+// so that a day when every keyed provider is down still produces a model
+// instead of a 429; the text chain already relies on the same service.
+const POLLINATIONS_TIMEOUT_MS = 40_000;
+async function pollinationsImage(prompt, aspectRatio, seed, { timeoutMs = POLLINATIONS_TIMEOUT_MS } = {}) {
+	const [width, height] = NIM_DIMENSIONS[aspectRatio] || NIM_DIMENSIONS['1:1'];
+	const q = new URLSearchParams({
+		width: String(width),
+		height: String(height),
+		nologo: 'true',
+		model: 'flux',
+		...(Number.isInteger(seed) ? { seed: String(seed) } : {}),
+	});
+	const url = `https://image.pollinations.ai/prompt/${encodeURIComponent(prompt.slice(0, 1_000))}?${q}`;
+	let res;
+	try {
+		res = await fetch(url, { signal: AbortSignal.timeout(Math.max(1_000, Math.min(POLLINATIONS_TIMEOUT_MS, timeoutMs))) });
+	} catch (err) {
+		const aborted = err?.name === 'AbortError' || err?.name === 'TimeoutError';
+		throw Object.assign(new Error(aborted ? 'pollinations timed out' : `pollinations unreachable: ${err?.message}`), {
+			code: aborted ? 'rate_limited' : 'provider_unreachable',
+		});
+	}
+	if (!res.ok) {
+		const err = new Error(`pollinations returned ${res.status}`);
+		err.providerStatus = res.status;
+		// 402 here is Pollinations' own free-tier throttle, not a platform billing
+		// state: tag it rate_limited (as the HF rung above already does for both
+		// 429 and 402) so a caller never mistakes a dead free lane for the
+		// platform's own paid Replicate/TRELLIS account running out of credit.
+		if (res.status === 429 || res.status === 402) err.code = 'rate_limited';
+		throw err;
+	}
+	const bytes = Buffer.from(await res.arrayBuffer());
+	if (!looksLikeImageBytes(bytes)) throw new Error('pollinations returned a non-image body');
+	return { imageUrl: await persistImageBytes(bytes), model: 'pollinations/flux' };
+}
+
+// Image persistence moved to api/_lib/image-persist.js (shared by the NIM
+// lane, the Vertex reference-image lane, and the Livepeer federation
+// provider). See that module for why every synthesized image is persisted to
+// R2 and handed on as a durable https URL, and why the format is sniffed from
+// magic bytes rather than trusted from the provider's declared type.
+
+// Vertex Imagen returns the PNG inline as a data: URI — persist it the same way
+// the NIM lane persists its base64 artifact.
+async function persistDataUriImage(result) {
+	if (!result?.imageUrl?.startsWith('data:')) return result;
+	const b64 = result.imageUrl.split(',')[1] || '';
+	return { ...result, imageUrl: await persistImageBase64(b64) };
+}
+
+// Free lane: FLUX.1-schnell on NVIDIA NIM. Synchronous invoke — the artifact
+// comes back inline as base64, no poll. Caller guarantees NVIDIA_API_KEY is set.
+// Throws on any failure (timeout, throttle, malformed body) so the caller can
+// degrade to the paid lanes; never returns a half-result.
+async function nimFluxImage(prompt, aspectRatio, seed = 0, { timeoutMs = NIM_TIMEOUT_MS } = {}) {
+	const key = readEnv('NVIDIA_API_KEY');
+	const [width, height] = NIM_DIMENSIONS[aspectRatio] || NIM_DIMENSIONS['1:1'];
+	const laneTimeout = Math.max(1_000, Math.min(NIM_TIMEOUT_MS, Number(timeoutMs) || NIM_TIMEOUT_MS));
+
+	let lastErr = null;
+	for (let attempt = 1; attempt <= NIM_MAX_ATTEMPTS; attempt++) {
+		const controller = new AbortController();
+		const timer = setTimeout(() => controller.abort(), laneTimeout);
+		let res;
+		try {
+			res = await fetch(NIM_FLUX_URL, {
+				method: 'POST',
+				headers: {
+					authorization: `Bearer ${key}`,
+					accept: 'application/json',
+					'content-type': 'application/json',
+				},
+				body: JSON.stringify({
+					prompt,
+					mode: 'base',
+					width,
+					height,
+					seed,
+					steps: NIM_FLUX_STEPS,
+					cfg_scale: NIM_FLUX_CFG_SCALE,
+				}),
+				signal: controller.signal,
+			});
+		} catch (err) {
+			const aborted = err?.name === 'AbortError' || err?.name === 'TimeoutError';
+			lastErr = Object.assign(
+				new Error(aborted ? 'nim flux timed out' : `nim flux unreachable: ${err?.message}`),
+				{ code: aborted ? 'rate_limited' : 'provider_unreachable' },
+			);
+			// A timeout already burned the full window — don't retry it (a second
+			// attempt just doubles the wait before failover). A non-timeout network
+			// blip gets one retry, mirroring the TRELLIS provider.
+			if (!aborted && attempt < NIM_MAX_ATTEMPTS) {
+				await sleep(NIM_RETRY_DELAY_MS);
+				continue;
+			}
+			throw lastErr;
+		} finally {
+			clearTimeout(timer);
+		}
+
+		if (!res.ok) {
+			const detail = await res.text().catch(() => '');
+			const message = `nim flux returned ${res.status}${detail ? `: ${detail.slice(0, 200)}` : ''}`;
+			// A fast transient gateway 5xx (cold model / capacity blip) gets one
+			// retry before we surface it and cascade to the paid lanes.
+			if (NIM_GATEWAY_RETRY_STATUSES.has(res.status) && attempt < NIM_MAX_ATTEMPTS) {
+				lastErr = Object.assign(new Error(message), { providerStatus: res.status });
+				await sleep(NIM_RETRY_DELAY_MS);
+				continue;
+			}
+			// 429 (credit-metered free tier) is retryable upstream; surface it so a
+			// caller can route, but here it just means "fall through to the paid lanes".
+			throw Object.assign(new Error(message), {
+				providerStatus: res.status,
+				...(res.status === 429 ? { code: 'rate_limited' } : {}),
+			});
+		}
+
+		const data = await res.json().catch(() => ({}));
+		const artifact = data?.artifacts?.[0];
+		const b64 = artifact?.base64;
+		if (!b64) throw new Error('nim flux finished but produced no image');
+		// A content filter answers 200 with a solid black frame and says so only in
+		// finishReason. Persisting that frame as the reference sent every 3D backend
+		// an image with no subject in it, and all three crashed on the empty mask
+		// (TRELLIS, Hunyuan3D and TripoSG on 2026-10-08). Hand off to the next lane.
+		const finish = artifact.finishReason ?? artifact.finish_reason;
+		if (finish && finish !== 'SUCCESS') {
+			throw Object.assign(new Error(`nim flux withheld the image (${finish})`), { code: 'safety_blocked' });
+		}
+		if (await isBlankFrame(Buffer.from(b64, 'base64'))) {
+			throw Object.assign(new Error('nim flux returned a blank frame'), { code: 'safety_blocked' });
+		}
+		return { imageUrl: await persistImageBase64(b64), model: NIM_FLUX_MODEL };
+	}
+	// Exhausted retries on a transient status/blip without a terminal verdict.
+	throw lastErr || new Error('nim flux failed after retries');
+}
+
+// A frame with no subject in it: every channel flat to within a couple of
+// levels, which is what a filtered render looks like whatever color it is
+// filled with. No real reference photo comes close; even a plain-background
+// product shot varies by tens of levels across the subject. An image sharp
+// cannot read is not judged blank here; the 3D backend reports it properly.
+export async function isBlankFrame(bytes) {
+	try {
+		const { default: sharp } = await import('sharp');
+		const { channels } = await sharp(bytes).stats();
+		return channels.length > 0 && channels.every((c) => c.stdev < 2);
+	} catch {
+		return false;
+	}
+}
+
+// Background / lighting / composition cues that signal the caller already
+// controls the scene. When one is present we leave the prompt untouched;
+// otherwise we append cues that steer the image toward a single, evenly-lit
+// subject on a plain background, which reconstructs into a far cleaner 3D mesh
+// (TRELLIS / Hunyuan3D build geometry + texture from this one image).
+//
+// These are deliberately NOT art-style words. A "cartoon" or "stylized" subject
+// still needs isolation + a plain background for good reconstruction — gating
+// the suffix on style words (as an earlier version did, which also listed
+// cartoon / stylized / colorful / vibrant) let "a cartoon fox" render a full
+// illustrated forest scene on the Gemini lane: background clutter the 3D backend
+// then tries, and fails, to reconstruct. Match whole words so a substring like
+// "light" inside "lightsaber" can't wrongly suppress the cue either. The suffix
+// only ever gets ADDED relative to the old behavior, so it can only push toward
+// cleaner single-subject references, never toward busier scenes.
+const COMPOSITION_CUE_WORDS = [
+	'studio', 'light', 'bright', 'backlit', 'background', 'plain', 'white bg', 'isolated',
+];
+const COMPOSITION_CUE_RE = new RegExp(`\\b(?:${COMPOSITION_CUE_WORDS.join('|')})\\b`, 'i');
+const FLUX_STYLE_SUFFIX = ', isolated subject, bright studio lighting, plain white background';
+
+// Deliberate art-style words — when the caller names a rendering style
+// (cartoon, voxel, watercolor…) the realism cues below must NOT fight it. This
+// list is only ever consulted to SKIP adding realism words; it never suppresses
+// the isolation suffix (see the regression note above — a cartoon fox still
+// needs a plain background to reconstruct cleanly).
+const ART_STYLE_WORDS = [
+	'cartoon', 'anime', 'manga', 'toon', 'chibi', 'stylized', 'low[- ]poly', 'voxel',
+	'pixel[- ]art', '8[- ]bit', '16[- ]bit', 'claymation', 'plasticine', 'illustration',
+	'illustrated', 'painting', 'painterly', 'watercolor', 'sketch', 'hand[- ]drawn',
+	'comic', 'cel[- ]shaded', 'origami', 'papercraft', 'plush', 'crochet', 'knitted',
+	'lego', 'minecraft', 'abstract',
+];
+const ART_STYLE_RE = new RegExp(`\\b(?:${ART_STYLE_WORDS.join('|')})\\b`, 'i');
+
+// Realism cues, added by default: the reference image is the sole source of the
+// 3D model's texture and proportions, so photographic language here is what
+// makes the final mesh read as a real object/person rather than a render.
+// Skipped when the caller named an art style (respect the ask) — and the whole
+// suffix pipeline stays untouched when the prompt already carries composition
+// cues, exactly as before.
+const REALISM_SUFFIX =
+	', photorealistic, true-to-life materials and surface detail, sharp focus, professional product photograph';
+
+// A human/humanoid subject needs portrait-photography language, not
+// product-photography language — "professional product photograph" reads
+// wrong for a person and steers FLUX toward glossy-mannequin skin instead of
+// the pores/asymmetry/texture that make a reconstructed avatar look like an
+// actual IRL person. Matched as whole words so "personality" or "manatee"
+// can't false-positive off "person"/"man".
+const PERSON_SUBJECT_WORDS = [
+	'person', 'human', 'man', 'woman', 'guy', 'girl', 'boy', 'lady', 'gentleman',
+	'people', 'face', 'portrait', 'selfie', 'model(?!s? of)', 'character(?!\\s+prop)',
+	'warrior', 'knight', 'soldier', 'wizard', 'ninja', 'astronaut', 'pirate',
+	'king', 'queen', 'hero', 'villain', 'avatar',
+];
+const PERSON_SUBJECT_RE = new RegExp(`\\b(?:${PERSON_SUBJECT_WORDS.join('|')})\\b`, 'i');
+const PERSON_REALISM_SUFFIX =
+	', photorealistic human, natural skin texture with visible pores and subtle asymmetry, ' +
+	'realistic hair strands, natural catchlight in the eyes, portrait photography, shot on a DSLR ' +
+	'with an 85mm lens, sharp focus';
+
+export function enhanceFluxPrompt(raw) {
+	const text = String(raw || '').trim();
+	if (!text) return text;
+	if (COMPOSITION_CUE_RE.test(text)) return text;
+	let realism = '';
+	if (!ART_STYLE_RE.test(text)) {
+		realism = PERSON_SUBJECT_RE.test(text) ? PERSON_REALISM_SUFFIX : REALISM_SUFFIX;
+	}
+	return text + realism + FLUX_STYLE_SUFFIX;
+}
+
+// Generate a single image from a text prompt.
+//
+// Tries the free lanes first (NIM FLUX, then Vertex Imagen) and degrades to the
+// paid Replicate backstop on any failure — a broken or throttled preferred
+// provider must hand off, never take down the whole text→3D pipeline. The last
+// configured lane's error is surfaced only when nothing is left to try.
+export async function textToImage(prompt, { aspectRatio = '1:1', skipNim = false, seed, budgetMs } = {}) {
+	prompt = enhanceFluxPrompt(prompt);
+	const budget = ladderBudgetMs(budgetMs);
+	const deadline = Date.now() + budget;
+	const remaining = () => deadline - Date.now();
+	// A lane with under a tenth of the budget left cannot finish; skip it.
+	const canTry = () => remaining() >= budget * 0.1;
+	const laneMs = (ownCeilingMs, laneRemains) =>
+		laneTimeoutMs(ownCeilingMs, { budgetMs: budget, remainingMs: remaining(), laneRemains });
+	// Optional deterministic seed. Honored on the lanes that expose one (NIM FLUX,
+	// Replicate flux); the Vertex/Gemini image API has no seed parameter, so a seed
+	// is silently ignored there. Undefined preserves the prior default (seed 0).
+	const hasSeed = Number.isInteger(seed) && seed >= 0;
+	const token = readEnv('REPLICATE_API_TOKEN');
+	const hasVertex = !!readEnv('GOOGLE_CLOUD_PROJECT') && vertexImagenEnabled();
+	// The federated lane is resolved UP FRONT, not at its position in the ladder,
+	// because every upstream lane's "is anything left to try" test has to count
+	// it. Reading it late made an enabled Livepeer lane invisible to that test, so
+	// a deployment where it was the only lane downstream threw the upstream error
+	// instead of handing off, and the configured lane never ran.
+	const { livepeerFederationEnabled, livepeerTextToImage } = await import('../_providers/livepeer.js');
+	const hasLivepeer = livepeerFederationEnabled();
+	// Quality-first ordering: the Vertex Gemini image model outdraws 4-step
+	// distilled FLUX for photoreal reference images, and it burns the GCP credit
+	// pool the platform is funded to spend — so when the lane is configured it
+	// leads by default. The reference image is the sole source of the 3D model's
+	// texture and proportions; this is the cheapest quality lever in the chain.
+	// VERTEX_IMAGEN_FIRST=0 restores the legacy NIM-first order without touching
+	// the lane's on/off gate (VERTEX_IMAGEN_ENABLED).
+	const vertexFirst = hasVertex && readEnv('VERTEX_IMAGEN_FIRST') !== '0';
+	// What remains DOWNSTREAM of the NIM lane. When Vertex leads it has already
+	// been consumed by the time NIM runs, so it no longer counts as a fallback —
+	// otherwise a NIM failure after a Vertex failure would "fall through" to a
+	// lane that was already tried and surface the wrong terminal error. Livepeer
+	// and Replicate both sit after NIM either way, so both always count.
+	const hasHf = !!readEnv('HF_TOKEN');
+	// Pollinations needs no key, so a fallback always exists past NIM and the
+	// keyed rungs: no single provider's failure is ever the terminal error.
+	const hasFallback = (!vertexFirst && hasVertex) || hasHf || hasLivepeer || !!token || true;
+
+	// One attempt at the Vertex lane, shared by both ladder positions. Returns
+	// null to mean "hand off to the next lane" (unconfigured, or a failure with a
+	// lane left to try); throws only when nothing remains downstream.
+	const tryVertex = async (laneRemains) => {
+		try {
+			const { generateImage, isConfigured } = await import('./vertex-imagen.js');
+			if (!isConfigured()) return null;
+			// A lane parked on a billing/auth fault beats nothing only when it is the
+			// only lane left; with a fallback behind it, skip the known-dead call
+			// instead of re-paying its full timeout on every request.
+			if (laneRemains && (await providersInCooldown([VERTEX_IMAGE_COOLDOWN_KEY])).has(VERTEX_IMAGE_COOLDOWN_KEY)) {
+				return null;
+			}
+			if (!canTry()) {
+				if (!laneRemains) throw budgetExhausted(budget);
+				return null;
+			}
+			return logImageProvider(
+				await persistDataUriImage(
+					await generateImage(prompt, { aspectRatio, timeoutMs: laneMs(VERTEX_LANE_CEILING_MS, laneRemains) }),
+				),
+			);
+		} catch (err) {
+			if (isAuthFault(err)) {
+				markProviderCooldown(VERTEX_IMAGE_COOLDOWN_KEY, AUTH_COOLDOWN_SECONDS, 'auth').catch(() => {});
+			}
+			if (!laneRemains) throw err;
+			console.warn(`vertex imagen failed, falling back: ${err?.message}`);
+			return null;
+		}
+	};
+
+	if (vertexFirst) {
+		const served = await tryVertex(!!readEnv('NVIDIA_API_KEY') || hasLivepeer || !!token);
+		if (served) return served;
+	}
+
+	// ── NVIDIA NIM FLUX (free, first) ─────────────────────────────────────────
+	// Skip the NIM lane when a fallback exists AND either the caller just watched a
+	// sibling NVCF lane time out this same request (`skipNim` — the gateway is
+	// degraded now, so a second NIM window would just stack timeouts) or a recent
+	// NIM FLUX failure left it in cooldown. With no fallback, NIM stays the only
+	// lane and is always tried — a degraded lane beats no image at all.
+	const nimCooling =
+		hasFallback &&
+		(skipNim || (await providersInCooldown([NIM_FLUX_COOLDOWN_KEY])).has(NIM_FLUX_COOLDOWN_KEY));
+	const nimWanted = readEnv('NVIDIA_API_KEY') && !nimCooling;
+	if (nimWanted && !canTry() && !hasFallback) throw budgetExhausted(budget);
+	if (nimWanted && canTry()) {
+		try {
+			return logImageProvider(
+				await nimFluxImage(prompt, aspectRatio, hasSeed ? seed : 0, {
+					timeoutMs: laneMs(NIM_TIMEOUT_MS, hasFallback),
+				}),
+			);
+		} catch (err) {
+			// A degraded lane (timeout / unreachable / throttle / 5xx) cools down so the
+			// next caller skips it; a clean 4xx (bad input) is not a lane-health fault.
+			if (isNimLaneDegraded(err)) {
+				markProviderCooldown(NIM_FLUX_COOLDOWN_KEY, NIM_FLUX_COOLDOWN_SECONDS).catch(() => {});
+			}
+			// Nothing downstream to fall through to → surface the NIM error.
+			if (!hasFallback) throw err;
+			// A handled degradation (Vertex/HF will serve the image), not a fault —
+			// warn so it doesn't read as an error in the logs like the rest of the
+			// free-first cascade.
+			console.warn(`nim flux failed, falling back: ${err?.message}`);
+		}
+	}
+
+	// ── Vertex AI Imagen path (legacy position — only when not already led) ──
+	if (hasVertex && !vertexFirst) {
+		const served = await tryVertex(!!token);
+		if (served) return served;
+	}
+
+	// ── Hugging Face routed providers (fal-ai, then nscale) ──────────────────
+	if (hasHf) {
+		const hfCooling = await providersInCooldown(
+			HF_IMAGE_PROVIDERS.map((provider) => `${HF_IMAGE_COOLDOWN_PREFIX}${provider.id}`),
+		);
+		for (const provider of HF_IMAGE_PROVIDERS) {
+			if (!canTry()) break;
+			// An out-of-credit or revoked-key provider parked in cooldown: the other
+			// HF rung (and everything downstream) is independent, so skip only this
+			// one rung instead of re-paying its timeout every request.
+			if (hfCooling.has(`${HF_IMAGE_COOLDOWN_PREFIX}${provider.id}`)) continue;
+			try {
+				return logImageProvider(
+					await hfRoutedImage(provider, prompt, aspectRatio, hasSeed ? seed : undefined, {
+						timeoutMs: laneMs(HF_IMAGE_TIMEOUT_MS, true),
+					}),
+				);
+			} catch (err) {
+				if (isAuthFault(err)) {
+					markProviderCooldown(`${HF_IMAGE_COOLDOWN_PREFIX}${provider.id}`, AUTH_COOLDOWN_SECONDS, 'auth').catch(() => {});
+				}
+				console.warn(`hf ${provider.id} failed, falling back: ${err?.message}`);
+			}
+		}
+	}
+
+	// ── Livepeer federation lane (Phase 4, behind LIVEPEER_FEDERATION_ENABLED) ──
+	// One class of GPU job routed to the decentralized compute network. Sits
+	// after the first-party free lanes (they cost nothing) and before the paid
+	// Replicate backstop (it costs real money per image): a successful federated
+	// call is strictly cheaper than every remaining option. Off by default; the
+	// measured case for flipping it is in docs/ops/livepeer-federation.md.
+	if (hasLivepeer && !canTry() && !token) throw budgetExhausted(budget);
+	if (hasLivepeer && canTry()) {
+		try {
+			return logImageProvider(
+				await livepeerTextToImage(prompt, { aspectRatio, seed, timeoutMs: laneMs(REPLICATE_POLL_TIMEOUT_MS, !!token) }),
+			);
+		} catch (err) {
+			// Nothing downstream to fall through to → surface the Livepeer error.
+			if (!token) throw err;
+			console.warn(`livepeer federation failed, falling back: ${err?.message}`);
+		}
+	}
+
+	// ── Pollinations, keyless ─────────────────────────────────────────────────
+	if (canTry()) {
+		try {
+			return logImageProvider(
+				await pollinationsImage(prompt, aspectRatio, hasSeed ? seed : undefined, {
+					timeoutMs: laneMs(POLLINATIONS_TIMEOUT_MS, !!token),
+				}),
+			);
+		} catch (err) {
+			if (!token) throw err;
+			console.warn(`pollinations failed, falling back: ${err?.message}`);
+		}
+	} else if (!token) {
+		throw budgetExhausted(budget);
+	}
+
+	// ── Replicate fallback ───────────────────────────────────────────────────
+	if (!token) {
+		throw Object.assign(
+			new Error(
+				'text-to-image is not configured: set NVIDIA_API_KEY (NIM), GOOGLE_CLOUD_PROJECT (Vertex AI), or REPLICATE_API_TOKEN (Replicate)',
+			),
+			{ code: 'unconfigured' },
+		);
+	}
+
+	if (!canTry()) throw budgetExhausted(budget);
+
+	const modelRef = readEnv('REPLICATE_TXT2IMG_MODEL') || DEFAULT_TXT2IMG_MODEL;
+	const isVersionHash = /^[a-f0-9]{40,64}$/i.test(modelRef);
+	const slug = modelRef.match(/^([a-z0-9-]+)\/([a-z0-9._-]+)(?::([a-f0-9]+))?$/i);
+
+	const input = {
+		prompt,
+		aspect_ratio: aspectRatio,
+		num_outputs: 1,
+		output_format: 'png',
+		// A clean, evenly-lit, single-subject image on a plain background
+		// reconstructs into a far better mesh than a busy scene — steer flux
+		// toward that without overriding a caller's own composition cues.
+		go_fast: true,
+		// Deterministic seed when the caller supplied one (flux accepts `seed`).
+		...(hasSeed ? { seed } : {}),
+	};
+
+	let endpoint;
+	let body;
+	if (isVersionHash) {
+		endpoint = `${REPLICATE_BASE}/predictions`;
+		body = JSON.stringify({ version: modelRef, input });
+	} else if (slug) {
+		const [, owner, name, pinned] = slug;
+		endpoint = `${REPLICATE_BASE}/models/${owner}/${name}/predictions`;
+		body = JSON.stringify(pinned ? { version: pinned, input } : { input });
+	} else {
+		throw new Error(`invalid REPLICATE_TXT2IMG_MODEL reference: ${modelRef}`);
+	}
+
+	// Pace creation to the platform account's rate before firing. On a reduced-rate
+	// (low-credit) Replicate account this caps at 6/min, burst 1 — and this paid
+	// backstop has no further free lane to shed to, so we QUEUE for the next slot
+	// rather than stampede the limit into account-wide throttle 429s. Reserve the
+	// slot; if it opens within the bounded wait, hold this worker until then; if the
+	// queue is deeper than the budget, surface a retryable rate-limit the forge
+	// boundary maps to a "queued — retry shortly" 429 (with an accurate Retry-After).
+	const slot = await reserveProviderRateSlot('replicate', {
+		ratePerMin: SCALE_LIMITS.replicateRatePerMin,
+		burst: SCALE_LIMITS.replicateRateBurst,
+		maxWaitMs: SCALE_LIMITS.replicateQueueMaxMs,
+	});
+	if (!slot.ok) {
+		throw Object.assign(
+			new Error('Image generation is queued behind other requests — please retry in a few seconds.'),
+			{ code: 'rate_limited', queued: true, retryAfter: Math.max(1, Math.ceil(slot.waitMs / 1000)) },
+		);
+	}
+	if (slot.waitMs > 0) await sleep(slot.waitMs);
+
+	let res;
+	try {
+		res = await fetch(endpoint, {
+			method: 'POST',
+			headers: {
+				authorization: `Bearer ${token}`,
+				'content-type': 'application/json',
+				prefer: 'wait',
+			},
+			body,
+			// The create call previously had NO timeout, so a `prefer: wait` that
+			// never returned held the ladder open indefinitely.
+			signal: AbortSignal.timeout(Math.max(1_000, laneMs(REPLICATE_POLL_TIMEOUT_MS, false))),
+		});
+	} catch (err) {
+		throw Object.assign(new Error(`text-to-image provider unreachable: ${err?.message}`), {
+			code: 'provider_unreachable',
+		});
+	}
+
+	const data = await res.json().catch(() => ({}));
+	if (!res.ok) {
+		const detail = data?.detail || data?.title || '';
+		// Replicate throttles prediction creation (notably when account credit is
+		// low). Surface it as a retryable rate limit, not a generic failure, so the
+		// caller can return 429 + retry hint instead of a hard 5xx. The throttle
+		// `detail` names the account's credit balance ("…less than $5.0 in credit…")
+		// — parse its reset hint for backoff and log it, but never relay that
+		// internal state to the buyer.
+		if (res.status === 429) {
+			if (detail) console.warn(`[text-to-image] replicate throttled: ${detail}`);
+			throw Object.assign(
+				new Error('Image generation is briefly busy upstream, please retry in a few seconds.'),
+				{
+					code: 'rate_limited',
+					providerDetail: detail,
+					retryAfter: parseRetryAfter(res.headers, detail),
+				},
+			);
+		}
+		// Hard out-of-credit / billing failure. Replicate returns this as a 402,
+		// but the same "purchase credit at replicate.com/billing" copy can ride in
+		// on other 4xx codes too — match on status OR content so a status change
+		// upstream can never spill the vendor's billing page onto the buyer. Keep
+		// the raw detail for logs (providerDetail); surface a neutral, buyer-safe
+		// message the caller maps to "temporarily unavailable" (never "go buy
+		// credit"). The free NIM lane is the primary path — this backstop being
+		// dry must read as a transient platform issue, not a user-facing dead end.
+		if (res.status === 402 || /credit|billing|purchase|payment required/i.test(detail)) {
+			if (detail) console.warn(`[text-to-image] replicate billing/credit failure: ${detail}`);
+			throw Object.assign(new Error('image provider billing error'), {
+				code: 'billing',
+				providerStatus: 402,
+				providerDetail: detail,
+			});
+		}
+		throw Object.assign(new Error(detail || `text-to-image returned ${res.status}`), {
+			providerStatus: res.status,
+		});
+	}
+
+	// With `Prefer: wait` the prediction usually completes inline. When Replicate
+	// returns before completion (slow model, cold start, wait window elapsed) it
+	// hands back a non-terminal status and no output — poll the prediction to a
+	// terminal state so the free text→3D lane never dead-ends on a transient
+	// "starting", instead of surfacing the partial state as a hard failure.
+	let url = extractImageUrl(data.output);
+	if (!url) {
+		const getUrl = data?.urls?.get;
+		const nonTerminal = data.status && !REPLICATE_TERMINAL_STATUSES.has(data.status);
+		if (getUrl && nonTerminal) {
+			const finished = await pollReplicatePrediction(getUrl, token, { timeoutMs: laneMs(REPLICATE_POLL_TIMEOUT_MS, false) });
+			url = extractImageUrl(finished?.output);
+			if (url) {
+				return logImageProvider({ imageUrl: url, predictionId: finished?.id || data.id, model: modelRef });
+			}
+			throw new Error(
+				`text-to-image did not complete (status: ${finished?.status || data.status})`,
+			);
+		}
+		if (data.status && data.status !== 'succeeded') {
+			throw new Error(`text-to-image did not complete (status: ${data.status})`);
+		}
+		throw new Error('text-to-image finished but produced no image');
+	}
+	return logImageProvider({ imageUrl: url, predictionId: data.id, model: modelRef });
+}
+
+// Turnaround-view instructions for multi-view 3D conditioning. Each rotates the
+// SAME subject; the identity-preservation phrasing ("this exact same subject,
+// identical materials/wear/lighting") is what keeps the Gemini edit from
+// redesigning the object between views (verified live 2026-07-16: front/side/
+// back of one worn leather chair kept its chassis, scuffs and lighting).
+const TURNAROUND_VIEW_INSTRUCTIONS = [
+	'Show this exact same subject in direct left side profile view (rotated 90 degrees). Keep the identical subject with identical materials, colors, wear marks and details, and identical lighting, on a plain neutral background. Same camera distance and framing.',
+	'Show this exact same subject from directly behind (rotated 180 degrees). Keep the identical subject with identical materials, colors, wear marks and details, and identical lighting, on a plain neutral background. Same camera distance and framing.',
+];
+
+// Synthesize additional turnaround views (side, then back) of the subject in
+// `primaryImageUrl` for multi-view 3D reconstruction. The self-host TRELLIS
+// worker fuses up to 6 views of one asset; geometry the primary view can't
+// see (backs, sides) stops being hallucinated when real views cover it.
+//
+// Runs only on the Vertex Gemini edit lane (image+instruction), the same GCP
+// credit pool as the primary reference image; there is no NIM/Replicate
+// fallback for edits. Strictly best-effort: any per-view failure (lane
+// unconfigured, safety block, throttle) just yields fewer views; the primary
+// view alone is always a complete input, so this can only ever add quality.
+export async function synthesizeTurnaroundViews(primaryImageUrl, { count = 2 } = {}) {
+	const wanted = TURNAROUND_VIEW_INSTRUCTIONS.slice(0, Math.max(0, count));
+	if (!wanted.length) return [];
+	let editImage;
+	try {
+		const vertex = await import('./vertex-imagen.js');
+		if (!vertex.isConfigured() || !vertexImagenEnabled()) return [];
+		editImage = vertex.editImage;
+	} catch {
+		return [];
+	}
+	const results = await Promise.allSettled(
+		wanted.map((instruction) =>
+			editImage(primaryImageUrl, instruction).then(persistDataUriImage),
+		),
+	);
+	const views = [];
+	for (const r of results) {
+		if (r.status === 'fulfilled' && r.value?.imageUrl) {
+			views.push(r.value.imageUrl);
+		} else if (r.status === 'rejected') {
+			console.warn(`[text-to-image] turnaround view failed, continuing: ${r.reason?.message}`);
+		}
+	}
+	return views;
+}

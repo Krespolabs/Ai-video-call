@@ -1,0 +1,10 @@
+{
+	"about": "Posts @trythreews made by hand, outside the pipeline. The archive scrapes stop at their scrape date, so without this list the duplicate check cannot see anything posted since. Add a row whenever the account posts manually.",
+	"posts": [
+		{
+			"postedAt": "2026-09-10",
+			"covers": "aws-authorization-spine",
+			"text": "three.ws is a verified AWS Partner. Budgets, entitlements, and the $THREE token layer: How we authorize autonomous agent spending @awscloud @AWS_Partners"
+		}
+	]
+}

@@ -1,0 +1,25 @@
+{
+	"$schema": "NPC dialogue table for the walk scene (Task 19). Slots: greeter, guide-wait, guide-arrive ({landmark} token). landmarks steer the guide NPC.",
+	"greeter": [
+		"Welcome to the beach — mind the warm sand.",
+		"Hey there. The water's perfect today.",
+		"Glad you came down. Grab a parasol if the sun's too much.",
+		"Welcome in. The tide's calm, the view's all yours."
+	],
+	"guide-wait": [
+		"Take your time — I'll wait by the shoreline.",
+		"No rush, the waves keep good company.",
+		"I'll hold here in the shade until you're ready."
+	],
+	"guide-arrive": [
+		"Here we are — {landmark}.",
+		"This is {landmark}. Best seat on the coast.",
+		"Welcome to {landmark}. Listen to that surf."
+	],
+	"landmarks": [
+		{ "name": "the palm grove", "pos": [-4.314, 0, 5.217] },
+		{ "name": "the parasols", "pos": [4.33, 0, 1.355] },
+		{ "name": "the water's edge", "pos": [0, 0, 9] },
+		{ "name": "the far dune", "pos": [-4.779, 0, -7.944] }
+	]
+}

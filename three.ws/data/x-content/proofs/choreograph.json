@@ -1,0 +1,121 @@
+{
+	"id": "choreograph",
+	"scenarioHash": "78587bedf9a42b09fff62e52882b891287946c1c7acea2c0b04db9e3d47599ab",
+	"ranAt": "2026-09-29T08:00:07.236Z",
+	"target": {
+		"commit": "f2081d946",
+		"revision": "three-ws-api-00460-4j6"
+	},
+	"passed": true,
+	"steps": [
+		{
+			"index": 1,
+			"kind": "goto",
+			"target": "https://three.ws/choreograph",
+			"detail": "loaded https://three.ws/choreograph",
+			"ok": true,
+			"ms": 6969,
+			"frames": 0
+		},
+		{
+			"index": 2,
+			"kind": "scroll",
+			"target": "Start from a routine",
+			"detail": "scrolled 293 px",
+			"ok": true,
+			"ms": 3485,
+			"frames": 27
+		},
+		{
+			"index": 3,
+			"kind": "click",
+			"target": "Shipped it",
+			"detail": "clicked",
+			"ok": true,
+			"ms": 7051,
+			"frames": 21
+		},
+		{
+			"index": 4,
+			"kind": "expect",
+			"target": "sign ·",
+			"detail": "appeared after 0.0 s",
+			"ok": true,
+			"ms": 17,
+			"frames": 0
+		},
+		{
+			"index": 5,
+			"kind": "scroll",
+			"target": "Your routine",
+			"detail": "scrolled 621 px",
+			"ok": true,
+			"ms": 8358,
+			"frames": 24
+		},
+		{
+			"index": 6,
+			"kind": "hold",
+			"target": "3600",
+			"detail": "3600 ms",
+			"ok": true,
+			"ms": 44232,
+			"frames": 108
+		},
+		{
+			"index": 7,
+			"kind": "scroll",
+			"target": "Add a gesture",
+			"detail": "scrolled 470 px",
+			"ok": true,
+			"ms": 13026,
+			"frames": 24
+		},
+		{
+			"index": 8,
+			"kind": "click",
+			"target": "wave +",
+			"detail": "clicked",
+			"ok": true,
+			"ms": 11708,
+			"frames": 21
+		},
+		{
+			"index": 9,
+			"kind": "expect",
+			"target": "wave ·",
+			"detail": "appeared after 0 filmed frames",
+			"ok": true,
+			"ms": 47,
+			"frames": 0
+		},
+		{
+			"index": 10,
+			"kind": "hold",
+			"target": "2500",
+			"detail": "2500 ms",
+			"ok": true,
+			"ms": 44245,
+			"frames": 75
+		}
+	],
+	"facts": {},
+	"saw": [
+		"sign ·",
+		"wave ·"
+	],
+	"responses": [],
+	"cuts": [],
+	"video": {
+		"path": "public/x-media/choreograph/reel.mp4",
+		"sha256": "5cf09e90edaaa263c044aadddd7a67058b9995927e7498f4e2bccaf8758c4fdb",
+		"frames": 300,
+		"motion": 0.813,
+		"durationSec": 10,
+		"width": 1280,
+		"height": 720,
+		"fps": 30,
+		"videoCodec": "h264",
+		"pixFmt": "yuv420p"
+	}
+}

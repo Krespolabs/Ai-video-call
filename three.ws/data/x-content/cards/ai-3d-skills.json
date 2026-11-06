@@ -1,0 +1,13 @@
+{
+	"out": "public/x-media/ai-3d-skills/card.png",
+	"headline": "Your AI can\nmake 3D now.",
+	"body": "Free three.ws skills for Claude. Ask for a 3D chair and get a real model back, from our free library or made from your words.",
+	"frame": "browser",
+	"shot": "https://three.ws/objects",
+	"label": "three.ws/objects",
+	"settleMs": 25000,
+	"scrollBy": 560,
+	"hide": [
+		".ch-toolbar"
+	]
+}

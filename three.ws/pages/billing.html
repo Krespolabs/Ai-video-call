@@ -1,0 +1,162 @@
+<!doctype html>
+<html lang="en">
+	<head>
+		<script>/* three.ws theme boot — no-flash */(function(){document.documentElement.classList.add('js');try{var m=localStorage.getItem('twx_theme');var l=m==='auto'?(window.matchMedia&&window.matchMedia('(prefers-color-scheme: light)').matches):m==='light';document.documentElement.setAttribute('data-theme',l?'light':'dark');}catch(e){document.documentElement.setAttribute('data-theme','dark');}})();</script>
+		<meta charset="utf-8" />
+		<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+		<title data-i18n="billing.meta_title">Billing &amp; invoices · three.ws</title>
+		<meta name="description" content="Your three.ws usage statement: every metered charge, the holder discount applied, and the on-chain settlement it traces to. Download or print your invoice."  data-i18n-attr="content:billing.meta_description"/>
+		<meta name="robots" content="noindex" />
+		<link rel="canonical" href="https://three.ws/billing" />
+		<link rel="icon" href="/favicon.ico" sizes="any" />
+		<link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+		<link rel="manifest" href="/manifest.webmanifest" />
+		<link rel="stylesheet" href="/style.css" />
+		<link rel="stylesheet" href="/nav.css" />
+		<link rel="stylesheet" href="/footer.css" />
+		<link rel="stylesheet" href="/fonts/fonts.css" />
+		<link rel="stylesheet" href="/mobile.css" />
+		<style>
+			.bill-wrap { max-width: 980px; margin: 0 auto; padding: clamp(1.25rem, 4vw, 3rem) 1.25rem 4rem; }
+			.bill-head { display: flex; flex-wrap: wrap; align-items: flex-end; justify-content: space-between; gap: 16px; margin-bottom: 8px; }
+			.bill-head h1 { font-size: clamp(1.6rem, 3vw, 2.1rem); margin: 0; letter-spacing: -0.02em; }
+			.bill-sub { color: rgba(255,255,255,0.6); font-size: 14px; margin: 4px 0 0; }
+			.bill-controls { display: flex; align-items: center; gap: 10px; }
+			.bill-controls select, .bill-controls a.bill-btn { font: inherit; font-size: 13px; padding: 8px 14px; border-radius: 10px; border: 1px solid rgba(255,255,255,0.14); background: rgba(14,14,14,0.9); color: rgba(255,255,255,0.85); cursor: pointer; text-decoration: none; transition: border-color var(--duration-fast), background var(--duration-fast); }
+			.bill-controls a.bill-btn:hover, .bill-controls select:hover { border-color: rgba(255,255,255,0.3); }
+			.bill-recon { display: inline-flex; align-items: center; gap: 7px; font-size: 12.5px; padding: 6px 12px; border-radius: 999px; border: 1px solid rgba(255,255,255,0.12); margin: 14px 0 24px; }
+			.bill-recon .dot { width: 8px; height: 8px; border-radius: 50%; }
+			.bill-recon.ok { border-color: color-mix(in srgb, #2fbf71 50%, transparent); color: #7fe3ab; }
+			.bill-recon.ok .dot { background: #2fbf71; }
+			.bill-recon.warn { border-color: color-mix(in srgb, #f0a93b 55%, transparent); color: #f3c478; }
+			.bill-recon.warn .dot { background: #f0a93b; }
+			.bill-card { border: 1px solid rgba(255,255,255,0.1); border-radius: 16px; background: rgba(10,10,10,0.85); overflow: hidden; }
+			table.bill-table { width: 100%; border-collapse: collapse; font-size: 14px; }
+			.bill-table th, .bill-table td { text-align: left; padding: 14px 18px; border-bottom: 1px solid rgba(255,255,255,0.06); }
+			.bill-table th { font-size: 11px; text-transform: uppercase; letter-spacing: 0.05em; color: rgba(255,255,255,0.5); font-weight: 600; }
+			.bill-table td.num, .bill-table th.num { text-align: right; font-variant-numeric: tabular-nums; }
+			.bill-table tr:last-child td { border-bottom: none; }
+			.bill-table .disc { color: #7fe3ab; font-size: 12px; }
+			.bill-total td { font-weight: 700; font-size: 15px; border-top: 2px solid rgba(255,255,255,0.14); }
+			.bill-state { padding: 56px 24px; text-align: center; color: rgba(255,255,255,0.65); }
+			.bill-state h2 { font-size: 18px; color: rgba(255,255,255,0.9); margin: 0 0 8px; }
+			.bill-state p { margin: 0 auto 18px; max-width: 460px; line-height: 1.55; }
+			.bill-state a.cta, .bill-state button.cta { display: inline-block; font: inherit; font-weight: 600; font-size: 14px; padding: 10px 20px; border-radius: 10px; border: none; background: var(--accent, #7c5cff); color: #fff; text-decoration: none; cursor: pointer; }
+			.bill-skel { height: 18px; border-radius: 6px; background: linear-gradient(90deg, rgba(255,255,255,0.05), rgba(255,255,255,0.12), rgba(255,255,255,0.05)); background-size: 200% 100%; animation: billShimmer 1.3s infinite; }
+			@keyframes billShimmer { 0% { background-position: 200% 0; } 100% { background-position: -200% 0; } }
+			@media (prefers-reduced-motion: reduce) { .bill-skel { animation: none; } }
+			@media print { header, footer, #footer-container, .bill-controls, .bill-recon a { display: none !important; } body { background: #fff; color: #000; } .bill-card { border-color: #ccc; } }
+		</style>
+	</head>
+	<body>
+		<a href="#main-content" class="h-skip-link" data-i18n="billing.skip_to_main_content">Skip to main content</a>
+		<header><div id="nav-container"></div></header>
+		<script src="/nav.js"></script>
+
+		<main id="main-content" class="bill-wrap">
+			<div class="bill-head">
+				<div>
+					<h1 data-i18n="billing.billing_invoices">Billing &amp; invoices</h1>
+					<p class="bill-sub" data-i18n="billing.every_metered_charge_the_three_holder_discou">Every metered charge, the $THREE holder discount applied, and the on-chain settlement it traces to.</p>
+				</div>
+				<div class="bill-controls">
+					<label for="bill-period" class="sr-only" data-i18n="billing.statement_period">Statement period</label>
+					<select id="bill-period" aria-label="Statement period"></select>
+					<a class="bill-btn" id="bill-csv" download data-i18n="billing.download_csv">Download CSV</a>
+					<button class="bill-btn" id="bill-print" type="button" data-i18n="billing.print_pdf">Print / PDF</button>
+				</div>
+			</div>
+
+			<div id="bill-recon-host"></div>
+			<div class="bill-card" id="bill-body" aria-live="polite"></div>
+		</main>
+
+		<script type="module">
+			const body = document.getElementById('bill-body');
+			const reconHost = document.getElementById('bill-recon-host');
+			const periodSel = document.getElementById('bill-period');
+			const csvLink = document.getElementById('bill-csv');
+			const esc = (s) => String(s).replace(/[<>&]/g, (c) => ({ '<': '&lt;', '>': '&gt;', '&': '&amp;' })[c]);
+
+			// Last 12 months as period options (UTC, YYYY-MM).
+			(function buildPeriods() {
+				const now = new Date();
+				const opts = [];
+				for (let i = 0; i < 12; i++) {
+					const d = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() - i, 1));
+					const label = `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, '0')}`;
+					const human = d.toLocaleDateString(undefined, { month: 'long', year: 'numeric', timeZone: 'UTC' });
+					opts.push(`<option value="${label}">${human}${i === 0 ? ' (current)' : ''}</option>`);
+				}
+				periodSel.innerHTML = opts.join('');
+			})();
+
+			function skeleton() {
+				body.innerHTML = `<table class="bill-table"><thead><tr><th>Charge</th><th class="num">Count</th><th class="num">Total</th></tr></thead><tbody>${
+					Array.from({ length: 4 }).map(() => `<tr><td><div class="bill-skel" style="width:60%"></div></td><td class="num"><div class="bill-skel" style="width:24px;margin-left:auto"></div></td><td class="num"><div class="bill-skel" style="width:50px;margin-left:auto"></div></td></tr>`).join('')
+				}</tbody></table>`;
+			}
+
+			function renderSignIn() {
+				reconHost.innerHTML = '';
+				body.innerHTML = `<div class="bill-state"><h2>Sign in to view your invoices</h2><p>Your usage statement is private to your account. Sign in to see every charge, your holder discount, and the settlement each traces to.</p><a class="cta" href="/login?next=/billing">Sign in</a></div>`;
+			}
+
+			function renderEmpty() {
+				body.innerHTML = `<div class="bill-state"><h2>No usage this period</h2><p>You haven't been billed for anything yet. Generation drafts are always free; paid lanes — High-quality generation, Game-Ready export, voice cloning, oracle calls — meter here as you use them, settled in $THREE.</p><a class="cta" href="/pricing">See what gets billed</a></div>`;
+			}
+
+			function renderError(retry) {
+				reconHost.innerHTML = '';
+				body.innerHTML = `<div class="bill-state"><h2>Couldn't load your statement</h2><p>We hit a snag fetching your invoice. Your charges are safe and unaffected — try again.</p><button class="cta" type="button" id="bill-retry">Retry</button></div>`;
+				document.getElementById('bill-retry')?.addEventListener('click', retry);
+			}
+
+			function renderRecon(recon) {
+				if (!recon || !recon.total) { reconHost.innerHTML = ''; return; }
+				const ok = recon.all_reconciled;
+				reconHost.innerHTML = `<span class="bill-recon ${ok ? 'ok' : 'warn'}"><span class="dot"></span>${ok ? `All ${recon.reconciled} charges reconciled to on-chain settlements` : `${recon.unreconciled} of ${recon.total} charges pending reconciliation`}</span>`;
+			}
+
+			function renderStatement(inv) {
+				renderRecon(inv.reconciliation);
+				if (!inv.line_items.length) { renderEmpty(); return; }
+				const rows = inv.line_items.map((l) => {
+					const disc = l.discount_bps > 0 ? `<span class="disc"> · ${(l.discount_bps / 100).toFixed(0)}% holder discount</span>` : '';
+					return `<tr><td>${esc(l.label)}${disc}</td><td class="num">${l.count}</td><td class="num">$${l.gross_usd}</td></tr>`;
+				}).join('');
+				body.innerHTML = `<table class="bill-table">
+					<thead><tr><th>Charge</th><th class="num">Count</th><th class="num">Total (USD)</th></tr></thead>
+					<tbody>${rows}</tbody>
+					<tfoot><tr class="bill-total"><td>Statement total</td><td class="num">${inv.totals.charge_count}</td><td class="num">$${inv.totals.gross_usd}</td></tr></tfoot>
+				</table>`;
+			}
+
+			async function load() {
+				const period = periodSel.value;
+				csvLink.href = `/api/billing/invoices?period=${period}&format=csv`;
+				skeleton();
+				try {
+					const r = await fetch(`/api/billing/invoices?period=${period}`, { headers: { accept: 'application/json' }, credentials: 'include' });
+					if (r.status === 401) { renderSignIn(); return; }
+					if (!r.ok) throw new Error(`invoices ${r.status}`);
+					const { invoice } = await r.json();
+					renderStatement(invoice);
+				} catch (err) {
+					console.warn('[billing] load failed:', err?.message || err);
+					renderError(load);
+				}
+			}
+
+			periodSel.addEventListener('change', load);
+			document.getElementById('bill-print').addEventListener('click', () => window.print());
+			load();
+		</script>
+
+		<script src="/brand.js" defer></script>
+		<div id="footer-container"></div>
+		<script src="/footer.js"></script>
+		<!-- Runtime i18n: detects locale, swaps annotated copy, mounts <lang-switcher>. -->
+	<script type="module" src="/i18n.js"></script>
+</body>
+</html>

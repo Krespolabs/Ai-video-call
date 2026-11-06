@@ -1,0 +1,987 @@
+<!doctype html>
+<html lang="en">
+	<head>
+		<meta charset="utf-8" />
+		<meta http-equiv="X-UA-Compatible" content="IE=edge" />
+		<title data-i18n="docs_walk_embed_api.meta_title">Walk Embed API — three.ws</title>
+		<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+		<meta
+			name="description"
+			content="The bi-directional postMessage contract for the three.ws walking-avatar embed: outbound events, inbound commands, the JS SDK, security model, and copy-paste React, Vue, and vanilla examples."
+		 data-i18n-attr="content:docs_walk_embed_api.meta_description"/>
+		<meta name="theme-color" content="#0a0a0a" />
+
+		<meta property="og:type" content="article" />
+		<meta property="og:site_name" content="three.ws" />
+		<meta property="og:title" content="three.ws — Walk Embed API"  data-i18n-attr="content:docs_walk_embed_api.meta_og_title"/>
+		<meta
+			property="og:description"
+			content="Drive a walking 3D avatar from any page. postMessage events, the ThreeWalkAvatar SDK, security, and React / Vue / vanilla examples."
+		 data-i18n-attr="content:docs_walk_embed_api.meta_og_description"/>
+		<meta property="og:url" content="https://three.ws/docs/walk-embed-api" />
+		<meta property="og:image" content="https://three.ws/og-image.png" />
+		<meta name="twitter:card" content="summary_large_image" />
+		<meta name="twitter:site" content="@trythreews" />
+		<meta name="twitter:title" content="Walk Embed API · three.ws"  data-i18n-attr="content:docs_walk_embed_api.meta_twitter_title"/>
+		<meta
+			name="twitter:description"
+			content="Drive a walking 3D avatar from any page. postMessage events, the ThreeWalkAvatar SDK, security, and React / Vue / vanilla examples."
+		 data-i18n-attr="content:docs_walk_embed_api.meta_twitter_description"/>
+		<meta name="twitter:image" content="https://three.ws/og-image.png" />
+
+		<link rel="canonical" href="https://three.ws/docs/walk-embed-api" />
+		<link rel="shortcut icon" href="/favicon.ico" />
+		<link rel="stylesheet" href="/fonts/fonts.css" />
+		<link rel="stylesheet" href="/style.css" />
+		<link rel="stylesheet" href="/nav.css" />
+		<link rel="stylesheet" href="/footer.css" />
+
+		<style>
+			.docs-main {
+				max-width: 880px;
+				margin: 0 auto;
+				padding: var(--space-2xl) var(--space-lg) var(--space-2xl);
+				line-height: var(--leading-normal);
+			}
+			.docs-main h1 {
+				font-family: var(--font-display);
+				font-weight: 300;
+				font-size: var(--text-3xl);
+				letter-spacing: -1px;
+				margin: 0 0 var(--space-sm);
+			}
+			.docs-lede {
+				color: var(--ink-dim);
+				font-size: var(--text-base);
+				max-width: 60ch;
+				margin: 0 0 var(--space-xl);
+			}
+			.docs-main h2 {
+				font-family: var(--font-display);
+				font-weight: 400;
+				font-size: var(--text-xl);
+				margin: var(--space-2xl) 0 var(--space-sm);
+				padding-bottom: var(--space-xs);
+				border-bottom: 1px solid var(--stroke);
+				scroll-margin-top: calc(var(--header-h) + var(--space-md));
+			}
+			.docs-main h3 {
+				font-weight: 600;
+				font-size: var(--text-lg);
+				margin: var(--space-xl) 0 var(--space-sm);
+			}
+			.docs-main p,
+			.docs-main li {
+				color: var(--ink);
+			}
+			.docs-main ul,
+			.docs-main ol {
+				padding-left: var(--space-lg);
+			}
+			.docs-main li {
+				margin: var(--space-2xs) 0;
+			}
+			.docs-main code {
+				font-family: var(--font-mono);
+				font-size: 0.9em;
+				background: var(--surface-2);
+				padding: 1px 6px;
+				border-radius: var(--radius-sm);
+				color: var(--ink-bright);
+			}
+			.docs-main a {
+				color: var(--accent);
+				text-decoration: none;
+				border-bottom: 1px solid transparent;
+				transition: border-color var(--duration-fast) var(--ease-standard);
+			}
+			.docs-main a:hover,
+			.docs-main a:focus-visible {
+				border-bottom-color: var(--accent);
+			}
+
+			.docs-toc {
+				padding: var(--space-md);
+				background: var(--surface-1);
+				border: 1px solid var(--stroke);
+				border-radius: var(--radius-lg);
+				margin-bottom: var(--space-xl);
+			}
+			.docs-toc strong {
+				color: var(--ink-bright);
+				font-size: var(--text-sm);
+			}
+			.docs-toc ul {
+				margin: var(--space-xs) 0 0;
+				padding: 0;
+				list-style: none;
+				display: flex;
+				flex-wrap: wrap;
+				gap: var(--space-2xs) var(--space-md);
+			}
+
+			/* ── Tables ─────────────────────────────────────────────────── */
+			.table-wrap {
+				overflow-x: auto;
+				border: 1px solid var(--stroke);
+				border-radius: var(--radius-lg);
+				margin: var(--space-md) 0;
+			}
+			table {
+				width: 100%;
+				border-collapse: collapse;
+				font-size: var(--text-sm);
+				min-width: 520px;
+			}
+			th,
+			td {
+				text-align: left;
+				padding: var(--space-xs) var(--space-sm);
+				border-bottom: 1px solid var(--stroke);
+				vertical-align: top;
+			}
+			tr:last-child td {
+				border-bottom: 0;
+			}
+			th {
+				color: var(--ink-dim);
+				font-weight: 600;
+				background: var(--surface-1);
+				position: sticky;
+				top: 0;
+			}
+			td code {
+				white-space: nowrap;
+			}
+			.dir {
+				display: inline-block;
+				font-family: var(--font-mono);
+				font-size: var(--text-2xs);
+				font-weight: 600;
+				padding: 1px 7px;
+				border-radius: var(--radius-pill);
+				white-space: nowrap;
+			}
+			.dir.out {
+				color: var(--success);
+				background: color-mix(in srgb, var(--success) 14%, transparent);
+			}
+			.dir.in {
+				color: var(--accent);
+				background: var(--accent-soft);
+			}
+
+			/* ── Code blocks + copy ─────────────────────────────────────── */
+			.code {
+				position: relative;
+				margin: var(--space-md) 0;
+			}
+			.code pre {
+				background: var(--bg-1);
+				border: 1px solid var(--stroke);
+				border-radius: var(--radius-lg);
+				padding: var(--space-md);
+				padding-right: calc(var(--space-md) + 88px);
+				overflow-x: auto;
+				margin: 0;
+				line-height: 1.6;
+			}
+			.code pre code {
+				font-family: var(--font-mono);
+				font-size: var(--text-sm);
+				background: transparent;
+				padding: 0;
+				color: var(--ink);
+				white-space: pre;
+			}
+			.copy-btn {
+				position: absolute;
+				top: var(--space-xs);
+				right: var(--space-xs);
+				font: inherit;
+				font-size: var(--text-2xs);
+				font-weight: 600;
+				color: var(--ink-dim);
+				background: var(--surface-2);
+				border: 1px solid var(--stroke);
+				border-radius: var(--radius-md);
+				padding: var(--space-3xs) var(--space-xs);
+				cursor: pointer;
+				transition: color var(--duration-fast) var(--ease-standard),
+					border-color var(--duration-fast) var(--ease-standard),
+					background var(--duration-fast) var(--ease-standard);
+			}
+			.copy-btn:hover {
+				color: var(--ink-bright);
+				border-color: var(--stroke-strong);
+				background: var(--surface-3);
+			}
+			.copy-btn:focus-visible {
+				outline: 2px solid var(--accent);
+				outline-offset: 2px;
+			}
+			.copy-btn.copied {
+				color: var(--success);
+				border-color: color-mix(in srgb, var(--success) 50%, transparent);
+			}
+
+			/* ── Tabs (example languages) ───────────────────────────────── */
+			.tabs {
+				margin: var(--space-md) 0;
+			}
+			.tablist {
+				display: flex;
+				gap: var(--space-2xs);
+				border-bottom: 1px solid var(--stroke);
+				margin-bottom: var(--space-sm);
+			}
+			.tab {
+				font: inherit;
+				font-size: var(--text-sm);
+				font-weight: 600;
+				color: var(--ink-dim);
+				background: none;
+				border: 0;
+				border-bottom: 2px solid transparent;
+				padding: var(--space-xs) var(--space-sm);
+				cursor: pointer;
+				transition: color var(--duration-fast) var(--ease-standard);
+			}
+			.tab:hover {
+				color: var(--ink);
+			}
+			.tab[aria-selected='true'] {
+				color: var(--ink-bright);
+				border-bottom-color: var(--accent);
+			}
+			.tab:focus-visible {
+				outline: 2px solid var(--accent);
+				outline-offset: -2px;
+				border-radius: var(--radius-sm);
+			}
+			.tabpanel[hidden] {
+				display: none;
+			}
+
+			/* ── Callouts ───────────────────────────────────────────────── */
+			.callout {
+				border: 1px solid var(--stroke);
+				border-left: 3px solid var(--accent);
+				background: var(--surface-1);
+				border-radius: var(--radius-md);
+				padding: var(--space-sm) var(--space-md);
+				margin: var(--space-md) 0;
+				font-size: var(--text-sm);
+			}
+			.callout.warn {
+				border-left-color: var(--warn);
+			}
+			.callout strong {
+				color: var(--ink-bright);
+			}
+
+			/* ── Playground ─────────────────────────────────────────────── */
+			.play {
+				display: grid;
+				grid-template-columns: minmax(0, 1fr) minmax(0, 1.1fr);
+				gap: var(--space-md);
+				margin: var(--space-md) 0;
+			}
+			.play-stage {
+				border: 1px solid var(--stroke);
+				border-radius: var(--radius-lg);
+				overflow: hidden;
+				background: var(--bg-1);
+				aspect-ratio: 4 / 5;
+				min-height: 320px;
+			}
+			.play-stage iframe {
+				width: 100%;
+				height: 100%;
+				border: 0;
+				display: block;
+			}
+			.play-controls {
+				display: flex;
+				flex-direction: column;
+				gap: var(--space-sm);
+				min-width: 0;
+			}
+			.ctrl-row {
+				display: flex;
+				flex-wrap: wrap;
+				gap: var(--space-2xs);
+				align-items: center;
+			}
+			.ctrl-row label {
+				font-size: var(--text-xs);
+				color: var(--ink-dim);
+				min-width: 64px;
+			}
+			.btn {
+				font: inherit;
+				font-size: var(--text-sm);
+				font-weight: 600;
+				color: var(--ink-bright);
+				background: var(--surface-2);
+				border: 1px solid var(--stroke);
+				border-radius: var(--radius-md);
+				padding: var(--space-2xs) var(--space-sm);
+				cursor: pointer;
+				transition: background var(--duration-fast) var(--ease-standard),
+					border-color var(--duration-fast) var(--ease-standard),
+					transform var(--duration-instant) var(--ease-standard);
+			}
+			.btn:hover {
+				background: var(--surface-3);
+				border-color: var(--stroke-strong);
+			}
+			.btn:active {
+				transform: translateY(1px);
+			}
+			.btn:focus-visible {
+				outline: 2px solid var(--accent);
+				outline-offset: 2px;
+			}
+			.play select,
+			.play input[type='text'] {
+				font: inherit;
+				font-size: var(--text-sm);
+				color: var(--ink-bright);
+				background: var(--bg-1);
+				border: 1px solid var(--stroke);
+				border-radius: var(--radius-md);
+				padding: var(--space-2xs) var(--space-xs);
+			}
+			.play input[type='text'] {
+				flex: 1;
+				min-width: 120px;
+			}
+			.play-log {
+				font-family: var(--font-mono);
+				font-size: var(--text-2xs);
+				line-height: 1.5;
+				background: var(--bg-1);
+				border: 1px solid var(--stroke);
+				border-radius: var(--radius-md);
+				padding: var(--space-xs);
+				height: 150px;
+				overflow-y: auto;
+				color: var(--ink-dim);
+				white-space: pre-wrap;
+				word-break: break-word;
+			}
+			.play-log .ev-out {
+				color: var(--success);
+			}
+			.play-log .ev-cmd {
+				color: var(--accent);
+			}
+			.play-log .ev-err {
+				color: var(--danger);
+			}
+
+			@media (max-width: 720px) {
+				.play {
+					grid-template-columns: 1fr;
+				}
+				.code pre {
+					padding-right: var(--space-md);
+				}
+				.copy-btn {
+					position: static;
+					display: inline-block;
+					margin-bottom: var(--space-2xs);
+				}
+			}
+
+			.visually-hidden {
+				position: absolute;
+				width: 1px;
+				height: 1px;
+				padding: 0;
+				margin: -1px;
+				overflow: hidden;
+				clip: rect(0, 0, 0, 0);
+				white-space: nowrap;
+				border: 0;
+			}
+		</style>
+	</head>
+	<body>
+		<header>
+			<div id="nav-container"></div>
+		</header>
+		<script src="/nav.js"></script>
+
+		<main class="docs-main">
+			<h1 data-i18n="docs_walk_embed_api.walk_embed_api">Walk Embed API</h1>
+			<p class="docs-lede" data-i18n-html="docs_walk_embed_api.the_walking_avatar_embed_is_programmable_dro">
+				The walking-avatar embed is programmable. Drop the
+				<a href="/walk-embed">/walk-embed</a> iframe on any page and drive it with a typed,
+				bi-directional <code>postMessage</code> contract — or skip the wire format entirely
+				and use the <code>ThreeWalkAvatar</code> SDK. This page is the full reference: every
+				event, the security model, a live playground, and copy-paste examples.
+			</p>
+
+			<div class="docs-toc">
+				<strong data-i18n="docs_walk_embed_api.on_this_page">On this page</strong>
+				<ul>
+					<li data-i18n-html="docs_walk_embed_api.quick_start"><a href="#quick-start">Quick start</a></li>
+					<li data-i18n-html="docs_walk_embed_api.live_playground"><a href="#playground">Live playground</a></li>
+					<li data-i18n-html="docs_walk_embed_api.outbound_events"><a href="#outbound">Outbound events</a></li>
+					<li data-i18n-html="docs_walk_embed_api.inbound_commands"><a href="#inbound">Inbound commands</a></li>
+					<li data-i18n-html="docs_walk_embed_api.vocabulary"><a href="#vocab">Vocabulary</a></li>
+					<li data-i18n-html="docs_walk_embed_api.envelope"><a href="#envelope">Envelope</a></li>
+					<li data-i18n-html="docs_walk_embed_api.security"><a href="#security">Security</a></li>
+					<li data-i18n-html="docs_walk_embed_api.examples"><a href="#examples">Examples</a></li>
+				</ul>
+			</div>
+
+			<h2 id="quick-start" data-i18n="docs_walk_embed_api.quick_start_2">Quick start</h2>
+			<p data-i18n="docs_walk_embed_api.render_the_iframe_then_wrap_it_with">
+				Render the iframe, then wrap it with the SDK to get a clean, promise-free command and
+				event API:
+			</p>
+			<div class="code" data-code>
+				<button class="copy-btn" type="button" aria-label="Copy code" data-i18n="docs_walk_embed_api.copy" data-i18n-attr="aria-label:docs_walk_embed_api.copy_code_arialabel">Copy</button>
+				<pre><code>&lt;iframe id="avatar" src="https://three.ws/walk-embed?env=studio"
+        style="width:320px;height:400px;border:0"&gt;&lt;/iframe&gt;
+
+&lt;script src="https://three.ws/walk-embed-sdk.js"&gt;&lt;/script&gt;
+&lt;script&gt;
+  const a = ThreeWalkAvatar.embed('#avatar');
+  a.on('ready', ({ avatarId, env }) =&gt; console.log('ready', avatarId, env));
+  a.on('position', ({ x, z, heading }) =&gt; console.log(x, z, heading));
+  a.goto(2, -1);
+  a.gesture('wave');
+  a.say('Hello from your site.');
+&lt;/script&gt;</code></pre>
+			</div>
+			<div class="callout">
+				<strong data-i18n="docs_walk_embed_api.no_build_step">No build step.</strong> The SDK is plain browser JS with zero dependencies.
+				It works from a <code>&lt;script&gt;</code> tag, a bundler, or an ESM
+				<code>import</code> of the URL.
+			</div>
+
+			<h2 id="playground" data-i18n="docs_walk_embed_api.live_playground_2">Live playground</h2>
+			<p data-i18n-html="docs_walk_embed_api.a_real_iframe_driven_through_the_sdk">
+				A real <code>/walk-embed</code> iframe, driven through the SDK. Send commands and
+				watch the event log update in real time — outbound events in green, the commands you
+				send in blue, errors in red.
+			</p>
+			<div class="play">
+				<div class="play-stage">
+					<iframe
+						id="pg-frame"
+						src="/walk-embed?env=studio&controls=none&ground=true"
+						title="Walk embed playground"
+						allow="accelerometer; gyroscope"
+					></iframe>
+				</div>
+				<div class="play-controls">
+					<div class="ctrl-row">
+						<label for="pg-x" data-i18n="docs_walk_embed_api.goto">goto</label>
+						<input type="text" id="pg-x" value="3" inputmode="decimal" aria-label="goto x" style="max-width:64px" />
+						<input type="text" id="pg-z" value="-2" inputmode="decimal" aria-label="goto z" style="max-width:64px" />
+						<button class="btn" type="button" id="pg-goto" data-i18n="docs_walk_embed_api.walk_there">Walk there</button>
+						<button class="btn" type="button" id="pg-reset" data-i18n="docs_walk_embed_api.reset">Reset</button>
+					</div>
+					<div class="ctrl-row">
+						<label for="pg-gesture" data-i18n="docs_walk_embed_api.gesture">gesture</label>
+						<select id="pg-gesture" aria-label="gesture"></select>
+						<button class="btn" type="button" id="pg-play-gesture" data-i18n="docs_walk_embed_api.play">Play</button>
+					</div>
+					<div class="ctrl-row">
+						<label for="pg-env" data-i18n="docs_walk_embed_api.env">env</label>
+						<select id="pg-env" aria-label="environment"></select>
+					</div>
+					<div class="ctrl-row">
+						<label for="pg-say" data-i18n="docs_walk_embed_api.say">say</label>
+						<input type="text" id="pg-say" value="Built on three.ws" aria-label="say text" />
+						<button class="btn" type="button" id="pg-say-btn" data-i18n="docs_walk_embed_api.speak">Speak</button>
+					</div>
+					<div class="ctrl-row">
+						<label for="pg-speed" data-i18n="docs_walk_embed_api.speed">speed</label>
+						<input type="text" id="pg-speed" value="1.5" inputmode="decimal" aria-label="speed" style="max-width:64px" />
+						<button class="btn" type="button" id="pg-speed-btn" data-i18n="docs_walk_embed_api.apply">Apply</button>
+						<button class="btn" type="button" id="pg-clear-log" data-i18n="docs_walk_embed_api.clear_log">Clear log</button>
+					</div>
+					<div class="play-log" id="pg-log" role="log" aria-live="polite" aria-label="Event log">waiting for walk:ready…</div>
+				</div>
+			</div>
+
+			<h2 id="outbound" data-i18n-html="docs_walk_embed_api.outbound_events_iframe_host">Outbound events <span style="font-weight:400;color:var(--ink-dim);font-size:var(--text-md)">(iframe → host)</span></h2>
+			<p data-i18n-html="docs_walk_embed_api.the_embed_emits_these_as_you_drive">
+				The embed emits these as you drive it and as the avatar lives its life. Subscribe with
+				<code>avatar.on(name, cb)</code>; the callback receives the message object.
+			</p>
+			<div class="table-wrap">
+				<table>
+					<thead>
+						<tr><th data-i18n="docs_walk_embed_api.event">Event</th><th data-i18n="docs_walk_embed_api.dir">Dir</th><th data-i18n="docs_walk_embed_api.payload">Payload</th><th data-i18n="docs_walk_embed_api.fires_when">Fires when</th></tr>
+					</thead>
+					<tbody>
+						<tr>
+							<td><code>walk:ready</code></td>
+							<td data-i18n-html="docs_walk_embed_api.out"><span class="dir out">OUT</span></td>
+							<td><code>{ avatarId, env }</code></td>
+							<td data-i18n-html="docs_walk_embed_api.avatar_animation_clips_finished_loading_re_s">Avatar + animation clips finished loading. Re-sent in reply to <code>walk:ping</code>.</td>
+						</tr>
+						<tr>
+							<td><code>walk:position</code></td>
+							<td data-i18n-html="docs_walk_embed_api.out_2"><span class="dir out">OUT</span></td>
+							<td><code>{ x, z, heading }</code></td>
+							<td data-i18n-html="docs_walk_embed_api.the_avatar_moves_throttled_to_10_hz">The avatar moves. Throttled to ≤ 10 Hz; <code>heading</code> is the facing yaw in radians.</td>
+						</tr>
+						<tr>
+							<td><code>walk:gesture</code></td>
+							<td data-i18n-html="docs_walk_embed_api.out_3"><span class="dir out">OUT</span></td>
+							<td><code>{ gesture }</code></td>
+							<td data-i18n="docs_walk_embed_api.a_gesture_starts_playing_echoes_both_one">A gesture starts playing (echoes both one-shots and locomotion changes).</td>
+						</tr>
+						<tr>
+							<td><code>walk:speak</code></td>
+							<td data-i18n-html="docs_walk_embed_api.out_4"><span class="dir out">OUT</span></td>
+							<td><code>{ text, durationMs }</code></td>
+							<td data-i18n-html="docs_walk_embed_api.the_avatar_starts_speaking_is_how_long">The avatar starts speaking. <code>durationMs</code> is how long the bubble stays up.</td>
+						</tr>
+						<tr>
+							<td><code>walk:env</code></td>
+							<td data-i18n-html="docs_walk_embed_api.out_5"><span class="dir out">OUT</span></td>
+							<td><code>{ env }</code></td>
+							<td data-i18n="docs_walk_embed_api.the_environment_changes">The environment changes.</td>
+						</tr>
+						<tr>
+							<td><code>walk:avatarChanged</code></td>
+							<td data-i18n-html="docs_walk_embed_api.out_6"><span class="dir out">OUT</span></td>
+							<td><code>{ avatarId }</code></td>
+							<td data-i18n="docs_walk_embed_api.a_live_avatar_swap_finished_loading">A live avatar swap finished loading.</td>
+						</tr>
+						<tr>
+							<td><code>walk:error</code></td>
+							<td data-i18n-html="docs_walk_embed_api.out_7"><span class="dir out">OUT</span></td>
+							<td><code>{ code, message }</code></td>
+							<td data-i18n="docs_walk_embed_api.a_command_was_rejected_or_a_load">A command was rejected or a load failed. Never carries internal state.</td>
+						</tr>
+					</tbody>
+				</table>
+			</div>
+
+			<h2 id="inbound" data-i18n-html="docs_walk_embed_api.inbound_commands_host_iframe">Inbound commands <span style="font-weight:400;color:var(--ink-dim);font-size:var(--text-md)">(host → iframe)</span></h2>
+			<p data-i18n-html="docs_walk_embed_api.send_these_to_drive_the_avatar_with">
+				Send these to drive the avatar. With the SDK, each maps to a method; over raw
+				<code>postMessage</code>, send the typed envelope (see
+				<a href="#envelope">Envelope</a>). Every command is validated and clamped inside the
+				iframe before it touches the avatar.
+			</p>
+			<div class="table-wrap">
+				<table>
+					<thead>
+						<tr><th data-i18n="docs_walk_embed_api.command">Command</th><th data-i18n="docs_walk_embed_api.dir_2">Dir</th><th data-i18n="docs_walk_embed_api.payload_2">Payload</th><th data-i18n="docs_walk_embed_api.sdk_method">SDK method</th></tr>
+					</thead>
+					<tbody>
+						<tr>
+							<td><code>walk:goto</code></td>
+							<td data-i18n-html="docs_walk_embed_api.in"><span class="dir in">IN</span></td>
+							<td><code>{ x, z }</code></td>
+							<td data-i18n-html="docs_walk_embed_api.walks_to_the_point_then_stops_clamped"><code>a.goto(x, z)</code> — walks to the point then stops (clamped to the ground disc).</td>
+						</tr>
+						<tr>
+							<td><code>walk:gesture</code></td>
+							<td data-i18n-html="docs_walk_embed_api.in_2"><span class="dir in">IN</span></td>
+							<td><code>{ gesture }</code></td>
+							<td><code>a.gesture(name)</code></td>
+						</tr>
+						<tr>
+							<td><code>walk:say</code></td>
+							<td data-i18n-html="docs_walk_embed_api.in_3"><span class="dir in">IN</span></td>
+							<td><code>{ text, voice?, durationMs? }</code></td>
+							<td><code>a.say(text, voice, durationMs)</code></td>
+						</tr>
+						<tr>
+							<td><code>walk:env</code></td>
+							<td data-i18n-html="docs_walk_embed_api.in_4"><span class="dir in">IN</span></td>
+							<td><code>{ env }</code></td>
+							<td><code>a.setEnv(env)</code></td>
+						</tr>
+						<tr>
+							<td><code>walk:avatar</code></td>
+							<td data-i18n-html="docs_walk_embed_api.in_5"><span class="dir in">IN</span></td>
+							<td><code>{ avatarId }</code></td>
+							<td data-i18n-html="docs_walk_embed_api.accepts_an_avatar_id_a_site_path"><code>a.setAvatar(id)</code> — accepts an avatar id, a site path, or a GLB URL.</td>
+						</tr>
+						<tr>
+							<td><code>walk:config</code></td>
+							<td data-i18n-html="docs_walk_embed_api.in_6"><span class="dir in">IN</span></td>
+							<td><code>{ speed?, bg?, controls? }</code></td>
+							<td><code>a.config({ … })</code></td>
+						</tr>
+						<tr>
+							<td><code>walk:move</code></td>
+							<td data-i18n-html="docs_walk_embed_api.in_7"><span class="dir in">IN</span></td>
+							<td><code>{ x, y, run? }</code></td>
+							<td data-i18n-html="docs_walk_embed_api.held_analog_drive_1_1_per_axis"><code>a.move(x, y, run)</code> — held analog drive (−1…1 per axis).</td>
+						</tr>
+						<tr>
+							<td><code>walk:reset</code></td>
+							<td data-i18n-html="docs_walk_embed_api.in_8"><span class="dir in">IN</span></td>
+							<td><code>{}</code></td>
+							<td data-i18n-html="docs_walk_embed_api.recenter_and_stop_all_motion"><code>a.reset()</code> — recenter and stop all motion.</td>
+						</tr>
+						<tr>
+							<td><code>walk:ping</code></td>
+							<td data-i18n-html="docs_walk_embed_api.in_9"><span class="dir in">IN</span></td>
+							<td><code>{}</code></td>
+							<td data-i18n-html="docs_walk_embed_api.re_request_the_sdk_fires_this_for"><code>a.ping()</code> — re-request <code>walk:ready</code> (the SDK fires this for you on attach).</td>
+						</tr>
+					</tbody>
+				</table>
+			</div>
+
+			<h2 id="vocab" data-i18n="docs_walk_embed_api.vocabulary_2">Vocabulary</h2>
+			<p data-i18n="docs_walk_embed_api.the_accepted_values_for_the_enumerated_paylo">The accepted values for the enumerated payload fields:</p>
+			<ul>
+				<li data-i18n-html="docs_walk_embed_api.gestures_and_are_one_shots_that_settle"><strong>Gestures:</strong> <code>idle</code>, <code>walk</code>, <code>run</code>, <code>wave</code>, <code>jump</code>. <code>wave</code> and <code>jump</code> are one-shots that settle back to idle; the rest control locomotion.</li>
+				<li data-i18n-html="docs_walk_embed_api.environments"><strong>Environments:</strong> <code>studio</code>, <code>void</code>, <code>beach</code>, <code>sunset</code>, <code>night</code>, <code>grid</code>.</li>
+				<li data-i18n-html="docs_walk_embed_api.controls"><strong>Controls</strong> (<code>config.controls</code>): <code>joystick</code>, <code>keyboard</code>, <code>none</code>.</li>
+				<li data-i18n-html="docs_walk_embed_api.speed_a_walk_speed_multiplier_clamped_to"><strong>Speed</strong> (<code>config.speed</code>): a walk-speed multiplier, clamped to <code>0.3…3</code>.</li>
+				<li data-i18n-html="docs_walk_embed_api.background_a_hex_color_or_an_string"><strong>Background</strong> (<code>config.bg</code>): <code>transparent</code>, a hex color, or an <code>rgb()/rgba()</code> string.</li>
+				<li data-i18n-html="docs_walk_embed_api.world_bounds_targets_are_clamped_to_a"><strong>World bounds:</strong> <code>goto</code> targets are clamped to a radius of ~11.5 m (the ground disc).</li>
+			</ul>
+			<p data-i18n-html="docs_walk_embed_api.feature_detect_at_runtime_via_the_sdk">
+				Feature-detect at runtime via <code>ThreeWalkAvatar.protocol</code> (the SDK) or
+				<code>window.WALK_EMBED_PROTOCOL</code> (inside the embed window).
+			</p>
+
+			<h2 id="envelope" data-i18n="docs_walk_embed_api.envelope_2">Envelope</h2>
+			<p data-i18n-html="docs_walk_embed_api.every_message_both_directions_is_a_plain">
+				Every message — both directions — is a plain object with a channel guard and version,
+				so it can never be confused with another library's <code>postMessage</code> traffic:
+			</p>
+			<div class="code" data-code>
+				<button class="copy-btn" type="button" aria-label="Copy code" data-i18n="docs_walk_embed_api.copy_2" data-i18n-attr="aria-label:docs_walk_embed_api.copy_code_arialabel_2">Copy</button>
+				<pre><code>{
+  channel: 'three-walk',   // namespace guard — ignore anything else
+  v: 1,                    // protocol version
+  type: 'walk:position',   // event or command name
+  id?: '&lt;correlation id&gt;', // echoed back on the result/error event
+  ...payload               // type-specific fields
+}</code></pre>
+			</div>
+			<p data-i18n-html="docs_walk_embed_api.if_you_talk_to_the_iframe_directly">
+				If you talk to the iframe directly (no SDK), post the envelope to
+				<code>iframe.contentWindow</code> and read events off <code>window</code>:
+			</p>
+			<div class="code" data-code>
+				<button class="copy-btn" type="button" aria-label="Copy code" data-i18n="docs_walk_embed_api.copy_3" data-i18n-attr="aria-label:docs_walk_embed_api.copy_code_arialabel_3">Copy</button>
+				<pre><code>const frame = document.getElementById('avatar');
+// command
+frame.contentWindow.postMessage(
+  { channel: 'three-walk', v: 1, type: 'walk:goto', x: 2, z: -1 },
+  'https://three.ws'
+);
+// events
+window.addEventListener('message', (e) =&gt; {
+  if (e.source !== frame.contentWindow) return;      // source check = auth
+  if (!e.data || e.data.channel !== 'three-walk') return;
+  if (e.data.type === 'walk:position') console.log(e.data.x, e.data.z);
+});</code></pre>
+			</div>
+
+			<h2 id="security" data-i18n="docs_walk_embed_api.security_2">Security</h2>
+			<ul>
+				<li data-i18n-html="docs_walk_embed_api.source_is_the_real_authentication_the_iframe">
+					<strong>Source is the real authentication.</strong> The iframe only accepts
+					commands whose source window is its own parent; the SDK only accepts events whose
+					source is the iframe it wraps. Spoofed origins can't inject either way.
+				</li>
+				<li data-i18n-html="docs_walk_embed_api.origin_allow_listing_is_opt_in_the">
+					<strong>Origin allow-listing is opt-in.</strong> The embed ships
+					<code>frame-ancestors *</code> so it drops onto any site, so inbound is allow-any
+					by default. Pin it with <code>?allowOrigins=https://your.site</code> (and
+					<code>?targetOrigin=</code> to pin where events are posted) when you know the
+					exact host.
+				</li>
+				<li data-i18n-html="docs_walk_embed_api.nothing_internal_leaks_outbound_messages_car">
+					<strong>Nothing internal leaks.</strong> Outbound messages carry only the fields
+					in the tables above — never session tokens, avatar source URLs, or scene state.
+					A live avatar swap reports the <em>public</em> <code>avatarId</code> you gave it,
+					not the resolved CDN URL.
+				</li>
+				<li data-i18n-html="docs_walk_embed_api.everything_inbound_is_validated_numbers_are">
+					<strong>Everything inbound is validated.</strong> Numbers are clamped, strings
+					are length-bounded, enums are checked, and <code>config.bg</code> is restricted to
+					safe color forms. A bad command yields a <code>walk:error</code>, never a throw.
+				</li>
+			</ul>
+			<div class="callout warn">
+				<strong data-i18n="docs_walk_embed_api.tip">Tip:</strong> if you embed user-generated avatar ids, still pass them through
+				<code>a.setAvatar()</code> — the iframe resolves and loads them on the same origin so
+				third-party hosts never need CORS exceptions.
+			</div>
+
+			<h2 id="examples" data-i18n="docs_walk_embed_api.examples_2">Examples</h2>
+			<p data-i18n="docs_walk_embed_api.the_same_integration_in_three_flavours_all">The same integration in three flavours. All three use the dependency-free SDK.</p>
+			<div class="tabs" data-tabs>
+				<div class="tablist" role="tablist" aria-label="Example language">
+					<button class="tab" role="tab" id="tab-react" aria-controls="panel-react" aria-selected="true" data-i18n="docs_walk_embed_api.react">React</button>
+					<button class="tab" role="tab" id="tab-vue" aria-controls="panel-vue" aria-selected="false" tabindex="-1" data-i18n="docs_walk_embed_api.vue">Vue</button>
+					<button class="tab" role="tab" id="tab-vanilla" aria-controls="panel-vanilla" aria-selected="false" tabindex="-1" data-i18n="docs_walk_embed_api.vanilla_js">Vanilla JS</button>
+				</div>
+
+				<div class="tabpanel" role="tabpanel" id="panel-react" aria-labelledby="tab-react">
+					<div class="code" data-code>
+						<button class="copy-btn" type="button" aria-label="Copy code" data-i18n="docs_walk_embed_api.copy_4" data-i18n-attr="aria-label:docs_walk_embed_api.copy_code_arialabel_4">Copy</button>
+						<pre><code>import { useEffect, useRef, useState } from 'react';
+
+export function WalkAvatar({ avatarId, env = 'studio' }) {
+  const frameRef = useRef(null);
+  const [pos, setPos] = useState(null);
+
+  useEffect(() =&gt; {
+    // Load the SDK once.
+    const SRC = 'https://three.ws/walk-embed-sdk.js';
+    function attach() {
+      const a = window.ThreeWalkAvatar.embed(frameRef.current);
+      a.on('ready', () =&gt; a.gesture('wave'));
+      a.on('position', setPos);
+      frameRef.current._ctl = a;
+    }
+    if (window.ThreeWalkAvatar) attach();
+    else {
+      const s = document.createElement('script');
+      s.src = SRC; s.onload = attach; document.head.appendChild(s);
+    }
+    return () =&gt; frameRef.current?._ctl?.destroy();
+  }, []);
+
+  return (
+    &lt;div&gt;
+      &lt;iframe
+        ref={frameRef}
+        src={`https://three.ws/walk-embed?env=${env}${avatarId ? `&amp;avatar=${avatarId}` : ''}`}
+        style={{ width: 320, height: 400, border: 0 }}
+        title="three.ws walking avatar"
+      /&gt;
+      {pos &amp;&amp; &lt;p&gt;x {pos.x.toFixed(2)} · z {pos.z.toFixed(2)}&lt;/p&gt;}
+    &lt;/div&gt;
+  );
+}</code></pre>
+					</div>
+				</div>
+
+				<div class="tabpanel" role="tabpanel" id="panel-vue" aria-labelledby="tab-vue" hidden>
+					<div class="code" data-code>
+						<button class="copy-btn" type="button" aria-label="Copy code" data-i18n="docs_walk_embed_api.copy_5" data-i18n-attr="aria-label:docs_walk_embed_api.copy_code_arialabel_5">Copy</button>
+						<pre><code>&lt;script setup&gt;
+import { ref, onMounted, onBeforeUnmount } from 'vue';
+
+const frame = ref(null);
+const pos = ref(null);
+let ctl = null;
+
+function attach() {
+  ctl = window.ThreeWalkAvatar.embed(frame.value);
+  ctl.on('ready', () =&gt; ctl.setEnv('beach'));
+  ctl.on('position', (p) =&gt; (pos.value = p));
+}
+
+onMounted(() =&gt; {
+  if (window.ThreeWalkAvatar) return attach();
+  const s = document.createElement('script');
+  s.src = 'https://three.ws/walk-embed-sdk.js';
+  s.onload = attach;
+  document.head.appendChild(s);
+});
+onBeforeUnmount(() =&gt; ctl?.destroy());
+&lt;/script&gt;
+
+&lt;template&gt;
+  &lt;iframe
+    ref="frame"
+    src="https://three.ws/walk-embed?env=studio"
+    style="width:320px;height:400px;border:0"
+    title="three.ws walking avatar"
+  /&gt;
+  &lt;p v-if="pos"&gt;x {{ pos.x.toFixed(2) }} · z {{ pos.z.toFixed(2) }}&lt;/p&gt;
+&lt;/template&gt;</code></pre>
+					</div>
+				</div>
+
+				<div class="tabpanel" role="tabpanel" id="panel-vanilla" aria-labelledby="tab-vanilla" hidden>
+					<div class="code" data-code>
+						<button class="copy-btn" type="button" aria-label="Copy code" data-i18n="docs_walk_embed_api.copy_6" data-i18n-attr="aria-label:docs_walk_embed_api.copy_code_arialabel_6">Copy</button>
+						<pre><code>&lt;iframe id="avatar" src="https://three.ws/walk-embed?env=studio"
+        style="width:320px;height:400px;border:0"&gt;&lt;/iframe&gt;
+
+&lt;script src="https://three.ws/walk-embed-sdk.js"&gt;&lt;/script&gt;
+&lt;script&gt;
+  const a = ThreeWalkAvatar.embed('#avatar');
+
+  a.on('ready', ({ avatarId, env }) =&gt; {
+    console.log('ready:', avatarId, env);
+    a.say('Welcome.', null, 4000);
+  });
+  a.on('position', ({ x, z, heading }) =&gt; {
+    // throttled to 10 Hz
+  });
+  a.on('error', ({ code, message }) =&gt; console.warn(code, message));
+
+  // Drive it.
+  document.querySelector('#go').addEventListener('click', () =&gt; {
+    a.goto(3, -2);
+    a.gesture('wave');
+    a.config({ speed: 1.5 });
+  });
+&lt;/script&gt;</code></pre>
+					</div>
+				</div>
+			</div>
+		</main>
+
+		<!-- SDK first so the playground can call ThreeWalkAvatar.embed() synchronously. -->
+		<script src="/walk-embed-sdk.js"></script>
+		<script>
+			(function () {
+				'use strict';
+
+				// ── Copy buttons ─────────────────────────────────────────────
+				document.querySelectorAll('.code[data-code]').forEach(function (block) {
+					var btn = block.querySelector('.copy-btn');
+					var pre = block.querySelector('pre code');
+					if (!btn || !pre) return;
+					btn.addEventListener('click', function () {
+						var text = pre.textContent;
+						var done = function () {
+							btn.textContent = 'Copied';
+							btn.classList.add('copied');
+							setTimeout(function () {
+								btn.textContent = 'Copy';
+								btn.classList.remove('copied');
+							}, 1400);
+						};
+						if (navigator.clipboard && navigator.clipboard.writeText) {
+							navigator.clipboard.writeText(text).then(done, fallback);
+						} else {
+							fallback();
+						}
+						function fallback() {
+							var ta = document.createElement('textarea');
+							ta.value = text;
+							ta.style.position = 'fixed';
+							ta.style.opacity = '0';
+							document.body.appendChild(ta);
+							ta.select();
+							try { document.execCommand('copy'); done(); } catch (e) {}
+							document.body.removeChild(ta);
+						}
+					});
+				});
+
+				// ── Tabs ──────────────────────────────────────────────────────
+				var tabsRoot = document.querySelector('.tabs[data-tabs]');
+				if (tabsRoot) {
+					var tabs = Array.prototype.slice.call(tabsRoot.querySelectorAll('.tab'));
+					function select(tab) {
+						tabs.forEach(function (t) {
+							var on = t === tab;
+							t.setAttribute('aria-selected', on ? 'true' : 'false');
+							t.tabIndex = on ? 0 : -1;
+							var panel = document.getElementById(t.getAttribute('aria-controls'));
+							if (panel) panel.hidden = !on;
+						});
+					}
+					tabs.forEach(function (tab, i) {
+						tab.addEventListener('click', function () { select(tab); });
+						tab.addEventListener('keydown', function (e) {
+							var next;
+							if (e.key === 'ArrowRight') next = tabs[(i + 1) % tabs.length];
+							else if (e.key === 'ArrowLeft') next = tabs[(i - 1 + tabs.length) % tabs.length];
+							if (next) { e.preventDefault(); next.focus(); select(next); }
+						});
+					});
+				}
+
+				// ── Live playground ───────────────────────────────────────────
+				var frame = document.getElementById('pg-frame');
+				var logEl = document.getElementById('pg-log');
+				var protocol = (window.ThreeWalkAvatar && window.ThreeWalkAvatar.protocol) || {
+					gestures: ['idle', 'walk', 'run', 'wave', 'jump'],
+					environments: ['studio', 'void', 'beach', 'sunset', 'night', 'grid'],
+				};
+
+				function fillSelect(id, values) {
+					var sel = document.getElementById(id);
+					if (!sel) return;
+					values.forEach(function (v) {
+						var o = document.createElement('option');
+						o.value = v; o.textContent = v;
+						sel.appendChild(o);
+					});
+				}
+				fillSelect('pg-gesture', protocol.gestures);
+				fillSelect('pg-env', protocol.environments);
+
+				function logLine(kind, text) {
+					var line = document.createElement('div');
+					line.className = kind;
+					var stamp = new Date().toLocaleTimeString();
+					line.textContent = stamp + '  ' + text;
+					logEl.appendChild(line);
+					// Keep the log bounded.
+					while (logEl.childNodes.length > 80) logEl.removeChild(logEl.firstChild);
+					logEl.scrollTop = logEl.scrollHeight;
+				}
+
+				if (!window.ThreeWalkAvatar) {
+					logLine('ev-err', 'SDK not loaded — playground disabled');
+					return;
+				}
+
+				var a = window.ThreeWalkAvatar.embed(frame);
+				logEl.textContent = '';
+				logLine('ev-cmd', 'embed() attached — pinging for walk:ready');
+
+				a.on('ready', function (d) { logLine('ev-out', 'walk:ready  avatar=' + (d.avatarId || '?') + ' env=' + (d.env || '?')); });
+				a.on('position', function (d) {
+					logLine('ev-out', 'walk:position  x=' + Number(d.x).toFixed(2) + ' z=' + Number(d.z).toFixed(2) + ' h=' + Number(d.heading).toFixed(2));
+				});
+				a.on('gesture', function (d) { logLine('ev-out', 'walk:gesture  ' + d.gesture); });
+				a.on('speak', function (d) { logLine('ev-out', 'walk:speak  "' + d.text + '" (' + d.durationMs + 'ms)'); });
+				a.on('env', function (d) { logLine('ev-out', 'walk:env  ' + d.env); });
+				a.on('error', function (d) { logLine('ev-err', 'walk:error  ' + d.code + ': ' + d.message); });
+
+				function num(id) { return parseFloat(document.getElementById(id).value); }
+
+				document.getElementById('pg-goto').addEventListener('click', function () {
+					var x = num('pg-x'), z = num('pg-z');
+					a.goto(x, z); logLine('ev-cmd', 'goto(' + x + ', ' + z + ')');
+				});
+				document.getElementById('pg-reset').addEventListener('click', function () {
+					a.reset(); logLine('ev-cmd', 'reset()');
+				});
+				document.getElementById('pg-play-gesture').addEventListener('click', function () {
+					var g = document.getElementById('pg-gesture').value;
+					a.gesture(g); logLine('ev-cmd', "gesture('" + g + "')");
+				});
+				document.getElementById('pg-env').addEventListener('change', function (e) {
+					a.setEnv(e.target.value); logLine('ev-cmd', "setEnv('" + e.target.value + "')");
+				});
+				document.getElementById('pg-say-btn').addEventListener('click', function () {
+					var t = document.getElementById('pg-say').value;
+					a.say(t); logLine('ev-cmd', "say('" + t + "')");
+				});
+				document.getElementById('pg-speed-btn').addEventListener('click', function () {
+					var s = num('pg-speed');
+					a.config({ speed: s }); logLine('ev-cmd', 'config({ speed: ' + s + ' })');
+				});
+				document.getElementById('pg-clear-log').addEventListener('click', function () {
+					logEl.textContent = '';
+				});
+			})();
+		</script>
+		<!-- Runtime i18n: detects locale, swaps annotated copy, mounts <lang-switcher>. -->
+	<script type="module" src="/i18n.js"></script>
+</body>
+</html>

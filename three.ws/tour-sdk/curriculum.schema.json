@@ -1,0 +1,68 @@
+{
+	"$schema": "http://json-schema.org/draft-07/schema#",
+	"$id": "https://three.ws/tour/curriculum.schema.json",
+	"title": "@three-ws/tour curriculum",
+	"description": "The document that drives a guided tour: what the 3D guide visits and what it says. Hand-author it, or generate it with buildCurriculum().",
+	"type": "object",
+	"required": ["stops"],
+	"properties": {
+		"version": { "type": "integer", "description": "Schema version. Current is 2." },
+		"generatedAt": { "type": "string", "description": "ISO timestamp of when the curriculum was generated (optional)." },
+		"generatedBy": { "type": "string", "description": "Tool that produced the curriculum (optional)." },
+		"title": { "type": "string", "description": "Human title of the tour." },
+		"tagline": { "type": "string", "description": "Short subtitle shown on a tour landing page." },
+		"estimatedMinutes": { "type": "number", "description": "Estimated length of the full tour." },
+		"stopCount": { "type": "integer", "description": "Number of stops (mirrors stops.length)." },
+		"tracks": {
+			"type": "array",
+			"description": "Selectable views over the stops. 'full' visits every stop; 'quick' visits only highlighted stops. At least one track is recommended.",
+			"items": {
+				"type": "object",
+				"required": ["id", "title"],
+				"properties": {
+					"id": { "type": "string", "description": "Track id. 'full' and 'quick' have built-in playlist semantics." },
+					"title": { "type": "string" },
+					"description": { "type": "string" },
+					"stopCount": { "type": "integer" },
+					"estimatedMinutes": { "type": "number" }
+				}
+			}
+		},
+		"sections": {
+			"type": "array",
+			"description": "Chapter headers, in render order. Each stop's `section` references a section `id`. Optional — if omitted, chapters are inferred from the stops.",
+			"items": {
+				"type": "object",
+				"required": ["id", "title"],
+				"properties": {
+					"id": { "type": "string" },
+					"title": { "type": "string" },
+					"intro": { "type": "string", "description": "Spoken bridge said when the guide first enters this chapter." }
+				}
+			}
+		},
+		"stops": {
+			"type": "array",
+			"minItems": 1,
+			"description": "The ordered list of features the guide visits.",
+			"items": {
+				"type": "object",
+				"required": ["path", "narration"],
+				"properties": {
+					"id": { "type": "string", "description": "Stable id for the stop (e.g. a slug of the path)." },
+					"path": { "type": "string", "description": "Route the stop lives on, e.g. '/pricing'. The tour navigates here when needed; '/' and trailing-slash variants are normalized." },
+					"section": { "type": "string", "description": "Section id this stop belongs to." },
+					"title": { "type": "string", "description": "Short feature name shown in the chapter map." },
+					"narration": { "type": "string", "description": "The line the guide speaks at this stop." },
+					"highlight": { "type": "boolean", "description": "Whether this stop is part of the Quick-highlights track." },
+					"sectionIntro": { "type": "string", "description": "If set, spoken once before this stop as the chapter's bridge (usually only on the first stop of a section)." },
+					"targets": {
+						"type": "array",
+						"description": "Ordered CSS selectors for the on-page element to spotlight. The first visible match wins; if none match, the guide falls back to the page heading / primary CTA. You can also mark an element in your HTML with [data-tour-target].",
+						"items": { "type": "string" }
+					}
+				}
+			}
+		}
+	}
+}

@@ -1,0 +1,1109 @@
+<!doctype html>
+<html lang="en">
+	<head>
+		<style>/* three.ws hidden-guard — make the `hidden` attribute authoritative; see scripts/lib/hidden-guard.mjs */[hidden]{display:none!important}</style>
+		<script>/* three.ws theme boot — no-flash; runtime in /theme-switcher.js */(function(){try{var m=localStorage.getItem('twx_theme');var l=m==='auto'?(window.matchMedia&&window.matchMedia('(prefers-color-scheme: light)').matches):m==='light';document.documentElement.setAttribute('data-theme',l?'light':'dark');}catch(e){document.documentElement.setAttribute('data-theme','dark');}})();</script>
+		<meta charset="utf-8" />
+		<link rel="icon" href="/favicon.ico" sizes="any" />
+		<link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+		<link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png" />
+		<link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png" />
+		<link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+		<link rel="manifest" href="/manifest.webmanifest" />
+		<title data-i18n="go.meta_title">GO · Bounties · three.ws</title>
+		<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+		<meta
+			name="description"
+			content="Post bounties, submit proof, earn rewards. The three.ws bounty board powered by $THREE."
+		 data-i18n-attr="content:go.meta_description"/>
+		<meta name="theme-color" content="#0a0a0f" />
+		<meta property="og:type" content="website" />
+		<meta property="og:site_name" content="three.ws" />
+		<meta property="og:title" content="GO · Bounties · three.ws"  data-i18n-attr="content:go.meta_og_title"/>
+		<meta
+			property="og:description"
+			content="Post bounties, submit proof, earn rewards on-chain."
+		 data-i18n-attr="content:go.meta_og_description"/>
+		<meta property="og:url" content="https://three.ws/go" />
+		<meta property="og:image" content="https://three.ws/api/page-og?s=crypto&amp;t=GO+Bounty+Board&amp;d=Post+a+bounty+with+a+SOL+reward%2C+submit+proof+of+doing+it%2C+and+let+the+poster+%28or+the+AI+judge%29+pick+a+winner.+Live+earner+and+spender+leaderboards.&amp;p=%2Fgo" />
+		<meta property="og:image:width" content="1200" />
+		<meta property="og:image:height" content="630" />
+		<meta name="twitter:card" content="summary_large_image" />
+		<meta name="twitter:site" content="@trythreews" />
+		<meta name="twitter:title" content="GO · Bounties · three.ws"  data-i18n-attr="content:go.meta_twitter_title"/>
+		<meta name="twitter:description" content="Post bounties, submit proof, earn rewards on-chain."  data-i18n-attr="content:go.meta_twitter_description"/>
+		<meta name="twitter:image" content="https://three.ws/api/page-og?s=crypto&amp;t=GO+Bounty+Board&amp;d=Post+a+bounty+with+a+SOL+reward%2C+submit+proof+of+doing+it%2C+and+let+the+poster+%28or+the+AI+judge%29+pick+a+winner.+Live+earner+and+spender+leaderboards.&amp;p=%2Fgo" />
+		<style>
+			* {
+				margin: 0;
+				padding: 0;
+				box-sizing: border-box;
+			}
+			:root {
+				--bg: #0a0a0f;
+				--surface: #111118;
+				--panel: rgba(255, 255, 255, 0.04);
+				--panel-hover: rgba(255, 255, 255, 0.07);
+				--border: rgba(255, 255, 255, 0.08);
+				--text: #f0f0f8;
+				--muted: rgba(240, 240, 248, 0.5);
+				--muted-2: rgba(240, 240, 248, 0.32);
+				--accent: #ffffff;
+				--accent-glow: rgba(255, 255, 255, 0.06);
+				--green: #e8e8e8;
+				--green-bg: rgba(255, 255, 255, 0.07);
+				--amber: #a8a8a8;
+				--amber-bg: rgba(255, 255, 255, 0.05);
+				--blue: #c0c0c0;
+				--blue-bg: rgba(255, 255, 255, 0.05);
+				--sol: #909090;
+				--radius: 12px;
+			}
+			html,
+			body {
+				background: var(--bg);
+				color: var(--text);
+				min-height: 100vh;
+			}
+			body {
+				font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+				-webkit-font-smoothing: antialiased;
+				background: var(--bg);
+			}
+			a {
+				color: inherit;
+				text-decoration: none;
+			}
+			button {
+				cursor: pointer;
+				border: none;
+				background: none;
+				color: inherit;
+				font: inherit;
+			}
+
+			/* ── Top bar ─────────────────────────────────────────── */
+			.topbar {
+				display: flex;
+				align-items: center;
+				justify-content: space-between;
+				gap: 12px;
+				padding: 14px clamp(16px, 4vw, 40px);
+				position: sticky;
+				top: 0;
+				z-index: 20;
+				backdrop-filter: blur(12px);
+				-webkit-backdrop-filter: blur(12px);
+				background: linear-gradient(180deg, rgba(10, 10, 15, 0.9) 70%, transparent);
+				border-bottom: 1px solid var(--border);
+			}
+			.brand {
+				display: flex;
+				align-items: center;
+				gap: 10px;
+				font-weight: 800;
+				font-size: 17px;
+				letter-spacing: -0.5px;
+			}
+			.brand .dot {
+				width: 10px;
+				height: 10px;
+				border-radius: 50%;
+				background: var(--accent);
+				box-shadow: 0 0 12px var(--accent);
+			}
+			.brand .go-badge {
+				font-size: 11px;
+				font-weight: 700;
+				letter-spacing: 0.08em;
+				background: var(--accent);
+				color: var(--bg);
+				padding: 2px 8px;
+				border-radius: 5px;
+				text-transform: uppercase;
+			}
+			.topbar-right {
+				display: flex;
+				align-items: center;
+				gap: 8px;
+			}
+			.btn {
+				display: inline-flex;
+				align-items: center;
+				gap: 6px;
+				padding: 8px 16px;
+				border-radius: 8px;
+				font-size: 13px;
+				font-weight: 600;
+				transition:
+					opacity 0.15s,
+					transform 0.1s;
+			}
+			.btn:active {
+				transform: scale(0.97);
+			}
+			.btn-primary {
+				background: var(--accent);
+				color: var(--bg);
+			}
+			.btn-primary:hover {
+				opacity: 0.88;
+			}
+			.btn-ghost {
+				background: var(--panel);
+				color: var(--text);
+				border: 1px solid var(--border);
+			}
+			.btn-ghost:hover {
+				background: var(--panel-hover);
+			}
+			.btn-sm {
+				padding: 6px 12px;
+				font-size: 12px;
+			}
+			#user-btn {
+				display: none;
+			}
+
+			/* ── Layout ──────────────────────────────────────────── */
+			.layout {
+				display: grid;
+				grid-template-columns: 1fr 300px;
+				gap: 0;
+				max-width: 1200px;
+				margin: 0 auto;
+				padding: 0 clamp(12px, 3vw, 32px) 80px;
+				align-items: start;
+			}
+			@media (max-width: 900px) {
+				.layout {
+					grid-template-columns: 1fr;
+				}
+				.sidebar {
+					display: none;
+				}
+			}
+
+			/* ── Feed column ─────────────────────────────────────── */
+			.feed-col {
+				border-right: 1px solid var(--border);
+				min-height: 100vh;
+			}
+
+			/* Tabs */
+			.tabs {
+				display: flex;
+				gap: 0;
+				border-bottom: 1px solid var(--border);
+				position: sticky;
+				top: 57px;
+				z-index: 10;
+				backdrop-filter: blur(10px);
+				-webkit-backdrop-filter: blur(10px);
+				background: rgba(10, 10, 15, 0.85);
+			}
+			.tab-btn {
+				flex: 1;
+				padding: 14px 0;
+				font-size: 13px;
+				font-weight: 600;
+				color: var(--muted);
+				border-bottom: 2px solid transparent;
+				transition:
+					color 0.15s,
+					border-color 0.15s;
+				text-align: center;
+				letter-spacing: 0.02em;
+			}
+			.tab-btn.active {
+				color: var(--text);
+				border-bottom-color: var(--accent);
+			}
+			.tab-btn:hover:not(.active) {
+				color: var(--text);
+			}
+
+			/* Feed */
+			#feed {
+				padding: 0;
+			}
+
+			/* ── Card ────────────────────────────────────────────── */
+			.card {
+				border-bottom: 1px solid var(--border);
+				padding: 18px 20px;
+				transition: background 0.12s;
+			}
+			.card:hover {
+				background: var(--panel);
+			}
+
+			.card-header {
+				display: flex;
+				align-items: flex-start;
+				gap: 10px;
+				margin-bottom: 10px;
+			}
+			.badge {
+				display: inline-flex;
+				align-items: center;
+				font-size: 10px;
+				font-weight: 700;
+				letter-spacing: 0.08em;
+				text-transform: uppercase;
+				padding: 3px 8px;
+				border-radius: 5px;
+				flex-shrink: 0;
+				margin-top: 2px;
+			}
+			.badge-open {
+				background: var(--green-bg);
+				color: var(--green);
+			}
+			.badge-resolving {
+				background: var(--amber-bg);
+				color: var(--amber);
+			}
+			.badge-closed {
+				background: var(--panel);
+				color: var(--muted);
+			}
+			.badge-sub {
+				background: var(--blue-bg);
+				color: var(--blue);
+			}
+
+			.card-meta {
+				flex: 1;
+				min-width: 0;
+			}
+			.card-title {
+				font-size: 14px;
+				font-weight: 600;
+				line-height: 1.4;
+				margin-bottom: 4px;
+			}
+			.card-desc {
+				font-size: 13px;
+				color: var(--muted);
+				line-height: 1.5;
+				margin-bottom: 8px;
+				display: -webkit-box;
+				-webkit-line-clamp: 2;
+				-webkit-box-orient: vertical;
+				overflow: hidden;
+			}
+
+			.card-footer {
+				display: flex;
+				align-items: center;
+				gap: 12px;
+				flex-wrap: wrap;
+			}
+			.poster {
+				display: flex;
+				align-items: center;
+				gap: 6px;
+				font-size: 12px;
+				color: var(--muted);
+			}
+			.poster-avatar {
+				width: 20px;
+				height: 20px;
+				border-radius: 50%;
+				background: linear-gradient(135deg, #ffffff, #505050);
+				display: flex;
+				align-items: center;
+				justify-content: center;
+				font-size: 9px;
+				font-weight: 700;
+				color: var(--bg);
+				flex-shrink: 0;
+			}
+			.reward {
+				display: flex;
+				align-items: center;
+				gap: 4px;
+				font-size: 13px;
+				font-weight: 700;
+				color: var(--text);
+			}
+			.reward-token {
+				font-size: 11px;
+				color: var(--muted);
+				font-weight: 500;
+			}
+			.time-left {
+				font-size: 12px;
+				color: var(--muted-2);
+			}
+			.sub-count {
+				font-size: 12px;
+				color: var(--muted);
+				display: flex;
+				align-items: center;
+				gap: 3px;
+			}
+			.coin-tag {
+				display: inline-flex;
+				align-items: center;
+				gap: 4px;
+				font-size: 11px;
+				color: var(--muted);
+				background: var(--panel);
+				border: 1px solid var(--border);
+				border-radius: 5px;
+				padding: 2px 7px;
+			}
+
+			/* Submission card specific */
+			.sub-card {
+				background: rgba(255, 255, 255, 0.02);
+			}
+			.sub-to {
+				font-size: 11px;
+				color: var(--muted-2);
+				margin-bottom: 6px;
+			}
+			.sub-to span {
+				color: var(--blue);
+			}
+			.sub-content {
+				font-size: 13px;
+				color: var(--muted);
+				line-height: 1.5;
+				margin-bottom: 8px;
+				display: -webkit-box;
+				-webkit-line-clamp: 3;
+				-webkit-box-orient: vertical;
+				overflow: hidden;
+			}
+			.sub-media {
+				width: 100%;
+				max-height: 200px;
+				object-fit: cover;
+				border-radius: 8px;
+				background: var(--surface);
+				margin-bottom: 8px;
+				display: block;
+			}
+			.sub-actions {
+				display: flex;
+				gap: 6px;
+				margin-top: 8px;
+			}
+			.submit-btn {
+				margin-left: auto;
+				font-size: 12px;
+				font-weight: 600;
+				padding: 5px 12px;
+				border-radius: 6px;
+				background: var(--accent);
+				color: var(--bg);
+				transition: opacity 0.15s;
+			}
+			.submit-btn:hover {
+				opacity: 0.85;
+			}
+			.resolve-btn {
+				font-size: 12px;
+				font-weight: 600;
+				padding: 5px 12px;
+				border-radius: 6px;
+				background: var(--panel);
+				color: var(--text);
+				border: 1px solid rgba(255, 255, 255, 0.1);
+				transition: background 0.15s;
+			}
+			.resolve-btn:hover {
+				background: rgba(255, 255, 255, 0.1);
+			}
+
+			/* Empty + Loading */
+			.empty {
+				padding: 60px 20px;
+				text-align: center;
+				color: var(--muted);
+				display: flex;
+				flex-direction: column;
+				align-items: center;
+				gap: 12px;
+			}
+			.empty-icon {
+				font-size: 40px;
+				opacity: 0.4;
+			}
+			.empty h3 {
+				font-size: 16px;
+				color: var(--text);
+			}
+			.empty p {
+				font-size: 13px;
+				max-width: 280px;
+				line-height: 1.5;
+			}
+			.skeleton {
+				background: linear-gradient(
+					90deg,
+					var(--panel) 25%,
+					var(--panel-hover) 50%,
+					var(--panel) 75%
+				);
+				background-size: 200% 100%;
+				animation: shimmer 1.4s infinite;
+				border-radius: 6px;
+			}
+			@keyframes shimmer {
+				0% {
+					background-position: 200% 0;
+				}
+				100% {
+					background-position: -200% 0;
+				}
+			}
+			.skel-block {
+				height: 14px;
+				margin-bottom: 8px;
+			}
+			.skel-card {
+				padding: 18px 20px;
+				border-bottom: 1px solid var(--border);
+			}
+
+			/* Load more */
+			.load-more-btn {
+				width: 100%;
+				padding: 16px;
+				text-align: center;
+				font-size: 13px;
+				color: var(--muted);
+				border-top: 1px solid var(--border);
+				transition:
+					color 0.15s,
+					background 0.15s;
+			}
+			.load-more-btn:hover {
+				color: var(--text);
+				background: var(--panel);
+			}
+
+			/* ── Sidebar ─────────────────────────────────────────── */
+			.sidebar {
+				padding: 24px 0 24px 24px;
+				display: flex;
+				flex-direction: column;
+				gap: 24px;
+			}
+			.sidebar-card {
+				background: var(--surface);
+				border: 1px solid var(--border);
+				border-radius: var(--radius);
+				overflow: hidden;
+			}
+			.sidebar-title {
+				font-size: 11px;
+				font-weight: 700;
+				letter-spacing: 0.1em;
+				text-transform: uppercase;
+				color: var(--muted);
+				padding: 12px 14px 10px;
+				border-bottom: 1px solid var(--border);
+			}
+			.leaderboard-row {
+				display: flex;
+				align-items: center;
+				gap: 10px;
+				padding: 10px 14px;
+				border-bottom: 1px solid var(--border);
+				font-size: 13px;
+			}
+			.leaderboard-row:last-child {
+				border-bottom: none;
+			}
+			.rank {
+				font-weight: 700;
+				color: var(--muted-2);
+				width: 16px;
+				flex-shrink: 0;
+			}
+			.rank.gold {
+				color: #f59e0b;
+			}
+			.rank.silver {
+				color: #94a3b8;
+			}
+			.rank.bronze {
+				color: #b45309;
+			}
+			.lb-info {
+				flex: 1;
+				min-width: 0;
+			}
+			.lb-name {
+				font-weight: 600;
+				overflow: hidden;
+				text-overflow: ellipsis;
+				white-space: nowrap;
+			}
+			.lb-sub {
+				font-size: 11px;
+				color: var(--muted);
+			}
+			.lb-amount {
+				font-weight: 700;
+				color: var(--text);
+				font-size: 13px;
+				flex-shrink: 0;
+			}
+			.top-bounty-row {
+				display: flex;
+				align-items: flex-start;
+				gap: 8px;
+				padding: 10px 14px;
+				border-bottom: 1px solid var(--border);
+				font-size: 13px;
+			}
+			.top-bounty-row:last-child {
+				border-bottom: none;
+			}
+			.tb-rank {
+				font-weight: 700;
+				color: var(--muted-2);
+				width: 16px;
+				flex-shrink: 0;
+				padding-top: 1px;
+			}
+			.tb-info {
+				flex: 1;
+				min-width: 0;
+			}
+			.tb-title {
+				font-weight: 600;
+				font-size: 12px;
+				line-height: 1.4;
+				margin-bottom: 3px;
+				display: -webkit-box;
+				-webkit-line-clamp: 2;
+				-webkit-box-orient: vertical;
+				overflow: hidden;
+			}
+			.tb-meta {
+				font-size: 11px;
+				color: var(--muted);
+			}
+			.tb-reward {
+				font-weight: 700;
+				color: var(--text);
+				font-size: 13px;
+				flex-shrink: 0;
+			}
+
+			/* ── Create bounty modal ─────────────────────────────── */
+			.modal-overlay {
+				position: fixed;
+				inset: 0;
+				background: rgba(0, 0, 0, 0.7);
+				z-index: 100;
+				display: flex;
+				align-items: center;
+				justify-content: center;
+				backdrop-filter: blur(4px);
+				padding: 20px;
+				opacity: 0;
+				pointer-events: none;
+				transition: opacity 0.2s;
+			}
+			.modal-overlay.open {
+				opacity: 1;
+				pointer-events: auto;
+			}
+			.modal {
+				background: var(--surface);
+				border: 1px solid var(--border);
+				border-radius: 16px;
+				width: 100%;
+				max-width: 520px;
+				max-height: 90vh;
+				overflow-y: auto;
+				transform: translateY(12px);
+				transition: transform 0.2s;
+			}
+			.modal-overlay.open .modal {
+				transform: translateY(0);
+			}
+			.modal-header {
+				display: flex;
+				align-items: center;
+				justify-content: space-between;
+				padding: 20px 22px 16px;
+				border-bottom: 1px solid var(--border);
+			}
+			.modal-title {
+				font-size: 16px;
+				font-weight: 700;
+			}
+			.modal-close {
+				color: var(--muted);
+				font-size: 18px;
+				padding: 4px;
+				border-radius: 6px;
+				transition: color 0.12s;
+			}
+			.modal-close:hover {
+				color: var(--text);
+			}
+			.modal-body {
+				padding: 20px 22px;
+				display: flex;
+				flex-direction: column;
+				gap: 14px;
+			}
+			.field label {
+				display: block;
+				font-size: 12px;
+				font-weight: 600;
+				color: var(--muted);
+				margin-bottom: 6px;
+				letter-spacing: 0.03em;
+			}
+			.field input,
+			.field textarea,
+			.field select {
+				width: 100%;
+				background: var(--bg);
+				border: 1px solid var(--border);
+				border-radius: 8px;
+				color: var(--text);
+				font: inherit;
+				font-size: 14px;
+				padding: 10px 12px;
+				outline: none;
+				transition: border-color 0.15s;
+				resize: vertical;
+			}
+			.field input:focus,
+			.field textarea:focus,
+			.field select:focus {
+				border-color: var(--accent);
+			}
+			.field-row {
+				display: grid;
+				grid-template-columns: 1fr 1fr;
+				gap: 10px;
+			}
+			.modal-footer {
+				padding: 14px 22px 20px;
+				display: flex;
+				gap: 8px;
+				justify-content: flex-end;
+				border-top: 1px solid var(--border);
+			}
+			.form-error {
+				font-size: 12px;
+				color: var(--danger, #f87171);
+				background: rgba(248, 113, 113, 0.1);
+				border-radius: 6px;
+				padding: 8px 12px;
+			}
+
+			/* Resolve modal: submission picker */
+			.sub-pick-list {
+				display: flex;
+				flex-direction: column;
+				gap: 8px;
+				max-height: 300px;
+				overflow-y: auto;
+			}
+			.sub-pick {
+				border: 2px solid var(--border);
+				border-radius: 8px;
+				padding: 12px 14px;
+				cursor: pointer;
+				transition:
+					border-color 0.12s,
+					background 0.12s;
+			}
+			.sub-pick:hover {
+				border-color: var(--accent);
+				background: var(--accent-glow);
+			}
+			.sub-pick.selected {
+				border-color: var(--accent);
+				background: var(--accent-glow);
+			}
+			.sub-pick-user {
+				font-size: 12px;
+				color: var(--muted);
+				margin-bottom: 4px;
+			}
+			.sub-pick-content {
+				font-size: 13px;
+			}
+
+			/* Toast */
+			.toast {
+				position: fixed;
+				bottom: 24px;
+				right: 24px;
+				z-index: 200;
+				background: var(--surface);
+				border: 1px solid var(--border);
+				border-radius: 10px;
+				padding: 12px 18px;
+				font-size: 13px;
+				font-weight: 600;
+				transform: translateY(8px);
+				opacity: 0;
+				transition: all 0.2s;
+				pointer-events: none;
+				box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+			}
+			.toast.show {
+				transform: translateY(0);
+				opacity: 1;
+			}
+			.toast.success {
+				border-color: rgba(255, 255, 255, 0.3);
+				color: var(--text);
+			}
+			.toast.fail {
+				border-color: rgba(248, 113, 113, 0.4);
+				color: var(--danger, #f87171);
+			}
+
+			/* ── Likes ───────────────────────────────────────────── */
+			.like-btn {
+				display: inline-flex;
+				align-items: center;
+				gap: 5px;
+				font-size: 12px;
+				font-weight: 600;
+				color: var(--muted);
+				background: var(--panel);
+				border: 1px solid var(--border);
+				border-radius: 999px;
+				padding: 4px 10px;
+				transition:
+					color 0.14s,
+					border-color 0.14s,
+					background 0.14s;
+			}
+			.like-btn:hover {
+				color: var(--text);
+				border-color: rgba(255, 255, 255, 0.18);
+			}
+			.like-btn:focus-visible {
+				outline: 2px solid var(--accent);
+				outline-offset: 2px;
+			}
+			.like-btn svg {
+				width: 13px;
+				height: 13px;
+				transition: transform 0.14s;
+			}
+			.like-btn.liked {
+				color: var(--text);
+				border-color: rgba(255, 255, 255, 0.3);
+				background: rgba(255, 255, 255, 0.08);
+			}
+			.like-btn.liked svg {
+				fill: var(--text);
+				transform: scale(1.08);
+			}
+			.like-btn:active svg {
+				transform: scale(0.8);
+			}
+			.like-btn[disabled] {
+				opacity: 0.6;
+				cursor: default;
+			}
+			.like-count {
+				font-variant-numeric: tabular-nums;
+			}
+
+			/* ── AI judge (resolve modal) ────────────────────────── */
+			.resolve-actions {
+				display: flex;
+				align-items: center;
+				justify-content: space-between;
+				gap: 10px;
+				margin-bottom: 12px;
+			}
+			.resolve-actions .hint {
+				font-size: 12px;
+				color: var(--muted-2);
+			}
+			.ai-judge-btn {
+				display: inline-flex;
+				align-items: center;
+				gap: 6px;
+				font-size: 12px;
+				font-weight: 600;
+				padding: 6px 12px;
+				border-radius: 8px;
+				color: var(--accent);
+				background: var(--accent-glow);
+				border: 1px solid rgba(124, 92, 255, 0.32);
+				transition:
+					background 0.14s,
+					opacity 0.14s;
+			}
+			.ai-judge-btn:hover {
+				background: rgba(124, 92, 255, 0.22);
+			}
+			.ai-judge-btn[disabled] {
+				opacity: 0.7;
+				cursor: default;
+			}
+			.ai-summary {
+				font-size: 12.5px;
+				line-height: 1.5;
+				color: var(--text);
+				background: linear-gradient(
+					90deg,
+					rgba(124, 92, 255, 0.14),
+					rgba(124, 92, 255, 0.03)
+				);
+				border: 1px solid rgba(124, 92, 255, 0.28);
+				border-radius: 10px;
+				padding: 11px 13px;
+				margin-bottom: 12px;
+			}
+			.ai-summary .ai-badge {
+				display: inline-flex;
+				align-items: center;
+				font-size: 9px;
+				font-weight: 800;
+				letter-spacing: 0.1em;
+				color: #fff;
+				background: var(--accent);
+				border-radius: 4px;
+				padding: 2px 6px;
+				margin-right: 7px;
+				vertical-align: 1px;
+			}
+			.ai-summary .ai-meta {
+				color: var(--muted-2);
+			}
+			.sub-pick-head {
+				display: flex;
+				align-items: center;
+				justify-content: space-between;
+				gap: 8px;
+			}
+			.sub-pick.recommended {
+				border-color: var(--accent);
+				box-shadow: 0 0 0 3px var(--accent-glow);
+			}
+			.sub-pick-rec {
+				display: inline-flex;
+				align-items: center;
+				gap: 4px;
+				font-size: 10px;
+				font-weight: 800;
+				letter-spacing: 0.06em;
+				text-transform: uppercase;
+				color: var(--accent);
+				margin-top: 6px;
+			}
+			.ai-score {
+				font-size: 12px;
+				font-weight: 800;
+				font-variant-numeric: tabular-nums;
+				color: #fff;
+				border-radius: 6px;
+				padding: 2px 8px;
+				flex-shrink: 0;
+				background: hsl(calc(var(--s, 0) * 1.2) 68% 42%);
+			}
+			.ai-verdict {
+				font-size: 11.5px;
+				color: var(--muted);
+				margin-top: 7px;
+				line-height: 1.45;
+			}
+			.sp-likes {
+				color: #ff6b81;
+				font-weight: 600;
+				margin-left: 6px;
+			}
+		</style>
+	
+	<link rel="canonical" href="https://three.ws/go">
+	<meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1">
+	<meta property="og:locale" content="en_US">
+	<meta property="og:image:alt" content="GO Bounty Board - three.ws">
+	<script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"WebPage","name":"GO Bounty Board","description":"Post a bounty with a SOL reward, submit proof of doing it, and let the poster (or the AI judge) pick a winner. Live earner and spender leaderboards.","url":"https://three.ws/go","isPartOf":{"@type":"WebSite","name":"three.ws","url":"https://three.ws"},"primaryImageOfPage":"https://three.ws/api/page-og?s=crypto&t=GO+Bounty+Board&d=Post+a+bounty+with+a+SOL+reward%2C+submit+proof+of+doing+it%2C+and+let+the+poster+%28or+the+AI+judge%29+pick+a+winner.+Live+earner+and+spender+leaderboards.&p=%2Fgo"}]}</script>
+</head>
+	<body>
+		<!-- Top bar -->
+		<header class="topbar">
+			<a href="/" class="brand" data-i18n-html="go.three_ws_go">
+				<span class="dot"></span>
+				three.ws
+				<span class="go-badge">GO</span>
+			</a>
+			<div class="topbar-right">
+				<a href="/bounties" class="btn btn-ghost btn-sm" data-i18n="go.live_pump_fun_bounties">Live pump.fun bounties</a>
+				<a href="/dashboard" class="btn btn-ghost btn-sm" data-i18n="go.dashboard">Dashboard</a>
+				<button id="create-btn" class="btn btn-primary btn-sm" data-i18n="go.post_bounty">+ Post Bounty</button>
+				<button id="user-btn" class="btn btn-ghost btn-sm"></button>
+			</div>
+		</header>
+
+		<!-- Main layout -->
+		<div class="layout">
+			<!-- Feed column -->
+			<div class="feed-col">
+				<nav class="tabs" role="tablist">
+					<button class="tab-btn active" data-tab="feed" data-i18n="go.trending">Trending</button>
+					<button class="tab-btn" data-tab="open" data-i18n="go.open">Open</button>
+					<button class="tab-btn" data-tab="submissions" data-i18n="go.submissions">Submissions</button>
+				</nav>
+				<div id="feed"></div>
+			</div>
+
+			<!-- Sidebar -->
+			<aside class="sidebar">
+				<div class="sidebar-card">
+					<div class="sidebar-title">Highest Value · Open</div>
+					<div id="top-bounties"></div>
+				</div>
+				<div class="sidebar-card">
+					<div class="sidebar-title">Top Earners · 30d</div>
+					<div id="top-earners"></div>
+				</div>
+				<div class="sidebar-card">
+					<div class="sidebar-title">Top Spenders · 30d</div>
+					<div id="top-spenders"></div>
+				</div>
+			</aside>
+		</div>
+
+		<!-- Create bounty modal -->
+		<div class="modal-overlay" id="create-modal" role="dialog" aria-modal="true">
+			<div class="modal">
+				<div class="modal-header">
+					<span class="modal-title" data-i18n="go.post_a_bounty">Post a Bounty</span>
+					<button class="modal-close" data-close="create-modal" aria-label="Close dialog" data-i18n-attr="aria-label:go.close_dialog_arialabel">✕</button>
+				</div>
+				<div class="modal-body">
+					<div id="create-error" class="form-error" style="display: none"></div>
+					<div class="field">
+						<label data-i18n="go.title">Title *</label>
+						<input
+							id="c-title"
+							type="text"
+							placeholder="What do you want people to do?"
+							maxlength="200"
+						/>
+					</div>
+					<div class="field">
+						<label data-i18n="go.description">Description</label>
+						<textarea
+							id="c-desc"
+							rows="3"
+							placeholder="Describe the task, rules, and what counts as a valid submission…"
+						></textarea>
+					</div>
+					<div class="field-row">
+						<div class="field">
+							<label data-i18n="go.reward_sol">Reward (SOL)</label>
+							<input id="c-sol" type="number" min="0" step="0.01" placeholder="0.5" />
+						</div>
+						<div class="field">
+							<label data-i18n="go.expires_in_days">Expires in (days)</label>
+							<select id="c-days">
+								<option value="3" data-i18n="go.3_days">3 days</option>
+								<option value="7" selected data-i18n="go.7_days">7 days</option>
+								<option value="14" data-i18n="go.14_days">14 days</option>
+								<option value="30" data-i18n="go.30_days">30 days</option>
+							</select>
+						</div>
+					</div>
+				</div>
+				<div class="modal-footer">
+					<button class="btn btn-ghost" data-close="create-modal" data-i18n="go.cancel">Cancel</button>
+					<button id="create-submit" class="btn btn-primary" data-i18n="go.post_bounty_2">Post Bounty</button>
+				</div>
+			</div>
+		</div>
+
+		<!-- Submit proof modal -->
+		<div class="modal-overlay" id="submit-modal" role="dialog" aria-modal="true">
+			<div class="modal">
+				<div class="modal-header">
+					<span class="modal-title" data-i18n="go.submit_proof">Submit Proof</span>
+					<button class="modal-close" data-close="submit-modal" aria-label="Close dialog" data-i18n-attr="aria-label:go.close_dialog_arialabel_2">✕</button>
+				</div>
+				<div class="modal-body">
+					<div id="submit-error" class="form-error" style="display: none"></div>
+					<div
+						id="submit-bounty-title"
+						style="font-size: 13px; color: var(--muted); margin-bottom: 4px"
+					></div>
+					<div class="field">
+						<label data-i18n="go.description_2">Description</label>
+						<textarea
+							id="s-content"
+							rows="3"
+							placeholder="Describe what you did…"
+						></textarea>
+					</div>
+					<div class="field">
+						<label data-i18n="go.media_link_url">Media / Link URL</label>
+						<input
+							id="s-url"
+							type="url"
+							placeholder="https://x.com/… or https://youtu.be/…"
+						/>
+					</div>
+				</div>
+				<div class="modal-footer">
+					<button class="btn btn-ghost" data-close="submit-modal" data-i18n="go.cancel_2">Cancel</button>
+					<button id="submit-proof-btn" class="btn btn-primary" data-i18n="go.submit">Submit</button>
+				</div>
+			</div>
+		</div>
+
+		<!-- Resolve modal -->
+		<div class="modal-overlay" id="resolve-modal" role="dialog" aria-modal="true">
+			<div class="modal">
+				<div class="modal-header">
+					<span class="modal-title" data-i18n="go.pick_a_winner">Pick a Winner</span>
+					<button class="modal-close" data-close="resolve-modal" aria-label="Close dialog" data-i18n-attr="aria-label:go.close_dialog_arialabel_3">✕</button>
+				</div>
+				<div class="modal-body">
+					<div id="resolve-error" class="form-error" style="display: none"></div>
+					<div class="resolve-actions">
+						<span class="hint" data-i18n="go.pick_the_submission_to_reward">Pick the submission to reward.</span>
+						<button id="ai-judge-btn" class="ai-judge-btn" type="button" data-i18n="go.rank_with_ai">
+							✨ Rank with AI
+						</button>
+					</div>
+					<div id="ai-summary" class="ai-summary" style="display: none"></div>
+					<div id="resolve-subs" class="sub-pick-list"></div>
+					<div class="field" style="margin-top: 12px">
+						<label data-i18n="go.solana_tx_hash_optional">Solana TX Hash (optional)</label>
+						<input
+							id="r-tx"
+							type="text"
+							placeholder="Paste transaction signature after paying…"
+						/>
+					</div>
+				</div>
+				<div class="modal-footer">
+					<button class="btn btn-ghost" data-close="resolve-modal" data-i18n="go.cancel_3">Cancel</button>
+					<button id="resolve-submit" class="btn btn-primary" data-i18n="go.confirm_winner">Confirm Winner</button>
+				</div>
+			</div>
+		</div>
+
+		<!-- Toast -->
+		<div class="toast" id="toast"></div>
+
+		<script type="module" src="/src/go.js"></script>
+		<!-- Runtime i18n: detects locale, swaps annotated copy, mounts <lang-switcher>. -->
+	<script type="module" src="/i18n.js"></script>
+</body>
+</html>

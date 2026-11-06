@@ -1,0 +1,127 @@
+{
+	"type": [
+		"https://eips.ethereum.org/EIPS/eip-8004#registration-v1",
+		"https://three.ws/specs/3d-agent-card-v1"
+	],
+	"name": "three.ws",
+	"symbol": "AGENT",
+	"description": "three.ws is the AI-agent layer for the open web: build, embed, monetize, and trade autonomous agents with real 3D avatars, on-chain identity, pay-per-call (x402), and pump.fun token launches. This is the platform's own ERC-8004 agent card — three.ws registered as a first-class agent in the IdentityRegistry, embodied by its default 3D avatar.",
+	"image": "https://three.ws/og-image.png",
+	"animation_url": "https://three.ws/avatars/default.glb",
+	"external_url": "https://three.ws",
+	"active": true,
+	"model": {
+		"uri": "https://three.ws/avatars/default.glb",
+		"format": "gltf-binary",
+		"sha256": "3ca13a1e3ad8f57e50266294b823641680dd3f3f174eb4be908ddca7afc0c82a",
+		"sizeBytes": 2875236,
+		"polygonCount": 13317,
+		"boundingBox": {
+			"min": [
+				-0.464,
+				-0.006,
+				-0.146
+			],
+			"max": [
+				0.464,
+				1.766,
+				0.197
+			]
+		},
+		"license": "CC-BY-4.0"
+	},
+	"body": {
+		"uri": "https://three.ws/avatars/default.glb",
+		"format": "gltf-binary"
+	},
+	"services": [
+		{
+			"name": "web",
+			"endpoint": "https://three.ws/"
+		},
+		{
+			"name": "A2A",
+			"endpoint": "https://three.ws/.well-known/agent-card.json",
+			"version": "0.3.0"
+		},
+		{
+			"name": "MCP",
+			"endpoint": "https://three.ws/.well-known/openapi.yaml",
+			"version": "2025-06-18"
+		}
+	],
+	"x402Support": true,
+	"x402Endpoints": [
+		{
+			"url": "https://three.ws/api/mcp",
+			"method": "POST",
+			"description": "MCP tool call — 3D avatar viewer, glTF model validation/inspection/optimization, and Solana agent data",
+			"networks": [
+				"solana",
+				"base"
+			],
+			"scheme": "exact",
+			"priceUsdc": "0.001"
+		}
+	],
+	"supportedTrust": [
+		"reputation",
+		"validation"
+	],
+	"attributes": [
+		{
+			"trait_type": "Platform",
+			"value": "three.ws"
+		},
+		{
+			"trait_type": "Standard",
+			"value": "Metaplex Core"
+		},
+		{
+			"trait_type": "Schema",
+			"value": "agent-manifest/0.1"
+		},
+		{
+			"trait_type": "$THREE",
+			"value": "FeMbDoX7R1Psc4GEcvJdsbNbZA3bfztcyDCatJVJpump"
+		}
+	],
+	"properties": {
+		"category": "vr",
+		"files": [
+			{
+				"uri": "https://three.ws/og-image.png",
+				"type": "image/png"
+			},
+			{
+				"uri": "https://three.ws/avatars/default.glb",
+				"type": "model/gltf-binary"
+			}
+		],
+		"creators": [
+			{
+				"address": "WWWkcM4G61wpGqKeKoTqWujhYjFiEG1z8qzbHrF4pao",
+				"share": 100
+			}
+		]
+	},
+	"platform": {
+		"name": "three.ws",
+		"url": "https://three.ws",
+		"tagline": "Give your AI a body.",
+		"x": "https://x.com/trythreews",
+		"github": "https://github.com/nirholas/three.ws"
+	},
+	"token": {
+		"symbol": "THREE",
+		"mint": "FeMbDoX7R1Psc4GEcvJdsbNbZA3bfztcyDCatJVJpump",
+		"url": "https://pump.fun/coin/FeMbDoX7R1Psc4GEcvJdsbNbZA3bfztcyDCatJVJpump"
+	},
+	"$schema": "https://3d-agent.io/schemas/manifest/0.1.json",
+	"spec": "agent-manifest/0.1",
+	"tags": [
+		"three.ws",
+		"ai-agent",
+		"platform"
+	]
+}

@@ -1,0 +1,602 @@
+/* The live 3D home (/home/:id).
+ *
+ * Layout is a three-pane shell: rooms on the left, the house in the middle,
+ * one selected thing on the right. Everything colourful in here comes from the
+ * house itself (a room's real light colour, a lock's real state); the chrome
+ * stays on the platform tokens so the page reads as three.ws and the house
+ * reads as the house. */
+
+/*
+ * Two semantic hues, cut for each theme.
+ *
+ * --warn and --danger are platform tokens tuned to glow on near-black, and this
+ * page uses them as TEXT: the room that is open, the refused line in the log,
+ * the risk band on the confirmation, the flag on a 2D room card. Measured on
+ * white on 2026-09-09 they read 2.22:1 and 2.90:1 against the 4.5:1 WCAG 1.4.3
+ * asks of body text, so a light-theme reader is told a door is open in a colour
+ * that barely leaves the page. The dark rungs below ARE the platform tokens, so
+ * nothing changes on the theme this page ships in; the light rungs are the same
+ * two signals darkened until they clear AA on white and on --bg-1.
+ */
+:root {
+	--hs-warn-ink: var(--warn);
+	--hs-danger-ink: var(--danger);
+}
+[data-theme='light'] {
+	--hs-warn-ink: #8a5a05;
+	--hs-danger-ink: #b3261e;
+}
+
+.hs-shell {
+	display: grid;
+	grid-template-rows: auto minmax(0, 1fr);
+	height: calc(100dvh - var(--header-h, 3.5rem));
+	min-height: 30rem;
+	color: var(--ink);
+}
+
+/* ── top bar ───────────────────────────────────────────────────────────────── */
+
+.hs-bar {
+	display: flex;
+	align-items: center;
+	gap: var(--space-sm);
+	flex-wrap: wrap;
+	/* The page opts into viewport-fit=cover so the house can fill a notched
+	   phone edge to edge, which also means the bar and the rail are laid out
+	   underneath the notch and the home indicator unless they say otherwise.
+	   max() keeps the ordinary padding everywhere the inset is zero, so a
+	   device without a cutout is unchanged. */
+	padding: var(--space-sm) max(var(--space-md), env(safe-area-inset-right, 0)) var(--space-sm)
+		max(var(--space-md), env(safe-area-inset-left, 0));
+	border-bottom: 1px solid var(--stroke);
+	background: var(--surface-1);
+}
+
+.hs-back {
+	display: inline-flex;
+	align-items: center;
+	gap: 0.35rem;
+	color: var(--ink-dim);
+	text-decoration: none;
+	font-size: var(--text-md);
+	border-radius: var(--radius-sm);
+}
+.hs-back:hover { color: var(--ink); }
+.hs-back:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
+
+.hs-title {
+	font-family: var(--font-display);
+	font-size: var(--text-ui);
+	font-weight: var(--weight-semibold);
+	letter-spacing: -0.01em;
+	margin: 0;
+	min-width: 0;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+	max-width: 22ch;
+}
+
+.hs-spacer { flex: 1 1 auto; }
+
+.hs-pill {
+	display: inline-flex;
+	align-items: center;
+	gap: 0.4rem;
+	padding: 0.22rem 0.62rem;
+	border-radius: var(--radius-pill);
+	border: 1px solid var(--stroke);
+	background: var(--surface-2);
+	font-size: var(--text-2xs);
+	font-weight: var(--weight-semibold);
+	letter-spacing: 0.04em;
+	text-transform: uppercase;
+	white-space: nowrap;
+}
+.hs-pill::before {
+	content: '';
+	width: 7px;
+	height: 7px;
+	border-radius: 50%;
+	background: var(--ink-dim);
+	transition: background var(--duration-base) var(--ease-standard), box-shadow var(--duration-base) var(--ease-standard);
+}
+.hs-pill[data-status='live']::before { background: var(--success); box-shadow: 0 0 0 3px rgba(74, 222, 128, 0.18); }
+.hs-pill[data-status='stale']::before { background: var(--warn); box-shadow: 0 0 0 3px rgba(251, 191, 36, 0.16); }
+.hs-pill[data-status='disconnected']::before { background: var(--danger); box-shadow: 0 0 0 3px rgba(248, 113, 113, 0.16); }
+.hs-pill[data-status='connecting']::before { background: var(--ink-dim); animation: hs-blink 1.1s ease-in-out infinite; }
+
+@keyframes hs-blink { 0%, 100% { opacity: 0.35; } 50% { opacity: 1; } }
+@media (prefers-reduced-motion: reduce) {
+	.hs-pill[data-status='connecting']::before { animation: none; }
+}
+
+.hs-btn {
+	appearance: none;
+	border: 1px solid var(--stroke);
+	background: var(--surface-2);
+	color: var(--ink);
+	border-radius: var(--radius-control);
+	padding: 0.34rem 0.7rem;
+	font: inherit;
+	font-size: var(--text-md);
+	font-weight: var(--weight-medium);
+	cursor: pointer;
+	transition: background var(--duration-fast) var(--ease-standard), border-color var(--duration-fast) var(--ease-standard), transform var(--duration-fast) var(--ease-standard);
+}
+.hs-btn:hover:not(:disabled):not([aria-disabled='true']) { background: var(--surface-3); border-color: var(--stroke-strong); }
+.hs-btn:active:not(:disabled):not([aria-disabled='true']) { transform: translateY(1px); }
+.hs-btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+/*
+ * `aria-disabled` reads and looks exactly like `disabled`, and behaves like it
+ * on click, but stays in the tab order and can still hold focus. A control that
+ * is busy for the length of a network round trip must not vanish from under a
+ * keyboard user's fingers, which the `disabled` property does: the browser
+ * blurs it, the keyboard lands on the document, and the person has to tab the
+ * whole house again to get back to the lamp they just pressed.
+ */
+.hs-btn:disabled,
+.hs-btn[aria-disabled='true'] { opacity: 0.5; cursor: not-allowed; }
+.hs-btn[aria-pressed='true'] { background: var(--surface-3); border-color: var(--stroke-strong); }
+.hs-btn--primary { background: var(--ink); color: var(--bg-0); border-color: transparent; font-weight: var(--weight-semibold); }
+.hs-btn--primary:hover:not(:disabled) { background: #fff; }
+.hs-btn--danger { border-color: rgba(248, 113, 113, 0.5); color: #ffd9d9; background: rgba(248, 113, 113, 0.12); }
+.hs-btn--danger:hover:not(:disabled) { background: rgba(248, 113, 113, 0.2); }
+
+/* ── body ──────────────────────────────────────────────────────────────────── */
+
+.hs-body {
+	display: grid;
+	grid-template-columns: minmax(13rem, 15rem) minmax(0, 1fr) minmax(15rem, 19rem);
+	min-height: 0;
+}
+
+.hs-rail,
+.hs-panel {
+	overflow-y: auto;
+	overscroll-behavior: contain;
+	padding: var(--space-md) var(--space-md) max(var(--space-md), env(safe-area-inset-bottom, 0));
+	background: var(--surface-1);
+}
+.hs-rail { padding-inline-start: max(var(--space-md), env(safe-area-inset-left, 0)); }
+.hs-panel { padding-inline-end: max(var(--space-md), env(safe-area-inset-right, 0)); }
+.hs-rail { border-inline-end: 1px solid var(--stroke); }
+.hs-panel { border-inline-start: 1px solid var(--stroke); }
+
+.hs-stage {
+	position: relative;
+	min-height: 0;
+	background: radial-gradient(120% 100% at 50% 0%, rgba(255, 255, 255, 0.05), transparent 62%), var(--bg-0);
+	overflow: hidden;
+}
+.hs-stage canvas { display: block; }
+.hs-stage.is-flat { overflow-y: auto; }
+
+/* Stale is a first-class state: the house greys out and says how old it is.
+ * It never empties. */
+.hs-stage.is-stale canvas { filter: grayscale(0.72) brightness(0.72); transition: filter var(--duration-slow) var(--ease-standard); }
+.hs-stage canvas { transition: filter var(--duration-slow) var(--ease-standard); }
+
+.hs-age {
+	position: absolute;
+	left: 50%;
+	/* Sits above the home indicator rather than behind it. */
+	bottom: max(var(--space-md), env(safe-area-inset-bottom, 0));
+	transform: translateX(-50%);
+	padding: 0.4rem 0.8rem;
+	border-radius: var(--radius-pill);
+	border: 1px solid rgba(251, 191, 36, 0.4);
+	background: rgba(20, 16, 4, 0.82);
+	color: #ffe9b0;
+	font-size: var(--text-md);
+	backdrop-filter: blur(8px);
+	display: flex;
+	align-items: center;
+	gap: 0.6rem;
+}
+
+/* ── rail ──────────────────────────────────────────────────────────────────── */
+
+.hs-rail-head {
+	font-size: var(--text-2xs);
+	font-weight: var(--weight-bold);
+	letter-spacing: 0.09em;
+	text-transform: uppercase;
+	color: var(--ink-dim);
+	margin: 0 0 var(--space-sm);
+}
+.hs-floor + .hs-floor { margin-top: var(--space-md); }
+.hs-floor-name {
+	font-size: var(--text-sm);
+	font-weight: var(--weight-semibold);
+	color: var(--ink-dim);
+	margin: 0 0 0.35rem;
+}
+.hs-room-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 0.25rem; }
+
+.hs-room {
+	width: 100%;
+	display: grid;
+	grid-template-columns: 10px minmax(0, 1fr) auto;
+	align-items: center;
+	gap: 0.55rem;
+	padding: 0.42rem 0.55rem;
+	border-radius: var(--radius-control);
+	border: 1px solid transparent;
+	background: transparent;
+	color: var(--ink);
+	font: inherit;
+	font-size: var(--text-md);
+	text-align: start;
+	cursor: pointer;
+	transition: background var(--duration-fast) var(--ease-standard), border-color var(--duration-fast) var(--ease-standard);
+}
+.hs-room:hover { background: var(--surface-2); }
+.hs-room:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.hs-room[aria-current='true'] { background: var(--surface-3); border-color: var(--stroke-strong); }
+.hs-room-dot {
+	width: 10px;
+	height: 10px;
+	border-radius: 50%;
+	background: var(--room-dot, rgba(255, 255, 255, 0.14));
+	box-shadow: 0 0 var(--room-halo, 0px) var(--room-dot, transparent);
+	transition: background var(--duration-slow) var(--ease-standard), box-shadow var(--duration-slow) var(--ease-standard);
+}
+.hs-room-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.hs-room-meta { font-size: var(--text-2xs); color: var(--ink-dim); font-variant-numeric: tabular-nums; }
+/*
+ * The selected room's state line, at full ink.
+ *
+ * `aria-current` raises the row to --surface-3, which lifts the background
+ * under text that is already --text-2xs and dimmed. Measured by axe on the
+ * live house: that one line was the only WCAG 1.4.3 failure in the whole lane.
+ * The fix is not a darker row, it is a brighter line: this is the room the
+ * reader is looking at, so the words that say what is on in it are the last
+ * thing that should be faint.
+ */
+.hs-room[aria-current='true'] .hs-room-meta { color: var(--ink); }
+.hs-room-alert { color: var(--hs-warn-ink); }
+
+/*
+ * The devices of the focused room.
+ *
+ * This is the keyboard and screen-reader route into the house. A WebGL canvas
+ * is one opaque element, so picking a lamp out of the 3D scene is a gesture
+ * only a pointer can make; without this list the 3D view could be navigated as
+ * far as the rooms and no further. It is deliberately visible rather than
+ * screen-reader-only, because a control that takes focus without being seen
+ * fails WCAG 2.4.7, and because picking a small object out of a 3D scene is
+ * fiddly with a mouse too.
+ */
+.hs-room-devices {
+	list-style: none;
+	margin: 0.2rem 0 0.35rem;
+	padding: 0;
+	/* The indent lines the device names up under the room name rather than
+	   under its light dot, so the nesting reads at a glance. Logical, so an RTL
+	   locale indents from the right. */
+	padding-inline-start: calc(10px + 0.55rem);
+	display: grid;
+	gap: 0.1rem;
+}
+.hs-room-device {
+	width: 100%;
+	display: grid;
+	grid-template-columns: minmax(0, 1fr) auto;
+	align-items: center;
+	gap: 0.5rem;
+	padding: 0.3rem 0.45rem;
+	border-radius: var(--radius-sm);
+	border: 1px solid transparent;
+	background: transparent;
+	color: var(--ink-dim);
+	font: inherit;
+	font-size: var(--text-sm);
+	text-align: start;
+	cursor: pointer;
+	transition: background var(--duration-fast) var(--ease-standard), color var(--duration-fast) var(--ease-standard), border-color var(--duration-fast) var(--ease-standard);
+}
+.hs-room-device:hover { background: var(--surface-2); color: var(--ink); }
+.hs-room-device:active { background: var(--surface-3); }
+.hs-room-device:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.hs-room-device[aria-current='true'] {
+	background: var(--surface-2);
+	border-color: var(--stroke-strong);
+	color: var(--ink);
+}
+.hs-room-device-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.hs-room-device-state { font-size: var(--text-2xs); color: var(--ink-dim); font-variant-numeric: tabular-nums; }
+
+/*
+ * A finger is not a pointer. WCAG 2.5.5 asks 44x44 of a touch target, and at
+ * their text sizes the rail's room and device rows, the view toggles and the
+ * 2D house's per-device action pills all render shorter than that. Only coarse
+ * pointers pay the extra height, so the desktop layout is untouched: a rail
+ * that grew 12px per row on a laptop would push half the house off the screen.
+ */
+@media (pointer: coarse) {
+	.hs-room,
+	.hs-room-device,
+	.hs-btn,
+	.hs-back,
+	.hs-card-title,
+	.hs-item-act {
+		min-height: 44px;
+	}
+	.hs-btn,
+	.hs-item-act {
+		display: inline-flex;
+		align-items: center;
+		justify-content: center;
+		min-width: 44px;
+	}
+	/* The 2D house's rows carry their own action button, so the row itself has
+	   to be tall enough for the button to reach 44px without the neighbouring
+	   rows' hit areas overlapping it. */
+	.hs-item { padding: 0.45rem 0; }
+}
+
+/* ── inspector ─────────────────────────────────────────────────────────────── */
+
+.hs-panel-empty { color: var(--ink-dim); font-size: var(--text-md); line-height: var(--leading-normal); }
+.hs-entity-name { font-family: var(--font-display); font-size: var(--text-lg); margin: 0 0 0.2rem; letter-spacing: -0.02em; }
+.hs-entity-id { font-family: var(--font-mono); font-size: var(--text-2xs); color: var(--ink-dim); margin: 0 0 var(--space-sm); word-break: break-all; }
+.hs-entity-state { font-size: var(--text-md); margin: 0 0 var(--space-md); }
+.hs-entity-attrs { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 0.2rem 0.7rem; font-size: var(--text-sm); margin: 0 0 var(--space-md); }
+.hs-entity-attrs dt { color: var(--ink-dim); }
+.hs-entity-attrs dd { margin: 0; overflow: hidden; text-overflow: ellipsis; }
+.hs-actions { display: flex; flex-wrap: wrap; gap: 0.4rem; }
+
+.hs-log { list-style: none; margin: var(--space-md) 0 0; padding: var(--space-sm) 0 0; border-top: 1px solid var(--hairline); display: grid; gap: 0.3rem; font-size: var(--text-sm); }
+.hs-log li { display: flex; gap: 0.5rem; color: var(--ink-dim); }
+.hs-log time { font-variant-numeric: tabular-nums; flex: none; }
+.hs-log .is-refused { color: var(--hs-warn-ink); }
+.hs-log .is-failed { color: var(--hs-danger-ink); }
+
+/* ── the confirmation, anchored to the thing it would move ─────────────────── */
+
+.hs-confirm {
+	position: absolute;
+	z-index: 6;
+	width: min(20rem, calc(100% - 2rem));
+	transform: translate(-50%, -100%);
+	padding: var(--space-sm) var(--space-md) var(--space-md);
+	border-radius: var(--radius-lg);
+	border: 1px solid rgba(251, 191, 36, 0.45);
+	background: rgba(18, 15, 6, 0.94);
+	box-shadow: 0 18px 48px rgba(0, 0, 0, 0.55);
+	backdrop-filter: blur(10px);
+	animation: hs-rise 180ms ease-out;
+}
+@keyframes hs-rise { from { opacity: 0; transform: translate(-50%, calc(-100% + 8px)); } }
+@media (prefers-reduced-motion: reduce) { .hs-confirm { animation: none; } }
+.hs-confirm::after {
+	content: '';
+	position: absolute;
+	left: 50%;
+	bottom: -7px;
+	width: 12px;
+	height: 12px;
+	transform: translateX(-50%) rotate(45deg);
+	background: rgba(18, 15, 6, 0.94);
+	border-right: 1px solid rgba(251, 191, 36, 0.45);
+	border-bottom: 1px solid rgba(251, 191, 36, 0.45);
+}
+.hs-confirm-risk { font-size: var(--text-2xs); font-weight: var(--weight-bold); letter-spacing: 0.09em; text-transform: uppercase; color: var(--hs-warn-ink); margin: 0 0 0.3rem; }
+.hs-confirm-text { font-size: var(--text-md); line-height: var(--leading-normal); margin: 0 0 var(--space-sm); }
+.hs-confirm-row { display: flex; gap: 0.4rem; flex-wrap: wrap; align-items: center; }
+.hs-confirm-remember { display: flex; align-items: center; gap: 0.35rem; font-size: var(--text-sm); color: var(--ink-dim); margin-top: var(--space-sm); }
+
+/* ── the designed nothings ─────────────────────────────────────────────────── */
+
+.hs-overlay {
+	position: absolute;
+	inset: 0;
+	display: grid;
+	place-content: center;
+	justify-items: center;
+	gap: var(--space-sm);
+	text-align: center;
+	padding: var(--space-lg);
+	background: rgba(8, 8, 10, 0.72);
+	backdrop-filter: blur(6px);
+	z-index: 5;
+}
+.hs-overlay h2 { font-family: var(--font-display); font-size: var(--text-lg); margin: 0; letter-spacing: -0.02em; }
+.hs-overlay p { max-width: 34rem; color: var(--ink-dim); font-size: var(--text-md); line-height: var(--leading-normal); margin: 0; }
+.hs-overlay code { font-family: var(--font-mono); font-size: var(--text-sm); background: var(--surface-2); padding: 0.1rem 0.35rem; border-radius: var(--radius-sm); }
+.hs-overlay .hs-actions { justify-content: center; margin-top: var(--space-xs); }
+
+/* Skeleton: the room list is readable before the 3D arrives, and nothing
+ * shifts when it does. */
+.hs-skeleton { display: grid; gap: 0.4rem; }
+.hs-skeleton span {
+	display: block;
+	height: 1.6rem;
+	border-radius: var(--radius-control);
+	background: linear-gradient(90deg, var(--surface-1), var(--surface-3), var(--surface-1));
+	background-size: 200% 100%;
+	animation: hs-shimmer 1.4s linear infinite;
+}
+@keyframes hs-shimmer { to { background-position: -200% 0; } }
+@media (prefers-reduced-motion: reduce) { .hs-skeleton span { animation: none; } }
+
+/* ── the 2D house ──────────────────────────────────────────────────────────── */
+
+.hs-flat { padding: var(--space-md); }
+.hs-flat-floor + .hs-flat-floor { margin-top: var(--space-lg); }
+.hs-flat-floor-name {
+	font-size: var(--text-2xs);
+	font-weight: var(--weight-bold);
+	letter-spacing: 0.09em;
+	text-transform: uppercase;
+	color: var(--ink-dim);
+	margin: 0 0 var(--space-sm);
+}
+.hs-flat-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(15rem, 1fr)); gap: var(--space-sm); }
+
+.hs-card {
+	border: 1px solid var(--stroke);
+	border-radius: var(--radius-lg);
+	padding: var(--space-sm) var(--space-md) var(--space-md);
+	background:
+		radial-gradient(120% 90% at 50% 0%, color-mix(in srgb, var(--room-light, #fff) calc(var(--room-glow, 0) * 100%), transparent), transparent 70%),
+		var(--surface-1);
+	transition: border-color var(--duration-base) var(--ease-standard), background var(--duration-slow) var(--ease-standard), opacity var(--duration-slow) var(--ease-standard);
+}
+.hs-card.is-focused { border-color: var(--stroke-strong); box-shadow: 0 0 0 2px var(--accent-soft); }
+/*
+ * Stale, without breaking contrast.
+ *
+ * This used to be `opacity: 0.62`, which composites the text INTO the page
+ * background: `--ink-dim` body copy measured 2.70:1 against the card behind it,
+ * against the 4.5:1 WCAG 1.4.3 asks of normal text. Measured on 2026-09-09 with
+ * the dark palette (`--bg-0` #0a0a0a, card `--surface-1`, ink-dim #888888), and
+ * no usable opacity fixes it: even 0.85, which barely reads as dimmed at all,
+ * only reaches 4.13:1. Dimming by alpha is simply the wrong instrument for text.
+ *
+ * So the state is carried by three things that cost no contrast: the colour
+ * drains completely (grayscale, and the room's own light stops glowing), the
+ * device names step down one rung of the ink ramp to the same grey the meta line
+ * already uses, and the border goes dashed. The dashed border is the part that
+ * matters for 1.4.1: stale is legible as a shape, not only as a shade, so it
+ * survives greyscale vision and a sunlit screen. The age pill over the stage
+ * says how old, in words.
+ */
+.hs-card.is-stale {
+	filter: grayscale(1);
+	--ink: var(--ink-dim);
+	--room-glow: 0;
+	border-style: dashed;
+}
+.hs-card-head { margin-bottom: var(--space-sm); }
+.hs-card-title {
+	appearance: none;
+	background: none;
+	border: 0;
+	padding: 0;
+	color: var(--ink);
+	font: inherit;
+	font-family: var(--font-display);
+	font-size: var(--text-ui);
+	font-weight: var(--weight-semibold);
+	letter-spacing: -0.01em;
+	cursor: pointer;
+	border-radius: var(--radius-sm);
+}
+.hs-card-title:hover { text-decoration: underline; }
+.hs-card-title:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
+.hs-card-meta { font-size: var(--text-sm); color: var(--ink-dim); margin: 0.15rem 0 0; }
+.hs-card-flag { font-size: var(--text-sm); color: var(--hs-warn-ink); margin: 0 0 var(--space-sm); }
+.hs-card-items { list-style: none; margin: 0; padding: 0; display: grid; gap: 0.15rem; }
+
+.hs-item {
+	display: grid;
+	grid-template-columns: 10px minmax(0, 1fr) auto auto;
+	align-items: center;
+	gap: 0.5rem;
+	padding: 0.28rem 0;
+	font-size: var(--text-md);
+	border-bottom: 1px solid var(--hairline);
+}
+.hs-item:last-child { border-bottom: 0; }
+/* Same rule as the stale card, same reason: `opacity: 0.55` put this row's
+ * text at 2.36:1. The row already says "unreachable" in words, so the visual
+ * only has to agree with it, not carry it alone. */
+.hs-item.is-unavailable {
+	filter: grayscale(1);
+	--ink: var(--ink-dim);
+}
+.hs-item-dot {
+	width: 10px;
+	height: 10px;
+	border-radius: 50%;
+	background: var(--dot);
+	transition: background var(--duration-slow) var(--ease-standard);
+}
+.hs-item-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.hs-item-state { font-size: var(--text-2xs); color: var(--ink-dim); font-variant-numeric: tabular-nums; }
+.hs-item-act {
+	appearance: none;
+	border: 1px solid var(--stroke);
+	background: var(--surface-2);
+	color: var(--ink);
+	border-radius: var(--radius-pill);
+	padding: 0.14rem 0.6rem;
+	font: inherit;
+	font-size: var(--text-2xs);
+	font-weight: var(--weight-semibold);
+	cursor: pointer;
+	transition: background var(--duration-fast) var(--ease-standard), border-color var(--duration-fast) var(--ease-standard);
+}
+.hs-item-act:hover:not(:disabled):not([aria-disabled='true']) { background: var(--surface-3); border-color: var(--stroke-strong); }
+.hs-item-act:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.hs-item-act:disabled,
+.hs-item-act[aria-disabled='true'] { opacity: 0.5; cursor: progress; }
+
+.hs-card-readouts {
+	display: grid;
+	grid-template-columns: minmax(0, 1fr) auto;
+	gap: 0.1rem 0.6rem;
+	margin: var(--space-sm) 0 0;
+	padding-top: var(--space-sm);
+	border-top: 1px solid var(--hairline);
+	font-size: var(--text-sm);
+	color: var(--ink-dim);
+}
+.hs-card-readouts dt { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.hs-card-readouts dd { margin: 0; font-variant-numeric: tabular-nums; color: var(--ink); }
+.hs-card-more { font-size: var(--text-2xs); color: var(--ink-dim); margin: var(--space-sm) 0 0; }
+
+/* ── responsive ────────────────────────────────────────────────────────────── */
+
+@media (max-width: 1100px) {
+	.hs-body { grid-template-columns: minmax(11rem, 13rem) minmax(0, 1fr); }
+	.hs-panel { grid-column: 1 / -1; border-inline-start: 0; border-top: 1px solid var(--stroke); max-height: 40vh; }
+}
+
+@media (max-width: 760px) {
+	.hs-shell { height: auto; min-height: 0; }
+	.hs-body { grid-template-columns: minmax(0, 1fr); }
+	.hs-rail { border-inline-end: 0; border-bottom: 1px solid var(--stroke); max-height: 40vh; }
+	.hs-stage { min-height: 62vh; }
+	.hs-panel { max-height: none; }
+	.hs-title { max-width: 14ch; }
+}
+
+/*
+ * Reduced motion, across the whole page and not just the three animations that
+ * used to name themselves here.
+ *
+ * The 3D scene already honours the preference from the inside: every damped
+ * quantity in src/home/scene-render.js snaps to its target, OrbitControls stops
+ * coasting, and focusing a room places the camera rather than flying it. What
+ * was left was the chrome around it, where a house's state travels in CSS: a
+ * room's light dot cross-fading to its new colour, a card fading as it goes
+ * stale, the whole canvas desaturating over --duration-slow. Those are the
+ * scene's transitions too, and someone who asked for less motion asked for
+ * these as well.
+ *
+ * The rule is a snap, never a freeze. A house is a live readout: values keep
+ * arriving and keep being correct, they simply stop travelling to their new
+ * state. 1ms rather than 0 so a transitionend listener still fires.
+ */
+@media (prefers-reduced-motion: reduce) {
+	.hs-shell *,
+	.hs-shell *::before,
+	.hs-shell *::after {
+		animation-duration: 1ms !important;
+		animation-iteration-count: 1 !important;
+		animation-delay: 0s !important;
+		transition-duration: 1ms !important;
+		transition-delay: 0s !important;
+		scroll-behavior: auto !important;
+	}
+	/* The 2D house's cards are the one place a transform moves a whole block
+	   rather than a colour. */
+	.hs-card,
+	.hs-btn:active:not(:disabled) {
+		transform: none !important;
+	}
+}

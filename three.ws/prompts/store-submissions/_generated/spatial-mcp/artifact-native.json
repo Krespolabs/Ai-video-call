@@ -1,0 +1,27 @@
+{
+  "spatialMcpVersion": "0.1",
+  "kind": "model",
+  "scene": {
+    "glbUrl": "https://three.ws/cdn/creations/demo.glb",
+    "format": "glb"
+  },
+  "camera": {
+    "autoRotate": true
+  },
+  "environment": {
+    "image": "neutral",
+    "exposure": 1,
+    "shadowIntensity": 1
+  },
+  "affordances": {
+    "orbit": true,
+    "zoom": true,
+    "fullscreen": true,
+    "download": true
+  },
+  "meta": {
+    "prompt": "a battle-worn sci-fi helmet",
+    "title": "Damaged helmet",
+    "viewerUrl": "https://three.ws/viewer?src=https%3A%2F%2Fthree.ws%2Fcdn%2Fcreations%2Fdemo.glb"
+  }
+}

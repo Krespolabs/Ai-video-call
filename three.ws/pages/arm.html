@@ -1,0 +1,429 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+	<script>/* three.ws theme boot — no-flash; runtime in /theme-switcher.js */(function(){try{var m=localStorage.getItem('twx_theme');var l=m==='auto'?(window.matchMedia&&window.matchMedia('(prefers-color-scheme: light)').matches):m==='light';document.documentElement.setAttribute('data-theme',l?'light':'dark');}catch(e){document.documentElement.setAttribute('data-theme','dark');}})();</script>
+	<meta charset="utf-8" />
+	<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+	<title data-i18n="arm.meta_title">Arm your agent: automate Oracle conviction · three.ws</title>
+	<meta name="description" content="Configure your 3D agent to act on Oracle conviction automatically: set the minimum score, position size, daily and open-position caps, narrative filters and alerts, then arm it in simulate or live mode. Every action gets graded against the outcome."  data-i18n-attr="content:arm.meta_description"/>
+	<meta property="og:title" content="Arm your agent · three.ws"  data-i18n-attr="content:arm.meta_og_title"/>
+	<meta property="og:description" content="Set the rules, arm your 3D agent, and let it trade Oracle conviction from its own custodial Solana wallet. Simulate first, go live when you trust it."  data-i18n-attr="content:arm.meta_og_description"/>
+	<meta property="og:type" content="website" />
+	<meta property="og:site_name" content="three.ws" />
+	<meta property="og:url" content="https://three.ws/oracle/arm" />
+	<meta name="twitter:card" content="summary_large_image" />
+	<meta name="twitter:title" content="Arm your agent: automate Oracle conviction"  data-i18n-attr="content:arm.meta_twitter_title"/>
+	<meta name="twitter:description" content="Rules, sizing, caps, alerts, then arm. Your 3D agent acts the instant a coin clears your bar."  data-i18n-attr="content:arm.meta_twitter_description"/>
+	<link rel="canonical" href="https://three.ws/oracle/arm" />
+	<link rel="icon" href="/favicon.ico" />
+	<link rel="stylesheet" href="/nav.css" />
+	<style>
+		:root {
+			--bg: #05060c; --panel: rgba(13,15,23,0.72); --panel-solid: #0c0e16; --line: rgba(255,255,255,0.09);
+			--ink: #eaeefa; --muted: #8a92a8; --faint: rgba(255,255,255,0.45);
+			--cyan: #cdd2e0; --violet: #a6acbc; --gold: #c4c9d6; --up: #e4e8f2; --down: #6c7280; --amber: #b6bcca;
+			--accent: #cdd2e0; --stroke-strong: rgba(255,255,255,0.22);
+			--r: 16px; --r-sm: 11px;
+			--mono: ui-monospace, "JetBrains Mono", SFMono-Regular, Menlo, monospace;
+			--shadow: 0 18px 52px -22px rgba(0,0,0,0.86), 0 1px 0 rgba(255,255,255,0.05) inset;
+			--blur: saturate(160%) blur(16px);
+		}
+		* { box-sizing: border-box; }
+		html, body { margin: 0; min-height: 100%; background: var(--bg); color: var(--ink);
+			font: 15px/1.55 Inter, ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; -webkit-font-smoothing: antialiased; }
+		body { background:
+			radial-gradient(58% 48% at 82% -6%, color-mix(in srgb, var(--violet) 16%, transparent), transparent 70%),
+			radial-gradient(48% 42% at 3% -2%, color-mix(in srgb, var(--cyan) 12%, transparent), transparent 66%), var(--bg); }
+		a { color: inherit; text-decoration: none; }
+		button { font: inherit; color: inherit; cursor: pointer; }
+		.wrap { max-width: 1180px; margin: 0 auto; padding: 0 18px 90px; }
+
+		/* hero */
+		.crumb { display: inline-flex; align-items: center; gap: 7px; margin: 30px 0 0; font: 600 12px/1 var(--mono); color: var(--muted); }
+		.crumb a:hover { color: var(--ink); }
+		.hero { padding: 14px 0 18px; }
+		.hero h1 { font-size: clamp(26px, 4vw, 38px); line-height: 1.05; letter-spacing: -0.024em; margin: 8px 0 10px; font-weight: 800; }
+		.hero p { max-width: 680px; font-size: 15px; color: var(--muted); margin: 0; }
+
+		.card { background: var(--panel); backdrop-filter: var(--blur); -webkit-backdrop-filter: var(--blur);
+			border: 1px solid var(--line); border-radius: var(--r); padding: 18px; box-shadow: var(--shadow); }
+		.card > h3 { margin: 0 0 3px; font-size: 15px; letter-spacing: -0.01em; display: flex; align-items: center; gap: 8px; }
+		.card .sub { color: var(--muted); font-size: 12.5px; margin: 0 0 16px; }
+		.card .stepno { display: inline-grid; place-items: center; width: 20px; height: 20px; border-radius: 6px; font: 700 11px/1 var(--mono);
+			background: color-mix(in srgb, var(--cyan) 16%, transparent); color: var(--cyan); border: 1px solid color-mix(in srgb, var(--cyan) 30%, var(--line)); }
+
+		/* control bar — agent + arm status */
+		.control { display: grid; grid-template-columns: 1fr auto auto; gap: 18px; align-items: center; margin: 6px 0 16px; }
+		.control .agentpick { min-width: 0; }
+		.control .agentpick label { display: block; font: 600 10px/1 var(--mono); text-transform: uppercase; letter-spacing: .08em; color: var(--faint); margin-bottom: 7px; }
+		.control select { width: 100%; max-width: 320px; background: rgba(255,255,255,0.03); border: 1px solid var(--line); border-radius: var(--r-sm); color: var(--ink); padding: 10px 12px; font: 600 14px/1 var(--mono); }
+		.armbox { display: flex; align-items: center; gap: 14px; }
+		.arm-state { text-align: right; }
+		.arm-state .lab { display: flex; align-items: center; gap: 8px; justify-content: flex-end; font-weight: 700; font-size: 15px; }
+		.arm-state .sub { font-size: 11.5px; color: var(--muted); max-width: 320px; margin-top: 3px; }
+		.arm-dot { width: 9px; height: 9px; border-radius: 50%; background: var(--muted); }
+		.arm-dot.off { background: var(--muted); }
+		.arm-dot.sim { background: var(--cyan); box-shadow: 0 0 0 0 color-mix(in srgb, var(--cyan) 55%, transparent); animation: pulse 1.9s infinite; }
+		.arm-dot.live { background: var(--amber); box-shadow: 0 0 0 0 color-mix(in srgb, var(--amber) 55%, transparent); animation: pulse 1.5s infinite; }
+		@keyframes pulse { 0%{box-shadow:0 0 0 0 currentColor} 70%{box-shadow:0 0 0 8px transparent} 100%{box-shadow:0 0 0 0 transparent} }
+
+		/* stat strip */
+		.stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 1px; background: var(--line); border: 1px solid var(--line); border-radius: var(--r-sm); overflow: hidden; margin: 0 0 18px; }
+		.stat { background: var(--panel-solid); padding: 13px 16px; }
+		.stat span { display: block; font: 600 10px/1 var(--mono); letter-spacing: .07em; text-transform: uppercase; color: var(--faint); margin-bottom: 7px; }
+		.stat-val { font: 800 21px/1 var(--mono); }
+		.stat-val.up { color: var(--up); } .stat-val.dn { color: var(--down); }
+
+		/* layout */
+		.layout { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; align-items: start; }
+		.col-config { display: flex; flex-direction: column; gap: 14px; }
+		.col-side { display: flex; flex-direction: column; gap: 14px; position: sticky; top: 14px; }
+
+		/* fields */
+		.field { margin-bottom: 14px; }
+		.field:last-child { margin-bottom: 0; }
+		.field > label, .field > .flab { display: block; font: 600 10.5px/1 var(--mono); text-transform: uppercase; letter-spacing: .07em; color: var(--faint); margin-bottom: 8px; }
+		.field input, .field select { width: 100%; background: rgba(255,255,255,0.03); border: 1px solid var(--line); border-radius: var(--r-sm); color: var(--ink); padding: 10px 12px; font: 600 14px/1 var(--mono); }
+		.field input:focus, .field select:focus { outline: 2px solid color-mix(in srgb, var(--cyan) 60%, transparent); outline-offset: 1px; }
+		.field-hint { margin-top: 7px; font-size: 11.5px; color: var(--muted); line-height: 1.5; }
+		.field-hint a { color: var(--cyan); } .field-hint code { background: rgba(255,255,255,.06); padding: 1px 4px; border-radius: 3px; font-size: 11px; }
+		.row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+		.suffixed { position: relative; }
+		.suffixed .suf { position: absolute; right: 12px; top: 50%; transform: translateY(-50%); font: 600 11px/1 var(--mono); color: var(--faint); pointer-events: none; }
+
+		/* segmented control */
+		.seg { display: inline-flex; width: 100%; background: rgba(255,255,255,0.03); border: 1px solid var(--line); border-radius: var(--r-sm); padding: 3px; gap: 3px; }
+		.seg button { flex: 1; padding: 9px 8px; border-radius: 8px; border: none; background: none; color: var(--muted); font: 600 12.5px/1.2 var(--mono); transition: background var(--duration-fast), color var(--duration-fast); text-align: center; }
+		.seg button small { display: block; font-size: 10px; color: var(--faint); margin-top: 3px; font-weight: 600; }
+		.seg button.on { background: color-mix(in srgb, var(--cyan) 20%, transparent); color: var(--ink); }
+		.seg button.on small { color: var(--cyan); }
+		.seg.live-on button[data-mode="live"].on { background: color-mix(in srgb, var(--amber) 22%, transparent); }
+		.seg.live-on button[data-mode="live"].on small { color: var(--amber); }
+
+		/* toggles */
+		.toggle { display: flex; align-items: center; justify-content: space-between; gap: 14px; padding: 13px 0; border-top: 1px solid var(--line); }
+		.toggle:first-of-type { border-top: none; }
+		.toggle .t-lab b { display: block; font-size: 13.5px; }
+		.toggle .t-lab span { font-size: 12px; color: var(--muted); }
+		.sw { width: 46px; height: 26px; border-radius: 999px; background: rgba(255,255,255,0.1); border: 1px solid var(--line); position: relative; transition: background var(--duration-base); flex: none; }
+		.sw::after { content: ""; position: absolute; top: 2px; left: 2px; width: 20px; height: 20px; border-radius: 50%; background: #fff; transition: transform var(--duration-base); }
+		.sw.on { background: var(--up); } .sw.on::after { transform: translateX(20px); }
+		.sw:focus-visible { outline: 2px solid var(--cyan); outline-offset: 2px; }
+		/* big arm switch */
+		.sw.xl { width: 64px; height: 34px; }
+		.sw.xl::after { width: 28px; height: 28px; }
+		.sw.xl.on::after { transform: translateX(30px); }
+
+		/* chips */
+		.chips { display: flex; flex-wrap: wrap; gap: 6px; }
+		.cchip { padding: 6px 11px; border-radius: 999px; border: 1px solid var(--line); background: rgba(255,255,255,0.03); font: 600 12px/1 var(--mono); color: var(--muted); transition: background var(--duration-fast), color var(--duration-fast), border-color var(--duration-fast); }
+		.cchip:hover { color: var(--ink); border-color: var(--stroke-strong); }
+		.cchip.on { border-color: color-mix(in srgb, var(--violet) 50%, var(--line)); color: var(--ink); background: color-mix(in srgb, var(--violet) 15%, transparent); }
+
+		.risk { margin-top: 12px; padding: 11px 13px; border-radius: var(--r-sm); background: rgba(255,255,255,0.03); border: 1px solid var(--line); font: 600 12px/1.5 var(--mono); color: var(--muted); }
+
+		/* telegram */
+		.tg-row { display: flex; gap: 6px; align-items: center; }
+		.tg-row input { flex: 1; min-width: 0; font-size: 12px; }
+		.tg-state { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; } .tg-state:empty { display: none; }
+		.tg-body { font-size: 12px; line-height: 1.45; flex: 1 1 200px; } .tg-err { color: var(--amber); }
+		.tg-state a.btn { text-decoration: none; } .tg-row button[hidden], .tg-row input[hidden] { display: none; }
+		.tg-note { display: none; margin-top: 7px; font-size: 11.5px; line-height: 1.4; }
+		.tg-note.ok { color: var(--up); } .tg-note.warn { color: var(--amber); }
+		.opt { font: 600 10px/1 var(--mono); padding: 2px 7px; border-radius: 999px; background: rgba(255,255,255,.08); color: var(--muted); border: 1px solid var(--line); text-transform: uppercase; letter-spacing: .05em; }
+
+		/* buttons */
+		.btn { display: inline-flex; align-items: center; justify-content: center; gap: 8px; padding: 10px 16px; border-radius: 999px; border: 1px solid var(--line);
+			background: var(--panel); color: var(--ink); font-weight: 600; font-size: 13.5px; transition: transform var(--duration-fast), border-color var(--duration-fast), background var(--duration-fast); }
+		.btn:hover { transform: translateY(-1px); border-color: color-mix(in srgb, var(--cyan) 50%, var(--line)); }
+		.btn:disabled { opacity: .5; cursor: not-allowed; transform: none; }
+		.btn.sm { padding: 9px 13px; font-size: 12.5px; white-space: nowrap; flex-shrink: 0; }
+		.btn.primary { width: 100%; padding: 13px; font-size: 14px;
+			background: linear-gradient(135deg, color-mix(in srgb, var(--cyan) 26%, var(--panel)), color-mix(in srgb, var(--violet) 26%, var(--panel)));
+			border-color: color-mix(in srgb, var(--cyan) 42%, var(--line)); color: #fff; }
+		.btn.primary.dirty { box-shadow: 0 0 0 0 color-mix(in srgb, var(--cyan) 60%, transparent); animation: dirtypulse 2s infinite; }
+		@keyframes dirtypulse { 0%{box-shadow:0 0 0 0 color-mix(in srgb,var(--cyan) 50%,transparent)} 70%{box-shadow:0 0 0 6px transparent} 100%{box-shadow:0 0 0 0 transparent} }
+		.save-note { font-size: 12px; margin-top: 10px; min-height: 16px; line-height: 1.45; }
+		.save-note.ok { color: var(--up); } .save-note.warn { color: var(--amber); }
+
+		/* ledger */
+		.ledger-empty { padding: 40px 18px; text-align: center; color: var(--muted); font-size: 13px; }
+		.act-wrap { overflow-x: auto; }
+		.act-table { width: 100%; border-collapse: collapse; font-size: 12.5px; }
+		.act-table th { padding: 8px 10px; text-align: left; font: 600 10px/1 var(--mono); letter-spacing: .07em; text-transform: uppercase; color: var(--faint); border-bottom: 1px solid var(--line); white-space: nowrap; }
+		.act-row td { padding: 9px 10px; border-bottom: 1px solid rgba(255,255,255,0.04); vertical-align: middle; }
+		.act-row:last-child td { border-bottom: none; }
+		.act-row[data-outcome="win"] .act-coin { color: var(--up); }
+		.act-row[data-outcome="loss"] .act-coin { color: var(--down); }
+		.act-coin a { color: inherit; font-weight: 600; }
+		.act-coin a:hover { text-decoration: underline; }
+		.act-mono { font-family: var(--mono); }
+		.act-mono.up { color: var(--up); } .act-mono.dn { color: var(--down); }
+		.act-when { color: var(--faint); font-size: 11px; white-space: nowrap; }
+		.act-live { font: 700 9.5px/1 var(--mono); letter-spacing: .04em; padding: 2px 6px; border-radius: 4px; background: color-mix(in srgb, var(--amber) 18%, transparent); color: var(--amber); }
+		.act-sim  { font: 700 9.5px/1 var(--mono); letter-spacing: .04em; padding: 2px 6px; border-radius: 4px; background: rgba(255,255,255,0.06); color: var(--faint); }
+		.act-delta { font-size: 10px; margin-left: 4px; font-weight: 700; } .act-delta.up { color: var(--up); } .act-delta.dn { color: var(--down); }
+		.tierpill { font: 700 10px/1 var(--mono); padding: 3px 7px; border-radius: 5px; text-transform: uppercase; letter-spacing: .04em; background: rgba(255,255,255,0.06); color: var(--muted); }
+		.tp-prime, .tp-strong { background: color-mix(in srgb, var(--up) 16%, transparent); color: var(--up); }
+		.tp-lean { background: color-mix(in srgb, var(--gold) 16%, transparent); color: var(--gold); }
+		.ledger-foot { margin-top: 14px; padding-top: 14px; border-top: 1px solid var(--line); font-size: 11.5px; color: var(--faint); line-height: 1.5; }
+		.ledger-foot a { color: var(--cyan); }
+
+		/* empty / signed-out state */
+		.empty { display: none; text-align: center; padding: 60px 22px; }
+		.empty b { display: block; color: var(--ink); font-size: 18px; margin-bottom: 8px; }
+		.empty p { color: var(--muted); max-width: 460px; margin: 0 auto 20px; font-size: 14px; }
+		.empty .empty-cta { display: flex; flex-wrap: wrap; gap: 10px; justify-content: center; }
+		.empty .empty-cta .btn { width: auto; padding: 12px 22px; }
+
+		/* Signed-out / no-agent / error: the config column has nothing to bind to,
+		   but the conviction stream is public, so the page still proves itself. */
+		.layout.preview-only { grid-template-columns: minmax(0, 620px); justify-content: center; }
+		.layout.preview-only .col-config { display: none; }
+		.layout.preview-only .col-side { position: static; }
+		.layout.preview-only .col-side > .card:not(#qualCard) { display: none; }
+
+		.foot { margin-top: 34px; padding-top: 22px; border-top: 1px solid var(--line); color: var(--faint); font-size: 12px; line-height: 1.6; }
+
+		/* wallet pill (control bar) */
+		.walletpill { display: flex; align-items: center; gap: 11px; padding: 9px 14px; border-radius: var(--r-sm); background: rgba(255,255,255,0.03); border: 1px solid var(--line); transition: border-color var(--duration-fast); }
+		.walletpill .wp-lab { font: 600 10px/1 var(--mono); text-transform: uppercase; letter-spacing: .08em; color: var(--faint); }
+		.walletpill .wp-bal { font: 800 15px/1 var(--mono); color: var(--ink); }
+		.walletpill .wp-run { font: 600 11px/1 var(--mono); color: var(--muted); }
+		.walletpill.low { border-color: color-mix(in srgb, var(--amber) 55%, var(--line)); }
+		.walletpill.low .wp-bal { color: var(--amber); }
+		.walletpill .wp-fund { font: 600 11.5px/1 var(--mono); color: var(--cyan); margin-left: 2px; }
+		.walletpill .wp-fund:hover { text-decoration: underline; }
+
+		/* edge readout (proof of the bar) */
+		.edge { display: flex; flex-wrap: wrap; gap: 8px 16px; align-items: baseline; margin-top: 12px; padding: 12px 14px; border-radius: var(--r-sm); background: rgba(255,255,255,0.03); border: 1px solid var(--line); }
+		.edge .e-stat { display: flex; align-items: baseline; gap: 6px; }
+		.edge .e-stat b { font: 800 15px/1 var(--mono); color: var(--ink); }
+		.edge .e-stat span { font: 600 9.5px/1 var(--mono); text-transform: uppercase; letter-spacing: .06em; color: var(--faint); }
+		.edge .e-note { width: 100%; font-size: 11px; color: var(--muted); line-height: 1.5; margin: 2px 0 0; }
+		.edge .e-note b { color: var(--ink); font-weight: 700; }
+
+		/* qualifying-now live preview */
+		.qual-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin: 0 0 6px; }
+		.qual-head .qh-count { display: flex; align-items: center; gap: 8px; font-weight: 700; font-size: 14px; }
+		.qual-head .qh-meta { font: 600 10px/1 var(--mono); color: var(--faint); white-space: nowrap; }
+		.live-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--up); color: var(--up); box-shadow: 0 0 0 0 color-mix(in srgb, var(--up) 60%, transparent); animation: pulse 1.9s infinite; flex: none; }
+		/* The dot claims the stream is live, so it must stop claiming it when the feed stops answering. */
+		.live-dot.stale { background: var(--muted); color: var(--muted); box-shadow: none; animation: none; }
+		.qual-sub { font-size: 12px; color: var(--muted); margin: 0 0 12px; }
+		.qrow { display: grid; grid-template-columns: 1fr auto auto; gap: 12px; align-items: center; padding: 10px 0; border-top: 1px solid rgba(255,255,255,0.05); }
+		.qrow:first-child { border-top: none; }
+		.qrow .q-main { min-width: 0; }
+		.qrow .q-sym { display: flex; align-items: center; gap: 7px; font-weight: 600; font-size: 13.5px; min-width: 0; }
+		.qrow .q-sym a { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+		.qrow .q-sym a:hover { text-decoration: underline; }
+		.qrow .q-sub { margin-top: 4px; font: 600 10.5px/1.3 var(--mono); color: var(--muted); display: flex; gap: 9px; flex-wrap: wrap; }
+		.qrow .q-score { font: 800 17px/1 var(--mono); text-align: right; }
+		.qrow .q-score.hi { color: var(--up); }
+		.qrow .q-size { font: 600 11px/1 var(--mono); color: var(--cyan); text-align: right; white-space: nowrap; }
+		.qrow .q-size span { display: block; font: 600 8.5px/1 var(--mono); color: var(--faint); text-transform: uppercase; letter-spacing: .06em; margin-bottom: 4px; }
+		.q-smart { color: var(--up); }
+		.qual-empty { padding: 26px 8px; text-align: center; color: var(--muted); font-size: 12.5px; line-height: 1.55; }
+		.coinimg { width: 18px; height: 18px; border-radius: 50%; object-fit: cover; background: rgba(255,255,255,0.06); flex: none; }
+
+		/* skeleton shimmer */
+		.sk { display: inline-block; background: linear-gradient(90deg, rgba(255,255,255,0.04) 25%, rgba(255,255,255,0.1) 37%, rgba(255,255,255,0.04) 63%); background-size: 400% 100%; animation: shimmer 1.4s ease infinite; border-radius: 6px; color: transparent !important; }
+		@keyframes shimmer { 0% { background-position: 100% 0; } 100% { background-position: -100% 0; } }
+
+		@media (max-width: 860px) {
+			.layout { grid-template-columns: 1fr; }
+			.col-side { position: static; }
+			.control { grid-template-columns: 1fr; }
+			.walletpill { justify-content: space-between; }
+			.armbox { justify-content: space-between; }
+			.arm-state { text-align: left; } .arm-state .lab { justify-content: flex-start; }
+			.stats { grid-template-columns: repeat(2, 1fr); }
+		}
+	</style>
+
+	<meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1">
+	<meta property="og:locale" content="en_US">
+	<meta property="og:image" content="https://three.ws/api/page-og?s=crypto&amp;t=Arm+your+agent%3A+automate+Oracle+conviction&amp;d=Configure+your+3D+agent+to+trade+Oracle+conviction+automatically%3A+set+the+minimum+score%2C+position+size%2C+daily+and+open-position+caps%2C+narrative+filters+and&amp;p=%2Foracle%2Farm">
+	<meta property="og:image:width" content="1200">
+	<meta property="og:image:height" content="630">
+	<meta property="og:image:type" content="image/png">
+	<meta property="og:image:alt" content="Arm your agent: automate Oracle conviction, three.ws">
+	<meta name="twitter:site" content="@trythreews">
+	<meta name="twitter:image" content="https://three.ws/api/page-og?s=crypto&amp;t=Arm+your+agent%3A+automate+Oracle+conviction&amp;d=Configure+your+3D+agent+to+trade+Oracle+conviction+automatically%3A+set+the+minimum+score%2C+position+size%2C+daily+and+open-position+caps%2C+narrative+filters+and&amp;p=%2Foracle%2Farm">
+	<script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"WebPage","name":"Arm your agent: automate Oracle conviction","description":"Configure your 3D agent to trade Oracle conviction automatically: set the minimum score, position size, daily and open-position caps, narrative filters and Telegram alerts, then arm it in simulate or live mode. Every action is graded against the outcome.","url":"https://three.ws/oracle/arm","isPartOf":{"@type":"WebSite","name":"three.ws","url":"https://three.ws"},"primaryImageOfPage":"https://three.ws/api/page-og?s=crypto&t=Arm+your+agent%3A+automate+Oracle+conviction&d=Configure+your+3D+agent+to+trade+Oracle+conviction+automatically%3A+set+the+minimum+score%2C+position+size%2C+daily+and+open-position+caps%2C+narrative+filters+and+Tele&p=%2Foracle%2Farm"},{"@type":"BreadcrumbList","itemListElement":[{"@type":"ListItem","position":1,"name":"Home","item":"https://three.ws/"},{"@type":"ListItem","position":2,"name":"Oracle","item":"https://three.ws/oracle"},{"@type":"ListItem","position":3,"name":"Arm","item":"https://three.ws/oracle/arm"}]}]}</script>
+</head>
+<body>
+	<header><div id="nav-container"></div></header>
+
+	<main class="wrap">
+		<div class="crumb"><a href="/oracle" data-i18n="arm.oracle">← Oracle</a> <span>/</span> <span style="color:var(--ink)" data-i18n="arm.arm_your_agent">Arm your agent</span></div>
+		<div class="hero">
+			<h1 data-i18n="arm.arm_your_agent_2">Arm your agent</h1>
+			<p data-i18n-html="arm.set_the_rules_once_your_3d_agent">Set the rules once. Your 3D agent watches the live Oracle conviction stream and acts the instant a coin clears your bar — buying a small position from its own custodial Solana wallet. Starts in <b>simulate</b> so you can watch it work risk-free, then go live when you trust it.</p>
+		</div>
+
+		<!-- no-agent state (signed in, nothing to arm yet) -->
+		<div class="empty" id="emptyState">
+			<b data-i18n="arm.create_a_3d_agent_to_arm_it">Create a 3D agent to arm it</b>
+			<p data-i18n="arm.your_agent_needs_its_own_custodial_solana">Your agent needs its own custodial Solana wallet to act on conviction. Spin one up in the studio, which takes about a minute, then come back here to set its rules.</p>
+			<div class="empty-cta">
+				<a class="btn primary" href="/create/studio" data-i18n="arm.create_an_agent">Create an agent →</a>
+				<a class="btn" href="/oracle" data-i18n="arm.browse_the_oracle">Browse the Oracle</a>
+			</div>
+		</div>
+
+		<!-- signed-out state -->
+		<div class="empty" id="signedOutState">
+			<b data-i18n="arm.sign_in_to_arm_an_agent">Sign in to arm an agent</b>
+			<p data-i18n="arm.arming_binds_rules_to_your_own_agent">Arming binds rules to your own agent and its custodial Solana wallet, so it needs an account. The conviction stream below is public: watch what clears a Strong+ bar right now, then sign in to point an agent at it.</p>
+			<div class="empty-cta">
+				<a class="btn primary" href="/login?next=%2Foracle%2Farm" data-i18n="arm.sign_in">Sign in</a>
+				<a class="btn" href="/register?next=%2Foracle%2Farm" data-i18n="arm.create_an_account">Create an account</a>
+			</div>
+		</div>
+
+		<!-- load-failure state -->
+		<div class="empty" id="errorState">
+			<b data-i18n="arm.could_not_load_your_agents">Could not load your agents</b>
+			<p><span id="errorDetail"></span> <span data-i18n="arm.the_conviction_stream_below_is_still_live">The conviction stream below is still live, so this is your agent list alone. Retry, or open the Oracle to keep watching.</span></p>
+			<div class="empty-cta">
+				<button class="btn primary" id="retryBtn" type="button" data-i18n="arm.try_again">Try again</button>
+				<a class="btn" href="/oracle" data-i18n="arm.browse_the_oracle_2">Browse the Oracle</a>
+			</div>
+		</div>
+
+		<!-- control bar -->
+		<div class="card control" id="setup">
+			<div class="agentpick">
+				<label for="agentSel" data-i18n="arm.agent">Agent</label>
+				<select id="agentSel" aria-label="Choose which agent to arm"></select>
+			</div>
+			<div class="walletpill" id="walletPill" hidden>
+				<span class="wp-lab" data-i18n="arm.wallet">Wallet</span>
+				<span class="wp-bal" id="walletBal">—</span>
+				<span class="wp-run" id="walletRun"></span>
+				<a class="wp-fund" id="walletFund" href="/agents" target="_blank" rel="noopener" data-i18n="arm.fund">Fund →</a>
+			</div>
+			<div class="armbox">
+				<div class="arm-state">
+					<div class="lab"><span class="arm-dot off" id="armStatusDot"></span><span id="armStatusLab" data-i18n="arm.disarmed">Disarmed</span></div>
+					<div class="sub" id="armStatusSub">Your agent is idle. Flip the switch to start watching the conviction stream.</div>
+				</div>
+				<div class="sw xl" id="armToggle" role="switch" aria-checked="false" tabindex="0" aria-label="Arm agent"></div>
+			</div>
+		</div>
+
+		<!-- live stats -->
+		<div class="stats" id="statsStrip">
+			<div class="stat"><span data-i18n="arm.win_rate">Win rate</span><b class="stat-val" id="statWin">—</b></div>
+			<div class="stat"><span data-i18n="arm.realized_pnl">Realized PnL</span><b class="stat-val" id="statPnl">—</b></div>
+			<div class="stat"><span data-i18n="arm.open_now">Open now</span><b class="stat-val" id="statOpen">—</b></div>
+			<div class="stat"><span data-i18n="arm.total_acts">Total acts</span><b class="stat-val" id="statTotal">—</b></div>
+		</div>
+
+		<div class="layout">
+			<!-- configuration -->
+			<div class="col-config">
+				<div class="card">
+					<h3 data-i18n-html="arm.1_entry_rules"><span class="stepno">1</span> Entry rules</h3>
+					<p class="sub" data-i18n="arm.when_should_your_agent_buy_only_plays">When should your agent buy? Only plays that clear every rule below get acted on.</p>
+					<div class="field">
+						<span class="flab" id="convSegLab" data-i18n="arm.minimum_conviction">Minimum conviction</span>
+						<div class="seg" id="convSeg" role="group" aria-labelledby="convSegLab">
+							<button type="button" data-min="86" data-i18n-html="arm.prime_86">Prime<small>≥ 86</small></button>
+							<button type="button" data-min="72" class="on" data-i18n-html="arm.strong_72">Strong+<small>≥ 72</small></button>
+							<button type="button" data-min="56" data-i18n-html="arm.lean_56">Lean+<small>≥ 56</small></button>
+						</div>
+						<div class="edge" id="edgeReadout" aria-live="polite"></div>
+					</div>
+					<div class="toggle">
+						<div class="t-lab"><b data-i18n="arm.require_smart_money_in">Require smart money in</b><span data-i18n="arm.only_act_if_1_proven_wallet_has">Only act if ≥1 proven wallet has already bought</span></div>
+						<div class="sw on" id="smartToggle" role="switch" aria-checked="true" tabindex="0" aria-label="Require smart money"></div>
+					</div>
+					<div class="field" style="margin-top:14px">
+						<span class="flab" id="catChipsLab" data-i18n-html="arm.only_these_narratives_none_selected_any">Only these narratives <span style="text-transform:none;letter-spacing:0;color:var(--muted)">(none selected = any)</span></span>
+						<div class="chips" id="catChips" role="group" aria-labelledby="catChipsLab"></div>
+					</div>
+				</div>
+
+				<div class="card">
+					<h3 data-i18n-html="arm.2_position_sizing_risk"><span class="stepno">2</span> Position sizing &amp; risk</h3>
+					<p class="sub" data-i18n="arm.how_much_to_commit_and_the_hard">How much to commit, and the hard caps your agent can never cross.</p>
+					<div class="row2">
+						<div class="field"><label for="fSize" data-i18n="arm.size_trade">Size / trade</label>
+							<div class="suffixed"><input id="fSize" type="number" min="0.001" step="0.01" value="0.05"><span class="suf" data-i18n="arm.sol">SOL</span></div>
+						</div>
+						<div class="field"><label for="fOpen" data-i18n="arm.max_open_positions">Max open positions</label><input id="fOpen" type="number" min="1" step="1" value="5"></div>
+					</div>
+					<div class="field"><label for="fDaily" data-i18n="arm.max_spend_day">Max spend / day</label>
+						<div class="suffixed"><input id="fDaily" type="number" min="0.01" step="0.05" value="0.5"><span class="suf" data-i18n="arm.sol_2">SOL</span></div>
+					</div>
+					<div class="toggle">
+						<div class="t-lab"><b data-i18n="arm.scale_size_by_conviction">Scale size by conviction</b><span id="scaleSub" data-i18n="arm.off_every_qualifying_play_uses_the_same">Off. Every qualifying play uses the same size.</span></div>
+						<div class="sw" id="scaleToggle" role="switch" aria-checked="false" tabindex="0" aria-label="Scale size by conviction"></div>
+					</div>
+					<div class="risk" id="riskSummary">Set a per-trade size and daily cap to see your exposure.</div>
+				</div>
+
+				<div class="card">
+					<h3 data-i18n-html="arm.3_alerts_optional"><span class="stepno">3</span> Alerts <span class="opt">optional</span></h3>
+					<p class="sub" data-i18n="arm.get_a_personal_telegram_ping_whenever_a">Get a personal Telegram ping whenever a coin crosses your threshold — armed or not.</p>
+					<div class="field">
+						<label for="tgInput">Telegram chat</label>
+						<div id="tgState" class="tg-state" aria-live="polite"></div>
+						<div class="tg-row">
+							<input id="tgInput" type="text" readonly hidden aria-label="Linked Telegram chat" autocomplete="off">
+							<button id="tgTest" class="btn sm" type="button" data-i18n="arm.send_test">Send test</button>
+						</div>
+						<div class="tg-note" id="tgNote" role="status" aria-live="polite"></div>
+						<div class="field-hint">Alerts go to the Telegram account linked to your three.ws account. Chat <a href="https://t.me/three_ws_bot" target="_blank" rel="noopener" data-i18n="arm.three_ws_bot">@three_ws_bot</a> and send <code>/start</code> to link it.</div>
+					</div>
+				</div>
+			</div>
+
+			<!-- side: live preview + mode + save + ledger -->
+			<div class="col-side">
+				<div class="card" id="qualCard">
+					<div class="qual-head">
+						<div class="qh-count"><span class="live-dot" id="liveDot"></span><span id="qualCount" data-i18n="arm.reading_the_conviction_stream">Reading the conviction stream…</span></div>
+						<div class="qh-meta" id="qualMeta"></div>
+					</div>
+					<p class="qual-sub" data-i18n="arm.live_coins_that_clear_every_rule_you">Live coins that clear every rule you've set — exactly what your agent would act on right now. Tighten or loosen the rules and watch this list change.</p>
+					<div id="qualBody"></div>
+				</div>
+
+				<div class="card">
+					<h3 data-i18n-html="arm.4_mode_arm"><span class="stepno">4</span> Mode &amp; arm</h3>
+					<p class="sub" data-i18n="arm.simulate_logs_every_play_risk_free_live">Simulate logs every play risk-free. Live spends real SOL from the agent wallet, capped by your limits.</p>
+					<div class="field">
+						<span class="flab" id="modeSegLab" data-i18n="arm.execution_mode">Execution mode</span>
+						<div class="seg" id="modeSeg" role="group" aria-labelledby="modeSegLab">
+							<button type="button" data-mode="simulate" class="on" data-i18n-html="arm.simulatespends_nothing">Simulate<small>spends nothing</small></button>
+							<button type="button" data-mode="live" data-i18n-html="arm.livereal_sol_capped">Live<small>real SOL, capped</small></button>
+						</div>
+					</div>
+					<button class="btn primary" id="saveBtn" style="margin-top:6px" data-i18n="arm.save_configuration">Save configuration</button>
+					<div class="save-note" id="saveNote" role="status" aria-live="polite"></div>
+				</div>
+
+				<div class="card" id="ledgerCard">
+					<h3 data-i18n="arm.recent_actions">Recent actions</h3>
+					<p class="sub" data-i18n="arm.every_move_your_agent_makes_simulated_or">Every move your agent makes — simulated or live — lands here and gets graded against the outcome. This is its win-rate ledger.</p>
+					<div id="ledgerBody"><div class="ledger-empty">Sign in and arm an agent to see its actions.</div></div>
+					<div class="ledger-foot">Want the full trading floor across every agent? See <a href="/activity" data-i18n="arm.live_agent_activity">live agent activity →</a></div>
+				</div>
+			</div>
+		</div>
+
+		<div class="foot">
+			Conviction is a probability, not a promise, and nothing here is financial advice. Your agent only ever spends from its own custodial wallet, never your personal one, and never beyond the daily and per-trade caps you set. Trade small, especially early.
+		</div>
+	</main>
+
+	<script src="/nav.js"></script>
+	<script src="/footer.js"></script>
+	<script type="module" src="/src/arm.js"></script>
+	<!-- Runtime i18n: detects locale, swaps annotated copy, mounts <lang-switcher>. -->
+	<script type="module" src="/i18n.js"></script>
+</body>
+</html>

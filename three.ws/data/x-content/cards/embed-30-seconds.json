@@ -1,0 +1,14 @@
+{
+	"out": "public/x-media/embed-30-seconds/card.png",
+	"headline": "A 3D agent on\nyour website.\nTwo lines.",
+	"headlineSize": 66,
+	"code": [
+		"<script type=\"module\"",
+		"  src=\"https://three.ws/agent-3d/latest/agent-3d.js\"></script>",
+		"<agent-3d agent-id=\"YOUR_AGENT_ID\" mode=\"floating\"></agent-3d>"
+	],
+	"foot": "No build step · no npm install · plain HTML, React, Next.js",
+	"frame": "browser",
+	"shot": "public/x-media/embed-30-seconds/demo-page.png",
+	"label": "yoursite.com"
+}

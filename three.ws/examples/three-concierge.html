@@ -1,0 +1,958 @@
+<!doctype html>
+<html lang="en">
+	<head>
+		<meta charset="utf-8" />
+		<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+		<title>Trinity — a 3D agent defined entirely in JSON · three.ws</title>
+		<meta
+			name="description"
+			content="Trinity, the three.ws concierge, mounted live from a JSON manifest: a glTF body, browser voice, skills, and scene tools — wired end to end."
+		/>
+		<style>
+			:root {
+				--bg: #07070b;
+				--bg-soft: #0e0e16;
+				--panel: rgba(20, 20, 30, 0.72);
+				--panel-border: rgba(255, 255, 255, 0.08);
+				--ink: #f4f4f8;
+				--ink-dim: #a3a3b4;
+				--ink-faint: #6b6b7e;
+				--accent: #7c5cff;
+				--accent-2: #22d3ee;
+				--ok: #34d399;
+				--warn: #fbbf24;
+				--err: #fb7185;
+				--radius: 16px;
+				--radius-sm: 10px;
+				--mono: ui-monospace, 'SF Mono', 'JetBrains Mono', Menlo, monospace;
+				--sans: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+			}
+
+			* {
+				box-sizing: border-box;
+			}
+
+			html,
+			body {
+				margin: 0;
+				min-height: 100%;
+			}
+
+			body {
+				font-family: var(--sans);
+				color: var(--ink);
+				background:
+					radial-gradient(
+						1100px 700px at 18% -10%,
+						rgba(124, 92, 255, 0.18),
+						transparent 60%
+					),
+					radial-gradient(
+						900px 600px at 95% 5%,
+						rgba(34, 211, 238, 0.12),
+						transparent 55%
+					),
+					var(--bg);
+				background-attachment: fixed;
+				-webkit-font-smoothing: antialiased;
+			}
+
+			a {
+				color: var(--accent-2);
+				text-decoration: none;
+			}
+			a:hover {
+				text-decoration: underline;
+			}
+
+			.wrap {
+				max-width: 1280px;
+				margin: 0 auto;
+				padding: clamp(20px, 4vw, 56px) clamp(16px, 3vw, 40px) 64px;
+			}
+
+			header.masthead {
+				display: flex;
+				align-items: center;
+				justify-content: space-between;
+				gap: 16px;
+				flex-wrap: wrap;
+				margin-bottom: clamp(20px, 3vw, 36px);
+			}
+
+			.brand {
+				display: flex;
+				align-items: center;
+				gap: 12px;
+			}
+			.brand .mark {
+				width: 38px;
+				height: 38px;
+				border-radius: 11px;
+				background: linear-gradient(135deg, var(--accent), var(--accent-2));
+				display: grid;
+				place-items: center;
+				font-weight: 800;
+				font-size: 18px;
+				color: #0b0b12;
+				box-shadow: 0 8px 30px rgba(124, 92, 255, 0.35);
+			}
+			.brand h1 {
+				font-size: 15px;
+				margin: 0;
+				letter-spacing: 0.2px;
+			}
+			.brand p {
+				margin: 2px 0 0;
+				font-size: 12px;
+				color: var(--ink-faint);
+			}
+
+			.source-pill {
+				font-family: var(--mono);
+				font-size: 12px;
+				color: var(--ink-dim);
+				background: var(--panel);
+				border: 1px solid var(--panel-border);
+				padding: 8px 12px;
+				border-radius: 999px;
+				display: inline-flex;
+				align-items: center;
+				gap: 8px;
+			}
+			.source-pill b {
+				color: var(--ink);
+				font-weight: 600;
+			}
+
+			.hero {
+				margin-bottom: clamp(20px, 3vw, 32px);
+			}
+			.hero h2 {
+				font-size: clamp(26px, 4.4vw, 44px);
+				line-height: 1.05;
+				margin: 0 0 12px;
+				letter-spacing: -0.02em;
+			}
+			.hero h2 .grad {
+				background: linear-gradient(120deg, var(--accent), var(--accent-2));
+				-webkit-background-clip: text;
+				background-clip: text;
+				color: transparent;
+			}
+			.hero p {
+				font-size: clamp(14px, 1.6vw, 17px);
+				color: var(--ink-dim);
+				max-width: 60ch;
+				margin: 0;
+			}
+
+			.stage {
+				display: grid;
+				grid-template-columns: minmax(0, 1.55fr) minmax(300px, 1fr);
+				gap: clamp(16px, 2vw, 24px);
+				align-items: start;
+			}
+			@media (max-width: 880px) {
+				.stage {
+					grid-template-columns: 1fr;
+				}
+			}
+
+			.viewer-card {
+				position: relative;
+				border-radius: var(--radius);
+				border: 1px solid var(--panel-border);
+				overflow: hidden;
+				background:
+					radial-gradient(120% 90% at 50% 0%, rgba(124, 92, 255, 0.1), transparent 55%),
+					linear-gradient(180deg, #14141e, #0a0a11);
+				min-height: 520px;
+				box-shadow: 0 30px 80px rgba(0, 0, 0, 0.45);
+			}
+
+			agent-3d {
+				display: block;
+				width: 100%;
+				height: clamp(460px, 64vh, 680px);
+				--agent-accent: var(--accent);
+				--agent-surface: rgba(15, 15, 24, 0.92);
+				--agent-on-surface: var(--ink);
+			}
+
+			/* Poster + error slots rendered by the element before/at failure */
+			.poster,
+			.errslot {
+				position: absolute;
+				inset: 0;
+				display: grid;
+				place-items: center;
+				text-align: center;
+				padding: 24px;
+				gap: 10px;
+			}
+			.poster .spin {
+				width: 34px;
+				height: 34px;
+				border-radius: 50%;
+				border: 3px solid rgba(255, 255, 255, 0.14);
+				border-top-color: var(--accent);
+				animation: spin 0.9s linear infinite;
+			}
+			@keyframes spin {
+				to {
+					transform: rotate(360deg);
+				}
+			}
+			.poster span,
+			.errslot span {
+				color: var(--ink-dim);
+				font-size: 13px;
+			}
+
+			/* Top-left live status chip overlaid on the viewer */
+			.statusbar {
+				position: absolute;
+				top: 14px;
+				left: 14px;
+				right: 14px;
+				display: flex;
+				align-items: center;
+				gap: 10px;
+				pointer-events: none;
+				z-index: 5;
+			}
+			.chip {
+				pointer-events: auto;
+				display: inline-flex;
+				align-items: center;
+				gap: 8px;
+				font-size: 12px;
+				font-weight: 600;
+				padding: 7px 12px;
+				border-radius: 999px;
+				background: rgba(10, 10, 16, 0.7);
+				border: 1px solid var(--panel-border);
+				backdrop-filter: blur(8px);
+			}
+			.dot {
+				width: 8px;
+				height: 8px;
+				border-radius: 50%;
+				background: var(--warn);
+				box-shadow: 0 0 0 0 rgba(251, 191, 36, 0.6);
+				animation: pulse 1.6s infinite;
+			}
+			.dot.ok {
+				background: var(--ok);
+				animation: none;
+			}
+			.dot.err {
+				background: var(--err);
+				animation: none;
+			}
+			@keyframes pulse {
+				0% {
+					box-shadow: 0 0 0 0 rgba(251, 191, 36, 0.5);
+				}
+				70% {
+					box-shadow: 0 0 0 7px rgba(251, 191, 36, 0);
+				}
+				100% {
+					box-shadow: 0 0 0 0 rgba(251, 191, 36, 0);
+				}
+			}
+			.progress-track {
+				pointer-events: none;
+				position: absolute;
+				left: 0;
+				right: 0;
+				bottom: 0;
+				height: 3px;
+				background: transparent;
+				z-index: 6;
+			}
+			.progress-track i {
+				display: block;
+				height: 100%;
+				width: 0%;
+				background: linear-gradient(90deg, var(--accent), var(--accent-2));
+				transition: width 0.3s ease;
+			}
+
+			/* Right rail */
+			.rail {
+				display: flex;
+				flex-direction: column;
+				gap: 16px;
+			}
+			.panel {
+				background: var(--panel);
+				border: 1px solid var(--panel-border);
+				border-radius: var(--radius);
+				padding: 16px;
+				backdrop-filter: blur(10px);
+			}
+			.panel h3 {
+				margin: 0 0 12px;
+				font-size: 12px;
+				letter-spacing: 0.08em;
+				text-transform: uppercase;
+				color: var(--ink-faint);
+				display: flex;
+				align-items: center;
+				justify-content: space-between;
+			}
+
+			.kv {
+				display: grid;
+				grid-template-columns: auto 1fr;
+				gap: 6px 12px;
+				font-size: 13px;
+			}
+			.kv dt {
+				color: var(--ink-faint);
+			}
+			.kv dd {
+				margin: 0;
+				color: var(--ink);
+				font-family: var(--mono);
+				font-size: 12px;
+				text-align: right;
+				word-break: break-word;
+			}
+
+			.taglist {
+				display: flex;
+				flex-wrap: wrap;
+				gap: 6px;
+				margin-top: 10px;
+			}
+			.tag {
+				font-size: 11px;
+				font-family: var(--mono);
+				color: var(--ink-dim);
+				border: 1px solid var(--panel-border);
+				border-radius: 7px;
+				padding: 4px 8px;
+				transition:
+					border-color 0.2s,
+					color 0.2s;
+			}
+			.tag.live {
+				color: var(--ok);
+				border-color: rgba(52, 211, 153, 0.4);
+			}
+
+			.btn-grid {
+				display: grid;
+				grid-template-columns: 1fr 1fr;
+				gap: 8px;
+			}
+			button.action,
+			.field button {
+				font: inherit;
+				font-size: 13px;
+				font-weight: 600;
+				color: var(--ink);
+				background: rgba(255, 255, 255, 0.04);
+				border: 1px solid var(--panel-border);
+				border-radius: var(--radius-sm);
+				padding: 10px 12px;
+				cursor: pointer;
+				transition:
+					transform 0.12s,
+					background 0.2s,
+					border-color 0.2s;
+			}
+			button.action:hover,
+			.field button:hover {
+				background: rgba(124, 92, 255, 0.16);
+				border-color: rgba(124, 92, 255, 0.5);
+			}
+			button.action:active,
+			.field button:active {
+				transform: translateY(1px);
+			}
+			button.action:focus-visible,
+			.field button:focus-visible,
+			input:focus-visible,
+			select:focus-visible {
+				outline: 2px solid var(--accent);
+				outline-offset: 2px;
+			}
+			button.action:disabled {
+				opacity: 0.4;
+				cursor: not-allowed;
+			}
+
+			select.action {
+				font: inherit;
+				font-size: 13px;
+				color: var(--ink);
+				background: rgba(255, 255, 255, 0.04);
+				border: 1px solid var(--panel-border);
+				border-radius: var(--radius-sm);
+				padding: 10px 12px;
+				width: 100%;
+				cursor: pointer;
+			}
+
+			.field {
+				display: flex;
+				gap: 8px;
+				margin-top: 10px;
+			}
+			.field input {
+				flex: 1;
+				min-width: 0;
+				font: inherit;
+				font-size: 13px;
+				color: var(--ink);
+				background: rgba(0, 0, 0, 0.3);
+				border: 1px solid var(--panel-border);
+				border-radius: var(--radius-sm);
+				padding: 10px 12px;
+			}
+			.field input::placeholder {
+				color: var(--ink-faint);
+			}
+
+			.hint {
+				font-size: 12px;
+				color: var(--ink-faint);
+				margin: 10px 0 0;
+				line-height: 1.5;
+			}
+
+			/* Chat / brain panel */
+			.chatlog {
+				display: flex;
+				flex-direction: column;
+				gap: 8px;
+				max-height: 240px;
+				overflow-y: auto;
+				margin-bottom: 10px;
+			}
+			.msg {
+				font-size: 13px;
+				line-height: 1.5;
+				padding: 9px 12px;
+				border-radius: 12px;
+				max-width: 88%;
+				animation: rise 0.25s ease;
+			}
+			@keyframes rise {
+				from {
+					opacity: 0;
+					transform: translateY(6px);
+				}
+			}
+			.msg.user {
+				align-self: flex-end;
+				background: linear-gradient(135deg, var(--accent), #6246e0);
+				color: #fff;
+			}
+			.msg.agent {
+				align-self: flex-start;
+				background: rgba(255, 255, 255, 0.05);
+				border: 1px solid var(--panel-border);
+			}
+			.msg.system {
+				align-self: stretch;
+				max-width: 100%;
+				background: rgba(251, 191, 36, 0.08);
+				border: 1px solid rgba(251, 191, 36, 0.3);
+				color: var(--ink);
+			}
+			.msg.system b {
+				color: var(--warn);
+			}
+			.msg.system code {
+				font-family: var(--mono);
+				font-size: 12px;
+				background: rgba(0, 0, 0, 0.4);
+				padding: 1px 5px;
+				border-radius: 5px;
+			}
+
+			/* Event log */
+			details.events summary {
+				cursor: pointer;
+				font-size: 12px;
+				letter-spacing: 0.08em;
+				text-transform: uppercase;
+				color: var(--ink-faint);
+				list-style: none;
+			}
+			details.events summary::-webkit-details-marker {
+				display: none;
+			}
+			details.events[open] summary {
+				margin-bottom: 10px;
+			}
+			.log {
+				font-family: var(--mono);
+				font-size: 11.5px;
+				line-height: 1.6;
+				max-height: 200px;
+				overflow-y: auto;
+				color: var(--ink-dim);
+			}
+			.log .t {
+				color: var(--ink-faint);
+			}
+			.log .e {
+				color: var(--accent-2);
+			}
+			.log .e.err {
+				color: var(--err);
+			}
+			.log .e.ok {
+				color: var(--ok);
+			}
+
+			.foot {
+				margin-top: 28px;
+				font-size: 12px;
+				color: var(--ink-faint);
+				text-align: center;
+			}
+
+			@media (prefers-reduced-motion: reduce) {
+				*,
+				*::before,
+				*::after {
+					animation-duration: 0.001ms !important;
+					transition-duration: 0.001ms !important;
+				}
+			}
+		</style>
+	</head>
+	<body>
+		<div class="wrap">
+			<header class="masthead">
+				<div class="brand">
+					<div class="mark">3</div>
+					<div>
+						<h1>three.ws</h1>
+						<p>3D agents, defined in JSON</p>
+					</div>
+				</div>
+				<span class="source-pill">
+					mounted from <b>./three-concierge/manifest.json</b>
+				</span>
+			</header>
+
+			<section class="hero">
+				<h2>
+					Meet <span class="grad">Trinity</span> — a 3D agent that lives in a JSON file.
+				</h2>
+				<p>
+					Nothing here is hand-rolled. The avatar, voice, skills, and scene tools below
+					are read straight from an
+					<a href="./three-concierge/manifest.json">agent manifest</a>, resolved by the
+					<code>&lt;agent-3d&gt;</code> web component, and rendered with Three.js.
+				</p>
+			</section>
+
+			<div class="stage">
+				<!-- ── Viewer ─────────────────────────────────────────── -->
+				<div class="viewer-card">
+					<div class="statusbar">
+						<span class="chip"
+							><i class="dot" id="statusDot"></i
+							><span id="statusText">Booting…</span></span
+						>
+					</div>
+
+					<agent-3d
+						id="trinity"
+						kiosk
+						eager
+						skill-trust="any"
+						camera-controls
+						auto-rotate
+						shadows
+						environment="neutral"
+						background="transparent"
+						voice
+						aria-label="Trinity, the three.ws concierge — interactive 3D avatar"
+					>
+						<div class="poster" slot="poster">
+							<div class="spin"></div>
+							<span>Loading Trinity from the manifest…</span>
+						</div>
+						<div class="errslot" slot="error">
+							<span
+								>Couldn't reach Trinity's model. Check the network tab and
+								retry.</span
+							>
+						</div>
+					</agent-3d>
+
+					<div class="progress-track"><i id="progressBar"></i></div>
+				</div>
+
+				<!-- ── Control rail ───────────────────────────────────── -->
+				<div class="rail">
+					<div class="panel">
+						<h3>Manifest <span id="readyBadge"></span></h3>
+						<dl class="kv">
+							<dt>Name</dt>
+							<dd id="mName">—</dd>
+							<dt>Body</dt>
+							<dd id="mBody">—</dd>
+							<dt>Format</dt>
+							<dd id="mFormat">—</dd>
+							<dt>Brain</dt>
+							<dd id="mBrain">—</dd>
+							<dt>Voice</dt>
+							<dd id="mVoice">—</dd>
+						</dl>
+						<div
+							class="taglist"
+							id="skillTags"
+							aria-label="Skills declared in the manifest"
+						></div>
+					</div>
+
+					<div class="panel">
+						<h3>
+							Scene tools
+							<span
+								style="
+									text-transform: none;
+									color: var(--ink-faint);
+									font-weight: 400;
+								"
+								>no brain needed</span
+							>
+						</h3>
+						<div class="btn-grid">
+							<button class="action" data-tool="wave" disabled>👋 Wave</button>
+							<button class="action" data-tool="look" disabled>👀 Look at me</button>
+							<button class="action" data-tool="cheer" disabled>🎉 Cheer</button>
+							<button class="action" data-tool="celebrate" disabled>
+								🙌 Celebrate
+							</button>
+						</div>
+						<select
+							class="action"
+							id="clipSelect"
+							style="margin-top: 8px"
+							disabled
+							aria-label="Play an animation clip"
+						>
+							<option value="">Play an animation clip…</option>
+						</select>
+						<div class="field">
+							<input
+								id="ttsInput"
+								type="text"
+								placeholder="Type a line for Trinity to speak…"
+								autocomplete="off"
+								disabled
+							/>
+							<button id="ttsBtn" disabled aria-label="Speak the line">
+								🔊 Speak
+							</button>
+						</div>
+						<p class="hint">
+							“Speak” uses the browser's built-in speech synthesis and plays Trinity's
+							talk animation — real voice, zero credentials.
+						</p>
+					</div>
+
+					<div class="panel">
+						<h3>Talk to Trinity</h3>
+						<div class="chatlog" id="chatlog" aria-live="polite"></div>
+						<div class="field">
+							<input
+								id="chatInput"
+								type="text"
+								placeholder="Ask Trinity something…"
+								autocomplete="off"
+								disabled
+							/>
+							<button id="chatBtn" disabled aria-label="Send message">Send</button>
+						</div>
+					</div>
+
+					<div class="panel">
+						<details class="events" open>
+							<summary>Live event stream</summary>
+							<div class="log" id="log" aria-live="polite"></div>
+						</details>
+					</div>
+				</div>
+			</div>
+
+			<p class="foot">
+				Body · voice · skills · tools — all resolved from one JSON file. See the
+				<a href="../specs/EMBED_SPEC.md">embed spec</a> and
+				<a href="../specs/AGENT_MANIFEST.md">manifest spec</a>.
+			</p>
+		</div>
+
+		<script type="module">
+			const el = document.getElementById('trinity');
+			const $ = (id) => document.getElementById(id);
+
+			// The manifest loader only accepts absolute http(s)/ipfs/agent sources,
+			// so resolve the bundle path against this page's URL and set it BEFORE
+			// the element registers and boots (hence the dynamic import below).
+			const MANIFEST_URL = new URL('./three-concierge/manifest.json', location.href).href;
+			el.setAttribute('manifest', MANIFEST_URL);
+			$('readyBadge') /* noop ref to ensure DOM is parsed */;
+
+			// ── Live event log ────────────────────────────────────────
+			const logEl = $('log');
+			let booted = performance.now();
+			function logLine(event, detail, kind = '') {
+				const t = ((performance.now() - booted) / 1000).toFixed(2);
+				const row = document.createElement('div');
+				const d = detail
+					? ` ${typeof detail === 'string' ? detail : JSON.stringify(detail)}`
+					: '';
+				row.innerHTML =
+					`<span class="t">${t.padStart(6, ' ')}s</span> ` +
+					`<span class="e ${kind}">${event}</span>` +
+					`<span class="d">${d.length > 80 ? d.slice(0, 80) + '…' : d}</span>`;
+				logEl.appendChild(row);
+				logEl.scrollTop = logEl.scrollHeight;
+			}
+
+			// ── Status chip + progress ────────────────────────────────
+			function setStatus(text, state = '') {
+				$('statusText').textContent = text;
+				$('statusDot').className = `dot ${state}`;
+			}
+
+			el.addEventListener('agent:load-progress', (e) => {
+				const { phase, pct } = e.detail;
+				$('progressBar').style.width = `${Math.round((pct || 0) * 100)}%`;
+				setStatus(`Loading ${phase}…`);
+				logLine('agent:load-progress', `${phase} ${(pct * 100) | 0}%`);
+			});
+
+			el.addEventListener('skill:loaded', (e) => {
+				logLine('skill:loaded', e.detail.name, 'ok');
+				markSkillLive(e.detail.name);
+			});
+
+			el.addEventListener('skill:tool-called', (e) => {
+				logLine('skill:tool-called', e.detail.tool, 'ok');
+			});
+
+			el.addEventListener('brain:message', (e) => {
+				logLine('brain:message', e.detail.role);
+				if (e.detail.role === 'assistant' && e.detail.content) {
+					addMsg('agent', e.detail.content);
+				}
+			});
+
+			el.addEventListener('voice:speech-start', () =>
+				logLine('voice:speech-start', null, 'ok'),
+			);
+			el.addEventListener('voice:speech-end', () => logLine('voice:speech-end'));
+
+			el.addEventListener('agent:error', (e) => {
+				const phase = e.detail?.phase;
+				logLine('agent:error', `${phase}: ${e.detail?.error?.message || ''}`, 'err');
+				// A send-phase error means the LLM brain isn't reachable for this
+				// local manifest — surface the honest, actionable state.
+				if (phase === 'send') showBrainGuidance();
+				else setStatus('Load error — see event log', 'err');
+			});
+
+			// ── Ready: bind manifest data + enable controls ───────────
+			el.addEventListener('agent:ready', (e) => {
+				const m = e.detail.manifest || {};
+				$('progressBar').style.width = '100%';
+				setTimeout(() => ($('progressBar').style.width = '0%'), 600);
+				setStatus('Live', 'ok');
+				$('readyBadge').innerHTML =
+					'<span class="tag live" style="text-transform:none">● ready</span>';
+
+				$('mName').textContent = m.name || 'Trinity';
+				$('mBody').textContent = (m.body?.uri || '').split('/').pop() || '—';
+				$('mFormat').textContent = m.body?.format || '—';
+				$('mBrain').textContent = m.brain?.model || m.brain?.provider || '—';
+				$('mVoice').textContent = m.voice?.tts?.provider
+					? `${m.voice.tts.provider} tts`
+					: '—';
+
+				renderSkillTags(m.skills || []);
+				enableSceneControls();
+				populateClips();
+				logLine('agent:ready', m.name, 'ok');
+			});
+
+			// ── Skills as live-lighting tags ──────────────────────────
+			// skill:loaded events arrive DURING load, before agent:ready renders
+			// the tags — so track loaded names and reconcile in both directions.
+			const skillSlugs = new Map();
+			const loadedSkills = new Set();
+			const norm = (s) => s.toLowerCase().replace(/[\s_.-]+/g, '');
+			function namesMatch(slug, name) {
+				const a = norm(slug),
+					b = norm(name);
+				return a === b || a.includes(b) || b.includes(a);
+			}
+			function renderSkillTags(skills) {
+				const box = $('skillTags');
+				box.innerHTML = '';
+				for (const s of skills) {
+					const slug = (s.uri || '').replace(/\/$/, '').split('/').pop();
+					const tag = document.createElement('span');
+					tag.className = 'tag';
+					tag.textContent = slug;
+					if ([...loadedSkills].some((n) => namesMatch(slug, n))) {
+						tag.classList.add('live');
+						tag.title = 'loaded';
+					}
+					box.appendChild(tag);
+					skillSlugs.set(slug, tag);
+				}
+			}
+			function markSkillLive(name) {
+				loadedSkills.add(name);
+				for (const [slug, tag] of skillSlugs) {
+					if (namesMatch(slug, name)) {
+						tag.classList.add('live');
+						tag.title = 'loaded';
+					}
+				}
+			}
+
+			// ── Scene tools (run off the SceneController — no LLM) ─────
+			function enableSceneControls() {
+				document
+					.querySelectorAll('button.action[data-tool]')
+					.forEach((b) => (b.disabled = false));
+				$('ttsInput').disabled = false;
+				$('ttsBtn').disabled = false;
+				$('clipSelect').disabled = false;
+				$('chatInput').disabled = false;
+				$('chatBtn').disabled = false;
+			}
+
+			document.querySelectorAll('button.action[data-tool]').forEach((btn) => {
+				btn.addEventListener('click', () => {
+					const tool = btn.dataset.tool;
+					if (tool === 'wave') el.wave();
+					else if (tool === 'look') el.lookAt('user');
+					else if (tool === 'cheer') el.playEmote('cheer');
+					else if (tool === 'celebrate') el.playEmote('celebrate');
+					logLine('scene-tool', tool);
+				});
+			});
+
+			function populateClips() {
+				const clips = el._listAvailableClips?.() || [];
+				const sel = $('clipSelect');
+				for (const c of clips) {
+					const o = document.createElement('option');
+					o.value = c.name;
+					o.textContent = `${c.icon} ${c.label}`;
+					sel.appendChild(o);
+				}
+				if (clips.length <= 0) {
+					sel.options[0].textContent = 'No baked clips on this model';
+				}
+				sel.addEventListener('change', () => {
+					if (sel.value) {
+						el.play(sel.value);
+						logLine('scene-tool', `play ${sel.value}`);
+					}
+				});
+			}
+
+			// ── Real browser TTS + talk animation (no brain) ──────────
+			function speakLine(text) {
+				if (!text.trim()) return;
+				el.speak(text); // talk animation
+				if ('speechSynthesis' in window) {
+					const u = new SpeechSynthesisUtterance(text);
+					u.rate = 1.0;
+					speechSynthesis.cancel();
+					speechSynthesis.speak(u);
+					logLine('tts', 'speechSynthesis', 'ok');
+				} else {
+					logLine('tts', 'unsupported', 'err');
+				}
+			}
+			$('ttsBtn').addEventListener('click', () => {
+				speakLine($('ttsInput').value);
+				$('ttsInput').value = '';
+			});
+			$('ttsInput').addEventListener('keydown', (e) => {
+				if (e.key === 'Enter') $('ttsBtn').click();
+			});
+
+			// ── Chat → real platform path via el.ask() ────────────────
+			const chatlog = $('chatlog');
+			function addMsg(role, text) {
+				const m = document.createElement('div');
+				m.className = `msg ${role}`;
+				if (role === 'system') m.innerHTML = text;
+				else m.textContent = text;
+				chatlog.appendChild(m);
+				chatlog.scrollTop = chatlog.scrollHeight;
+				return m;
+			}
+			let brainGuidanceShown = false;
+			function showBrainGuidance() {
+				if (brainGuidanceShown) return;
+				brainGuidanceShown = true;
+				addMsg(
+					'system',
+					"<b>Trinity's brain isn't connected.</b> The avatar, voice, skills, " +
+						'and scene tools all run locally from the manifest — but live LLM chat ' +
+						'needs a registered agent so calls can route through the platform proxy. ' +
+						'Register Trinity to get an <code>agent-id</code>, then swap ' +
+						'<code>manifest=…</code> for <code>agent-id=…</code> to light this up.',
+				);
+			}
+
+			async function sendChat() {
+				const input = $('chatInput');
+				const text = input.value.trim();
+				if (!text) return;
+				addMsg('user', text);
+				input.value = '';
+				input.disabled = true;
+				$('chatBtn').disabled = true;
+				logLine('ask()', text);
+				try {
+					const reply = await el.ask(text);
+					if (reply) addMsg('agent', reply);
+				} catch (err) {
+					// honest, designed failure — not a fake reply
+					showBrainGuidance();
+				} finally {
+					input.disabled = false;
+					$('chatBtn').disabled = false;
+					input.focus();
+				}
+			}
+			$('chatBtn').addEventListener('click', sendChat);
+			$('chatInput').addEventListener('keydown', (e) => {
+				if (e.key === 'Enter') sendChat();
+			});
+
+			// ── Boot ──────────────────────────────────────────────────
+			// Register <agent-3d> only now that the manifest URL is set and every
+			// listener above is attached — so the first load-progress/ready event
+			// is captured. Defining the element upgrades the in-DOM node and fires
+			// its connectedCallback, which begins the boot.
+			setStatus('Booting…');
+			logLine('boot', MANIFEST_URL.split('/').slice(-2).join('/'));
+			import('./../src/element.js').catch((err) => {
+				setStatus('Failed to load component', 'err');
+				logLine('import-error', err.message, 'err');
+			});
+		</script>
+	</body>
+</html>

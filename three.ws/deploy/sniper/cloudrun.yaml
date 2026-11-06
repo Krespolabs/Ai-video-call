@@ -1,0 +1,155 @@
+# Cloud Run service — agent-sniper (autonomous pump.fun sniper worker).
+#
+# A long-lived background worker (NOT an HTTP server, NOT a Vercel cron). It
+# holds the PumpPortal new-mint feed open, scores launches, and — in live mode —
+# snipes from each agent's OWN encrypted Solana wallet. Because it holds a
+# websocket open and must keep its CPU between requests, it runs with always-on
+# CPU and exactly one always-warm instance.
+#
+# ── SINGLE INSTANCE IS LOAD-BEARING ──────────────────────────────────────────
+# The worker's budget + concurrency guardrails are made race-free by an
+# IN-PROCESS per-agent lock (workers/agent-sniper/executor.js, README "Guardrails").
+# Running more than one instance would let two instances each pass the daily-budget
+# check and double-spend. minScale == maxScale == 1 is therefore mandatory, not a
+# cost choice. Scaling out would require an atomic DB spend reservation first.
+#
+# ── DEFAULT MODE IS SIMULATE ──────────────────────────────────────────────────
+# SNIPER_MODE defaults to `simulate` (real on-chain quotes, NO broadcast, zero
+# spend). Going live is a deliberate, documented cutover — see deploy/sniper/README.md.
+# Live mode also REQUIRES a real RPC (loadConfig refuses to start live on a public
+# RPC), supplied via the SOLANA_RPC_URL secret below.
+#
+# ── ONE-TIME SECRET SETUP (never commit these) ────────────────────────────────
+#   printf '%s' "$DATABASE_URL"   | gcloud secrets create sniper-database-url --data-file=-
+#   printf '%s' "$JWT_SECRET"     | gcloud secrets create sniper-jwt-secret   --data-file=-
+#   printf '%s' "$SOLANA_RPC_URL" | gcloud secrets create sniper-solana-rpc-url --data-file=-   # live only
+#   # optional ops alerting (reuses the platform's ops channel):
+#   printf '%s' "$TELEGRAM_BOT_TOKEN"      | gcloud secrets create telegram-bot-token       --data-file=-
+#   printf '%s' "$TELEGRAM_ALERTS_CHAT_ID" | gcloud secrets create telegram-alerts-chat-id  --data-file=-
+#   # then grant the runtime SA read on each:
+#   for s in sniper-database-url sniper-jwt-secret sniper-solana-rpc-url telegram-bot-token telegram-alerts-chat-id; do \
+#     gcloud secrets add-iam-policy-binding "$s" \
+#       --member=serviceAccount:agent-sniper-sa@aerial-vehicle-466722-p5.iam.gserviceaccount.com \
+#       --role=roles/secretmanager.secretAccessor; done
+#
+# Apply with:
+#   gcloud run services replace deploy/sniper/cloudrun.yaml --region=us-central1
+# (or, end to end: node scripts/deploy-sniper.mjs)
+
+apiVersion: serving.knative.dev/v1
+kind: Service
+metadata:
+  name: agent-sniper
+  labels:
+    cloud.googleapis.com/location: us-central1
+  annotations:
+    run.googleapis.com/launch-stage: BETA
+    # Not a public website — the only "traffic" is the platform's own deploy.
+    run.googleapis.com/ingress: internal
+spec:
+  template:
+    metadata:
+      annotations:
+        # Exactly one always-warm instance. See the SINGLE INSTANCE note above —
+        # this is required for guardrail correctness, not just to avoid cold starts.
+        autoscaling.knative.dev/minScale: "1"
+        autoscaling.knative.dev/maxScale: "1"
+        # Always-on CPU: the worker scores feed events and sweeps positions on a
+        # timer with no inbound request to "wake" it. Throttling CPU between
+        # requests would freeze the feed loop and silently stop sniping.
+        run.googleapis.com/cpu-throttling: "false"
+        run.googleapis.com/execution-environment: gen2
+    spec:
+      serviceAccountName: agent-sniper-sa@aerial-vehicle-466722-p5.iam.gserviceaccount.com
+      # No inbound HTTP; one worker process. Keep concurrency at 1.
+      containerConcurrency: 1
+      timeoutSeconds: 3600
+      containers:
+        - image: us-central1-docker.pkg.dev/aerial-vehicle-466722-p5/workers/agent-sniper:latest
+          env:
+            - name: NODE_ENV
+              value: production
+            # LIVE: signs + broadcasts real trades from agent wallets. Requires the
+            # sniper-solana-rpc-url secret set to a real RPC and ≥1 funded agent
+            # wallet with an armed strategy, or the worker crash-loops / every buy
+            # fails. Code guardrails still apply (mandatory stop-loss, price-impact
+            # breaker, daily budget, kill switches). Set back to "simulate" to halt
+            # all spend without touching open positions.
+            - name: SNIPER_MODE
+              value: simulate
+            - name: SNIPER_NETWORK
+              value: mainnet
+            # Emergency stop: set to "1" and redeploy to halt all new buys while
+            # still letting open positions manage/exit.
+            - name: SNIPER_GLOBAL_KILL
+              value: "0"
+            # Liveness heartbeat cadence (ms) → bot_heartbeat → /api/sniper/status.
+            - name: SNIPER_HEARTBEAT_MS
+              value: "30000"
+            # Buy-side auto-funding: keep each armed agent's own wallet topped from
+            # the launcher master so a live sniper never silently runs out of SOL.
+            # Only moves real SOL in live mode AND when the master wallet is set
+            # (LAUNCHER_MASTER_SECRET_KEY_B64 / PUMP_X402_LAUNCHER_SECRET_KEY_B64);
+            # otherwise it logs intent and refuses. Caps below are SOL.
+            - name: SNIPER_AUTO_FUND
+              value: "1"
+            - name: SNIPER_AUTO_FUND_MIN_SOL      # refill when balance drops under this
+              value: "0.02"
+            - name: SNIPER_AUTO_FUND_TARGET_SOL   # refill back up to this reserve
+              value: "0.05"
+            - name: SNIPER_AUTO_FUND_PER_TX_SOL   # hard cap on a single top-up
+              value: "0.1"
+            - name: SNIPER_AUTO_FUND_DAILY_SOL    # hard cap on total top-ups per UTC day
+              value: "1.0"
+            # Sentiment-flip exit: let the per-coin x402 sentiment the worker already
+            # pays for cut an UNDERWATER position early on a confident bearish flip,
+            # ahead of the hard stop-loss. Off by default — never overrides
+            # stop-loss / take-profit / a winning position. Flip to "1" to arm.
+            - name: SNIPER_EXIT_ON_BEARISH
+              value: "0"
+            - name: SNIPER_EXIT_BEARISH_MIN_CONFIDENCE  # 0..1 confidence floor
+              value: "0.7"
+            # Required: Neon Postgres (strategies + position ledger + heartbeat).
+            - name: DATABASE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: sniper-database-url
+                  key: latest
+            # Required: decrypts each agent's encrypted Solana secret to sign.
+            # Never baked into the image; loaded per-trade at runtime.
+            - name: JWT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: sniper-jwt-secret
+                  key: latest
+            # Required for LIVE mode (a public RPC 429s under the firehose). Safe to
+            # leave mounted in simulate too — it's only used when a trade broadcasts.
+            - name: SOLANA_RPC_URL
+              valueFrom:
+                secretKeyRef:
+                  name: sniper-solana-rpc-url
+                  key: latest
+            # Ops alerting (optional) — reuses the platform's shared ops channel.
+            # Absent → sendOpsAlert is a no-op, the worker still runs. Cloud Run's
+            # `services replace` hard-fails if a secretKeyRef target doesn't exist
+            # (no such thing as an optional mount), so these stay commented out
+            # until the telegram-bot-token / telegram-alerts-chat-id secrets are
+            # actually created in Secret Manager. Uncomment + redeploy once they
+            # exist — no code change needed, sendOpsAlert already reads them.
+            # - name: TELEGRAM_BOT_TOKEN
+            #   valueFrom:
+            #     secretKeyRef:
+            #       name: telegram-bot-token
+            #       key: latest
+            # - name: TELEGRAM_ALERTS_CHAT_ID
+            #   valueFrom:
+            #     secretKeyRef:
+            #       name: telegram-alerts-chat-id
+            #       key: latest
+          resources:
+            limits:
+              cpu: "1"
+              memory: 1Gi
+  traffic:
+    - percent: 100
+      latestRevision: true

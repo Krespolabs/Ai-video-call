@@ -1,0 +1,95 @@
+{
+  "packageId": "ws.three.app",
+  "host": "three.ws",
+  "name": "three.ws",
+  "launcherName": "three.ws",
+  "display": "standalone",
+  "orientation": "portrait",
+  "themeColor": "#000000",
+  "themeColorDark": "#000000",
+  "navigationColor": "#000000",
+  "navigationColorDark": "#000000",
+  "navigationDividerColor": "#080814",
+  "navigationDividerColorDark": "#080814",
+  "backgroundColor": "#080814",
+  "enableNotifications": true,
+  "startUrl": "/seeker?utm_source=seeker_app",
+  "iconUrl": "https://three.ws/pwa-512x512.png",
+  "maskableIconUrl": "https://three.ws/pwa-maskable-512x512.png",
+  "monochromeIconUrl": "https://three.ws/pwa-icon.svg",
+  "appVersion": "1.1.0",
+  "appVersionCode": 2,
+  "shortcuts": [
+    {
+      "name": "Create avatar",
+      "shortName": "Create",
+      "url": "https://three.ws/create?utm_source=seeker_shortcut",
+      "chosenIconUrl": "https://three.ws/pwa-192x192.png"
+    },
+    {
+      "name": "Marketplace",
+      "shortName": "Discover",
+      "url": "https://three.ws/marketplace?utm_source=seeker_shortcut",
+      "chosenIconUrl": "https://three.ws/pwa-192x192.png"
+    },
+    {
+      "name": "My agents",
+      "shortName": "My agents",
+      "url": "https://three.ws/my-agents?utm_source=seeker_shortcut",
+      "chosenIconUrl": "https://three.ws/pwa-192x192.png"
+    }
+  ],
+  "shareTarget": {
+    "action": "/create/share",
+    "method": "POST",
+    "enctype": "multipart/form-data",
+    "params": {
+      "title": "title",
+      "text": "text",
+      "url": "url",
+      "files": [
+        {
+          "name": "media",
+          "accept": [
+            "image/jpeg",
+            "image/png",
+            "image/webp",
+            "model/gltf-binary"
+          ]
+        }
+      ]
+    }
+  },
+  "generatorApp": "bubblewrap-cli",
+  "webManifestUrl": "https://three.ws/manifest.webmanifest",
+  "fallbackType": "customtabs",
+  "features": {
+    "locationDelegation": {
+      "enabled": false
+    },
+    "playBilling": {
+      "enabled": false
+    },
+    "appsFlyer": {
+      "enabled": false
+    },
+    "firstRunFlag": {
+      "enabled": false
+    }
+  },
+  "alphaDependencies": {
+    "enabled": false
+  },
+  "enableSiteSettingsShortcut": true,
+  "isChromeOSOnly": false,
+  "isMetaQuest": false,
+  "fullScopeUrl": "https://three.ws/",
+  "minSdkVersion": 23,
+  "orientationFlag": "portrait",
+  "splashScreenFadeOutDuration": 300,
+  "additionalTrustedOrigins": [],
+  "retainedBundles": [],
+  "appLanguages": [
+    "en"
+  ]
+}

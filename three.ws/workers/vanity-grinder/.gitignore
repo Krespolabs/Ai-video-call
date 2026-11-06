@@ -1,0 +1,6 @@
+# Never commit ground keys (even encrypted) or run state.
+out/
+*.jsonl
+checkpoint.json
+summary.json
+node_modules/

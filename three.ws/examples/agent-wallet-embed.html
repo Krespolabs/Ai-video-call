@@ -1,0 +1,130 @@
+<!doctype html>
+<html lang="en">
+	<head>
+		<meta charset="utf-8" />
+		<meta name="viewport" content="width=device-width, initial-scale=1" />
+		<title>&lt;agent-3d wallet&gt; — the portable agent wallet</title>
+		<style>
+			/* Deliberately a "stranger's blog": plain styles, no three.ws tokens.css.
+			   The wallet must look right and work with nothing of ours on the page. */
+			:root { color-scheme: dark; }
+			body {
+				margin: 0;
+				padding: 40px 24px 80px;
+				background: #0c0c10;
+				color: #e8e8ea;
+				font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+				line-height: 1.5;
+			}
+			.wrap { max-width: 920px; margin: 0 auto; }
+			h1 { margin: 0 0 6px; font-size: 26px; }
+			.lede { color: #9a9aa2; margin: 0 0 28px; max-width: 60ch; }
+			h2 {
+				margin: 36px 0 10px; font-size: 13px; text-transform: uppercase;
+				letter-spacing: .06em; color: #8a8a93;
+			}
+			.grid { display: grid; gap: 24px; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); }
+			agent-3d { width: 100%; height: 420px; border-radius: 14px; overflow: hidden; background: #111; display: block; }
+			.card { background: #141418; border: 1px solid rgba(255,255,255,.07); border-radius: 14px; padding: 18px; }
+			.card h3 { margin: 0 0 4px; font-size: 15px; }
+			.card p { margin: 0 0 14px; color: #9a9aa2; font-size: 13px; }
+			pre {
+				background: #08080b; border: 1px solid rgba(255,255,255,.07); border-radius: 10px;
+				padding: 14px; overflow-x: auto; font-family: ui-monospace, "JetBrains Mono", Menlo, monospace;
+				font-size: 12.5px; color: #c4b5fd;
+			}
+			.note { font-size: 12.5px; color: #6b6b73; margin-top: 10px; }
+			a { color: #a78bfa; }
+			.tiny { width: 240px; max-width: 100%; }
+			.tiny agent-3d { height: 240px; }
+		</style>
+	</head>
+	<body>
+		<div class="wrap">
+			<h1>The agent wallet, dropped on any website</h1>
+			<p class="lede">
+				This page loads nothing of three.ws's own styling — it is a stand-in for a
+				stranger's blog. The <code>&lt;agent-3d wallet&gt;</code> web component below
+				renders a live 3D agent <em>and</em> its real, self-contained custodial wallet:
+				the vanity address, the live USD value, lifetime tips, and a working tip flow.
+				Everything reads from the public, CORS-safe
+				<code>/api/agents/wallet-embed</code> endpoint. It is the visitor view by
+				construction — tip + “open on three.ws”, never an owner control.
+			</p>
+
+			<h2>Live agent with its wallet</h2>
+			<div class="grid">
+				<div>
+					<agent-3d id="demo" wallet></agent-3d>
+					<p class="note" id="agent-note">Finding a public agent to show…</p>
+				</div>
+				<div class="card">
+					<h3>Same wallet, standalone</h3>
+					<p>
+						The wallet is portable on its own too — mount it into any element
+						(here, a light-DOM card; it also works inside a closed shadow root).
+					</p>
+					<div id="standalone"></div>
+				</div>
+			</div>
+
+			<h2>Tiny embed (200&nbsp;px)</h2>
+			<div class="tiny">
+				<agent-3d id="demo-tiny" wallet="tip"></agent-3d>
+			</div>
+			<p class="note">The chip stays legible and the tip popover stays usable at embed sizes.</p>
+
+			<h2>Drop it on your own page</h2>
+			<pre>&lt;script type="module" src="https://three.ws/dist-lib/agent-3d.js"&gt;&lt;/script&gt;
+
+&lt;!-- wallet            → tip-enabled chip (default)
+     wallet="card"     → always-open wallet card
+     wallet="identity" → read-only chip, no tip flow --&gt;
+&lt;agent-3d agent-id="YOUR_AGENT_ID" wallet style="width:360px;height:420px"&gt;&lt;/agent-3d&gt;</pre>
+			<p class="note">
+				Replace <code>YOUR_AGENT_ID</code> with any three.ws agent UUID. No API key,
+				no auth — the wallet endpoint exposes only public address + balance + tips.
+			</p>
+		</div>
+
+		<!-- Dev serves /dist-lib/agent-3d.js via a Vite plugin; prod serves the built lib. -->
+		<script type="module" src="/dist-lib/agent-3d.js"></script>
+		<script type="module">
+			import { mountPortableWallet } from '/src/shared/portable-wallet.js';
+
+			// Pick a REAL public agent so the demo shows real chain data, never a fixture.
+			async function firstPublicAgentId() {
+				const tryUrls = ['/api/marketplace/agents?limit=12', '/api/trending?limit=12'];
+				for (const u of tryUrls) {
+					try {
+						const r = await fetch(u, { headers: { accept: 'application/json' } });
+						if (!r.ok) continue;
+						const j = await r.json();
+						const list = j.agents || j.data || j.items || j.results || [];
+						const hit = list.find((a) => a && (a.id || a.agent_id));
+						if (hit) return hit.id || hit.agent_id;
+					} catch { /* try next */ }
+				}
+				return null;
+			}
+
+			const note = document.getElementById('agent-note');
+			const id = await firstPublicAgentId();
+			if (!id) {
+				note.textContent = 'No public agent available right now — open three.ws to browse agents.';
+			} else {
+				for (const elId of ['demo', 'demo-tiny']) {
+					const el = document.getElementById(elId);
+					el.setAttribute('agent-id', id);
+					el.setAttribute('src', `/api/avatars/${id}`);
+				}
+				note.innerHTML = `Showing agent <code>${id}</code> — the chip, tips, and balance are live.`;
+				mountPortableWallet(document.getElementById('standalone'), {
+					agentId: id,
+					origin: location.origin,
+					variant: 'card',
+				});
+			}
+		</script>
+	</body>
+</html>

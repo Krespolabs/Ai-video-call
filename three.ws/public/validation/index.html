@@ -1,0 +1,1262 @@
+<!doctype html>
+<html lang="en">
+	<head>
+		<meta charset="utf-8" />
+		<meta name="viewport" content="width=device-width,initial-scale=1" />
+		<title data-i18n="validation_index.meta_title">glTF Validator · three.ws</title>
+		<meta
+			name="description"
+			content="Run the official Khronos glTF 2.0 validator and glTF-Transform performance inspector in your browser. Optionally sign &amp; pin reports on-chain."
+		 data-i18n-attr="content:validation_index.meta_description"/>
+		<link rel="icon" href="/favicon.ico" />
+		<style>
+			:root {
+				color-scheme: dark;
+				--accent: #ffffff;
+				--accent2: #ffffff;
+				--border: #232323;
+				--bg: #000;
+				--panel: #151515;
+				--panel2: #1b1b1b;
+				--muted: #888;
+				--text: #eee;
+				--text-soft: #bbb;
+				--ok: #76d776;
+				--warn: #ffc107;
+				--err: #ff5252;
+			}
+			* {
+				box-sizing: border-box;
+			}
+			body {
+				font:
+					15px/1.55 -apple-system,
+					system-ui,
+					Segoe UI,
+					Roboto,
+					sans-serif;
+				color: var(--text);
+				margin: 0;
+				background: var(--bg);
+				min-height: 100vh;
+			}
+			a {
+				color: #888888;
+				text-decoration: none;
+			}
+			header {
+				display: flex;
+				align-items: center;
+				justify-content: space-between;
+				padding: 16px 24px;
+				border-bottom: 1px solid var(--border);
+				position: sticky;
+				top: 0;
+				background: var(--bg);
+				z-index: 5;
+			}
+			.brand {
+				font-weight: 600;
+				letter-spacing: -0.01em;
+			}
+			nav a {
+				margin-right: 14px;
+				color: #aaa;
+				font-size: 14px;
+			}
+			nav a.active {
+				color: #fff;
+			}
+			main {
+				padding: 28px;
+				max-width: 1200px;
+				margin: 0 auto;
+			}
+			h1 {
+				font-size: 22px;
+				margin: 0 0 6px;
+				letter-spacing: -0.01em;
+			}
+			.sub {
+				color: var(--muted);
+				margin: 0 0 22px;
+				font-size: 14px;
+			}
+			.btn {
+				padding: 9px 14px;
+				border-radius: 9px;
+				border: 0;
+				font-size: 13px;
+				font-weight: 600;
+				cursor: pointer;
+				background: var(--accent);
+				color: #fff;
+				transition: filter 0.12s;
+			}
+			.btn:hover {
+				filter: brightness(1.1);
+			}
+			.btn:disabled {
+				opacity: 0.5;
+				cursor: not-allowed;
+				filter: none;
+			}
+			.btn.sec {
+				background: #232323;
+				color: #ddd;
+			}
+			.btn.ghost {
+				background: transparent;
+				border: 1px solid var(--border);
+				color: var(--text-soft);
+			}
+			.btn.ghost:hover {
+				background: var(--panel);
+				color: var(--text);
+			}
+			input[type='text'],
+			input[type='url'],
+			textarea,
+			select {
+				width: 100%;
+				background: #101010;
+				border: 1px solid var(--border);
+				color: #eee;
+				padding: 9px 11px;
+				border-radius: 8px;
+				font-size: 14px;
+				font-family: inherit;
+			}
+			input:focus,
+			textarea:focus,
+			select:focus {
+				outline: none;
+				border-color: var(--accent);
+			}
+			/* One visible focus ring for every keyboard-reachable control. The
+			   inputs above trade the UA outline for a border colour, so they get
+			   the ring back here too. */
+			.btn:focus-visible,
+			.tab:focus-visible,
+			.sample-chip:focus-visible,
+			.report-download:focus-visible,
+			.record-actions button:focus-visible,
+			.record-actions a:focus-visible,
+			.result-error-retry:focus-visible,
+			nav a:focus-visible,
+			input:focus-visible,
+			textarea:focus-visible,
+			select:focus-visible,
+			.drop-zone:focus-within {
+				outline: 2px solid var(--accent);
+				outline-offset: 2px;
+			}
+			/* Visually hidden, still focusable and still announced. */
+			.sr-only {
+				position: absolute;
+				width: 1px;
+				height: 1px;
+				padding: 0;
+				margin: -1px;
+				overflow: hidden;
+				clip: rect(0, 0, 0, 0);
+				white-space: nowrap;
+				border: 0;
+			}
+			textarea {
+				resize: vertical;
+				font-family: ui-monospace, SF Mono, Menlo, monospace;
+				font-size: 13px;
+			}
+
+			/* ── Tabs ────────────────────────────────────────────────────── */
+			.tabs {
+				display: flex;
+				gap: 4px;
+				border-bottom: 1px solid var(--border);
+				margin: 18px 0 24px;
+			}
+			.tab {
+				padding: 10px 18px;
+				background: transparent;
+				border: 0;
+				border-bottom: 2px solid transparent;
+				color: var(--muted);
+				font: inherit;
+				font-weight: 500;
+				cursor: pointer;
+				margin-bottom: -1px;
+			}
+			.tab:hover {
+				color: var(--text-soft);
+			}
+			.tab.active {
+				color: var(--text);
+				border-bottom-color: var(--accent);
+			}
+			.tab-panel {
+				display: none;
+			}
+			.tab-panel.active {
+				display: block;
+			}
+
+			/* ── Drop zone + URL input ───────────────────────────────────── */
+			.input-row {
+				display: grid;
+				grid-template-columns: 1fr 1fr;
+				gap: 14px;
+				margin-bottom: 14px;
+			}
+			@media (max-width: 720px) {
+				.input-row {
+					grid-template-columns: 1fr;
+				}
+			}
+			.drop-zone {
+				position: relative;
+				border: 2px dashed var(--border);
+				border-radius: 12px;
+				padding: 26px 18px;
+				text-align: center;
+				background: var(--panel);
+				cursor: pointer;
+				transition: border-color 0.15s, background 0.15s;
+			}
+			.drop-zone:hover,
+			.drop-zone.drag,
+			.drop-zone:focus-within {
+				border-color: var(--accent);
+				background: rgba(255, 255, 255, 0.05);
+			}
+			/* Hidden from sight, kept in the tab order: display:none would drop the
+			   only file picker on the page out of keyboard reach entirely. */
+			.drop-zone input[type='file'] {
+				position: absolute;
+				width: 1px;
+				height: 1px;
+				padding: 0;
+				margin: 0;
+				overflow: hidden;
+				clip: rect(0, 0, 0, 0);
+				border: 0;
+				opacity: 0;
+			}
+			.drop-zone .dz-title {
+				font-weight: 600;
+				color: var(--text);
+				margin-bottom: 4px;
+			}
+			.drop-zone .dz-sub {
+				font-size: 12px;
+				color: var(--muted);
+			}
+			.url-box {
+				background: var(--panel);
+				border: 1px solid var(--border);
+				border-radius: 12px;
+				padding: 18px;
+			}
+			.url-box label {
+				display: block;
+				font-size: 13px;
+				font-weight: 500;
+				color: var(--text-soft);
+				margin-bottom: 6px;
+			}
+			.url-row {
+				display: flex;
+				gap: 8px;
+			}
+			.url-row input {
+				flex: 1;
+			}
+			.url-box .url-hint {
+				font-size: 12px;
+				color: var(--muted);
+				margin-top: 8px;
+			}
+
+			.samples {
+				display: flex;
+				flex-wrap: wrap;
+				align-items: center;
+				gap: 8px;
+				margin-bottom: 16px;
+			}
+			.samples-label {
+				font-size: 12px;
+				color: var(--muted);
+				margin-right: 4px;
+			}
+			.sample-chip {
+				background: var(--panel);
+				border: 1px solid var(--border);
+				color: var(--text-soft);
+				padding: 6px 12px;
+				border-radius: 99px;
+				font-size: 12px;
+				cursor: pointer;
+				transition: all 0.12s;
+			}
+			.sample-chip:hover {
+				border-color: var(--accent);
+				color: var(--text);
+			}
+
+			.status {
+				font-size: 13px;
+				color: var(--text-soft);
+				padding: 10px 14px;
+				background: var(--panel);
+				border: 1px solid var(--border);
+				border-radius: 8px;
+				margin-bottom: 16px;
+				font-family: ui-monospace, SF Mono, Menlo, monospace;
+			}
+			.status.ok {
+				border-color: rgba(118, 215, 118, 0.3);
+				color: var(--ok);
+			}
+			.status.err {
+				border-color: rgba(255, 92, 92, 0.4);
+				color: #ffb3b3;
+				background: rgba(255, 92, 92, 0.08);
+			}
+			.status:empty {
+				display: none;
+			}
+
+			.action-bar {
+				display: flex;
+				gap: 8px;
+				margin-bottom: 16px;
+				align-items: center;
+				justify-content: flex-end;
+			}
+
+			/* ── Validator report (shared by /app and /validation) ─────── */
+			.report {
+				padding: 0;
+				color: var(--text);
+			}
+			.report h1,
+			.report h2 {
+				margin: 0 0 8px;
+				font-size: 20px;
+			}
+			.report-sub {
+				color: var(--muted);
+				font-size: 13px;
+				margin: 0 0 16px;
+			}
+			.report-head {
+				display: flex;
+				align-items: baseline;
+				justify-content: space-between;
+				gap: 14px;
+				flex-wrap: wrap;
+				margin-bottom: 12px;
+			}
+			.report-download {
+				font-size: 12px;
+				background: var(--panel);
+				border: 1px solid var(--border);
+				padding: 6px 12px;
+				border-radius: 7px;
+				color: var(--text-soft);
+			}
+			.report-download:hover {
+				background: var(--panel2);
+				color: var(--text);
+			}
+			.report ul {
+				line-height: 1.65;
+				padding-left: 22px;
+			}
+			.report ul li {
+				margin: 4px 0;
+			}
+			.report-banner {
+				display: flex;
+				align-items: center;
+				gap: 12px;
+				padding: 14px 16px;
+				border-radius: 8px;
+				margin-bottom: 16px;
+				font-size: 14px;
+			}
+			.report-banner-clean {
+				background: rgba(118, 215, 118, 0.1);
+				border: 1px solid rgba(118, 215, 118, 0.3);
+				color: var(--ok);
+			}
+			.report-banner-issues {
+				background: rgba(244, 67, 54, 0.08);
+				border: 1px solid rgba(244, 67, 54, 0.25);
+				color: var(--text);
+			}
+			.report-banner-icon {
+				font-size: 18px;
+				font-weight: bold;
+			}
+			.report-section-heading {
+				font-size: 15px;
+				margin: 22px 0 10px;
+				padding-left: 12px;
+				border-left: 4px solid #888;
+				font-weight: 600;
+			}
+			.report-count {
+				font-weight: normal;
+				opacity: 0.7;
+				font-size: 0.9em;
+			}
+			.report-table-wrap {
+				overflow-x: auto;
+				border: 1px solid var(--border);
+				border-radius: 8px;
+				margin-bottom: 14px;
+			}
+			.report-table {
+				border-collapse: collapse;
+				width: 100%;
+				font-size: 13px;
+			}
+			.report-table thead tr {
+				background: var(--panel);
+			}
+			.report-table th,
+			.report-table td {
+				padding: 8px 12px;
+				text-align: left;
+				color: var(--text-soft);
+				border-bottom: 1px solid var(--border);
+			}
+			.report-table tr:last-child td {
+				border-bottom: 0;
+			}
+			.report-table tr:nth-child(2n) td {
+				background: rgba(255, 255, 255, 0.015);
+			}
+			.report-table code {
+				font-family: ui-monospace, SF Mono, Menlo, monospace;
+				font-size: 12px;
+				color: var(--text);
+			}
+
+			/* ── Inspect report ──────────────────────────────────────────── */
+			.inspect-grid {
+				display: grid;
+				grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+				gap: 10px;
+				margin-bottom: 22px;
+			}
+			.inspect-card {
+				background: var(--panel);
+				border: 1px solid var(--border);
+				border-radius: 10px;
+				padding: 14px 16px;
+			}
+			.inspect-card-label {
+				font-size: 11px;
+				text-transform: uppercase;
+				letter-spacing: 0.5px;
+				color: var(--muted);
+				margin-bottom: 6px;
+			}
+			.inspect-card-value {
+				font-size: 22px;
+				font-weight: 600;
+				color: var(--text);
+				font-variant-numeric: tabular-nums;
+			}
+			.inspect-card-foot {
+				font-size: 11px;
+				color: var(--muted);
+				margin-top: 4px;
+			}
+			.inspect-suggestions {
+				display: flex;
+				flex-direction: column;
+				gap: 8px;
+				margin-bottom: 22px;
+			}
+			.inspect-suggestion {
+				background: var(--panel);
+				border: 1px solid var(--border);
+				border-left: 3px solid #888;
+				border-radius: 8px;
+				padding: 12px 14px;
+			}
+			.inspect-suggestion-head {
+				display: flex;
+				align-items: center;
+				gap: 10px;
+				margin-bottom: 6px;
+				flex-wrap: wrap;
+			}
+			.inspect-suggestion-badge {
+				font-size: 10px;
+				font-weight: 700;
+				color: #fff;
+				padding: 2px 8px;
+				border-radius: 4px;
+				text-transform: uppercase;
+				letter-spacing: 0.5px;
+			}
+			.inspect-suggestion-id {
+				font-size: 11px;
+				color: var(--muted);
+				font-family: ui-monospace, SF Mono, Menlo, monospace;
+			}
+			.inspect-suggestion-estimate {
+				font-size: 11px;
+				color: var(--ok);
+				margin-left: auto;
+			}
+			.inspect-suggestion-msg {
+				font-size: 13px;
+				color: var(--text-soft);
+				line-height: 1.5;
+			}
+			.inspect-ext-list {
+				list-style: none;
+				padding: 0;
+				display: flex;
+				flex-wrap: wrap;
+				gap: 6px;
+				margin-bottom: 22px;
+			}
+			.inspect-ext-list li {
+				background: var(--panel);
+				border: 1px solid var(--border);
+				border-radius: 6px;
+				padding: 4px 10px;
+				font-size: 12px;
+			}
+			.inspect-ext-list code {
+				font-family: ui-monospace, SF Mono, Menlo, monospace;
+				color: var(--text);
+			}
+			.inspect-ext-required {
+				margin-left: 8px;
+				font-size: 10px;
+				color: var(--accent2);
+				text-transform: uppercase;
+				letter-spacing: 0.5px;
+			}
+
+			.loading {
+				padding: 40px 20px;
+				text-align: center;
+				color: var(--muted);
+				font-size: 13px;
+			}
+			.err {
+				padding: 12px;
+				background: rgba(255, 92, 92, 0.1);
+				border: 1px solid rgba(255, 92, 92, 0.3);
+				border-radius: 8px;
+				color: #ffb3b3;
+			}
+			.empty-result {
+				padding: 60px 20px;
+				text-align: center;
+				color: var(--muted);
+				border: 1px dashed var(--border);
+				border-radius: 12px;
+			}
+			.empty-result-title {
+				font-size: 14px;
+				font-weight: 600;
+				color: var(--text-soft);
+				margin-bottom: 6px;
+			}
+
+			/* ── Failure card (fetch blocked, unreadable file, validator crash) ── */
+			.result-error {
+				padding: 22px;
+				border: 1px solid rgba(255, 92, 92, 0.35);
+				background: rgba(255, 92, 92, 0.06);
+				border-radius: 12px;
+			}
+			.result-error-title {
+				font-size: 15px;
+				font-weight: 600;
+				color: #ffb3b3;
+				margin-bottom: 6px;
+			}
+			.result-error-detail {
+				font-size: 13px;
+				color: var(--text-soft);
+				font-family: ui-monospace, SF Mono, Menlo, monospace;
+				word-break: break-word;
+				margin-bottom: 14px;
+			}
+			.result-error-hints {
+				margin: 0 0 16px;
+				padding-left: 20px;
+				font-size: 13px;
+				color: var(--muted);
+				line-height: 1.6;
+			}
+			.result-error-actions {
+				display: flex;
+				flex-wrap: wrap;
+				gap: 8px;
+			}
+			.result-error-retry {
+				padding: 8px 14px;
+				border-radius: 8px;
+				border: 1px solid var(--border);
+				background: var(--panel2);
+				color: var(--text);
+				font: inherit;
+				font-size: 13px;
+				font-weight: 600;
+				cursor: pointer;
+			}
+			.result-error-retry:hover {
+				background: #262626;
+			}
+
+			/* ── Records tab (kept compatible with ValidationDashboard) ── */
+			.records-toolbar {
+				display: flex;
+				gap: 12px;
+				margin-bottom: 18px;
+				flex-wrap: wrap;
+				align-items: center;
+			}
+			.records-toolbar input {
+				padding: 9px 11px;
+				background: #101010;
+				border: 1px solid var(--border);
+				color: #eee;
+				border-radius: 8px;
+				font-size: 14px;
+				width: 190px;
+			}
+			.records {
+				display: flex;
+				flex-direction: column;
+				gap: 12px;
+			}
+			.record {
+				background: var(--panel);
+				border: 1px solid var(--border);
+				border-radius: 10px;
+				padding: 16px;
+			}
+			.record-header {
+				display: flex;
+				justify-content: space-between;
+				align-items: flex-start;
+				margin-bottom: 10px;
+			}
+			.record-title {
+				display: flex;
+				align-items: center;
+				gap: 10px;
+			}
+			.record-title h3 {
+				margin: 0;
+				font-size: 14px;
+			}
+			.badge {
+				display: inline-flex;
+				align-items: center;
+				padding: 3px 9px;
+				border-radius: 99px;
+				font-size: 11px;
+				font-weight: 600;
+				text-transform: uppercase;
+				letter-spacing: 0.5px;
+			}
+			.badge.pass {
+				background: rgba(76, 175, 80, 0.15);
+				color: var(--ok);
+			}
+			.badge.warn {
+				background: rgba(255, 193, 7, 0.15);
+				color: var(--warn);
+			}
+			.badge.fail {
+				background: rgba(244, 67, 54, 0.15);
+				color: var(--err);
+			}
+			.record-meta {
+				display: flex;
+				gap: 16px;
+				font-size: 12px;
+				color: var(--muted);
+				margin: 8px 0;
+				flex-wrap: wrap;
+			}
+			.record-meta-item {
+				display: flex;
+				flex-direction: column;
+				gap: 2px;
+			}
+			.record-meta-label {
+				color: #666;
+				font-size: 11px;
+				text-transform: uppercase;
+				letter-spacing: 0.5px;
+			}
+			.record-meta-value {
+				color: #ccc;
+				font-family: ui-monospace, SF Mono, Menlo, monospace;
+				font-size: 13px;
+				word-break: break-all;
+			}
+			.record-actions {
+				display: flex;
+				gap: 8px;
+				margin-top: 10px;
+			}
+			.record-actions button,
+			.record-actions a {
+				padding: 6px 10px;
+				font-size: 12px;
+				border-radius: 7px;
+				border: 1px solid var(--border);
+				background: var(--panel2);
+				color: #ddd;
+				cursor: pointer;
+				text-decoration: none;
+			}
+			.record-actions button:hover,
+			.record-actions a:hover {
+				background: #232323;
+			}
+			.record-notes {
+				font-size: 13px;
+				color: #aaa;
+				margin: 8px 0 4px;
+				padding: 8px 10px;
+				background: rgba(255, 255, 255, 0.06);
+				border-left: 2px solid var(--accent);
+				border-radius: 0 6px 6px 0;
+			}
+			.empty {
+				text-align: center;
+				padding: 60px 20px;
+				border: 1px dashed var(--border);
+				border-radius: 14px;
+				color: var(--muted);
+			}
+			.empty-title {
+				font-size: 15px;
+				font-weight: 600;
+				color: #aaa;
+				margin-bottom: 8px;
+			}
+			.empty-sub {
+				font-size: 13px;
+				margin-bottom: 18px;
+			}
+			.err-box {
+				padding: 12px;
+				background: rgba(255, 92, 92, 0.1);
+				border: 1px solid rgba(255, 92, 92, 0.3);
+				border-radius: 8px;
+				color: #ffb3b3;
+				margin-bottom: 14px;
+			}
+			.info-box {
+				padding: 12px;
+				background: rgba(255, 255, 255, 0.1);
+				border: 1px solid rgba(255, 255, 255, 0.3);
+				border-radius: 8px;
+				color: #c9bfff;
+				margin-bottom: 14px;
+				font-size: 13px;
+			}
+
+			/* ── Submit modal (unchanged element IDs/classes for dashboard) */
+			.modal-overlay {
+				position: fixed;
+				inset: 0;
+				background: rgba(0, 0, 0, 0.6);
+				/* Above the shared site chrome: nav.css stacks the sticky header at
+				   100 and its popovers up to 10000, so a dialog at 60 let the header
+				   sit on top of its own scrim and stay clickable. */
+				z-index: 10050;
+				display: grid;
+				place-items: center;
+				opacity: 0;
+				pointer-events: none;
+				/* visibility, not just opacity: an opacity-0 dialog keeps its
+				   controls in the tab order and swallows keyboard focus. */
+				visibility: hidden;
+				/* visibility flips instantly on open (so the dialog is focusable on the
+				   same tick) and only after the fade on close. */
+				transition: opacity 0.15s, visibility 0s linear 0.15s;
+			}
+			.modal-overlay.open {
+				opacity: 1;
+				pointer-events: auto;
+				visibility: visible;
+				transition: opacity 0.15s, visibility 0s;
+			}
+			.modal {
+				background: #0f0f0f;
+				border: 1px solid var(--border);
+				border-radius: 14px;
+				padding: 22px;
+				width: min(640px, calc(100vw - 32px));
+				max-height: calc(100vh - 32px);
+				overflow-y: auto;
+			}
+			.modal h2 {
+				margin: 0 0 4px;
+				font-size: 17px;
+			}
+			.modal .sub {
+				margin: 0 0 18px;
+			}
+			.modal-actions {
+				display: flex;
+				gap: 8px;
+				margin-top: 20px;
+				justify-content: flex-end;
+			}
+			.form-group {
+				margin-bottom: 18px;
+			}
+			.form-group label {
+				display: block;
+				font-size: 13px;
+				font-weight: 500;
+				color: var(--text-soft);
+				margin-bottom: 6px;
+			}
+			.section-title {
+				font-size: 13px;
+				font-weight: 600;
+				margin: 14px 0 8px;
+				color: var(--text-soft);
+			}
+			.file-input-wrapper {
+				position: relative;
+				display: inline-block;
+				width: 100%;
+			}
+			.file-input-wrapper input[type='file'] {
+				position: absolute;
+				opacity: 0;
+				width: 0;
+				height: 0;
+			}
+			.file-input-label {
+				display: block;
+				padding: 18px;
+				background: #101010;
+				border: 2px dashed var(--border);
+				border-radius: 8px;
+				text-align: center;
+				cursor: pointer;
+				color: var(--muted);
+			}
+			.file-input-wrapper:hover .file-input-label {
+				border-color: var(--accent);
+				color: var(--text-soft);
+			}
+			pre {
+				background: #101010;
+				border: 1px solid var(--border);
+				border-radius: 8px;
+				padding: 10px 12px;
+				overflow: auto;
+				font-size: 12px;
+				max-height: 200px;
+			}
+			code {
+				font-family: ui-monospace, SF Mono, Menlo, monospace;
+			}
+			.toast {
+				position: fixed;
+				bottom: 24px;
+				left: 50%;
+				transform: translateX(-50%);
+				background: var(--panel2);
+				border: 1px solid var(--border);
+				padding: 10px 18px;
+				border-radius: 99px;
+				font-size: 13px;
+				color: #ddd;
+				z-index: 10060;
+				box-shadow: 0 4px 18px rgba(0, 0, 0, 0.4);
+			}
+			.toast.err {
+				border-color: #cc4040;
+				background: #1e1010;
+			}
+			.header-logo {
+				width: 14px;
+				height: 14px;
+				vertical-align: -2px;
+				margin-right: 6px;
+			}
+			.how-grid {
+				display: grid;
+				grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+				gap: 12px;
+				margin-bottom: 22px;
+			}
+			.how-card {
+				background: var(--panel);
+				border: 1px solid var(--border);
+				border-radius: 10px;
+				padding: 14px 16px;
+			}
+			.how-card-icon {
+				font-size: 18px;
+				margin-bottom: 8px;
+			}
+			.how-card-title {
+				font-size: 13px;
+				font-weight: 600;
+				color: #ddd;
+				margin-bottom: 4px;
+			}
+			.how-card-desc {
+				font-size: 12px;
+				color: var(--muted);
+				line-height: 1.5;
+			}
+		</style>
+	
+	<link rel="canonical" href="https://three.ws/validation">
+	<meta property="og:type" content="website">
+	<meta property="og:site_name" content="three.ws">
+	<meta property="og:title" content="glTF Validator · three.ws" data-i18n-attr="content:validation_index.meta_og_title">
+	<meta property="og:description" content="Khronos-spec validator for glTF/GLB files. Paste a URL or upload a model." data-i18n-attr="content:validation_index.meta_og_description">
+	<meta property="og:url" content="https://three.ws/validation">
+	<meta property="og:image" content="https://three.ws/api/page-og?s=build&amp;t=glTF+Validator&amp;d=Khronos-spec+validator+for+glTF%2FGLB+files.+Paste+a+URL+or+upload+a+model.&amp;p=%2Fvalidation">
+	<meta property="og:image:width" content="1200">
+	<meta property="og:image:height" content="630">
+	<meta name="twitter:card" content="summary_large_image">
+	<meta name="twitter:title" content="glTF Validator · three.ws" data-i18n-attr="content:validation_index.meta_twitter_title">
+	<meta name="twitter:description" content="Khronos-spec validator for glTF/GLB files. Paste a URL or upload a model." data-i18n-attr="content:validation_index.meta_twitter_description">
+	<meta name="twitter:image" content="https://three.ws/api/page-og?s=build&amp;t=glTF+Validator&amp;d=Khronos-spec+validator+for+glTF%2FGLB+files.+Paste+a+URL+or+upload+a+model.&amp;p=%2Fvalidation">
+	<script type="application/ld+json">{"@context":"https://schema.org","@type":"WebPage","name":"glTF Validator","description":"Khronos-spec validator for glTF/GLB files. Paste a URL or upload a model.","url":"https://three.ws/validation","isPartOf":{"@type":"WebSite","name":"three.ws","url":"https://three.ws"}}</script>
+
+	<meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1">
+	<meta property="og:locale" content="en_US">
+	<meta property="og:image:alt" content="glTF Validator — three.ws">
+	<meta name="twitter:site" content="@trythreews">
+</head>
+	<body>
+		<header>
+			<div id="nav-container"></div>
+		</header>
+		<script src="/nav.js"></script>
+
+		<main>
+			<h1 data-i18n="validation_index.gltf_validator">glTF Validator</h1>
+			<p class="sub" data-i18n-html="validation_index.run_the_official_khronos_gltf_2_0">
+				Run the official
+				<a href="https://github.com/KhronosGroup/glTF-Validator" target="_blank" rel="noreferrer"
+					>Khronos glTF 2.0 validator</a
+				>
+				and a
+				<a href="https://gltf-transform.dev" target="_blank" rel="noreferrer"
+					>glTF-Transform</a
+				>
+				performance inspector, fully client-side. Optionally sign &amp; pin reports
+				on-chain.
+			</p>
+
+			<div class="how-grid">
+				<div class="how-card">
+					<div class="how-card-icon">◈</div>
+					<div class="how-card-title">Khronos spec check</div>
+					<div class="how-card-desc">
+						Validates glTF 2.0 file structure, accessors, materials and extensions against
+						the official Khronos suite.
+					</div>
+				</div>
+				<div class="how-card">
+					<div class="how-card-icon">◆</div>
+					<div class="how-card-title">Performance inspector</div>
+					<div class="how-card-desc">
+						Surfaces what the spec check does not — texture weights, draw-call shape, and
+						compression opportunities (Draco, Meshopt, KTX2).
+					</div>
+				</div>
+				<div class="how-card">
+					<div class="how-card-icon">◇</div>
+					<div class="how-card-title">On-chain attestations</div>
+					<div class="how-card-desc">
+						Sign reports with a wallet, pin to IPFS, and record on the Validation Registry
+						so anyone can verify the audit.
+					</div>
+				</div>
+			</div>
+
+			<div class="tabs" role="tablist" aria-label="Validator views">
+				<button
+					class="tab active"
+					type="button"
+					role="tab"
+					id="tab-validate"
+					aria-controls="panel-validate"
+					data-tab="validate"
+					aria-selected="true"
+					data-i18n="validation_index.validate"
+				>
+					Validate
+				</button>
+				<button
+					class="tab"
+					type="button"
+					role="tab"
+					id="tab-inspect"
+					aria-controls="panel-inspect"
+					data-tab="inspect"
+					aria-selected="false"
+					tabindex="-1"
+					data-i18n="validation_index.inspect"
+				>
+					Inspect
+				</button>
+				<button
+					class="tab"
+					type="button"
+					role="tab"
+					id="tab-records"
+					aria-controls="panel-records"
+					data-tab="records"
+					aria-selected="false"
+					tabindex="-1"
+					data-i18n="validation_index.records"
+				>
+					Records
+				</button>
+			</div>
+
+			<!-- ── Validate panel ─────────────────────────────────────────── -->
+			<section
+				class="tab-panel active"
+				data-tab="validate"
+				role="tabpanel"
+				id="panel-validate"
+				aria-labelledby="tab-validate"
+			>
+				<div class="input-row">
+					<label class="drop-zone" id="drop-zone">
+						<input
+							type="file"
+							id="file-input"
+							accept=".glb,.gltf,model/gltf-binary,model/gltf+json"
+							aria-describedby="dz-sub"
+						/>
+						<div class="dz-title">Drop a .glb or .gltf file</div>
+						<div class="dz-sub" id="dz-sub">or click to choose · runs entirely in your browser</div>
+					</label>
+					<div class="url-box">
+						<label for="url-input" data-i18n="validation_index.or_fetch_from_a_url">…or fetch from a URL</label>
+						<div class="url-row">
+							<input
+								type="url"
+								id="url-input"
+								placeholder="https://example.com/model.glb"
+							/>
+							<button class="btn" id="url-btn" data-i18n="validation_index.fetch">Fetch</button>
+						</div>
+						<div class="url-hint">CORS must be allowed by the host server.</div>
+					</div>
+				</div>
+
+				<div class="samples">
+					<span class="samples-label" id="samples-label" data-i18n="validation_index.try_a_sample">Try a sample:</span>
+					<span id="samples" role="group" aria-labelledby="samples-label"></span>
+				</div>
+
+				<div id="status" class="status" role="status" aria-live="polite"></div>
+
+				<div class="action-bar">
+					<button
+						class="btn ghost"
+						type="button"
+						id="sign-btn"
+						disabled
+						title="Runs after a validation completes"
+						data-i18n="validation_index.sign_pin_on_chain"
+					>
+						Sign &amp; pin on-chain →
+					</button>
+				</div>
+
+				<div id="validate-output">
+					<div class="empty-result">
+						<div class="empty-result-title">No model loaded</div>
+						<div>Drop a file, paste a URL, or pick a sample to run the validator.</div>
+					</div>
+				</div>
+			</section>
+
+			<!-- ── Inspect panel ──────────────────────────────────────────── -->
+			<section
+				class="tab-panel"
+				data-tab="inspect"
+				role="tabpanel"
+				id="panel-inspect"
+				aria-labelledby="tab-inspect"
+			>
+				<div id="inspect-output">
+					<div class="empty-result">
+						<div class="empty-result-title">No model loaded</div>
+						<div>
+							Load a model in the <b data-i18n="validation_index.validate_2">Validate</b> tab. Both checks run in
+							parallel and results appear here.
+						</div>
+					</div>
+				</div>
+			</section>
+
+			<!-- ── Records panel ──────────────────────────────────────────── -->
+			<section
+				class="tab-panel"
+				data-tab="records"
+				role="tabpanel"
+				id="panel-records"
+				aria-labelledby="tab-records"
+			>
+				<p class="sub" data-i18n="validation_index.on_chain_proof_that_an_agent_s">
+					On-chain proof that an agent's GLB model has been audited. Each record is signed by
+					a validator's wallet and stored immutably.
+				</p>
+
+				<div class="records-toolbar">
+					<label class="sr-only" for="agent-input">Agent ID</label>
+					<input type="text" id="agent-input" inputmode="numeric" placeholder="Agent ID (e.g., 1)" />
+					<label class="sr-only" for="chain-input">Chain ID</label>
+					<input type="text" id="chain-input" inputmode="numeric" placeholder="Chain ID (e.g., 84532)" />
+					<button class="btn" type="button" id="load-btn" data-i18n="validation_index.load_records">Load Records</button>
+					<button class="btn sec" type="button" id="submit-btn" data-i18n="validation_index.submit_json_report">Submit JSON Report</button>
+				</div>
+
+				<div id="error" class="err-box" role="alert" style="display: none"></div>
+				<div id="info" class="info-box" role="status" aria-live="polite" style="display: none"></div>
+				<div id="records" class="records"></div>
+				<div id="empty" class="empty" style="display: none">
+					<div class="empty-title">No validation records found</div>
+					<div class="empty-sub">
+						This agent hasn't been validated yet, or the agent ID / chain ID is incorrect.
+					</div>
+					<button class="btn" type="button" id="empty-submit-btn" data-i18n="validation_index.submit_a_validation">Submit a Validation</button>
+				</div>
+			</section>
+		</main>
+
+		<!-- Submit Modal — IDs preserved so ValidationDashboard wiring still works -->
+		<div class="modal-overlay" id="submit-modal">
+			<div class="modal" role="dialog" aria-modal="true" tabindex="-1" aria-labelledby="submit-modal-title">
+				<h2 id="submit-modal-title" data-i18n="validation_index.submit_validation_report">Submit Validation Report</h2>
+				<p class="sub" data-i18n="validation_index.upload_a_json_validation_report_signed_by">
+					Upload a JSON validation report, signed by your wallet and stored on-chain.
+				</p>
+
+				<div class="form-group">
+					<label for="report-file" data-i18n="validation_index.report_file_json">Report File (JSON)</label>
+					<div class="file-input-wrapper">
+						<input type="file" id="report-file" accept=".json" />
+						<label for="report-file" class="file-input-label" data-i18n="validation_index.click_to_select_or_drag_a_json">
+							📄 Click to select or drag a JSON report file
+						</label>
+					</div>
+					<div
+						id="file-status"
+						role="status"
+						aria-live="polite"
+						style="font-size: 12px; color: var(--muted); margin-top: 8px"
+					></div>
+				</div>
+
+				<div id="preview-section" style="display: none">
+					<div class="section-title">Preview</div>
+					<pre id="preview-json"></pre>
+					<div id="preview-error" role="alert" style="color: #ffb3b3; font-size: 12px; margin-top: 8px"></div>
+				</div>
+
+				<div id="hash-section" style="display: none" class="form-group">
+					<label for="report-hash" data-i18n="validation_index.report_hash">Report Hash</label>
+					<input
+						type="text"
+						id="report-hash"
+						readonly
+						style="font-family: ui-monospace, SF Mono, Menlo, monospace; font-size: 12px"
+					/>
+					<div style="font-size: 12px; color: var(--muted); margin-top: 6px">
+						Computed via keccak256(JSON.stringify(report))
+					</div>
+				</div>
+
+				<div class="modal-actions">
+					<button class="btn sec" id="cancel-report-btn" type="button" data-i18n="validation_index.cancel">Cancel</button>
+					<button class="btn" id="submit-report-btn" type="button" disabled data-i18n="validation_index.submit_on_chain">Submit on-chain</button>
+				</div>
+			</div>
+		</div>
+
+		<script type="module">
+			import { ValidationDashboard } from '../../src/validation-ui.js';
+			import { ValidationPage } from '../../src/validation-page.js';
+
+			const dashboard = new ValidationDashboard(document.querySelector('main'), {
+				agentInput: document.getElementById('agent-input'),
+				chainInput: document.getElementById('chain-input'),
+				loadBtn: document.getElementById('load-btn'),
+				submitBtn: document.getElementById('submit-btn'),
+				recordsContainer: document.getElementById('records'),
+				emptyState: document.getElementById('empty'),
+				errorEl: document.getElementById('error'),
+				infoEl: document.getElementById('info'),
+				submitModal: document.getElementById('submit-modal'),
+				reportFile: document.getElementById('report-file'),
+				fileStatus: document.getElementById('file-status'),
+				previewSection: document.getElementById('preview-section'),
+				previewJson: document.getElementById('preview-json'),
+				previewError: document.getElementById('preview-error'),
+				hashSection: document.getElementById('hash-section'),
+				reportHash: document.getElementById('report-hash'),
+				submitReportBtn: document.getElementById('submit-report-btn'),
+			});
+
+			const page = new ValidationPage(
+				{
+					tabs: document.querySelectorAll('.tab'),
+					panels: document.querySelectorAll('.tab-panel'),
+					dropZone: document.getElementById('drop-zone'),
+					fileInput: document.getElementById('file-input'),
+					urlInput: document.getElementById('url-input'),
+					urlBtn: document.getElementById('url-btn'),
+					samples: document.getElementById('samples'),
+					statusEl: document.getElementById('status'),
+					validateOut: document.getElementById('validate-output'),
+					inspectOut: document.getElementById('inspect-output'),
+					signBtn: document.getElementById('sign-btn'),
+				},
+				dashboard,
+			);
+
+			window.valDash = dashboard;
+			window.valPage = page;
+			document.getElementById('cancel-report-btn').addEventListener('click', () => dashboard.closeModal());
+
+			document
+				.getElementById('empty-submit-btn')
+				.addEventListener('click', () => dashboard.openModal());
+		</script>
+
+		<div id="footer-container"></div>
+		<script src="/footer.js" defer></script>
+		<script src="/brand.js" defer></script>
+	<!-- Runtime i18n: detects locale, swaps annotated copy, mounts <lang-switcher>. -->
+	<script type="module" src="/i18n.js"></script>
+</body>
+</html>

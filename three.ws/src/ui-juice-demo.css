@@ -1,0 +1,204 @@
+/******************************************************************************
+ * ui-juice-demo.css — layout for the game-feel library demo (/ui-juice).
+ * Tokens only (public/tokens.css). The motion itself lives in ui-juice.css;
+ * this file is just the page chrome that frames each primitive.
+ *****************************************************************************/
+
+.ujd-shell {
+	max-width: 980px;
+	margin: 0 auto;
+	padding: var(--space-xl) var(--space-md) var(--space-2xl);
+	color: var(--ink);
+}
+
+.ujd-head { margin-bottom: var(--space-lg); }
+.ujd-head h1 {
+	font-family: var(--font-display);
+	font-size: var(--text-2xl);
+	color: var(--ink-bright);
+	margin: 0 0 var(--space-xs);
+}
+.ujd-head p {
+	color: var(--ink-dim);
+	font-size: var(--text-ui);
+	line-height: var(--leading-normal);
+	max-width: 66ch;
+	margin: 0 0 var(--space-sm);
+}
+.ujd-head a { color: var(--accent); }
+
+.ujd-rm {
+	display: inline-flex;
+	align-items: center;
+	gap: var(--space-2xs);
+	font-size: var(--text-2xs);
+	text-transform: uppercase;
+	letter-spacing: 0.06em;
+	padding: var(--space-2xs) var(--space-sm);
+	border: 1px solid var(--stroke);
+	border-radius: var(--radius-pill);
+	background: var(--surface-1);
+	color: var(--ink-dim);
+}
+.ujd-rm[data-reduced='true'] { color: var(--warn); border-color: rgba(251, 191, 36, 0.4); }
+
+/* ── grid of primitive cards ─────────────────────────────────────────────── */
+.ujd-grid {
+	display: grid;
+	grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+	gap: var(--space-md);
+}
+.ujd-card {
+	border: 1px solid var(--stroke);
+	border-radius: var(--radius-lg);
+	background: var(--surface-1);
+	padding: var(--space-md);
+	display: flex;
+	flex-direction: column;
+	gap: var(--space-sm);
+	min-height: 168px;
+}
+.ujd-card h2 {
+	font-size: var(--text-md);
+	font-weight: var(--weight-semibold);
+	color: var(--ink-bright);
+	margin: 0;
+	display: flex;
+	align-items: center;
+	gap: var(--space-2xs);
+}
+.ujd-card h2 code {
+	font-family: var(--font-mono);
+	font-size: var(--text-2xs);
+	color: var(--ink-faint);
+	background: var(--surface-2);
+	padding: 1px var(--space-2xs);
+	border-radius: var(--radius-sm);
+}
+.ujd-card .ujd-stage {
+	flex: 1;
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	justify-content: center;
+	gap: var(--space-2xs);
+	min-height: 72px;
+}
+
+/* ── controls ────────────────────────────────────────────────────────────── */
+.ujd-controls { display: flex; flex-wrap: wrap; gap: var(--space-2xs); }
+.ujd-btn {
+	font: inherit;
+	font-size: var(--text-sm);
+	font-weight: var(--weight-medium);
+	color: var(--ink);
+	background: var(--surface-2);
+	border: 1px solid var(--stroke);
+	border-radius: var(--radius-md);
+	padding: var(--space-2xs) var(--space-sm);
+	cursor: pointer;
+	transition: background var(--duration-fast) var(--ease-standard),
+		border-color var(--duration-fast) var(--ease-standard),
+		transform var(--duration-instant) var(--ease-standard);
+}
+.ujd-btn:hover { background: var(--surface-3); border-color: var(--stroke-strong); }
+.ujd-btn:active { transform: translateY(1px); }
+.ujd-btn:focus-visible {
+	outline: var(--focus-ring-width) solid var(--focus-ring-color);
+	outline-offset: var(--focus-ring-offset);
+}
+.ujd-btn[aria-pressed='true'] { background: var(--accent-soft); border-color: var(--stroke-strong); color: var(--ink-bright); }
+.ujd-btn--up { color: var(--success); }
+.ujd-btn--down { color: var(--danger); }
+
+.ujd-range { width: 100%; accent-color: var(--wallet-accent-strong); }
+
+/* ── countUp tile + sparkline ────────────────────────────────────────────── */
+.ujd-bignum {
+	font-family: var(--font-mono);
+	font-size: var(--text-xl);
+	font-weight: var(--weight-bold);
+	color: var(--ink-bright);
+	font-variant-numeric: tabular-nums;
+	border-radius: var(--radius-md);
+	padding: var(--space-2xs) var(--space-sm);
+}
+.ujd-net { font-size: var(--text-2xs); color: var(--ink-dim); font-variant-numeric: tabular-nums; }
+.ujd-net[data-dir='up'] { color: var(--success); }
+.ujd-net[data-dir='down'] { color: var(--danger); }
+
+/* ── flash card ──────────────────────────────────────────────────────────── */
+.ujd-flash-card {
+	width: 100%;
+	min-height: 56px;
+	border-radius: var(--radius-md);
+	border: 1px solid var(--stroke);
+	background: var(--surface-2);
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	color: var(--ink-dim);
+	font-size: var(--text-sm);
+}
+
+/* ── live feed ───────────────────────────────────────────────────────────── */
+.ujd-feed {
+	list-style: none;
+	margin: 0;
+	padding: 0;
+	width: 100%;
+	font-size: var(--text-sm);
+}
+.ujd-feed-row {
+	display: flex;
+	align-items: center;
+	gap: var(--space-sm);
+	padding: var(--space-2xs) var(--space-xs);
+	border-bottom: 1px solid var(--surface-1);
+}
+.ujd-feed-row:last-child { border-bottom: 0; }
+.ujd-feed-seq { color: var(--ink-faint); font-variant-numeric: tabular-nums; font-size: var(--text-2xs); min-width: 2.4em; }
+.ujd-feed-label { flex: 1; color: var(--ink); }
+.ujd-feed-time { color: var(--ink-dim); font-family: var(--font-mono); font-size: var(--text-2xs); }
+.ujd-empty { color: var(--ink-faint); text-align: center; padding: var(--space-sm); font-size: var(--text-sm); list-style: none; }
+
+/* ── standings (FLIP) ────────────────────────────────────────────────────── */
+.ujd-board { list-style: none; margin: 0; padding: 0; width: 100%; }
+.ujd-rank-row {
+	display: flex;
+	align-items: center;
+	gap: var(--space-sm);
+	padding: var(--space-2xs) var(--space-xs);
+	font-size: var(--text-sm);
+	will-change: transform;
+}
+.ujd-rank-n { color: var(--ink-faint); font-weight: var(--weight-bold); font-variant-numeric: tabular-nums; min-width: 2em; }
+.ujd-rank-name { color: var(--ink-bright); min-width: 4em; }
+.ujd-rank-bar { flex: 1; height: 6px; border-radius: var(--radius-pill); background: var(--surface-3); overflow: hidden; }
+.ujd-rank-bar > span {
+	display: block;
+	height: 100%;
+	background: var(--wallet-accent-strong);
+	border-radius: inherit;
+	transition: width var(--duration-base) var(--ease-emphasized);
+}
+.ujd-rank-score { color: var(--ink-dim); font-variant-numeric: tabular-nums; min-width: 2em; text-align: right; }
+
+/* ── ripple panel ────────────────────────────────────────────────────────── */
+.ujd-ripple-panel {
+	width: 100%;
+	min-height: 56px;
+	border-radius: var(--radius-md);
+	border: 1px solid var(--stroke-strong);
+	background: var(--surface-2);
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	color: var(--ink-dim);
+	font-size: var(--text-sm);
+}
+
+@media (prefers-reduced-motion: reduce) {
+	.ujd-btn:active { transform: none; }
+	.ujd-rank-bar > span { transition: none; }
+}

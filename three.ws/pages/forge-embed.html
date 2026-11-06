@@ -1,0 +1,316 @@
+<!doctype html>
+<html lang="en">
+	<head>
+		<meta charset="UTF-8" />
+		<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+		<title data-i18n="forge_embed.meta_title">three.ws — embedded 3D model</title>
+		<meta name="description" content="An interactive 3D model forged on three.ws."  data-i18n-attr="content:forge_embed.meta_description"/>
+		<!-- Embeddable surface: keep it out of the index, allow framing anywhere. -->
+		<meta name="robots" content="noindex" />
+		<link rel="icon" href="/favicon.ico" sizes="any" />
+		<script
+			type="module"
+			src="https://cdn.jsdelivr.net/npm/@google/model-viewer@4.4.0/dist/model-viewer.min.js"
+			integrity="sha384-wjsPzEO+lXOf7d9csIDfAQpPt2OKuUU3m0K9qsdKIuzX4N8czSF6hdh23eAbZa3p"
+			crossorigin="anonymous"
+		></script>
+		<style>
+			:root {
+				color-scheme: dark;
+			}
+			html,
+			body {
+				margin: 0;
+				padding: 0;
+				width: 100%;
+				height: 100%;
+				overflow: hidden;
+				background: transparent;
+				font-family: ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+			}
+			#stage {
+				position: fixed;
+				inset: 0;
+			}
+			model-viewer {
+				width: 100%;
+				height: 100%;
+				--poster-color: transparent;
+				outline: none;
+			}
+			/* Dark studio backdrop (default). ?bg=transparent removes it so the
+			   model floats over the host page. */
+			body[data-bg='dark'] model-viewer {
+				background: radial-gradient(120% 120% at 50% 0%, #161616 0%, #0b0b0b 70%);
+			}
+			body[data-bg='light'] model-viewer {
+				background: radial-gradient(120% 120% at 50% 0%, #f4f4f6 0%, #dcdce2 75%);
+			}
+
+			/* Attribution / growth badge — links back to Forge. */
+			.brand {
+				position: fixed;
+				left: 12px;
+				bottom: 12px;
+				z-index: 3;
+				display: inline-flex;
+				align-items: center;
+				gap: 6px;
+				padding: 6px 10px;
+				border-radius: 999px;
+				font: 600 11.5px/1 ui-monospace, SFMono-Regular, Menlo, monospace;
+				letter-spacing: 0.04em;
+				text-transform: uppercase;
+				text-decoration: none;
+				color: rgba(255, 255, 255, 0.82);
+				background: rgba(8, 8, 14, 0.55);
+				border: 1px solid rgba(255, 255, 255, 0.14);
+				backdrop-filter: blur(8px);
+				-webkit-backdrop-filter: blur(8px);
+				transition:
+					background 0.15s,
+					color 0.15s,
+					border-color 0.15s;
+			}
+			.brand:hover {
+				color: #fff;
+				background: rgba(8, 8, 14, 0.72);
+				border-color: rgba(255, 255, 255, 0.28);
+			}
+			.brand .dot {
+				width: 6px;
+				height: 6px;
+				border-radius: 50%;
+				background: #6ee7b7;
+				box-shadow: 0 0 6px #6ee7b7;
+			}
+			body[data-bg='light'] .brand {
+				color: rgba(10, 10, 16, 0.78);
+				background: rgba(255, 255, 255, 0.6);
+				border-color: rgba(0, 0, 0, 0.12);
+			}
+			body[data-bg='light'] .brand:hover {
+				color: #000;
+			}
+
+			/* AR button + progress, lightly themed to match. */
+			model-viewer::part(default-progress-bar) {
+				background: #6ee7b7;
+			}
+
+			/* Prominent one-tap AR launcher — only revealed on devices that can
+			   actually enter AR (phones/tablets). model-viewer's own button is a
+			   small icon; this is the obvious call to action on a phone. */
+			.ar-cta {
+				position: fixed;
+				left: 50%;
+				bottom: 18px;
+				transform: translateX(-50%);
+				z-index: 4;
+				display: inline-flex;
+				align-items: center;
+				gap: 8px;
+				padding: 13px 22px;
+				border: 0;
+				border-radius: 999px;
+				cursor: pointer;
+				font: 600 14.5px/1 ui-sans-serif, system-ui, -apple-system, sans-serif;
+				color: #07140e;
+				background: #6ee7b7;
+				box-shadow: 0 12px 34px -8px rgba(110, 231, 183, 0.6);
+				transition:
+					transform 0.14s ease,
+					box-shadow 0.14s ease,
+					background 0.14s ease;
+			}
+			.ar-cta:hover {
+				background: #8af0c6;
+				transform: translateX(-50%) translateY(-1px);
+			}
+			.ar-cta:active {
+				transform: translateX(-50%) translateY(1px);
+			}
+			.ar-cta:focus-visible {
+				outline: 2px solid var(--focus-ring-color, #fff);
+				outline-offset: 3px;
+			}
+			.ar-cta svg {
+				width: 18px;
+				height: 18px;
+			}
+			.ar-cta[hidden] {
+				display: none;
+			}
+
+			.msg {
+				position: fixed;
+				inset: 0;
+				z-index: 2;
+				display: none;
+				flex-direction: column;
+				align-items: center;
+				justify-content: center;
+				gap: 10px;
+				padding: 24px;
+				text-align: center;
+				color: rgba(255, 255, 255, 0.62);
+			}
+			.msg h1 {
+				margin: 0;
+				font-size: 16px;
+				font-weight: 600;
+				color: rgba(255, 255, 255, 0.9);
+			}
+			.msg p {
+				margin: 0;
+				font-size: 13.5px;
+				line-height: 1.5;
+				max-width: 38ch;
+			}
+			.msg a {
+				color: #6ee7b7;
+				text-decoration: none;
+			}
+			.msg a:hover {
+				text-decoration: underline;
+			}
+			body[data-state='error'] #stage {
+				display: none;
+			}
+			body[data-state='error'] .msg {
+				display: flex;
+			}
+			body[data-state='error'] {
+				background: radial-gradient(120% 120% at 50% 0%, #15151c 0%, #0b0b0f 70%);
+			}
+		</style>
+		<script src="/model-viewer-meshopt.js"></script>
+	</head>
+	<body data-bg="dark" data-state="ok">
+		<div id="stage">
+			<model-viewer
+				id="mv"
+				camera-controls
+				auto-rotate
+				auto-rotate-delay="500"
+				rotation-per-second="16deg"
+				interaction-prompt="auto"
+				shadow-intensity="1"
+				shadow-softness="0.9"
+				exposure="1.05"
+				tone-mapping="aces"
+				environment-image="/environments/gallery/env.hdr"
+				ar
+				ar-modes="webxr scene-viewer quick-look"
+				alt="Interactive 3D model forged on three.ws"
+			></model-viewer>
+		</div>
+
+		<button class="ar-cta" id="ar-btn" type="button" hidden>
+			<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+				<path d="M12 2 3 7v10l9 5 9-5V7l-9-5Z" />
+				<path d="m3 7 9 5 9-5" />
+				<path d="M12 12v10" />
+			</svg>
+			View in AR
+		</button>
+
+		<a class="brand" id="brand" href="https://three.ws/forge" target="_blank" rel="noopener" aria-label="Forge your own 3D model on three.ws" data-i18n-html="forge_embed.forged_on_three_ws" data-i18n-attr="aria-label:forge_embed.forge_your_own_3d_model_on_t_arialabel">
+			<span class="dot" aria-hidden="true"></span>
+			Forged on three.ws
+		</a>
+
+		<div class="msg">
+			<h1 data-i18n="forge_embed.no_model_to_show">No model to show</h1>
+			<p data-i18n-html="forge_embed.this_embed_is_missing_its_model_url">
+				This embed is missing its model URL. Generate one at
+				<a href="https://three.ws/forge" target="_blank" rel="noopener">three.ws/forge</a>
+				and copy the embed code from the result.
+			</p>
+		</div>
+
+		<script>
+			(function () {
+				var params = new URL(location.href).searchParams;
+				var raw = params.get('src') || '';
+				var title = params.get('title') || '';
+				var poster = params.get('poster') || '';
+				var bg = params.get('bg');
+				var hideBrand = params.get('brand') === '0';
+
+				// Background: dark (default) | light | transparent.
+				if (bg === 'transparent') document.body.removeAttribute('data-bg');
+				else if (bg === 'light') document.body.setAttribute('data-bg', 'light');
+				else document.body.setAttribute('data-bg', 'dark');
+
+				if (hideBrand) {
+					var b = document.getElementById('brand');
+					if (b) b.style.display = 'none';
+				}
+
+				// Only accept http(s) absolute URLs or same-origin absolute paths.
+				// Anything else (javascript:, data:, protocol-relative) is rejected
+				// so a hostile embedder can't turn the iframe into an XSS vector.
+				function safeUrl(u) {
+					if (!u) return null;
+					if (u[0] === '/' && u[1] !== '/') return u;
+					try {
+						var parsed = new URL(u, location.origin);
+						if (parsed.protocol === 'http:' || parsed.protocol === 'https:') {
+							return parsed.href;
+						}
+					} catch (e) {
+						/* fallthrough */
+					}
+					return null;
+				}
+
+				var src = safeUrl(raw);
+				var mv = document.getElementById('mv');
+				if (!src || !mv) {
+					document.body.setAttribute('data-state', 'error');
+					return;
+				}
+
+				mv.setAttribute('src', src);
+				if (title) mv.setAttribute('alt', title + ' — forged on three.ws');
+				var safePoster = safeUrl(poster);
+				if (safePoster) mv.setAttribute('poster', safePoster);
+
+				// Carry the prompt through to the "Forge your own" link so a click
+				// from an embed lands on the same idea, ready to remix.
+				if (title) {
+					var brand = document.getElementById('brand');
+					if (brand) {
+						brand.href = 'https://three.ws/forge?prompt=' + encodeURIComponent(title);
+					}
+				}
+
+				mv.addEventListener('error', function () {
+					document.body.setAttribute('data-state', 'error');
+				});
+
+				// One-tap AR: reveal the launcher only where AR can actually run,
+				// and trigger it from the user's tap (AR needs a gesture).
+				var arBtn = document.getElementById('ar-btn');
+				function maybeShowAR() {
+					if (arBtn && mv.canActivateAR) arBtn.hidden = false;
+				}
+				mv.addEventListener('load', maybeShowAR);
+				// canActivateAR can resolve before 'load' on supported devices.
+				setTimeout(maybeShowAR, 700);
+				if (arBtn) {
+					arBtn.addEventListener('click', function () {
+						try {
+							mv.activateAR();
+						} catch (e) {
+							/* AR unsupported mid-session — leave the viewer as-is. */
+						}
+					});
+				}
+			})();
+		</script>
+		<!-- Runtime i18n: detects locale, swaps annotated copy, mounts <lang-switcher>. -->
+	<script type="module" src="/i18n.js"></script>
+</body>
+</html>

@@ -1,0 +1,348 @@
+/* Scene Studio — three.ws chrome over the vendored three.js editor.
+ *
+ * The studio is dark-locked (the page pins data-theme="dark"), so these rules
+ * skin the editor unconditionally — they must win over BOTH the vendor light
+ * defaults and its `prefers-color-scheme: dark` media block, which is why
+ * every selector is prefixed with #studio-app (adds an id, beats the vendor's
+ * class-level specificity regardless of OS color scheme). */
+
+body.scene-studio {
+	overflow: hidden;
+	font-family: var(--font-body);
+}
+
+/* The editor panels position themselves absolutely against their nearest
+ * positioned ancestor; this container pins the whole tool under the site nav.
+ *
+ * The offset is --nav-h (the rendered height of the nav.js header), NOT
+ * --header-h: those are different numbers (69px vs 56px), and using the
+ * smaller one parked the top 13px of the editor behind the sticky nav, which
+ * sliced the tops off the File/Edit/Add/View/Render/Help glyphs and hid the
+ * autosave checkbox at every width. See the --nav-h note in public/tokens.css. */
+#studio-app {
+	position: fixed;
+	top: calc(var(--nav-h, 69px) + env(safe-area-inset-top, 0px));
+	left: 0;
+	right: 0;
+	bottom: 0;
+	background: var(--bg-0);
+	color: var(--ink);
+	font-size: 14px;
+}
+
+/* --- Menubar -------------------------------------------------------------- */
+
+#studio-app #menubar {
+	background: rgba(10, 10, 12, 0.92);
+	border-bottom: 1px solid var(--stroke);
+	color: var(--ink);
+}
+
+#studio-app #menubar .menu .title {
+	color: var(--ink);
+}
+
+/* The vendored #menubar is a fixed 36px tall strip of floated menus, and every
+ * panel below it (#viewport, #sidebar, #toolbar, #script, #player) is pinned to
+ * `top: 36px`. At 320px the six titles no longer fit on one line, so `Help`
+ * floated onto a second row that the 36px strip cannot show: it spilled over
+ * the viewport and landed under the quick-action bar. Tightening the padding
+ * below 600px fits all six on the single row the layout assumes. */
+@media (max-width: 600px) {
+	#studio-app #menubar .menu {
+		padding-right: 2px;
+	}
+
+	#studio-app #menubar .menu .title {
+		padding: 10px 6px;
+	}
+
+	/* Below 600px the vendored sidebar stops being a right-hand column and docks
+	 * full-width along the bottom, but it is also the .TabbedPanel, which carries
+	 * `min-width: 335px` from vendor/css/main.css. 335 is wider than a 320px
+	 * viewport, so the dock overflowed the screen by 15px and body's
+	 * `overflow: hidden` cut that strip off: the outliner's type labels, the right
+	 * stepper of every number field, and the right edge of every row in the
+	 * OBJECT/GEOMETRY/MATERIAL panels were unreachable at 320px.
+	 *
+	 * The min-width exists to stop the desktop resizer (vendor/js/Resizer.js
+	 * clamps its drag to the same 335) from collapsing the column. A full-width
+	 * bottom dock has no resizer (the same media query hides #resizer), so there
+	 * is nothing left for the floor to protect. */
+	#studio-app #sidebar {
+		min-width: 0;
+	}
+}
+
+#studio-app #menubar .menu:hover,
+#studio-app #menubar .menu.open {
+	background: var(--surface-2);
+}
+
+#studio-app #menubar .menu .options {
+	background: #14151c;
+	border: 1px solid var(--stroke-strong);
+	border-radius: var(--radius-sm);
+	box-shadow: var(--shadow-2);
+	padding: 4px 0;
+}
+
+#studio-app #menubar .menu .options hr {
+	border-color: var(--stroke);
+}
+
+#studio-app #menubar .menu .options .option {
+	color: var(--ink);
+	transition: background-color var(--duration-fast) var(--ease-standard);
+}
+
+#studio-app #menubar .menu .options .option:hover,
+#studio-app #menubar .menu .options .option:focus-visible {
+	background: var(--surface-3);
+	color: #fff;
+}
+
+#studio-app #menubar .menu .key {
+	color: var(--ink-dim);
+	border-color: var(--stroke-strong);
+}
+
+/* --- Sidebar / tabs -------------------------------------------------------- */
+
+#studio-app #sidebar {
+	background: #0e0f15;
+	border-left: 1px solid var(--stroke);
+	color: var(--ink);
+}
+
+#studio-app #sidebar .Panel {
+	color: var(--ink);
+	border-top: 1px solid var(--stroke);
+}
+
+#studio-app #sidebar .Panel .Panel {
+	border-top: none;
+}
+
+#studio-app #tabs {
+	background: rgba(10, 10, 12, 0.92);
+	border-bottom: 1px solid var(--stroke);
+}
+
+#studio-app .TabbedPanel .Tabs {
+	background: transparent;
+	border-bottom: 1px solid var(--stroke);
+}
+
+#studio-app .TabbedPanel .Tab {
+	color: var(--ink-dim);
+	background: transparent;
+	border: none;
+	border-bottom: 2px solid transparent;
+	transition:
+		color var(--duration-fast) var(--ease-standard),
+		border-color var(--duration-fast) var(--ease-standard);
+}
+
+#studio-app .TabbedPanel .Tab:hover {
+	color: var(--ink);
+}
+
+#studio-app .TabbedPanel .Tab.selected {
+	color: #fff;
+	border-bottom-color: var(--accent);
+	background: transparent;
+}
+
+/* --- Outliner --------------------------------------------------------------- */
+
+#studio-app .Outliner {
+	background: var(--surface-1);
+	border: 1px solid var(--stroke);
+	border-radius: var(--radius-sm);
+	color: var(--ink);
+}
+
+#studio-app #outliner .option {
+	border-radius: 3px;
+	transition: background-color var(--duration-instant) var(--ease-standard);
+}
+
+#studio-app #outliner .option:hover {
+	background: var(--surface-2);
+}
+
+#studio-app #outliner .option.active {
+	background: rgba(255, 255, 255, 0.16);
+	color: #fff;
+}
+
+#studio-app #outliner .type {
+	color: var(--ink-dim);
+}
+
+/* --- Controls: buttons, inputs, selects ------------------------------------- */
+
+#studio-app .Button {
+	color: var(--ink);
+	background-color: var(--surface-2);
+	border: 1px solid var(--stroke);
+	border-radius: var(--radius-sm);
+	transition:
+		background-color var(--duration-fast) var(--ease-standard),
+		border-color var(--duration-fast) var(--ease-standard);
+	cursor: pointer;
+}
+
+#studio-app .Button:hover {
+	color: #fff;
+	background-color: var(--surface-3);
+	border-color: var(--stroke-strong);
+}
+
+#studio-app .Button:active {
+	background-color: rgba(255, 255, 255, 0.14);
+}
+
+#studio-app .Button.selected {
+	color: #fff;
+	background-color: rgba(255, 255, 255, 0.22);
+	border-color: var(--stroke-strong);
+}
+
+#studio-app .Input,
+#studio-app .TextArea {
+	background-color: var(--bg-1);
+	border: 1px solid var(--stroke);
+	border-radius: var(--radius-sm);
+	color: var(--ink);
+	transition: border-color var(--duration-fast) var(--ease-standard);
+}
+
+#studio-app .Input:focus,
+#studio-app .TextArea:focus {
+	border-color: var(--stroke-strong);
+	color: #fff;
+}
+
+#studio-app .Select {
+	color: var(--ink);
+	background-color: var(--bg-1);
+	border: 1px solid var(--stroke);
+	border-radius: var(--radius-sm);
+	transition:
+		background-color var(--duration-fast) var(--ease-standard),
+		border-color var(--duration-fast) var(--ease-standard);
+}
+
+#studio-app .Select:hover {
+	color: #fff;
+	background-color: var(--surface-3);
+}
+
+/* Keyboard focus ring on every interactive control. */
+#studio-app .Button:focus-visible,
+#studio-app .Input:focus-visible,
+#studio-app .TextArea:focus-visible,
+#studio-app .Select:focus-visible,
+#studio-app .TabbedPanel .Tab:focus-visible {
+	outline: 2px solid rgba(255, 255, 255, 0.5);
+	outline-offset: 1px;
+}
+
+/* --- Floating toolbar -------------------------------------------------------- */
+
+#studio-app #toolbar {
+	background: rgba(16, 17, 24, 0.88);
+	border: 1px solid var(--stroke-strong);
+	border-radius: var(--radius-md);
+	backdrop-filter: blur(12px);
+	-webkit-backdrop-filter: blur(12px);
+	box-shadow: var(--shadow-2);
+}
+
+#studio-app #toolbar .Button {
+	background: transparent;
+	border: none;
+}
+
+#studio-app #toolbar .Button:hover {
+	background: var(--surface-3);
+}
+
+#studio-app #toolbar .Button.selected {
+	background: rgba(255, 255, 255, 0.22);
+}
+
+/* Icons ship as dark strokes for the upstream light theme — invert for ours
+ * (unconditional; the vendor only inverts under prefers-color-scheme: dark). */
+#studio-app #toolbar img {
+	filter: invert(1);
+}
+
+/* The vendored toolbar is positioned but leaves z-index at auto, so it painted
+ * under the empty-state overlay (z-index: 5). On a phone-height viewport the
+ * vendor parks it at `bottom: 330px`, which lands inside the band the overlay
+ * covers, and the first-run card hid the translate/rotate/scale controls
+ * outright. Lifting the live control above the hint keeps it clickable at every
+ * height; the card is click-through everywhere except its own body. */
+#studio-app #toolbar {
+	z-index: 6;
+}
+
+/* --- Listbox / dialogs -------------------------------------------------------- */
+
+#studio-app .Listbox {
+	background: var(--surface-1);
+	border: 1px solid var(--stroke);
+	border-radius: var(--radius-sm);
+	color: var(--ink);
+}
+
+#studio-app .Listbox .ListboxItem:hover {
+	background: var(--surface-2);
+}
+
+#studio-app .Listbox .ListboxItem.active {
+	background: rgba(255, 255, 255, 0.16);
+}
+
+#studio-app .Dialog-content {
+	background: #14151c;
+	border: 1px solid var(--stroke-strong);
+	border-radius: var(--radius-lg);
+	box-shadow: var(--shadow-2);
+	color: var(--ink);
+}
+
+#studio-app .Dialog-title {
+	color: #fff;
+}
+
+#studio-app .Dialog-background {
+	background: rgba(0, 0, 0, 0.6);
+	backdrop-filter: blur(4px);
+	-webkit-backdrop-filter: blur(4px);
+}
+
+/* --- Animation timeline bar --------------------------------------------------- */
+
+#studio-app #animation {
+	background: rgba(10, 10, 12, 0.92);
+	border-top: 1px solid var(--stroke);
+}
+
+#studio-app #animation .Panel {
+	color: var(--ink-dim);
+}
+
+#studio-app #animation input[type='range'] {
+	accent-color: var(--accent);
+}
+
+/* --- Resizers --------------------------------------------------------------- */
+
+#studio-app #resizer:hover,
+#studio-app #animation-resizer:hover {
+	background: rgba(255, 255, 255, 0.18);
+}

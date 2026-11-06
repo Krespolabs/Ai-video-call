@@ -1,0 +1,5234 @@
+/**
+ * Cron dispatcher — single Vercel serverless function for every /api/cron/* job.
+ *
+ * Vercel routes /api/cron/<name> to this file via the [name] dynamic segment;
+ * `req.query.name` carries the kebab-case job id. Each branch below is a
+ * verbatim move of the original per-file handler body — no logic changes,
+ * especially around auth / CRON_SECRET checks.
+ *
+ * ROUTING — READ THIS BEFORE ADDING A HANDLER. This project uses a legacy
+ * `routes` array in vercel.json, which does NOT auto-route dynamic [name]
+ * segments: every job name in HANDLERS must ALSO appear in the explicit
+ * `/api/cron/(name-a|name-b|…)` → `/api/cron/[name]?name=$1` route there, or
+ * the job 404s in production while working fine in local dev. That exact gap
+ * silently killed all 30+ dispatcher jobs (payouts, subscriptions, buybacks,
+ * pumpfun monitors) until July 2026. tests/cron-dispatcher-routing.test.js
+ * fails the suite if the map and the route drift — keep both in sync.
+ *
+ * Cron paths handled (kebab-case → handler):
+ *   audit-log-cleanup             → handleAuditLogCleanup
+ *   erc8004-crawl                 → handleErc8004Crawl
+ *   index-delegations             → handleIndexDelegations
+ *   process-subscriptions         → handleProcessSubscriptions
+ *   pump-agent-stats              → handlePumpAgentStats
+ *   pumpfun-monitor               → handlePumpfunMonitor
+ *   pumpfun-signals               → handlePumpfunSignals
+ *   pumpfun-graduations-sync      → handlePumpfunGraduationsSync
+ *   run-buyback                   → handleRunBuyback
+ *   run-three-buyback             → handleRunThreeBuyback
+ *   run-dca                       → handleRunDca
+ *   run-distribute-payments       → handleRunDistributePayments
+ *   run-subscriptions             → handleRunSubscriptions
+ *   solana-attest-event-cleanup   → handleSolanaAttestEventCleanup
+ *   solana-attestations-crawl     → handleSolanaAttestationsCrawl
+ */
+
+import { Interface } from 'ethers';
+import { createPublicClient, encodeFunctionData, parseAbi } from 'viem';
+import { evmTransport } from '../_lib/evm/rpc.js';
+import { baseSepolia, base } from 'viem/chains';
+
+import { sql } from '../_lib/db.js';
+import { matchedSlurStem } from '../_lib/display-name-safety.js';
+import { submitProtected } from '../_lib/execution-engine.js';
+import { cors, error, json, method, wrapCron } from '../_lib/http.js';
+import { fetchUpstream } from '../_lib/upstream-fetch.js';
+import { env } from '../_lib/env.js';
+import { llmComplete } from '../_lib/llm.js';
+import { CHAINS } from '../_lib/erc8004-chains.js';
+import { REGISTRY_TOPICS, decodeRegistryLog } from '../_lib/erc8004-registry-events.js';
+import { REPUTATION_TOPICS, decodeReputationLog, reputationRegistryFor } from '../_lib/erc8004-reputation-events.js';
+import { agentRef, recordEvents } from '../_lib/onchain-events.js';
+import { DELEGATION_MANAGER_DEPLOYMENTS, DELEGATION_MANAGER_ABI } from '../../src/erc7710/abi.js';
+import {
+	getPumpAgent,
+	getPumpAgentOffline,
+	getConnection,
+	getRpcFallback,
+	getPumpSdk,
+	getAmmPoolState,
+	buildUnsignedTxBase64,
+	solanaPubkey,
+} from '../_lib/pump.js';
+import { mintAttestation, deriveEventId, loadAttesterKeypair } from '../_lib/attest-event.js';
+import { pumpfunMcp, pumpfunBotEnabled } from '../_lib/pumpfun-mcp.js';
+import { getMints, getWhales, getClaims } from '../_lib/channel-feed-sources.js';
+import { crawlAgentAttestations } from '../_lib/solana-attestations.js';
+import { SOLANA_USDC_MINT, SOLANA_USDC_MINT_DEVNET, EVM_USDC } from '../payments/_config.js';
+import { chargeSubscription, failPayment } from '../_lib/subscription-billing.js';
+import { sendEmail } from '../_lib/email.js';
+import { fetchSafePublicUrl } from '../_lib/ssrf-guard.js';
+import { runPumpAlertRules } from '../_lib/pump-alert-runner.js';
+import { publishUserEvent } from '../_lib/feed.js';
+import { confirmSkillPurchase } from '../_lib/purchase-confirm.js';
+import { requireCron } from '../_lib/cron-auth.js';
+import { acquireLock } from '../_lib/cache.js';
+import { resolveURI } from '../../src/ipfs.js';
+import {
+	OUTCOME,
+	applyChargeFailure,
+	chargeStatusFor,
+	classifyChargeFailure,
+} from '../_lib/recurring.js';
+import {
+	adoptLegacyDcaStrategies,
+	claimEvmDca,
+	dueEvmDca,
+	recordEvmDcaFailure,
+	recordEvmDcaSuccess,
+} from '../_lib/dca-unified.js';
+
+// ─── Dispatcher ──────────────────────────────────────────────────────────────
+
+const HANDLERS = {
+	'erc8004-crawl': handleErc8004Crawl,
+	'solana-agents-crawl': handleSolanaAgentsCrawl,
+	'index-delegations': handleIndexDelegations,
+	'process-subscriptions': handleProcessSubscriptions,
+	'pump-agent-stats': handlePumpAgentStats,
+	'pumpfun-monitor': handlePumpfunMonitor,
+	'pumpfun-signals': handlePumpfunSignals,
+	'pumpfun-graduations-sync': handlePumpfunGraduationsSync,
+	'run-buyback': handleRunBuyback,
+	'run-three-buyback': handleRunThreeBuyback,
+	'run-dca': handleRunDca,
+	'run-distribute-payments': handleRunDistributePayments,
+	'run-subscriptions': handleRunSubscriptions,
+	'audit-log-cleanup': handleAuditLogCleanup,
+	'settle-royalties': handleSettleRoyalties,
+	'solana-attest-event-cleanup': handleSolanaAttestEventCleanup,
+	'solana-attestations-crawl': handleSolanaAttestationsCrawl,
+	'expire-pending-purchases': handleExpirePendingPurchases,
+	'confirm-pending-purchases': handleConfirmPendingPurchases,
+	'cleanup-csrf-tokens': handleCleanupCsrfTokens,
+	'process-withdrawals': handleProcessWithdrawals,
+	'monetization-payouts': handleProcessWithdrawals,
+	'run-x-scheduled-posts': handleRunXScheduledPosts,
+	'run-x-triggers': handleRunXTriggers,
+	'x-mentions': handleXMentions,
+	'fetch-x-metrics': handleFetchXMetrics,
+	'run-coin-cycle': handleRunCoinCycle,
+	'run-coin-payouts': handleRunCoinPayouts,
+	'club-payouts': handleClubPayouts,
+	'siwx-gc': handleSiwxGc,
+	'unstoppable-tick': handleUnstoppableTick,
+	'cosmetic-splits-sweep': handleCosmeticSplitsSweep,
+	'treasury-autopilot': handleTreasuryAutopilot,
+	'irl-drops-refund': handleIrlDropsRefund,
+};
+
+// ═══════════════════════════════════════════════════════════════════════════
+// irl-drops-refund — auto-refund expired, unclaimed IRL money drops
+// ═══════════════════════════════════════════════════════════════════════════
+// A drop placed in a spot nobody visits, or with claims left over at expiry,
+// returns its remaining escrow balance to the creator. Idempotent: markRefunding
+// CAS-es the drop to 'refunded' so a second pass can't double-sweep; an empty
+// escrow (fully claimed, or never funded) is marked 'expired' and skipped.
+async function handleIrlDropsRefund(req, res) {
+	if (cors(req, res, { methods: 'GET,POST,OPTIONS' })) return;
+	if (!requireCron(req, res)) return;
+
+	const {
+		listExpiredRefundable, getDropRow, markRefunding, sweepRefund, recordRefundTx, markExpired, readDropBalance, fundingConfigured,
+	} = await import('../_lib/irl-drops.js');
+
+	const report = { refunded: 0, expired: 0, errors: [] };
+	let ids = [];
+	try {
+		ids = await listExpiredRefundable(40);
+	} catch (err) {
+		report.errors.push({ stage: 'list', error: err.message || String(err) });
+		return json(res, 200, report);
+	}
+
+	for (const id of ids) {
+		try {
+			const row = await getDropRow(id);
+			if (!row) continue;
+
+			// Nothing on-chain to return (never funded, or fully claimed) → mark expired.
+			const bal = await readDropBalance({ address: row.escrow_address, asset: row.asset });
+			if (bal.atomics != null && BigInt(bal.atomics) <= 0n) {
+				await markExpired({ dropId: id });
+				report.expired += 1;
+				continue;
+			}
+			if (!row.refund_address || !fundingConfigured()) {
+				// Can't sweep yet (no refund address on file, or payout wallet
+				// unconfigured) — leave it for a later pass rather than losing track.
+				continue;
+			}
+
+			// These are already past expiry; CAS to 'refunded' is idempotent so a
+			// second pass returns null rather than double-sweeping.
+			const locked = await markRefunding({ dropId: id, allowActive: true });
+			if (!locked) continue; // already refunded / not in a refundable state
+			const refundTx = await sweepRefund({ drop: locked });
+			await recordRefundTx({ dropId: id, refundTx });
+			report.refunded += 1;
+		} catch (err) {
+			report.errors.push({ id, error: err.message || String(err) });
+		}
+	}
+	return json(res, 200, report);
+}
+
+// vercel.json grants this route 300s (`functions["api/cron/[name].js"].maxDuration`);
+// without passing maxDurationMs here, wrapCron falls back to its 120s default and
+// races every job behind this shared dispatcher against that instead, truncating
+// anything that legitimately needs more than 120s (e.g. run-buyback, solana-agents-crawl).
+export const maxDuration = 300;
+
+export default wrapCron(
+	async (req, res) => {
+		const name = req.query?.name;
+		const handler = typeof name === 'string' ? HANDLERS[name] : null;
+		if (!handler) return error(res, 404, 'not_found', 'unknown cron');
+		return handler(req, res);
+	},
+	{ maxDurationMs: maxDuration * 1000 },
+);
+
+// ═══════════════════════════════════════════════════════════════════════════
+// solana-agents-crawl — index external Solana agents (Metaplex + AgenC)
+// ═══════════════════════════════════════════════════════════════════════════
+// Enumerates every agent in the Metaplex Agent Registry and the AgenC
+// coordination protocol into solana_agents_index, so /agents lists the whole
+// Solana ecosystem — not just three.ws-launched agents. Each source is isolated:
+// a failing registry (RPC disables getProgramAccounts, IDL drift) is reported in
+// its own block and never aborts the other.
+async function handleSolanaAgentsCrawl(req, res) {
+	if (cors(req, res, { methods: 'GET,POST,OPTIONS' })) return;
+	if (!requireCron(req, res)) return;
+
+	const { crawlMetaplexAgents, crawlAgencAgents } = await import('../_lib/solana-agents-crawl.js');
+
+	// Hard budget split across the two registries so a slow first scan can't
+	// starve the second before Vercel's function limit.
+	const start = Date.now();
+	const BUDGET_MS = 240_000;
+	const report = { metaplex: null, agenc: null, errors: [] };
+
+	try {
+		report.metaplex = await crawlMetaplexAgents({ deadline: start + BUDGET_MS / 2 });
+	} catch (err) {
+		report.errors.push({ source: 'metaplex', error: err.message || String(err) });
+	}
+	try {
+		report.agenc = await crawlAgencAgents({ deadline: start + BUDGET_MS });
+	} catch (err) {
+		report.errors.push({ source: 'agenc', error: err.message || String(err) });
+	}
+
+	return json(res, 200, report);
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// erc8004-crawl
+// ═══════════════════════════════════════════════════════════════════════════
+
+// Blocks scanned per chain per cron invocation. Public RPCs typically allow
+// 2000-block ranges; lower this if a chain's RPC rejects with "block range".
+const ERC8004_BLOCK_CHUNK = 1_000;
+
+// On first run (no cursor), scan this many recent blocks. Keep small so the
+// initial cron run stays well under Vercel's 300s limit. Set
+// ERC8004_CRAWL_LOOKBACK=50000 in Vercel env only for a one-time manual backfill.
+const ERC8004_DEFAULT_LOOKBACK = parseInt(process.env.ERC8004_CRAWL_LOOKBACK || '2000', 10);
+
+// Metadata enrichment per invocation.
+const ERC8004_METADATA_BATCH = 25;
+
+const ERC8004_FETCH_TIMEOUT_MS = 10_000;
+
+// Headers sent on every EVM JSON-RPC POST. Node/undici's fetch sends no
+// `User-Agent` by default, and PublicNode's gateway (ethereum.publicnode.com,
+// base.publicnode.com, the *-sepolia-rpc.publicnode.com testnet hosts) hard-403s
+// any request without an identifiable UA — which blanked the last lane of the
+// failover chain and surfaced as the "RPC HTTP 403 from …publicnode.com" storm in
+// the index-delegations and erc8004 crawl stages. A descriptive bot UA satisfies
+// the gateway; `accept` keeps strict providers from negotiating a non-JSON body.
+const EVM_RPC_HEADERS = {
+	'content-type': 'application/json',
+	accept: 'application/json',
+	'user-agent': 'three.ws-onchain-indexer/1.0 (+https://three.ws)',
+};
+
+// Metadata URLs are external, user-controlled (on-chain agentURI) and often
+// point at slow IPFS gateways. Cap each fetch tighter than RPC calls so a single
+// hung gateway can't stall the whole enrichment batch toward Vercel's 300s kill.
+const ERC8004_METADATA_TIMEOUT_MS = 5_000;
+
+// Hard budget: stop processing and return before Vercel's 300s limit.
+const CRAWL_BUDGET_MS = 240_000;
+
+async function handleErc8004Crawl(req, res) {
+	if (cors(req, res, { methods: 'GET,POST,OPTIONS' })) return;
+
+	if (!requireCron(req, res)) return;
+
+	const crawlStart = Date.now();
+	const report = { chains: [], enriched: 0, errors: [], skipped: 0 };
+
+	// Neediest chain first, never the array order. The budget below cuts the
+	// sweep short on a slow tick, and with a fixed order that always cuts the
+	// SAME tail: the chains at the end of CHAINS were starved every single tick,
+	// which is how one cursor reached 107 days stale while the chains above it
+	// stayed current. Ordering by backlog turns a truncated tick into "the worst
+	// chains got served" instead of "the last chains got skipped again".
+	const order = await erc8004CrawlOrder();
+
+	for (const chain of order) {
+		if (Date.now() - crawlStart > CRAWL_BUDGET_MS) {
+			report.skipped += 1;
+			continue;
+		}
+		try {
+			const r = await erc8004CrawlChain(chain);
+			report.chains.push({ chainId: chain.id, name: chain.name, ...r });
+		} catch (err) {
+			report.errors.push({ chainId: chain.id, error: err.message || String(err) });
+			await sql`
+				UPDATE erc8004_crawl_cursor
+				SET last_error = ${String(err.message || err).slice(0, 500)}
+				WHERE chain_id = ${chain.id}
+			`.catch(() => {});
+		}
+	}
+
+	// Second pass: spend whatever budget the first pass left on the chains that
+	// are still behind head. One chunk per chain per tick is enough to HOLD a
+	// slow chain but cannot DRAIN a fast one, and the arithmetic is not close.
+	// Measured on 2026-08-28: Arbitrum One sat 18,375,509 blocks behind at a
+	// 8,000-block window. The cron runs every 15 minutes, so one chunk per tick
+	// buys 768,000 blocks a day against a chain that produces roughly 345,600,
+	// which drains the backlog in about six weeks. Meanwhile a tick that found
+	// every other chain at head returned with most of its 240 seconds unspent.
+	// This pass hands that idle budget to the worst backlog instead of throwing
+	// it away, and does nothing at all on a tick where every chain is current.
+	report.catchUp = await erc8004CatchUp(order, report, crawlStart);
+
+	if (Date.now() - crawlStart <= CRAWL_BUDGET_MS) {
+		try {
+			report.enriched = await erc8004EnrichMetadata(
+				ERC8004_METADATA_BATCH,
+				crawlStart + CRAWL_BUDGET_MS,
+			);
+		} catch (err) {
+			report.errors.push({ stage: 'metadata', error: err.message || String(err) });
+		}
+	}
+
+	return json(res, 200, report);
+}
+
+// The first pass must always finish, so the catch-up pass only starts once the
+// sweep has left at least this much of the budget unspent, and it stops itself
+// this far from the deadline so metadata enrichment still gets its turn.
+const CRAWL_CATCHUP_RESERVE_MS = 45_000;
+
+/**
+ * Chains the catch-up pass should feed more chunks to, worst backlog first.
+ * A chain is a candidate only when its first-pass result says it is genuinely
+ * behind head AND that pass actually moved the cursor: a chain that scanned
+ * nothing hit its provider's floor or errored, and re-asking it in the same
+ * tick would just spin on the same rejection.
+ * Pure: no clock, no DB. This is the seam the tests drive.
+ * @param {object[]} results the first pass's report.chains entries
+ * @returns {object[]}
+ */
+export function catchUpCandidates(results) {
+	return (results || [])
+		.filter((r) => Number(r?.blocksBehind) > 0 && Number(r?.scanned) > 0)
+		.sort((a, b) => Number(b.blocksBehind) - Number(a.blocksBehind));
+}
+
+/**
+ * Feed extra chunks to the chains still behind head until the budget runs out.
+ * Re-reads the neediest chain each round rather than draining one to completion,
+ * so a single enormous backlog cannot starve the others of the same idle budget.
+ * @param {object[]} order the chain configs the first pass walked
+ * @param {{ chains: object[], errors: object[] }} report mutated in place
+ * @param {number} crawlStart
+ * @returns {Promise<{ rounds: number, scanned: number, chains: number[] }>}
+ */
+async function erc8004CatchUp(order, report, crawlStart) {
+	const summary = { rounds: 0, scanned: 0, chains: [] };
+	const byId = new Map(order.map((c) => [c.id, c]));
+	// Behind-ness as the first pass measured it, updated in place each round so
+	// the next round re-picks the worst without re-querying the cursor table.
+	const behind = new Map(
+		catchUpCandidates(report.chains).map((r) => [r.chainId, Number(r.blocksBehind)]),
+	);
+
+	while (behind.size) {
+		if (Date.now() - crawlStart > CRAWL_BUDGET_MS - CRAWL_CATCHUP_RESERVE_MS) break;
+		const [chainId] = [...behind.entries()].sort((a, b) => b[1] - a[1])[0];
+		const chain = byId.get(chainId);
+		if (!chain) {
+			behind.delete(chainId);
+			continue;
+		}
+		try {
+			const r = await erc8004CrawlChain(chain);
+			report.chains.push({ chainId: chain.id, name: chain.name, catchUp: true, ...r });
+			summary.rounds += 1;
+			summary.scanned += Number(r.scanned) || 0;
+			if (!summary.chains.includes(chain.id)) summary.chains.push(chain.id);
+			// Nothing scanned means the provider refused even the floor window, so
+			// drop the chain rather than spin on the same rejection for the rest of
+			// the budget.
+			if (Number(r.blocksBehind) > 0 && Number(r.scanned) > 0) behind.set(chainId, Number(r.blocksBehind));
+			else behind.delete(chainId);
+		} catch (err) {
+			report.errors.push({ chainId: chain.id, stage: 'catch-up', error: err.message || String(err) });
+			behind.delete(chainId);
+		}
+	}
+	return summary;
+}
+
+/**
+ * Every configured chain, worst backlog first. A chain with no cursor row has
+ * never been crawled at all and outranks everything, since it contributes no
+ * coverage whatsoever until its first tick.
+ * @returns {Promise<object[]>}
+ */
+async function erc8004CrawlOrder() {
+	let cursors = [];
+	try {
+		cursors = await sql`SELECT chain_id, blocks_behind, updated_at FROM erc8004_crawl_cursor`;
+	} catch {
+		// An unreadable cursor table must not stop the crawl; fall back to the
+		// declared order, which is what ran before this ordering existed.
+		return [...CHAINS];
+	}
+	const by = new Map(cursors.map((c) => [Number(c.chain_id), c]));
+	return [...CHAINS].sort((a, b) => rank(by.get(b.id)) - rank(by.get(a.id)));
+}
+
+// Ceiling on how far cursor age alone can lift a chain that reports no backlog.
+// It has to be high enough that a cursor stale for days outranks one crawled
+// minutes ago, and low enough that it never preempts a chain with a real
+// backlog to clear.
+const STALE_RANK_CAP = 10_000;
+
+/**
+ * Sweep priority for one chain's cursor. Never-crawled sorts above every
+ * backlog; otherwise the backlog itself ranks, and a chain reporting no backlog
+ * ranks by how long its cursor has been standing still.
+ *
+ * That last clause used to be `Math.min(ageMin, 1)`, which silently disabled
+ * itself. The cron runs every 15 minutes, so by the time it reads the table
+ * EVERY caught-up chain is older than the 1-minute cap and they all return
+ * exactly 1. The sort then falls through to the declared array order on every
+ * single tick, which is the starvation the tie-break was added to prevent.
+ *
+ * It also hid broken chains. blocks_behind is only written by a SUCCESSFUL
+ * crawl, so a chain erroring on every tick keeps reporting whatever its last
+ * good crawl left, which is 0, and reads as caught up forever. Measured
+ * 2026-08-28: Polygon's cursor had not advanced in 122 days and BNB Chain's in
+ * 89, both still reporting 0 blocks behind, both sorted to the bottom of every
+ * sweep. Ranking them by age puts the most-starved chains at the front of a
+ * tick that runs out of budget, which is the only time the order matters.
+ * Pure: the clock is injected. This is the seam the tests drive.
+ * @param {{ blocks_behind?: number|string|null, updated_at?: string|Date|null }|null|undefined} cursor
+ * @param {number} [now]
+ * @returns {number}
+ */
+export function rank(cursor, now = Date.now()) {
+	if (!cursor) return Number.MAX_SAFE_INTEGER;
+	const behind = Number(cursor.blocks_behind || 0);
+	if (behind > 0) return behind;
+	const ageMin = cursor.updated_at ? (now - new Date(cursor.updated_at).getTime()) / 60_000 : 0;
+	return Math.min(Math.max(ageMin, 0), STALE_RANK_CAP);
+}
+
+// Concurrent eth_getBlockByNumber calls while stamping a range's event blocks.
+// See the loop in erc8004CrawlChain for why this is bounded rather than a single
+// Promise.all over every block in the window.
+const ERC8004_BLOCKTIME_CONCURRENCY = 8;
+
+// Ceiling for the adaptive window. Public RPCs commonly cap eth_getLogs at
+// 2,000 to 10,000 blocks; the crawl walks up toward this and backs off the
+// moment a provider says no, so no chain needs its limit hardcoded here.
+const ERC8004_MAX_BLOCK_CHUNK = 8_000;
+const ERC8004_MIN_BLOCK_CHUNK = 100;
+// Ceiling on how long erc8004CrawlChain's shrink-retry loop may run for ONE
+// chain before it must checkpoint. Comfortably under CRAWL_BUDGET_MS (240s) so
+// a single stuck chain can never consume the whole tick, and short enough that
+// an external request timeout around this cron cannot kill the process before
+// a write happens. Measured 2026-10-25: Base's cursor sat frozen for 2+ days
+// because this loop had no time bound at all, only the backoffChunkSize fixed
+// point at the floor, which a slow or rejecting lane could take minutes to
+// reach, with nothing written until it did.
+const ERC8004_CHAIN_BUDGET_MS = 60_000;
+// Range rejections name the range rather than a stable error code, and every
+// provider words it differently.
+//
+// A bare "limit exceeded" is deliberately NOT here. It is the wording of the
+// JSON-RPC -32005 rate/compute limit (bnbchain data-seed, zan.top), which no
+// smaller range fixes: matching it made the crawl read a plan limit as a range
+// ceiling and shrink to the floor forever instead of surfacing the real fault.
+// Every entry below names a range or a result volume, which shrinking does fix.
+//
+// `ranges? over N blocks` is dRPC's free tier, and its number is wrong: on
+// 2026-10-08 a testnet's dRPC lane answered "ranges over 10000 blocks are not
+// supported on free plan" to every window from 8,000 down to 200 and served 101.
+// It is still a range ceiling that shrinking reaches, which is all this asks.
+const RANGE_REJECTED = /block range|range is too large|too wide|too many blocks|ranges? over \d+ blocks|query returned more than|exceed maximum block range|limited to|response size|logs matched|exceeds? max(?:imum)? results|retry with the range/i;
+
+/**
+ * Is this RPC failure the provider refusing the width of the requested range?
+ * Only those are worth retrying smaller; everything else is a real fault.
+ * @param {unknown} message
+ * @returns {boolean}
+ */
+export function isRangeRejection(message) {
+	return RANGE_REJECTED.test(String(message ?? ''));
+}
+
+// Blocks the provider no longer holds at all. Distinct from a range rejection
+// in the one way that matters: no smaller window fixes it, because the data is
+// gone rather than the request being too wide. Narrow on purpose, so a node
+// that is merely busy is never mistaken for one that has pruned.
+// `archive request` and its siblings belong here rather than under a range
+// rejection: a keyless public node that will serve the last few thousand blocks
+// and answers anything older with "archive requests require a personal token"
+// has drawn the same retention wall a pruning node draws, just with a paywall
+// behind it. Measured on 2026-09-02, that wording is what two of the three
+// stalled chains were sitting on, and shrinking the window walked straight into
+// it at every size down to the 100-block floor.
+const PRUNED_HISTORY =
+	/has been pruned|pruned history|missing trie node|state is not available|do not have the state|archive request|requires? an archive|archive node (?:is )?required/i;
+
+/**
+ * Is this RPC failure the provider saying it no longer retains the blocks the
+ * cursor points at?
+ *
+ * This is the EVM twin of the Solana unresolvable-cursor stall, and it fails the
+ * same way: the crawl resumes at `last_block + 1`, the provider has pruned that
+ * height, the whole call errors, and the cursor is only written on the success
+ * path, so every later tick asks for the same dead blocks forever. Measured on
+ * 2026-09-02, one chain's cursor had not moved since 2026-04-28 for exactly this
+ * reason while the range backoff, which cannot help here, retried around it.
+ * @param {unknown} message
+ * @returns {boolean}
+ */
+export function isPrunedHistoryRejection(message) {
+	return PRUNED_HISTORY.test(String(message ?? ''));
+}
+
+/**
+ * The block window to request for a chain this tick.
+ *
+ * A fixed window is the reason five chains could never catch up: it is a bet
+ * that every chain produces blocks slower than the crawl consumes them, and on
+ * Arbitrum One (0.28x of the cron period per 1,000 blocks) that bet loses every
+ * tick, forever. So grow the window while a chain is behind and shrink it when
+ * the provider objects, letting each lane settle at the largest range it will
+ * actually serve.
+ *
+ * Pure, so the growth and backoff curves are testable without an RPC.
+ * @param {{ stored?: number|null, configured?: number|null, behind: number }} a
+ * @returns {number}
+ */
+export function nextChunkSize({ stored, configured, behind }) {
+	const floor = Math.max(ERC8004_MIN_BLOCK_CHUNK, 1);
+	const base = Number(stored) > 0 ? Number(stored) : configured || ERC8004_BLOCK_CHUNK;
+	// Caught up: hold the window rather than growing it for no reason.
+	if (behind <= base) return clampChunk(base, floor);
+	// Behind: double, but never overshoot the backlog itself.
+	return clampChunk(Math.min(base * 2, behind), floor);
+}
+
+/** Halve the window after a provider rejects the range, never below the floor. */
+export function backoffChunkSize(current) {
+	return clampChunk(Math.floor((Number(current) || ERC8004_BLOCK_CHUNK) / 2), ERC8004_MIN_BLOCK_CHUNK);
+}
+
+function clampChunk(n, floor) {
+	return Math.max(floor, Math.min(ERC8004_MAX_BLOCK_CHUNK, Math.trunc(n)));
+}
+
+export async function erc8004CrawlChain(chain, { now = Date.now } = {}) {
+	const [cursor] = await sql`
+		SELECT last_block, chunk_size FROM erc8004_crawl_cursor WHERE chain_id = ${chain.id}
+	`;
+
+	const latestHex = await erc8004RpcCall(chain.rpcUrls ?? chain.rpcUrl, 'eth_blockNumber', []);
+	const latestBlock = Number.parseInt(latestHex, 16);
+
+	let fromBlock = cursor
+		? Number(cursor.last_block) + 1
+		: Math.max(0, latestBlock - ERC8004_DEFAULT_LOOKBACK);
+
+	if (fromBlock > latestBlock) {
+		await erc8004RecordHead(chain.id, latestBlock, latestBlock);
+		return { inserted: 0, scanned: 0, lastBlock: latestBlock, fromBlock, blocksBehind: 0 };
+	}
+
+	// Adaptive per chain, seeded by the declared override for a restrictive RPC.
+	// See nextChunkSize: a fixed window is why fast chains never caught up.
+	let chunkSize = nextChunkSize({
+		stored: cursor?.chunk_size,
+		configured: chain.blockChunk,
+		behind: latestBlock - fromBlock + 1,
+	});
+
+	let toBlock;
+	let logs;
+	let reputationLogs;
+	// A rejected range is the growth loop finding this chain's ceiling, not an
+	// outage, so shrink and retry the SAME blocks now rather than ending the tick
+	// empty. Retrying only on the next tick deadlocks a chain forever: the
+	// rejection stores the halved window, then nextChunkSize sees a backlog wider
+	// than it and doubles straight back to the size that was just refused, so the
+	// cursor never moves. Measured on 2026-08-14: BSC Testnet and Moonbeam sat at
+	// scanned=0 across four consecutive ticks while their backlogs grew.
+	let narrowedFrom = null;
+	let prunedSkip = null;
+	const loopStart = now();
+	for (;;) {
+		if (now() - loopStart > ERC8004_CHAIN_BUDGET_MS) {
+			// The shrink loop has run long enough that something downstream (a slow
+			// or rate-limited lane, a dense block range needing many halvings) is
+			// costing more wall-clock time than this chain may safely hold the tick
+			// hostage for. Persist whatever progress exists so the NEXT tick resumes
+			// from here instead of silently retrying the exact same blocks forever.
+			await sql`
+				INSERT INTO erc8004_crawl_cursor (chain_id, last_block, updated_at, head_block, blocks_behind, chunk_size, last_error)
+				VALUES (${chain.id}, ${Math.max(0, fromBlock - 1)}, now(), ${latestBlock},
+				        ${Math.max(0, latestBlock - fromBlock + 1)}, ${chunkSize}, ${'shrink loop exceeded ' + ERC8004_CHAIN_BUDGET_MS + 'ms budget at chunk ' + chunkSize})
+				ON CONFLICT (chain_id) DO UPDATE SET
+					updated_at    = now(),
+					head_block    = excluded.head_block,
+					blocks_behind = excluded.blocks_behind,
+					chunk_size    = excluded.chunk_size,
+					last_error    = excluded.last_error
+			`;
+			return {
+				inserted: 0,
+				scanned: 0,
+				lastBlock: fromBlock - 1,
+				fromBlock,
+				blocksBehind: Math.max(0, latestBlock - fromBlock + 1),
+				chunkSize,
+				loopBudgetExceeded: true,
+			};
+		}
+		toBlock = Math.min(fromBlock + chunkSize - 1, latestBlock);
+		const range = {
+			fromBlock: '0x' + fromBlock.toString(16),
+			toBlock: '0x' + toBlock.toString(16),
+		};
+		try {
+			// Topic OR-set, not the single Registered topic: an agent's row used to
+			// freeze at its registration block because ownership transfers, URI updates
+			// and metadata writes were never requested from the RPC at all. See the
+			// coverage census in api/_lib/erc8004-registry-events.js.
+			logs = await erc8004RpcCall(chain.rpcUrls ?? chain.rpcUrl, 'eth_getLogs', [
+				{ address: chain.registry, topics: [REGISTRY_TOPICS], ...range },
+			]);
+
+			// The reputation registry lives at its own CREATE2 address on the same
+			// network class; scan the identical block range so an agent's trust signals
+			// (feedback, revocations, responses) reach the index alongside its identity
+			// history. A chain with no reputation deployment yields an empty log list,
+			// not an error.
+			reputationLogs = await erc8004RpcCall(chain.rpcUrls ?? chain.rpcUrl, 'eth_getLogs', [
+				{ address: reputationRegistryFor(chain.testnet), topics: [REPUTATION_TOPICS], ...range },
+			]);
+			break;
+		} catch (err) {
+			// Pruned blocks are unreachable at every window size, so shrinking is
+			// the wrong move and waiting is worse: the cursor stays parked on data
+			// the provider will never serve, and the chain indexes nothing again,
+			// forever. Resume at the head instead, once per tick so a provider that
+			// keeps saying no cannot spin here.
+			//
+			// The skipped span is a real, permanent gap in this chain's history: it
+			// can only be recovered from an archive node, which the keyless failover
+			// tail is not. Report it rather than closing over it, so the gap is a
+			// number someone can act on instead of a silence.
+			if (isPrunedHistoryRejection(err?.message || err) && prunedSkip === null) {
+				const resumeAt = Math.max(0, latestBlock - ERC8004_DEFAULT_LOOKBACK);
+				if (resumeAt > fromBlock) {
+					prunedSkip = { from: fromBlock, to: resumeAt, blocks: resumeAt - fromBlock };
+					fromBlock = resumeAt;
+					continue;
+				}
+			}
+			// Any RPC failure that is not the provider refusing the range is a genuine
+			// error and propagates to the per-chain handler above. The head is already
+			// known here, so bank the real backlog first: blocks_behind is otherwise
+			// written only on success, and a chain that errors every tick keeps the 0
+			// its last good crawl left behind and reads as caught up forever.
+			if (!isRangeRejection(err?.message || err)) {
+				await erc8004RecordBacklog(chain.id, latestBlock, fromBlock).catch(() => {});
+				throw err;
+			}
+			const reduced = backoffChunkSize(chunkSize);
+			if (reduced >= chunkSize) {
+				// Already at the floor: the provider will not serve even the smallest
+				// window this tick. Record it and leave the cursor untouched so the next
+				// tick retries the same blocks against the failover RPC.
+				await sql`
+					INSERT INTO erc8004_crawl_cursor (chain_id, last_block, updated_at, head_block, blocks_behind, chunk_size, last_error)
+					VALUES (${chain.id}, ${Math.max(0, fromBlock - 1)}, now(), ${latestBlock},
+					        ${Math.max(0, latestBlock - fromBlock + 1)}, ${chunkSize}, ${'range rejected at ' + chunkSize + ' blocks (floor)'})
+					ON CONFLICT (chain_id) DO UPDATE SET
+						updated_at    = now(),
+						head_block    = excluded.head_block,
+						blocks_behind = excluded.blocks_behind,
+						chunk_size    = excluded.chunk_size,
+						last_error    = excluded.last_error
+				`;
+				return {
+					inserted: 0,
+					scanned: 0,
+					lastBlock: fromBlock - 1,
+					fromBlock,
+					blocksBehind: Math.max(0, latestBlock - fromBlock + 1),
+					chunkSize,
+					rangeRejected: true,
+				};
+			}
+			narrowedFrom = narrowedFrom ?? chunkSize;
+			chunkSize = reduced;
+		}
+	}
+
+	// Fetch block timestamps for any blocks that produced events.
+	const blockTimes = {};
+	const allLogs = [...logs, ...reputationLogs];
+	if (allLogs.length > 0) {
+		const uniqueBlockHexes = [...new Set(allLogs.map((l) => l.blockNumber))];
+		// Bounded fan-out, not one request per block all at once. The window this
+		// crawl asks for grows while a chain is behind, so a catching-up chain can
+		// return several hundred distinct event blocks in a single tick, and firing
+		// that many concurrent eth_getBlockByNumber calls is the reliable way to
+		// get rate-limited off every lane at once. A log whose timestamp cannot be
+		// read is still applied to the agent row; it just does not enter the event
+		// index, which refuses to invent a time.
+		for (let i = 0; i < uniqueBlockHexes.length; i += ERC8004_BLOCKTIME_CONCURRENCY) {
+			await Promise.all(
+				uniqueBlockHexes.slice(i, i + ERC8004_BLOCKTIME_CONCURRENCY).map(async (bn) => {
+					try {
+						const block = await erc8004RpcCall(
+							chain.rpcUrls ?? chain.rpcUrl,
+							'eth_getBlockByNumber',
+							[bn, false],
+						);
+						blockTimes[bn] = block ? Number.parseInt(block.timestamp, 16) : null;
+					} catch {
+						// registered_at will be null for this block
+					}
+				}),
+			);
+		}
+	}
+
+	let inserted = 0;
+	const byClass = { registration: 0, metadata: 0, transfer: 0, reputation: 0 };
+	const events = [];
+
+	for (const log of logs) {
+		try {
+			const ev = decodeRegistryLog(log);
+			if (!ev) continue;
+
+			const ts = blockTimes[log.blockNumber];
+			const occurredAt = ts ? new Date(ts * 1000).toISOString() : null;
+			// Absolute on-chain time only. A log whose block timestamp could not be
+			// read is still applied to the agent row, but is NOT written to the event
+			// index, because a timeline entry stamped with ingestion time is a lie.
+			if (occurredAt) {
+				events.push({
+					chain: 'evm',
+					chainId: chain.id,
+					network: chain.testnet ? 'testnet' : 'mainnet',
+					agentRef: agentRef({ chain: 'evm', chainId: chain.id, agentId: ev.agentId }),
+					eventClass: ev.eventClass,
+					eventName: ev.eventName,
+					tx: ev.tx,
+					logIndex: ev.logIndex,
+					blockNumber: ev.blockNumber,
+					occurredAt,
+					actor: ev.type === 'transfer' ? ev.from : ev.owner || null,
+					counterparty: ev.type === 'transfer' ? ev.to : null,
+					payload: erc8004EventPayload(ev, chain),
+				});
+			}
+
+			if (ev.type === 'registered') {
+				await sql`
+					INSERT INTO erc8004_agents_index
+						(chain_id, agent_id, owner, registry, agent_uri,
+						 registered_block, registered_tx, registered_at, last_seen_at)
+					VALUES
+						(${chain.id}, ${ev.agentId}, ${ev.owner}, ${chain.registry.toLowerCase()},
+						 ${ev.agentUri || null}, ${ev.blockNumber}, ${ev.tx},
+						 ${occurredAt}, now())
+					ON CONFLICT (chain_id, agent_id) DO UPDATE SET
+						owner = excluded.owner,
+						agent_uri = COALESCE(excluded.agent_uri, erc8004_agents_index.agent_uri),
+						last_seen_at = now()
+				`;
+				inserted += 1;
+				byClass.registration += 1;
+			} else if (ev.type === 'uri_updated') {
+				// A new agentURI invalidates every enriched field. Clearing
+				// last_metadata_at re-queues the row for the enrichment pass instead
+				// of serving the old name and image for the next seven days.
+				await sql`
+					UPDATE erc8004_agents_index
+					SET agent_uri = ${ev.agentUri || null},
+					    last_metadata_at = null,
+					    metadata_error = null,
+					    last_seen_at = now()
+					WHERE chain_id = ${chain.id} AND agent_id = ${ev.agentId}
+				`;
+				byClass.metadata += 1;
+			} else if (ev.type === 'metadata_set') {
+				byClass.metadata += 1;
+			} else if (ev.type === 'transfer' && !ev.isMint) {
+				// The reason an agent's indexed owner could never change: nothing
+				// watched Transfer. Only a row that already exists is updated; a
+				// transfer of an agent registered before the crawl window is
+				// recorded as history and reconciled when Registered is backfilled.
+				await sql`
+					UPDATE erc8004_agents_index
+					SET owner = ${ev.to}, last_seen_at = now()
+					WHERE chain_id = ${chain.id} AND agent_id = ${ev.agentId}
+				`;
+				byClass.transfer += 1;
+			}
+		} catch (decodeErr) {
+			console.warn('[crawl] decode failed', chain.id, log.transactionHash, decodeErr.message);
+		}
+	}
+
+	// Reputation logs were fetched from every chain on every tick and then used
+	// only to look up block timestamps: nothing decoded them, so the entire EVM
+	// trust dimension was discarded on arrival. A census of the index on
+	// 2026-08-14 found 9,231 EVM events across metadata, registration and
+	// transfer and exactly ZERO reputation events, while a 1,000-block sample of
+	// Base alone carried 8 NewFeedback logs. Decode them into the same batch.
+	for (const log of reputationLogs) {
+		try {
+			const ev = decodeReputationLog(log);
+			if (!ev) continue;
+			const ts = blockTimes[log.blockNumber];
+			if (!ts) continue; // absolute on-chain time or nothing, same rule as above
+			events.push({
+				chain: 'evm',
+				chainId: chain.id,
+				network: chain.testnet ? 'testnet' : 'mainnet',
+				agentRef: agentRef({ chain: 'evm', chainId: chain.id, agentId: ev.agentId }),
+				eventClass: ev.eventClass,
+				eventName: ev.eventName,
+				tx: ev.tx,
+				logIndex: ev.logIndex,
+				blockNumber: ev.blockNumber,
+				occurredAt: new Date(ts * 1000).toISOString(),
+				// The client is who left the feedback; a response is written by the
+				// responder, which is the agent's side of the exchange.
+				actor: ev.responder || ev.client || null,
+				counterparty: ev.responder ? ev.client || null : null,
+				payload: erc8004ReputationPayload(ev, chain),
+			});
+			byClass.reputation += 1;
+		} catch (decodeErr) {
+			console.warn('[crawl] reputation decode failed', chain.id, log.transactionHash, decodeErr.message);
+		}
+	}
+
+	const recorded = events.length ? await recordEvents(events) : { inserted: 0, rejected: 0 };
+
+	// Always advance cursor to toBlock so the next run continues from here.
+	// blocks_behind is the honest freshness signal: updated_at only says the cron
+	// ran, and a chain producing blocks faster than the crawl consumes them keeps
+	// a fresh updated_at forever while falling further behind every tick.
+	const blocksBehind = Math.max(0, latestBlock - toBlock);
+	// A skip closes the backlog, which is exactly why the gap has to be banked
+	// here. The moment the cursor reaches the head this chain reports zero blocks
+	// behind and reads as perfectly healthy, so the span it jumped over would
+	// otherwise exist only in one cron response that rotates out of the logs.
+	// Accumulated, never overwritten: a provider that keeps pruning under the
+	// crawl shows up as a number that grows.
+	const gapBlocks = prunedSkip ? prunedSkip.blocks : 0;
+	await sql`
+		INSERT INTO erc8004_crawl_cursor (
+			chain_id, last_block, updated_at, head_block, blocks_behind, chunk_size, last_error,
+			history_gap_blocks, history_gap_to, history_gap_at
+		)
+		VALUES (
+			${chain.id}, ${toBlock}, now(), ${latestBlock}, ${blocksBehind}, ${chunkSize}, null,
+			${gapBlocks}, ${prunedSkip ? prunedSkip.to : null}, ${prunedSkip ? new Date() : null}
+		)
+		ON CONFLICT (chain_id) DO UPDATE SET
+			last_block    = GREATEST(erc8004_crawl_cursor.last_block, ${toBlock}),
+			updated_at    = now(),
+			head_block    = excluded.head_block,
+			blocks_behind = excluded.blocks_behind,
+			chunk_size    = excluded.chunk_size,
+			last_error    = null,
+			history_gap_blocks = erc8004_crawl_cursor.history_gap_blocks + excluded.history_gap_blocks,
+			history_gap_to     = COALESCE(excluded.history_gap_to, erc8004_crawl_cursor.history_gap_to),
+			history_gap_at     = COALESCE(excluded.history_gap_at, erc8004_crawl_cursor.history_gap_at)
+	`;
+
+	return {
+		inserted,
+		scanned: toBlock - fromBlock + 1,
+		lastBlock: toBlock,
+		fromBlock,
+		logs: logs.length,
+		events: recorded.inserted,
+		byClass,
+		headBlock: latestBlock,
+		blocksBehind,
+		// Present only when the tick overshot the provider's ceiling and recovered
+		// by shrinking in place, so the report distinguishes "settled at its real
+		// window" from "asked for too much and still delivered".
+		...(narrowedFrom ? { narrowedFrom } : {}),
+		// Present only when the provider had pruned the blocks the cursor pointed
+		// at and the crawl resumed at the head. Names the span that is now a
+		// permanent gap for this chain.
+		...(prunedSkip ? { prunedSkip } : {}),
+		chunkSize,
+	};
+}
+
+/**
+ * Record how far behind head a chain is on a tick that failed to advance it.
+ *
+ * Deliberately leaves updated_at and last_block alone: the cursor did not move,
+ * and the lag monitor reads updated_at as "last time this chain advanced". Only
+ * the backlog is refreshed, so a chain stuck on a dead lane shows the blocks it
+ * is missing instead of the 0 from its last successful crawl. Measured on
+ * 2026-10-08: one testnet had not advanced in 26 days (its first lane's
+ * hostname no longer resolves) and still reported 0 blocks behind against a
+ * head 2.3 million blocks past its cursor.
+ * @param {number} chainId
+ * @param {number} headBlock
+ * @param {number} fromBlock the first block the failed tick tried to read
+ */
+async function erc8004RecordBacklog(chainId, headBlock, fromBlock) {
+	await sql`
+		UPDATE erc8004_crawl_cursor
+		SET head_block    = ${headBlock},
+		    blocks_behind = ${Math.max(0, headBlock - fromBlock + 1)}
+		WHERE chain_id = ${chainId}
+	`;
+}
+
+/**
+ * Stamp a caught-up chain's head so the lag monitor can tell "0 blocks behind"
+ * apart from "never measured". A chain with nothing to scan still reports.
+ * @param {number} chainId
+ * @param {number} headBlock
+ * @param {number} lastBlock
+ */
+async function erc8004RecordHead(chainId, headBlock, lastBlock) {
+	await sql`
+		INSERT INTO erc8004_crawl_cursor (chain_id, last_block, updated_at, head_block, blocks_behind, last_error)
+		VALUES (${chainId}, ${lastBlock}, now(), ${headBlock}, 0, null)
+		ON CONFLICT (chain_id) DO UPDATE SET
+			updated_at    = now(),
+			head_block    = excluded.head_block,
+			blocks_behind = 0,
+			last_error    = null
+	`;
+}
+
+// Per-class payload for the event index. Keeps the raw on-chain detail that the
+// agent-row columns cannot hold (which metadata key changed, the URI at the time
+// of the event, whether a transfer was the registration mint).
+// Per-class payload for a reputation event. Keeps the score with its decimals
+// (an int128 rendered as a decimal string, so nothing rounds), the tags that
+// say what the score is about, and the off-chain URI the attestation points at.
+function erc8004ReputationPayload(ev, chain) {
+	const base = {
+		registry: reputationRegistryFor(chain.testnet),
+		agentId: ev.agentId,
+		client: ev.client || null,
+		feedbackIndex: ev.feedbackIndex ?? null,
+	};
+	if (ev.type === 'feedback') {
+		return {
+			...base,
+			value: ev.value,
+			valueDecimals: ev.valueDecimals,
+			tag1: ev.tag1,
+			tag2: ev.tag2,
+			endpoint: ev.endpoint,
+			feedbackUri: ev.feedbackUri,
+			feedbackHash: ev.feedbackHash,
+		};
+	}
+	if (ev.type === 'feedback_response') {
+		return { ...base, responder: ev.responder, responseUri: ev.responseUri, responseHash: ev.responseHash };
+	}
+	return base;
+}
+
+function erc8004EventPayload(ev, chain) {
+	const base = { registry: chain.registry.toLowerCase(), agentId: ev.agentId };
+	if (ev.type === 'registered' || ev.type === 'uri_updated') {
+		return { ...base, agentUri: ev.agentUri || null, owner: ev.owner };
+	}
+	if (ev.type === 'metadata_set') {
+		return { ...base, key: ev.key, value: ev.value };
+	}
+	return { ...base, from: ev.from, to: ev.to, mint: ev.isMint };
+}
+
+async function erc8004EnrichMetadata(limit, deadline) {
+	const rows = await sql`
+		SELECT chain_id, agent_id, agent_uri
+		FROM erc8004_agents_index
+		WHERE agent_uri IS NOT NULL
+		  AND (last_metadata_at IS NULL OR last_metadata_at < now() - interval '7 days')
+		ORDER BY last_metadata_at NULLS FIRST, registered_at DESC NULLS LAST
+		LIMIT ${limit}
+	`;
+
+	let done = 0;
+	for (const row of rows) {
+		// Each row may fetch a slow external URL; stop before the cron's hard
+		// budget so a long IPFS tail can't push the function into a 504.
+		if (deadline && Date.now() > deadline) break;
+		try {
+			const meta = await erc8004FetchAgentMetadata(row.agent_uri);
+			if (!meta) {
+				await sql`
+					UPDATE erc8004_agents_index
+					SET metadata_error = 'fetch failed',
+					    last_metadata_at = now()
+					WHERE chain_id = ${row.chain_id} AND agent_id = ${row.agent_id}
+				`;
+				continue;
+			}
+			const name = erc8004Truncate(meta.name || '', 200);
+			const description = erc8004Truncate(meta.description || '', 1000);
+			const image = erc8004ResolveGateway(meta.image || '');
+			const services = Array.isArray(meta.services) ? meta.services : [];
+			const avatarSvc = services.find(
+				(s) => String(s?.name || '').toLowerCase() === 'avatar' && s?.endpoint,
+			);
+			const glbUrl = avatarSvc ? erc8004ResolveGateway(avatarSvc.endpoint) : null;
+			const has3d = !!glbUrl;
+			// `meta` is attacker-controlled — it is whatever the agent's owner published
+			// on-chain. Letting `meta.active` alone decide visibility means a third party
+			// chooses what name three.ws renders: one Base-registered agent's name was a
+			// racial slur, active and shown on /marketplace. Withhold those rows.
+			// Every public feed already filters `active = true`, so this single flag
+			// covers explore, marketplace, agents and search. Slurs only, never general
+			// profanity — a false positive silently delists a legitimate agent.
+			const slur = matchedSlurStem(`${name} ${description}`);
+			if (slur) {
+				console.warn('[crawl] withholding agent: slur in on-chain metadata', {
+					chain_id: row.chain_id,
+					agent_id: row.agent_id,
+					matched: slur,
+				});
+			}
+			const active = meta.active !== false && !slur;
+			const x402 = !!(meta.x402Support || meta.x402);
+
+			await sql`
+				UPDATE erc8004_agents_index
+				SET name = ${name || null},
+				    description = ${description || null},
+				    image = ${image || null},
+				    glb_url = ${glbUrl},
+				    services = ${JSON.stringify(services)}::jsonb,
+				    has_3d = ${has3d},
+				    active = ${active},
+				    x402_support = ${x402},
+				    metadata_error = null,
+				    last_metadata_at = now()
+				WHERE chain_id = ${row.chain_id} AND agent_id = ${row.agent_id}
+			`;
+			done += 1;
+		} catch (err) {
+			await sql`
+				UPDATE erc8004_agents_index
+				SET metadata_error = ${erc8004Truncate(err.message || String(err), 500)},
+				    last_metadata_at = now()
+				WHERE chain_id = ${row.chain_id} AND agent_id = ${row.agent_id}
+			`;
+		}
+	}
+	return done;
+}
+
+async function erc8004RpcCall(urls, method, params) {
+	const urlList = Array.isArray(urls) ? urls : [urls];
+	let lastErr;
+	// The one lane failure the caller can act on, kept across the whole chain of
+	// lanes. Reporting only the LAST lane's error buries it: on 2026-09-02 one
+	// chain's first lane said plainly that it no longer holds the blocks the
+	// cursor points at, its final lane answered a generic `limit exceeded`, and
+	// the crawl saw only the second. So the cursor never learned to skip the
+	// unreachable span and the chain sat stale for eight days. A retention wall
+	// outranks a busy provider because it is the diagnosis that ends the stall.
+	let retentionErr = null;
+	for (const url of urlList) {
+		const ac = new AbortController();
+		const t = setTimeout(() => ac.abort(), ERC8004_FETCH_TIMEOUT_MS);
+		try {
+			const res = await fetch(url, {
+				method: 'POST',
+				headers: EVM_RPC_HEADERS,
+				body: JSON.stringify({ jsonrpc: '2.0', id: 1, method, params }),
+				signal: ac.signal,
+			});
+			// Read the body BEFORE the status. Providers that gate archive ranges
+			// answer with a real JSON-RPC error under a 403, and throwing on the
+			// status alone reduced that to "HTTP 403 from <host>", which no
+			// rejection predicate can classify and no recovery can act on.
+			const data = await res.json().catch(() => null);
+			if (data?.error) throw new Error(`RPC ${data.error.code}: ${data.error.message}`);
+			if (!res.ok) throw new Error(`HTTP ${res.status} from ${url}`);
+			if (!data) throw new Error(`unreadable JSON-RPC body from ${url}`);
+			return data.result;
+		} catch (err) {
+			lastErr = err;
+			if (retentionErr === null && isPrunedHistoryRejection(err?.message || err)) retentionErr = err;
+		} finally {
+			clearTimeout(t);
+		}
+	}
+	throw retentionErr ?? lastErr;
+}
+
+async function erc8004FetchAgentMetadata(uri) {
+	const url = erc8004ResolveGateway(uri);
+	if (!url) return null;
+	try {
+		// agentURI is attacker-controllable on-chain data — SSRF-guard the fetch
+		// (and every redirect hop) exactly like the alert-webhook path below.
+		const res = await fetchSafePublicUrl(url, {
+			signal: AbortSignal.timeout(ERC8004_METADATA_TIMEOUT_MS),
+		});
+		if (!res.ok) return null;
+		return await res.json();
+	} catch {
+		return null;
+	}
+}
+
+function erc8004ResolveGateway(uri) {
+	if (!uri || typeof uri !== 'string') return '';
+	const url = resolveURI(uri);
+	return url.startsWith('http://') || url.startsWith('https://') ? url : '';
+}
+
+function erc8004Truncate(s, max) {
+	if (!s) return '';
+	return s.length > max ? s.slice(0, max) : s;
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// index-delegations
+// ═══════════════════════════════════════════════════════════════════════════
+
+// Topic hashes are derived from the ABI so they stay in sync with contract changes.
+const dmIface = new Interface(DELEGATION_MANAGER_ABI);
+const DISABLED_TOPIC = dmIface.getEvent('DisabledDelegation').topicHash;
+const REDEEMED_TOPIC = dmIface.getEvent('RedeemedDelegation').topicHash;
+
+// Max blocks per eth_getLogs call. Public RPCs 429 above ~2000.
+// Ethereum mainnet (chainId 1) nodes cap eth_getLogs at 50 blocks; use 25 to
+// stay safely under the limit and avoid 504s.
+const IDX_BLOCK_CAP = 2000;
+const IDX_MAINNET_BLOCK_CAP = 25; // ETH mainnet is far more restrictive
+const IDX_RPC_TIMEOUT_MS = 10_000;
+// Stay this many blocks behind the chain tip. Two reasons:
+//   1. idxRpc rotates across a pool of public RPCs, and they are not perfectly
+//      in sync — eth_blockNumber may resolve on a node at head N while a sibling
+//      serves eth_getLogs with a head of N-2, which rejects toBlock=N with
+//      "block range extends beyond current head block". A small buffer keeps the
+//      queried range valid on every node in the pool.
+//   2. It avoids indexing blocks that can still be reorged out near the tip.
+// The next tick advances the cursor and picks up the buffered blocks once they
+// are safely confirmed.
+const IDX_HEAD_CONFIRMATIONS = 5;
+// Hard time budget per cron invocation, leaving 8 s headroom before the 30 s
+// serverless limit. It covers the WHOLE tick, so it is divided across the chains
+// still to be indexed rather than consumed by whichever one runs first (see
+// idxChainDeadline).
+const IDX_TIME_BUDGET_MS = 22_000;
+// Floor on one chain's slice of that budget. Ethereum mainnet is both first in
+// DELEGATION_MANAGER_DEPLOYMENTS and the slowest (its nodes cap eth_getLogs at 25
+// blocks), so with a single shared deadline it spent the entire budget and every
+// later chain returned zero batches on every tick. A chain that indexes nothing
+// also never writes an indexer_state cursor, so it re-derived its start block from
+// the head each tick and never made progress at all: Base delegation revocations
+// went permanently unindexed. Each chain now gets an equal share of whatever is
+// left, never less than this.
+const IDX_MIN_CHAIN_SLICE_MS = 2_500;
+// One cron period, matching this job's `*/5` schedule in vercel.json. Used only
+// to rotate which chain is indexed first, so the offset advances by exactly one
+// per tick and every chain leads once per full rotation.
+const IDX_ROTATION_PERIOD_MS = 5 * 60_000;
+
+// Wall-clock deadline for the chain about to be indexed: an even split of the
+// budget that remains across the chains that remain.
+function idxChainDeadline(started, chainsRemaining) {
+	const left = Math.max(0, IDX_TIME_BUDGET_MS - (Date.now() - started));
+	return Date.now() + Math.max(IDX_MIN_CHAIN_SLICE_MS, Math.floor(left / Math.max(1, chainsRemaining)));
+}
+
+// Approximate blocks per day, used only to seed the cursor on first run.
+const BLOCKS_PER_DAY = {
+	84532: 43200, // Base Sepolia ~2 s/block
+	11155111: 7200, // Sepolia ~12 s/block
+};
+
+// Public RPC fallbacks per chain — tried in order. Override primary via env
+// RPC_URL_<chainId> with a keyed provider (Alchemy/Infura/Quicknode); the env
+// URL is always tried first (see idxRpcUrls). The public fallbacks below are a
+// best-effort safety net only, so prod SHOULD still set RPC_URL_1 / RPC_URL_8453
+// for the most reliable indexing — but the keyless set is curated to ones that
+// actually answer eth_getLogs from a serverless datacenter IP.
+//
+// Why these and not the "obvious" ones — every endpoint below was probed live for
+// eth_blockNumber AND eth_getLogs from a datacenter host:
+//   • eth.llamarpc.com / base.llamarpc.com / *.llamarpc.com → now sit behind a
+//     Cloudflare "Just a moment…" bot challenge that hard-403s every server-side
+//     POST (no browser to solve the JS challenge). They were the FIRST entry in
+//     the old chain 1 list, so every tick burned an attempt on a guaranteed 403.
+//   • cloudflare-eth.com → endpoint sunset (-32046 "Cannot fulfill request").
+//   • rpc.sepolia.org / rpc2.sepolia.org → dead (404 / no route).
+//   • rpc.ankr.com/<chain> keyless → "Unauthorized: authenticate with an API key"
+//     (handled in idxRpcUrls: rewritten to the keyed form when ANKR_API_KEY is
+//     set, dropped otherwise so it never wastes an attempt).
+//   • *.publicnode.com → answers fine from most hosts but 403s from Vercel's IAD
+//     egress range, so it is demoted to LAST (best-effort) rather than relied on —
+//     it was the surfaced "RPC HTTP 403 from …publicnode.com" storm.
+// Leading providers (dRPC, 1rpc, mevblocker, ethpandaops, tenderly) are
+// independent operators verified serving eth_getLogs keyless from a datacenter,
+// so a single one being throttled or blocked still leaves a working lane.
+const PUBLIC_RPCS = {
+	1: [
+		'https://eth.drpc.org',
+		'https://1rpc.io/eth',
+		'https://rpc.mevblocker.io',
+		'https://rpc.ankr.com/eth',
+		'https://ethereum-rpc.publicnode.com',
+	],
+	8453: [
+		'https://mainnet.base.org',
+		'https://base.drpc.org',
+		'https://1rpc.io/base',
+		'https://rpc.ankr.com/base',
+		'https://base-rpc.publicnode.com',
+	],
+	84532: [
+		'https://sepolia.base.org',
+		'https://base-sepolia.drpc.org',
+		'https://base-sepolia.gateway.tenderly.co',
+		'https://rpc.ankr.com/base_sepolia',
+		'https://base-sepolia-rpc.publicnode.com',
+	],
+	11155111: [
+		'https://sepolia.drpc.org',
+		'https://1rpc.io/sepolia',
+		'https://rpc.sepolia.ethpandaops.io',
+		'https://sepolia.gateway.tenderly.co',
+		'https://rpc.ankr.com/eth_sepolia',
+		'https://ethereum-sepolia-rpc.publicnode.com',
+	],
+	421614: [
+		'https://sepolia-rollup.arbitrum.io/rpc',
+		// PublicNode serves testnets at the `<chain>-rpc` subdomain (cf. the working
+		// base-/ethereum-sepolia entries above). The bare `arbitrum-sepolia.publicnode.com`
+		// host has no RPC service and answered every request with a hard 403 — fixed
+		// to the canonical `-rpc` form so failover lands on a live node.
+		'https://arbitrum-sepolia-rpc.publicnode.com',
+		// Tenderly's keyless public gateway — an independent provider so a single
+		// node's outage/throttle doesn't blank the rotation.
+		'https://arbitrum-sepolia.gateway.tenderly.co',
+		'https://rpc.ankr.com/arbitrum_sepolia',
+	],
+	11155420: [
+		'https://sepolia.optimism.io',
+		// Same PublicNode testnet `-rpc` correction as Arbitrum Sepolia above.
+		'https://optimism-sepolia-rpc.publicnode.com',
+		'https://optimism-sepolia.gateway.tenderly.co',
+		'https://rpc.ankr.com/optimism_sepolia',
+	],
+};
+
+function idxRpcUrls(chainId) {
+	const envUrl = process.env[`RPC_URL_${chainId}`];
+	// Paid metered reserve (e.g. a Quicknode credit-funded endpoint) appended
+	// AFTER every free public fallback: it bills against a monthly quota, so it
+	// should only serve when the whole free chain is down or throttled — the
+	// inverse of RPC_URL_<chainId>, which is tried first.
+	const lastResortUrl = process.env[`RPC_URL_${chainId}_LAST_RESORT`];
+	const ankrKey = process.env.ANKR_API_KEY;
+	// Ankr sunset keyless access: every https://rpc.ankr.com/<chain> call now
+	// returns "Unauthorized: authenticate with an API key", so a keyless entry
+	// is a guaranteed failed attempt + error log each run. With a key, rewrite
+	// to Ankr's authenticated form (…/<chain>/<KEY>); without one, drop it so
+	// failover lands on a working public node instead.
+	// PublicNode hard-403s from Vercel's egress range (see PUBLIC_RPCS note). On a
+	// Vercel deployment that endpoint is a guaranteed failed attempt — it both
+	// wastes a failover slot and is the source of the "RPC HTTP 403 from
+	// …publicnode.com" error storm — so drop it there. It stays in the rotation for
+	// self-hosted / non-Vercel runs where it answers normally.
+	const onVercel = !!process.env.VERCEL;
+	const fallbacks = (PUBLIC_RPCS[chainId] ?? [])
+		.map((url) => {
+			if (onVercel && url.includes('.publicnode.com')) return null;
+			if (!url.startsWith('https://rpc.ankr.com/')) return url;
+			return ankrKey ? `${url}/${ankrKey}` : null;
+		})
+		.filter(Boolean);
+	const urls = envUrl ? [envUrl, ...fallbacks] : fallbacks;
+	if (lastResortUrl && !urls.includes(lastResortUrl)) urls.push(lastResortUrl);
+	return urls;
+}
+
+async function handleIndexDelegations(req, res) {
+	if (cors(req, res, { methods: 'GET,POST,OPTIONS' })) return;
+
+	if (!requireCron(req, res)) return;
+
+	const started = Date.now();
+	const report = { chains: [], skippedChains: [], expiredSwept: 0, errors: [] };
+
+	// Index each chain independently — one chain's RPC failure must not abort others.
+	//
+	// The lead position is rotated per tick. Every chain is guaranteed at least one
+	// batch once it is started (a chain that indexes nothing never writes a cursor,
+	// so it would re-derive its start block from the head forever and never make
+	// progress), which means a slow chain can push the tail of the list past the
+	// budget. Rotating puts a different chain at the front each tick, so the tail
+	// is never the same chain twice and the budget stays a real ceiling.
+	const deployments = Object.entries(DELEGATION_MANAGER_DEPLOYMENTS);
+	const offset = Math.floor(started / IDX_ROTATION_PERIOD_MS) % deployments.length;
+	const ordered = deployments.map((_, i) => deployments[(i + offset) % deployments.length]);
+
+	for (const [i, [chainIdStr, contract]] of ordered.entries()) {
+		const chainId = Number(chainIdStr);
+		// Budget spent: leave the rest for the next tick, which will lead with a
+		// chain further along the rotation.
+		if (i > 0 && Date.now() - started > IDX_TIME_BUDGET_MS) {
+			report.skippedChains.push(chainId);
+			continue;
+		}
+		const t0 = Date.now();
+		try {
+			const r = await idxIndexChain(chainId, contract, idxChainDeadline(started, ordered.length - i));
+			const summary = { chainId, ...r, elapsedMs: Date.now() - t0 };
+			report.chains.push(summary);
+			console.log(JSON.stringify({ stage: 'index-delegations', ...summary }));
+		} catch (err) {
+			const entry = { chainId, error: err.message || String(err) };
+			report.errors.push(entry);
+			console.error(JSON.stringify({ stage: 'index-delegations', ...entry }));
+		}
+	}
+
+	// Expiry sweep — idempotent, catches expirations missed between grant and indexer.
+	try {
+		const swept = await sql`
+			UPDATE agent_delegations
+			SET status = 'expired'
+			WHERE status = 'active' AND expires_at < NOW()
+			RETURNING id
+		`;
+		report.expiredSwept = swept.length;
+	} catch (err) {
+		report.errors.push({ stage: 'expiry-sweep', error: err.message || String(err) });
+		console.error(JSON.stringify({ stage: 'expiry-sweep', error: err.message }));
+	}
+
+	// Emit summary to usage_events (best-effort — non-fatal if table shape differs).
+	try {
+		await sql`
+			INSERT INTO usage_events (kind, tool, status, latency_ms)
+			VALUES ('permissions.indexer.tick', 'index-delegations', 'ok', ${Date.now() - started})
+		`;
+	} catch {
+		/* non-fatal */
+	}
+
+	return json(res, 200, report);
+}
+
+async function idxIndexChain(chainId, contract, deadline = Date.now() + IDX_TIME_BUDGET_MS) {
+	const urls = idxRpcUrls(chainId);
+	if (!urls.length) throw new Error(`no RPC URL configured for chain ${chainId}`);
+
+	// Per-chain batch size: ETH mainnet nodes cap eth_getLogs at 50 blocks.
+	const BATCH = chainId === 1 ? IDX_MAINNET_BLOCK_CAP : IDX_BLOCK_CAP;
+
+	const headHex = await idxRpc(urls, 'eth_blockNumber', []);
+	// Index only up to a confirmed head, never the raw tip — see
+	// IDX_HEAD_CONFIRMATIONS for why (cross-RPC head skew + reorg safety).
+	const latestBlock = Math.max(0, parseInt(headHex, 16) - IDX_HEAD_CONFIRMATIONS);
+
+	const [cursor] = await sql`
+		SELECT last_indexed_block FROM indexer_state
+		WHERE contract = ${contract.toLowerCase()} AND chain_id = ${chainId}
+	`;
+	const initialFrom = cursor
+		? Number(cursor.last_indexed_block) + 1
+		: Math.max(0, latestBlock - (BLOCKS_PER_DAY[chainId] ?? 7200));
+
+	let fromBlock = initialFrom;
+	// Seeded one block BEFORE the start so a chain that runs no batch at all
+	// reports the empty range it actually covered. Seeding it to latestBlock made
+	// a starved chain's summary read as a full successful scan.
+	let toBlock = initialFrom - 1; // updated each iteration; reflects final processed range
+	let batches = 0;
+	let revokedCount = 0;
+	let redeemedCount = 0;
+	let logErrorCount = 0;
+	let earlyExit = false;
+
+	while (fromBlock <= latestBlock) {
+		// Time budget: save cursor and break before the function times out. Checked
+		// at the top of the loop, so a chain always gets at least one batch even
+		// when the earlier chains overran.
+		if (batches > 0 && Date.now() > deadline) {
+			console.warn(
+				JSON.stringify({
+					stage: 'index-delegations',
+					chainId,
+					warning: 'time-budget-exceeded',
+					overrunMs: Date.now() - deadline,
+					stoppedAtBlock: fromBlock,
+				}),
+			);
+			earlyExit = true;
+			break;
+		}
+		batches += 1;
+
+		toBlock = Math.min(fromBlock + BATCH - 1, latestBlock);
+
+		let logs;
+		try {
+			logs = await idxRpc(urls, 'eth_getLogs', [
+				{
+					address: contract,
+					topics: [[DISABLED_TOPIC, REDEEMED_TOPIC]],
+					fromBlock: '0x' + fromBlock.toString(16),
+					toBlock: '0x' + toBlock.toString(16),
+				},
+			]);
+		} catch (fetchErr) {
+			// AbortError (batch timed out) or a transient block-range/head-skew
+			// error (a lagging RPC in the rotation pool rejecting a range it
+			// hasn't synced yet) — save the cursor at the start of this batch so
+			// the next invocation retries it, then stop. These are not failures:
+			// the cron resumes from here next tick.
+			const transient =
+				fetchErr.name === 'AbortError' ||
+				fetchErr.name === 'TimeoutError' ||
+				/beyond (the )?current head|block range|range is too large|exceeds/i.test(
+					fetchErr.message || '',
+				);
+			if (transient) {
+				console.warn(
+					JSON.stringify({
+						stage: 'index-delegations',
+						chainId,
+						warning: 'rpc-transient',
+						message: fetchErr.message,
+						stoppedAtBlock: fromBlock,
+					}),
+				);
+				// Rewind cursor to fromBlock-1 so the next run retries this batch.
+				await sql`
+					INSERT INTO indexer_state (contract, chain_id, last_indexed_block, updated_at)
+					VALUES (${contract.toLowerCase()}, ${chainId}, ${fromBlock - 1}, NOW())
+					ON CONFLICT (contract, chain_id) DO UPDATE SET
+						last_indexed_block = LEAST(indexer_state.last_indexed_block, ${fromBlock - 1}),
+						updated_at = NOW()
+				`;
+				earlyExit = true;
+				break;
+			}
+			throw fetchErr;
+		}
+
+		if (logs.length > 0) {
+			// Fetch block timestamps only for blocks that have events.
+			const uniqueBlocks = [...new Set(logs.map((l) => l.blockNumber))];
+			const blockTs = {};
+			for (const bn of uniqueBlocks) {
+				const block = await idxRpc(urls, 'eth_getBlockByNumber', [bn, false]);
+				blockTs[bn] = new Date(parseInt(block.timestamp, 16) * 1000).toISOString();
+			}
+
+			for (const log of logs) {
+				try {
+					const ts = blockTs[log.blockNumber];
+					const topic = log.topics[0];
+
+					if (topic === DISABLED_TOPIC) {
+						// DisabledDelegation indexes delegationHash as topics[1].
+						const delegationHash = log.topics[1];
+						const rows = await sql`
+							UPDATE agent_delegations
+							SET status = 'revoked',
+							    revoked_at = ${ts}::timestamptz,
+							    tx_hash_revoke = ${log.transactionHash}
+							WHERE delegation_hash = ${delegationHash} AND status = 'active'
+							RETURNING id
+						`;
+						revokedCount += rows.length;
+					} else if (topic === REDEEMED_TOPIC) {
+						// RedeemedDelegation does not index delegationHash. Decode the
+						// non-indexed `delegation` tuple from log.data and defer to the
+						// contract's getDelegationHash() rather than reimplementing the
+						// EIP-712 struct hash locally — provably matches the on-chain
+						// value and survives any future ABI change to the struct.
+						const parsed = dmIface.parseLog({
+							topics: log.topics,
+							data: log.data,
+						});
+						const callData = dmIface.encodeFunctionData('getDelegationHash', [
+							parsed.args.delegation,
+						]);
+						const raw = await idxRpc(urls, 'eth_call', [
+							{ to: contract, data: callData },
+							'latest',
+						]);
+						const [delegationHash] = dmIface.decodeFunctionResult(
+							'getDelegationHash',
+							raw,
+						);
+						const rows = await sql`
+							UPDATE agent_delegations
+							SET redemption_count = redemption_count + 1,
+							    last_redeemed_at = ${ts}::timestamptz
+							WHERE delegation_hash = ${delegationHash}
+							RETURNING id
+						`;
+						redeemedCount += rows.length;
+					} else {
+						// eth_getLogs filter restricts to the two topics above, so this
+						// branch is unreachable under current configuration. Guard
+						// anyway so future filter widening fails loudly in logs
+						// rather than silently miscategorizing events.
+						logErrorCount++;
+						console.warn(
+							JSON.stringify({
+								stage: 'index-delegations',
+								chainId,
+								warning: 'unknown-topic',
+								topic,
+								tx: log.transactionHash,
+							}),
+						);
+					}
+				} catch (err) {
+					// Isolate per-log failures so one bad event doesn't abort the
+					// batch and force a full re-scan on the next tick.
+					logErrorCount++;
+					console.error(
+						JSON.stringify({
+							stage: 'index-delegations',
+							chainId,
+							error: 'log-process-failed',
+							message: err.message || String(err),
+							tx: log.transactionHash,
+							topic: log.topics?.[0],
+						}),
+					);
+				}
+			}
+		}
+
+		// Advance cursor after each batch so a timeout preserves partial progress.
+		await sql`
+			INSERT INTO indexer_state (contract, chain_id, last_indexed_block, updated_at)
+			VALUES (${contract.toLowerCase()}, ${chainId}, ${toBlock}, NOW())
+			ON CONFLICT (contract, chain_id) DO UPDATE SET
+				last_indexed_block = GREATEST(indexer_state.last_indexed_block, excluded.last_indexed_block),
+				updated_at = NOW()
+		`;
+
+		fromBlock = toBlock + 1;
+	}
+
+	return {
+		fromBlock: initialFrom,
+		toBlock,
+		batches,
+		revokedCount,
+		redeemedCount,
+		logErrorCount,
+		earlyExit,
+	};
+}
+
+async function idxRpc(urls, method, params) {
+	let lastErr;
+	for (const url of urls) {
+		const ac = new AbortController();
+		const t = setTimeout(() => ac.abort(), IDX_RPC_TIMEOUT_MS);
+		try {
+			const res = await fetch(url, {
+				method: 'POST',
+				headers: EVM_RPC_HEADERS,
+				body: JSON.stringify({ jsonrpc: '2.0', id: 1, method, params }),
+				signal: ac.signal,
+			});
+			if (!res.ok) throw new Error(`RPC HTTP ${res.status} from ${url}`);
+			const data = await res.json();
+			if (data.error) {
+				throw new Error(
+					`RPC ${method} error: ${data.error.message ?? JSON.stringify(data.error)}`,
+				);
+			}
+			return data.result;
+		} catch (err) {
+			lastErr = err;
+		} finally {
+			clearTimeout(t);
+		}
+	}
+	throw lastErr;
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// pump-agent-stats
+// ═══════════════════════════════════════════════════════════════════════════
+
+// Keep small: each mint makes 2-3 Solana RPC calls; public RPC rate-limits at
+// 429 immediately, so large batches reliably 504 within Vercel's 30s window.
+const PUMP_STATS_MAX_PER_RUN = 20;
+// Per-mint cap so one stuck mint can't eat the whole run. A healthy private RPC
+// answers each of the 2-3 sequential calls in a few hundred ms (~1s/mint), so a
+// 4s cap is generous for real work while failing fast on a hung endpoint. The
+// 22s DEADLINE below is the real total-run guard; this only bounds one mint.
+const PUMP_STATS_MINT_TIMEOUT_MS = 4_000;
+
+// Pump.fun graduation threshold (mainnet curve). Used only as a UI hint —
+// progress_pct is a coarse bar, not financial advice.
+const GRADUATION_REAL_SOL = 85_000_000_000n; // ~85 SOL in lamports
+
+async function handlePumpAgentStats(req, res) {
+	if (cors(req, res, { methods: 'GET,POST,OPTIONS' })) return;
+	if (!method(req, res, ['GET', 'POST'])) return;
+
+	if (!requireCron(req, res)) return;
+
+	const mints = await sql`
+		select id, mint, network, user_id, name from pump_agent_mints
+		order by id limit ${PUMP_STATS_MAX_PER_RUN}
+	`;
+
+	const DEADLINE = Date.now() + 22_000;
+	const report = {
+		scanned: mints.length,
+		updated: 0,
+		errors: 0,
+		graduations: 0,
+		timeouts: 0,
+		rate_limited: 0,
+		skipped: 0,
+	};
+	let consecutiveRateLimit = 0;
+
+	for (const m of mints) {
+		if (Date.now() >= DEADLINE) {
+			report.skipped += mints.length - mints.indexOf(m);
+			break;
+		}
+		if (consecutiveRateLimit >= 3) {
+			report.skipped += mints.length - mints.indexOf(m);
+			console.log(
+				JSON.stringify({
+					event: 'pump_agent_stats.circuit_open',
+					consecutive_429: consecutiveRateLimit,
+				}),
+			);
+			break;
+		}
+
+		try {
+			const stats = await Promise.race([
+				pumpStatsSnapshotMint(m),
+				new Promise((_, rej) =>
+					setTimeout(
+						() =>
+							rej(Object.assign(new Error('snapshot timeout'), { code: 'TIMEOUT' })),
+						PUMP_STATS_MINT_TIMEOUT_MS,
+					),
+				),
+			]);
+
+			consecutiveRateLimit = 0;
+
+			// Detect graduation flip false→true vs prior snapshot.
+			const [prior] = await sql`
+				select graduated from pump_agent_stats where mint_id=${m.id} limit 1
+			`;
+			const justGraduated = stats.graduated && prior && !prior.graduated;
+
+			await sql`
+				insert into pump_agent_stats
+					(mint_id, network, mint, graduated, bonding_curve, amm,
+					 last_signature, last_signature_at, recent_tx_count, refreshed_at, error)
+				values (
+					${m.id}, ${m.network}, ${m.mint}, ${stats.graduated},
+					${stats.bonding_curve ? JSON.stringify(stats.bonding_curve) : null}::jsonb,
+					${stats.amm ? JSON.stringify(stats.amm) : null}::jsonb,
+					${stats.last_signature}, ${stats.last_signature_at},
+					${stats.recent_tx_count}, now(), null
+				)
+				on conflict (mint_id) do update set
+					graduated         = excluded.graduated,
+					bonding_curve     = excluded.bonding_curve,
+					amm               = excluded.amm,
+					last_signature    = excluded.last_signature,
+					last_signature_at = excluded.last_signature_at,
+					recent_tx_count   = excluded.recent_tx_count,
+					refreshed_at      = now(),
+					error             = null
+			`;
+
+			// Price-point time series.
+			const price = pumpStatsDerivePrice(stats);
+			if (price) {
+				await sql`
+					insert into pump_agent_price_points (mint_id, sol_per_token, market_cap_lamports, source)
+					values (${m.id}, ${price.sol_per_token}, ${price.market_cap_lamports?.toString() ?? null}, ${price.source})
+				`;
+			}
+
+			// Emit a self-sourced graduation signal (no upstream bot needed).
+			if (justGraduated) {
+				report.graduations++;
+				try {
+					await sql`
+						insert into pumpfun_signals (wallet, agent_asset, kind, weight, payload, tx_signature)
+						values (
+							null, ${m.mint}, 'graduation', 0.3,
+							${JSON.stringify({ source: 'pump-agent-stats', network: m.network })}::jsonb,
+							${`graduated:${m.mint}:${Date.now()}`}
+						)
+						on conflict (tx_signature, kind) do nothing
+					`;
+				} catch {
+					// pumpfun_signals table optional
+				}
+
+				// Tell the launch owner their coin filled its bonding curve and
+				// migrated — the platform already knew this the instant the flip
+				// happened but had no way to surface it until now.
+				if (m.user_id) {
+					publishUserEvent(m.user_id, {
+						type: 'pump_launch_filled',
+						name: m.name || null,
+						mint: m.mint,
+						link: `/launches/${encodeURIComponent(m.mint)}`,
+					});
+				}
+			}
+
+			report.updated++;
+		} catch (e) {
+			if (e.code === 'TIMEOUT') {
+				report.timeouts++;
+			} else if (e.code === 'RATE_LIMITED' || /429/.test(e.message)) {
+				report.rate_limited++;
+				consecutiveRateLimit++;
+			} else {
+				report.errors++;
+				consecutiveRateLimit = 0;
+			}
+			await sql`
+				insert into pump_agent_stats (mint_id, network, mint, error, refreshed_at)
+				values (${m.id}, ${m.network}, ${m.mint}, ${e.message || 'snapshot failed'}, now())
+				on conflict (mint_id) do update set error = excluded.error, refreshed_at = now()
+			`.catch(() => {});
+		}
+	}
+
+	return json(res, 200, report);
+}
+
+async function pumpStatsSnapshotMint({ network, mint }) {
+	const mintPk = solanaPubkey(mint);
+	if (!mintPk) throw new Error('invalid mint pubkey');
+
+	const out = {
+		graduated: false,
+		bonding_curve: null,
+		amm: null,
+		last_signature: null,
+		last_signature_at: null,
+		recent_tx_count: 0,
+	};
+
+	// Bonding curve
+	let curve = null;
+	try {
+		const { sdk } = await getPumpSdk({ network });
+		if (sdk.fetchBuyState) {
+			const state = await sdk.fetchBuyState(mintPk, mintPk);
+			curve = state.bondingCurve;
+		} else if (sdk.fetchBondingCurve) {
+			curve = await sdk.fetchBondingCurve(mintPk);
+		}
+	} catch (e) {
+		// The bonding-curve fetch is the dominant source of production 429s
+		// (it runs through the single getConnection endpoint). Propagate rate
+		// limiting so the outer loop's circuit breaker actually trips instead
+		// of silently recording a null curve and burning the per-mint budget.
+		if (/429|rate.limit|max usage/i.test(e?.message || '')) {
+			throw Object.assign(new Error(`RPC 429: ${e.message}`), { code: 'RATE_LIMITED' });
+		}
+		curve = null;
+	}
+
+	if (curve && !curve.complete) {
+		const realSol = BigInt(curve.realSolReserves?.toString?.() ?? '0');
+		const pct =
+			GRADUATION_REAL_SOL > 0n
+				? Number((realSol * 10000n) / GRADUATION_REAL_SOL) / 100
+				: null;
+		out.bonding_curve = {
+			real_sol: realSol.toString(),
+			real_token: curve.realTokenReserves?.toString?.() ?? null,
+			virtual_sol: curve.virtualSolReserves?.toString?.() ?? null,
+			virtual_token: curve.virtualTokenReserves?.toString?.() ?? null,
+			complete: curve.complete ?? false,
+			progress_pct: pct != null ? Math.min(100, Math.max(0, pct)) : null,
+		};
+	} else {
+		// Try AMM pool
+		try {
+			const amm = await getAmmPoolState({ network, mint: mintPk });
+			out.graduated = true;
+			out.amm = {
+				pool: amm.poolKey.toString(),
+				base_reserve: amm.baseReserve.toString(),
+				quote_reserve: amm.quoteReserve.toString(),
+				// Quotes price against vault + virtual; expose both so a consumer
+				// of this snapshot can reproduce the same numbers.
+				virtual_quote_reserves: amm.virtualQuoteReserves.toString(),
+				effective_quote_reserve: amm.effectiveQuoteReserve.toString(),
+				lp_supply: amm.pool.lpSupply?.toString?.() ?? null,
+			};
+		} catch (e) {
+			if (e.code !== 'pool_not_found') throw e;
+			// graduated state inferred from curve.complete only
+			if (curve?.complete) out.graduated = true;
+		}
+	}
+
+	// Recent activity snapshot via RPC. withFallback is the wrapper's call
+	// surface — it rotates across SOLANA_RPC_FALLBACK_URLS on 429/5xx. Calling
+	// RPC methods directly on the RpcFallback instance is a TypeError (the
+	// wrapper has no such method), so this must go through withFallback.
+	try {
+		const rpc = getRpcFallback({ network });
+		const sigs = await rpc.withFallback((conn) =>
+			conn.getSignaturesForAddress(mintPk, { limit: 50 }),
+		);
+		out.recent_tx_count = sigs.length;
+		if (sigs.length > 0) {
+			out.last_signature = sigs[0].signature;
+			if (sigs[0].blockTime) {
+				out.last_signature_at = new Date(sigs[0].blockTime * 1000).toISOString();
+			}
+		}
+	} catch (e) {
+		if (/429|rate.limit|max usage/i.test(e?.message || '')) {
+			throw Object.assign(new Error(`RPC 429: ${e.message}`), { code: 'RATE_LIMITED' });
+		}
+		// Other RPC hiccup — leave activity fields null
+	}
+
+	return out;
+}
+
+// Compute coarse sol-per-token + market_cap_lamports from a stats snapshot.
+// Bonding curve: virtual_sol / virtual_token (the AMM-style invariant pump uses).
+// AMM: quote_reserve / base_reserve.
+function pumpStatsDerivePrice(stats) {
+	if (stats.bonding_curve) {
+		const vSol = Number(stats.bonding_curve.virtual_sol || 0);
+		const vTok = Number(stats.bonding_curve.virtual_token || 0);
+		if (vSol > 0 && vTok > 0) {
+			const sol_per_token = vSol / vTok;
+			// total supply ≈ virtual_token + real_token (heuristic, sufficient for charting)
+			const totalTok =
+				BigInt(stats.bonding_curve.virtual_token || 0) +
+				BigInt(stats.bonding_curve.real_token || 0);
+			const market_cap_lamports =
+				totalTok > 0n ? BigInt(Math.floor(sol_per_token * Number(totalTok))) : null;
+			return { sol_per_token, market_cap_lamports, source: 'bonding_curve' };
+		}
+	}
+	if (stats.amm) {
+		const q = Number(stats.amm.quote_reserve || 0);
+		const b = Number(stats.amm.base_reserve || 0);
+		if (q > 0 && b > 0) {
+			return { sol_per_token: q / b, market_cap_lamports: null, source: 'amm' };
+		}
+	}
+	return null;
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// pumpfun-monitor
+// ═══════════════════════════════════════════════════════════════════════════
+
+const PUMPFUN_MONITOR_MAX_PER_RUN = 50;
+const WHALE_TRADE_USD_FLOOR = 1_000;
+
+async function handlePumpfunMonitor(req, res) {
+	if (cors(req, res, { methods: 'GET,POST,OPTIONS' })) return;
+
+	if (!requireCron(req, res)) return;
+
+	// Heartbeat + per-user alert evaluation run on every tick regardless of
+	// attester provisioning, so /api/healthz reports real bot status and the
+	// dashboard's server-side alerts fire even when no tab is open.
+	await writeBotHeartbeat();
+	const alertReport = await runPumpAlertRules().catch((e) => ({
+		error: e?.message || String(e),
+	}));
+
+	if (!process.env.ATTEST_AGENT_SECRET_KEY) {
+		// Skip the attestation work cleanly when the attester key isn't
+		// provisioned — returning 503 every 3 min would mark the cron job as
+		// failing in the dashboard. Heartbeat + alerts above already ran.
+		return json(res, 200, {
+			skipped: true,
+			reason: 'attester_not_configured',
+			heartbeat: true,
+			alerts: alertReport,
+		});
+	}
+
+	// Pull the latest stats joined with the agent's Metaplex Core asset and
+	// the prior cursor state. Only consider mints whose stats have changed
+	// since the last cursor checkpoint.
+	const rows = await sql`
+		select
+			m.id            as mint_id,
+			m.mint          as token_mint,
+			m.network,
+			m.agent_id,
+			m.agent_authority,
+			s.graduated,
+			s.last_signature,
+			s.last_signature_at,
+			a.id            as agent_row_id,
+			a.user_id,
+			coalesce(a.meta->'onchain'->>'sol_asset', a.meta->>'sol_mint_address') as agent_asset,
+			c.last_graduated,
+			c.last_authority,
+			c.last_trade_signature
+		from pump_agent_mints m
+		join pump_agent_stats  s on s.mint_id = m.id
+		join agent_identities  a on a.id = m.agent_id
+		left join pumpfun_monitor_cursor c on c.mint_id = m.id
+		where coalesce(a.meta->'onchain'->>'sol_asset', a.meta->>'sol_mint_address') is not null
+		  and (
+		     c.mint_id is null
+		  or c.last_graduated      is distinct from s.graduated
+		  or c.last_authority      is distinct from m.agent_authority
+		  or c.last_trade_signature is distinct from s.last_signature
+		  )
+		order by s.refreshed_at desc nulls last
+		limit ${PUMPFUN_MONITOR_MAX_PER_RUN}
+	`;
+
+	let attester;
+	try {
+		attester = loadAttesterKeypair();
+	} catch (e) {
+		// Key is present but undecodable (wrong encoding). Skip the attestation
+		// work cleanly rather than 500-ing every run and marking the cron job as
+		// failing — heartbeat + alerts above already ran. Surface the reason so
+		// the misconfiguration is visible in the cron response/logs.
+		return json(res, 200, {
+			skipped: true,
+			reason: e?.code === 'attester_key_undecodable' ? 'attester_key_undecodable' : 'attester_load_failed',
+			detail: e?.message || String(e),
+			heartbeat: true,
+			alerts: alertReport,
+		});
+	}
+	const report = {
+		scanned: rows.length,
+		minted: 0,
+		deduped: 0,
+		in_progress: 0,
+		errors: 0,
+		events: [],
+	};
+
+	for (const r of rows) {
+		const events = detectEvents(r);
+		for (const ev of events) {
+			try {
+				const result = await mintAttestation({
+					...ev,
+					agent_asset: r.agent_asset,
+					network: r.network,
+					token_mint: r.token_mint,
+					attester,
+				});
+				report[
+					result.status === 'minted'
+						? 'minted'
+						: result.status === 'deduped'
+							? 'deduped'
+							: 'in_progress'
+				]++;
+				report.events.push({
+					mint: r.token_mint,
+					type: ev.event_type,
+					status: result.status,
+					signature: result.signature,
+				});
+			} catch (e) {
+				report.errors++;
+				report.events.push({
+					mint: r.token_mint,
+					type: ev.event_type,
+					status: 'error',
+					error: e?.message || String(e),
+				});
+			}
+		}
+
+		// Always update the cursor — even when nothing was emitted — so we
+		// don't re-scan unchanged rows next tick.
+		await sql`
+			insert into pumpfun_monitor_cursor (mint_id, last_graduated, last_authority, last_trade_signature, last_processed_at)
+			values (${r.mint_id}, ${r.graduated}, ${r.agent_authority}, ${r.last_signature}, now())
+			on conflict (mint_id) do update set
+				last_graduated       = excluded.last_graduated,
+				last_authority       = excluded.last_authority,
+				last_trade_signature = excluded.last_trade_signature,
+				last_processed_at    = now()
+		`;
+	}
+
+	report.alerts = alertReport;
+	report.heartbeat = true;
+	return json(res, 200, report);
+}
+
+// ── Bot heartbeat ───────────────────────────────────────────────────────────
+// Records that the monitor ran so /api/healthz can report real bot status.
+// Best-effort: a heartbeat failure must never fail the cron run.
+async function writeBotHeartbeat() {
+	try {
+		await sql`
+			insert into bot_heartbeat (worker, mode, last_beat_at)
+			values ('pumpfun-monitor', 'cron', now())
+			on conflict (worker) do update set last_beat_at = now(), mode = excluded.mode
+		`;
+	} catch (e) {
+		console.error('[pumpfun-monitor] heartbeat failed:', e?.message || e);
+	}
+}
+
+// ── Server-side alert delivery ──────────────────────────────────────────────
+// Pump dashboard alert rules are evaluated and delivered by the dedicated runner
+// module (api/_lib/pump-alert-runner.js), invoked as runPumpAlertRules() at the
+// top of handlePumpfunMonitor. It matches every enabled pump_alert_rules row
+// against the live pump.fun event stream (graduations, agent mints, prices,
+// whale buys), honors each rule's cooldown, dedupes, and fans matches out across
+// the in-app / webhook / Telegram delivery channels with per-channel isolation.
+
+/** Map a single (stats, cursor) row to the attestation events to emit. */
+function detectEvents(r) {
+	const out = [];
+	const slot_or_ts = r.last_signature_at ? new Date(r.last_signature_at).getTime() : Date.now();
+
+	// Graduation flip false -> true.
+	if (r.graduated === true && r.last_graduated !== true) {
+		out.push({
+			event_type: 'graduation',
+			source: 'pumpfun.graduation',
+			event_id: deriveEventId({
+				event_type: 'graduation',
+				mint: r.token_mint,
+				slot_or_ts: 'final',
+			}),
+			task_id: `pumpfun:${r.token_mint}:graduation`,
+			detail: { network: r.network },
+		});
+	}
+
+	// CTO: agent_authority changed (creator takeover).
+	if (r.agent_authority && r.last_authority && r.agent_authority !== r.last_authority) {
+		out.push({
+			event_type: 'cto_detected',
+			source: 'pumpfun.cto',
+			event_id: deriveEventId({
+				event_type: 'cto',
+				mint: r.token_mint,
+				slot_or_ts: `${r.last_authority}->${r.agent_authority}`,
+			}),
+			task_id: `pumpfun:${r.token_mint}:cto:${slot_or_ts}`,
+			detail: { from: r.last_authority, to: r.agent_authority, network: r.network },
+		});
+	}
+
+	return out;
+}
+
+// Exported for tests.
+export { detectEvents, WHALE_TRADE_USD_FLOOR };
+
+// ═══════════════════════════════════════════════════════════════════════════
+// pumpfun-signals
+// ═══════════════════════════════════════════════════════════════════════════
+
+const CLAIMS_PER_RUN = 200;
+const GRADS_PER_RUN = 50;
+const WHALES_PER_RUN = 100;
+const MINTS_PER_RUN = 100;
+// Leave headroom under Vercel's function limit. The sources are cheap (Redis
+// lrange + one Postgres read), but the per-signal inserts are sequential, so a
+// budget keeps a large backlog from running long on a cold DB.
+const SIGNALS_TIME_BUDGET_MS = 22_000;
+
+const SIGNAL_WEIGHT = {
+	first_claim: +0.2,
+	graduation: +0.3,
+	influencer: +0.2,
+	whale_buy: +0.1,
+	launch: +0.05,
+	new_account: -0.2,
+	fake_claim: -0.6,
+};
+
+async function handlePumpfunSignals(req, res) {
+	if (cors(req, res, { methods: 'GET,POST,OPTIONS' })) return;
+
+	if (!requireCron(req, res)) return;
+
+	// Every source below is real and bot-independent:
+	//   • graduations — pumpfunMcp.graduations() reads the WS-fed
+	//     pumpfun_graduations table (kept live by pumpfun-graduations-sync), or
+	//     the upstream bot when PUMPFUN_BOT_URL is set.
+	//   • claims      — the bot's getRecentClaims (rich tier/age intel) when
+	//     configured, merged with the pf:claims Redis lane the channel feed uses.
+	//   • whales      — pf:whales Redis lane (first whale-buy events).
+	//   • mints       — pf:mints Redis lane (new token launches).
+	// The cron emits whatever is live and degrades gracefully when a lane is
+	// empty; it never fabricates events.
+	const botEnabled = pumpfunBotEnabled();
+	const deadline = Date.now() + SIGNALS_TIME_BUDGET_MS;
+
+	const [claimsBot, grads, redisClaims, whales, mints] = await Promise.all([
+		botEnabled
+			? pumpfunMcp.recentClaims({ limit: CLAIMS_PER_RUN }).catch((e) => ({ ok: false, error: e?.message }))
+			: Promise.resolve({ ok: false }),
+		pumpfunMcp.graduations({ limit: GRADS_PER_RUN }).catch((e) => ({ ok: false, error: e?.message })),
+		getClaims(CLAIMS_PER_RUN).catch(() => []),
+		getWhales(WHALES_PER_RUN).catch(() => []),
+		getMints(MINTS_PER_RUN).catch(() => []),
+	]);
+
+	// Bot claims carry richer intel (tier, github_account_age_days); the Redis
+	// lane is a bot-free fallback. Merge with bot enrichment winning on tx
+	// collisions.
+	const claimItems = pumpfunMergeBySig(
+		pumpfunArr(claimsBot.ok ? claimsBot.data : null),
+		Array.isArray(redisClaims) ? redisClaims : [],
+	);
+	const gradItems = pumpfunArr(grads.ok ? grads.data : null);
+	const whaleItems = Array.isArray(whales) ? whales : [];
+	const mintItems = Array.isArray(mints) ? mints : [];
+
+	const report = {
+		bot: botEnabled,
+		sources: {
+			claims: claimItems.length,
+			graduations: gradItems.length,
+			whales: whaleItems.length,
+			mints: mintItems.length,
+		},
+		inserted: 0,
+		skipped_unlinked: 0,
+		skipped_by_cursor: 0,
+		errors: [],
+	};
+
+	// Resolve every actor wallet → linked agent asset in a single query, and load
+	// the per-source cursors so we only evaluate events newer than last run.
+	const wallets = pumpfunCollectWallets({
+		claims: claimItems,
+		grads: gradItems,
+		whales: whaleItems,
+		mints: mintItems,
+	});
+	const [linked, cursors] = await Promise.all([
+		pumpfunLinkedWalletMap(wallets),
+		pumpfunLoadCursors(),
+	]);
+
+	// Process each source through its cursor. Graduations are the highest-signal,
+	// always-on lane, so they run first within the time budget.
+	await pumpfunProcessSource({
+		source: 'graduations', items: gradItems, cursors, linked, report, deadline,
+		walletOf: (ev) => ev.creator || ev.dev_wallet,
+		signalsOf: (ev) => [{
+			kind: 'graduation',
+			payload: { mint: ev.mint, symbol: ev.symbol, name: ev.name },
+			tx_signature: ev.tx_signature || ev.signature,
+		}],
+	});
+	await pumpfunProcessSource({
+		source: 'claims', items: claimItems, cursors, linked, report, deadline,
+		walletOf: (ev) => ev.claimer || ev.github_wallet,
+		signalsOf: (ev) => pumpfunSignalsFromClaim(ev),
+	});
+	await pumpfunProcessSource({
+		source: 'whales', items: whaleItems, cursors, linked, report, deadline,
+		walletOf: (ev) => ev.buyer || ev.trader || ev.traderPublicKey,
+		signalsOf: (ev) => [{
+			kind: 'whale_buy',
+			payload: { mint: ev.mint, amount_sol: ev.amount_sol ?? ev.sol_amount ?? null },
+			tx_signature: ev.signature || ev.tx_signature,
+		}],
+	});
+	await pumpfunProcessSource({
+		source: 'mints', items: mintItems, cursors, linked, report, deadline,
+		walletOf: (ev) => ev.creator || ev.traderPublicKey,
+		signalsOf: (ev) => [{
+			kind: 'launch',
+			payload: { mint: ev.mint, symbol: ev.symbol, name: ev.name },
+			tx_signature: ev.signature || ev.tx_signature,
+		}],
+	});
+
+	return json(res, 200, report);
+}
+
+// Normalize a feed event's timestamp to epoch milliseconds. pump.fun lanes use
+// epoch seconds; the graduations table may surface ISO strings. Falls back to
+// now() so an event without a timestamp is still treated as fresh (processed
+// once, then skipped by the cursor next run).
+function pumpfunTsMs(ev) {
+	const t = ev?.timestamp ?? ev?.created_at ?? ev?._seen_at ?? ev?.seen_at ?? null;
+	if (t == null) return Date.now();
+	if (typeof t === 'number') return t < 1e12 ? Math.round(t * 1000) : Math.round(t);
+	const parsed = Date.parse(t);
+	return Number.isFinite(parsed) ? parsed : Date.now();
+}
+
+// Walk a newest-first event list, emitting signals only for events at or after
+// the stored cursor and only for wallets linked to an agent. Advances the
+// cursor to the newest event timestamp seen (never backwards) so the next run
+// skips everything older. Events strictly older than the cursor are counted in
+// report.skipped_by_cursor and never re-inserted.
+async function pumpfunProcessSource({ source, items, cursors, linked, report, deadline, walletOf, signalsOf }) {
+	const cursorMs = cursors.get(source) ?? 0;
+	let maxMs = cursorMs;
+	let newestSig = null;
+
+	for (const ev of items) {
+		if (Date.now() > deadline) break;
+
+		const tsMs = pumpfunTsMs(ev);
+		if (tsMs < cursorMs) {
+			report.skipped_by_cursor++;
+			continue;
+		}
+		// Track the high-water mark across all events (linked or not) so we don't
+		// re-evaluate already-seen events next run.
+		if (tsMs > maxMs) {
+			maxMs = tsMs;
+			newestSig = ev.signature || ev.tx_signature || newestSig;
+		}
+
+		const wallet = walletOf(ev);
+		if (!wallet || !linked.has(wallet)) {
+			report.skipped_unlinked++;
+			continue;
+		}
+
+		try {
+			for (const sig of signalsOf(ev)) {
+				if (!sig.tx_signature) continue;
+				const ok = await pumpfunInsertSignal({
+					wallet,
+					agent_asset: linked.get(wallet) || null,
+					kind: sig.kind,
+					weight: SIGNAL_WEIGHT[sig.kind] ?? 0,
+					payload: sig.payload,
+					tx_signature: sig.tx_signature,
+				});
+				if (ok) report.inserted++;
+			}
+		} catch (err) {
+			report.errors.push({ source, tx: ev.signature || ev.tx_signature, error: err.message });
+		}
+	}
+
+	if (maxMs > cursorMs) {
+		await pumpfunSaveCursor(source, maxMs, newestSig).catch((e) =>
+			report.errors.push({ source, stage: 'cursor', error: e?.message || String(e) }),
+		);
+	}
+}
+
+// Merge two event lists, deduping by signature with `primary` winning. Used to
+// fold the bot's rich claims over the bot-free Redis lane.
+function pumpfunMergeBySig(primary, secondary) {
+	const seen = new Set();
+	const out = [];
+	for (const e of [...primary, ...secondary]) {
+		const sig = e?.signature || e?.tx_signature;
+		if (!sig || seen.has(sig)) continue;
+		seen.add(sig);
+		out.push(e);
+	}
+	return out;
+}
+
+// Load every source cursor in one read. Returns source → last_seen_ms. A missing
+// cursor table (not migrated yet) degrades to "no cursor" so the cron still runs.
+async function pumpfunLoadCursors() {
+	const map = new Map();
+	try {
+		const rows = await sql`select source, last_seen_ms from pumpfun_signals_cursor`;
+		for (const r of rows) map.set(r.source, Number(r.last_seen_ms) || 0);
+	} catch {
+		// cursor table absent — process once, then it's created on first save.
+	}
+	return map;
+}
+
+async function pumpfunSaveCursor(source, lastSeenMs, lastSignature) {
+	await sql`
+		insert into pumpfun_signals_cursor (source, last_seen_ms, last_signature, updated_at)
+		values (${source}, ${Math.floor(lastSeenMs)}, ${lastSignature || null}, now())
+		on conflict (source) do update set
+			last_seen_ms   = greatest(pumpfun_signals_cursor.last_seen_ms, excluded.last_seen_ms),
+			last_signature = excluded.last_signature,
+			updated_at     = now()
+	`;
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// pumpfun-graduations-sync
+// ═══════════════════════════════════════════════════════════════════════════
+//
+// Keeps the `pumpfun_graduations` table fresh independently of browser traffic.
+//
+// The live feed (api/_lib/pumpfun-ws-feed.js) only persists graduations while a
+// /api/pump SSE stream is open — on a serverless platform that means the table
+// goes stale whenever nobody is watching the feed. This cron opens the same
+// real PumpPortal migration stream for a bounded window each run; the feed's
+// own persistGraduation() writes any graduations it observes, so
+// /api/pump/recent-graduations and the MCP graduations tool stay live. No
+// external bot or API key required — it's the public PumpPortal WebSocket.
+
+// Must finish inside economy-tick's 60s per-engine budget (CALL_TIMEOUT_MS in
+// api/cron/economy-tick.js) — the every-minute heartbeat is this handler's only
+// real scheduler (its own vercel.json cron entry sits past Vercel's 40-cron
+// cutoff and never fires). A 100s window here read as `failed: timeout` on
+// every tick and stacked overlapping PumpPortal sockets.
+const GRAD_SYNC_WINDOW_MS = 45_000;
+
+async function handlePumpfunGraduationsSync(req, res) {
+	if (cors(req, res, { methods: 'GET,POST,OPTIONS' })) return;
+
+	if (!requireCron(req, res)) return;
+
+	const { connectPumpFunFeed } = await import('../_lib/pumpfun-ws-feed.js');
+
+	const controller = new AbortController();
+	const seen = new Map(); // tx signature → { mint, symbol }
+
+	const stop = connectPumpFunFeed({
+		kind: 'graduation',
+		signal: controller.signal,
+		onEvent: ({ kind, data }) => {
+			if (kind !== 'graduation') return;
+			const sig = data?.tx_signature || data?.signature;
+			if (sig && !seen.has(sig)) seen.set(sig, { mint: data.mint, symbol: data.symbol || null });
+		},
+	});
+
+	const before = await gradTableCount();
+	await sleep(GRAD_SYNC_WINDOW_MS);
+	controller.abort();
+	try {
+		stop?.();
+	} catch {
+		// stop() is best-effort — the abort already halted the feed.
+	}
+	// Let any in-flight enrich→persist writes settle before counting rows.
+	await sleep(750);
+	const after = await gradTableCount();
+
+	return json(res, 200, {
+		windowMs: GRAD_SYNC_WINDOW_MS,
+		observed: seen.size,
+		mints: [...seen.values()].map((v) => v.symbol || v.mint).slice(0, 25),
+		table_total: after,
+		inserted: before == null || after == null ? null : Math.max(0, after - before),
+	});
+}
+
+async function gradTableCount() {
+	try {
+		const rows = await sql`select count(*)::int as n from pumpfun_graduations`;
+		return rows?.[0]?.n ?? null;
+	} catch (err) {
+		console.warn('[pumpfun-graduations-sync] count failed:', err?.message);
+		return null;
+	}
+}
+
+function sleep(ms) {
+	return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function pumpfunArr(x) {
+	if (!x) return [];
+	return Array.isArray(x) ? x : x.items || [];
+}
+
+function pumpfunCollectWallets({ claims = [], grads = [], whales = [], mints = [] }) {
+	const out = new Set();
+	const add = (w) => { if (w) out.add(w); };
+	for (const c of claims) { add(c.claimer); add(c.github_wallet); }
+	for (const g of grads) { add(g.creator); add(g.dev_wallet); }
+	for (const w of whales) { add(w.buyer); add(w.trader); add(w.traderPublicKey); }
+	for (const m of mints) { add(m.creator); add(m.traderPublicKey); }
+	return [...out];
+}
+
+async function pumpfunLinkedWalletMap(wallets) {
+	const map = new Map();
+	if (wallets.length === 0) return map;
+	const rows = await sql`
+		select uw.address, ai.meta->>'sol_mint_address' as agent_asset
+		from user_wallets uw
+		left join agent_identities ai
+			on ai.user_id = uw.user_id
+			and ai.deleted_at is null
+			and ai.meta->>'chain_type' = 'solana'
+		where uw.chain_type = 'solana'
+		  and uw.address = any(${wallets})
+	`;
+	for (const r of rows) map.set(r.address, r.agent_asset);
+	return map;
+}
+
+function pumpfunSignalsFromClaim(ev) {
+	const out = [];
+	// Bot claims carry tx_signature; the pf:claims Redis lane carries signature.
+	const base = { tx_signature: ev.tx_signature || ev.signature, payload: ev };
+	const attribution = ev.attribution_status || ev.attribution;
+	const verifiedRelationship = attribution === 'verified_repository'
+		|| attribution === 'verified_creator_wallet'
+		|| (!attribution && (ev.verified === true || ev.signal_verified === true));
+	// A first withdrawal is positive reputation only when the coin relationship
+	// is verified. Raw, mismatched, or pooled claims remain visible as evidence
+	// but must not boost an agent/token trust score.
+	if (ev.first_time_claim && verifiedRelationship) out.push({ kind: 'first_claim', ...base });
+	if (ev.fake_claim) out.push({ kind: 'fake_claim', ...base });
+	if (verifiedRelationship && (ev.tier === 'mega' || ev.tier === 'influencer')) {
+		out.push({ kind: 'influencer', ...base });
+	}
+	if (ev.github_account_age_days != null && ev.github_account_age_days < 30) {
+		out.push({ kind: 'new_account', ...base });
+	}
+	return out;
+}
+
+async function pumpfunInsertSignal({ wallet, agent_asset, kind, weight, payload, tx_signature }) {
+	if (!tx_signature) return false;
+	const result = await sql`
+		insert into pumpfun_signals (wallet, agent_asset, kind, weight, payload, tx_signature)
+		values (${wallet}, ${agent_asset}, ${kind}, ${weight}, ${JSON.stringify(payload)}::jsonb, ${tx_signature})
+		on conflict (tx_signature, kind) do nothing
+		returning id
+	`;
+	return result.length > 0;
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// run-buyback
+// ═══════════════════════════════════════════════════════════════════════════
+
+async function buybackLoadRelayer() {
+	const b64 = process.env.PUMP_CRON_RELAYER_SECRET_KEY_B64;
+	if (!b64) return null;
+	const [{ Keypair }] = await Promise.all([import('@solana/web3.js')]);
+	return Keypair.fromSecretKey(Buffer.from(b64, 'base64'));
+}
+
+/**
+ * Resolve the quote currency a coin's autonomous lanes (buyback, distribute) must
+ * operate in. A coin's vaults, swaps, and burns all settle in its quote asset:
+ * USDC for USDC-paired coins, native SOL (wSOL) for SOL-paired coins. The
+ * authoritative source is the on-chain bonding curve — the same field the trade
+ * builders read — so this stays correct even for coins launched before the
+ * `quote_mint` column existed (their DB value is null but their curve is not).
+ *
+ * Falls back to the recorded `dbQuoteMint`, then to USDC (the agent earn
+ * currency), when the curve can't be read — so a transient RPC miss never
+ * silently switches a USDC coin onto the SOL vault.
+ *
+ * @returns {Promise<{ currencyStr: string, quoteSymbol: 'SOL'|'USDC'|'OTHER', source: 'chain'|'db'|'fallback' }>}
+ */
+async function resolveCoinQuoteCurrency({ network, mint, dbQuoteMint = null }) {
+	const { resolveCustodialQuote } = await import('../_lib/pump-trade-args.js');
+	try {
+		const { bondingCurvePda, PUMP_SDK } = await import('@pump-fun/pump-sdk');
+		const info = await getConnection({ network }).getAccountInfo(
+			bondingCurvePda(solanaPubkey(mint)),
+		);
+		if (info) {
+			const bc = PUMP_SDK.decodeBondingCurve(info);
+			const q = resolveCustodialQuote(bc.quoteMint, network);
+			return { currencyStr: q.quoteMint, quoteSymbol: q.quoteSymbol, source: 'chain' };
+		}
+	} catch {
+		// fall through to the DB hint / USDC default below
+	}
+	if (dbQuoteMint) {
+		const q = resolveCustodialQuote(dbQuoteMint, network);
+		return { currencyStr: q.quoteMint, quoteSymbol: q.quoteSymbol, source: 'db' };
+	}
+	const usdc = network === 'devnet' ? SOLANA_USDC_MINT_DEVNET : SOLANA_USDC_MINT;
+	return { currencyStr: usdc, quoteSymbol: 'USDC', source: 'fallback' };
+}
+
+// Same over-invocation disease already fixed for economy-reconcile: this
+// route is also one of economy-tick.js's fan-out TARGETS, fired every minute,
+// on top of its own dedicated vercel.json `0 * * * *` Cloud Scheduler job,
+// with nothing stopping the two callers from overlapping. Each run reads and
+// can swap/burn up to 200 coins' buyback vaults, so an overlapping run risks
+// racing itself on the same vault balance, not just running long. The lease
+// makes the hourly cadence durable regardless of how often the route fires;
+// its TTL IS the cadence and is never explicitly released.
+const BUYBACK_LEASE_KEY = 'cron:run-buyback:lease';
+const BUYBACK_LEASE_SECONDS = 55 * 60;
+
+async function handleRunBuyback(req, res) {
+	if (cors(req, res, { methods: 'GET,POST,OPTIONS', origins: '*' })) return;
+	if (!method(req, res, ['GET', 'POST'])) return;
+
+	if (!requireCron(req, res)) return;
+
+	if (!(await acquireLock(BUYBACK_LEASE_KEY, BUYBACK_LEASE_SECONDS))) {
+		return json(res, 200, { ok: true, skipped: true, reason: 'lease_held' });
+	}
+
+	const relayer = await buybackLoadRelayer();
+
+	// Honor per-coin autopilot policy. A missing pump_autopilot row preserves the
+	// legacy "always eligible, burn-only" behaviour via coalesce, so existing
+	// coins keep working until an owner opts into autopilot from /autopilot.
+	const mints = await sql`
+		select m.id, m.mint, m.network, m.slippage_bps, m.quote_mint,
+		       coalesce(ap.buyback_full_swap, m.full_swap) as full_swap,
+		       coalesce(ap.buyback_min_atomics, 0)         as buyback_min_atomics
+		from pump_agent_mints m
+		left join pump_autopilot ap on ap.mint_id = m.id
+		where coalesce(ap.enabled, true) = true
+		  and coalesce(ap.buyback_enabled, true) = true
+		limit 200
+	`;
+
+	const results = [];
+	for (const m of mints) {
+		// Operate in the coin's quote asset — the currency its vault holds and its
+		// curve swaps. USDC coins buy back with USDC, SOL coins with SOL. Anything
+		// the lane can't operate in still records a run row below (never a silent
+		// no-op): empty vaults → 'skipped', build/swap errors → 'failed'.
+		const { currencyStr } = await resolveCoinQuoteCurrency({
+			network: m.network,
+			mint: m.mint,
+			dbQuoteMint: m.quote_mint,
+		});
+		const currency = solanaPubkey(currencyStr);
+		const fullSwap = m.full_swap === true;
+		const minAtomics = BigInt(m.buyback_min_atomics ?? 0);
+
+		try {
+			const { agent } = await getPumpAgent({ network: m.network, mint: m.mint });
+			const balances = await agent.getBalances(currency);
+			const buyback = BigInt(balances.buybackVault?.balance ?? 0);
+
+			if (buyback === 0n || buyback < minAtomics) {
+				const [run] = await sql`
+					insert into pump_buyback_runs (mint_id, currency_mint, status)
+					values (${m.id}, ${currencyStr}, 'skipped') returning id
+				`;
+				results.push({
+					mint: m.mint,
+					status: 'skipped',
+					run_id: run.id,
+					reason: buyback === 0n ? 'empty' : 'below_threshold',
+				});
+				continue;
+			}
+
+			const { offline } = await getPumpAgentOffline({ network: m.network, mint: m.mint });
+			const [{ PUMP_PROGRAM_ID }] = await Promise.all([import('@three-ws/agent-payments')]);
+
+			const payerPk = relayer ? relayer.publicKey : solanaPubkey(m.mint);
+			const params = {
+				globalBuybackAuthority: payerPk, // gated by globalConfig — for skipped-swap form, can be relayer
+				currencyMint: currency,
+				swapProgramToInvoke: PUMP_PROGRAM_ID, // pump bonding-curve program (same for burn-only and full-swap)
+				swapInstructionData: Buffer.alloc(0), // empty = skip swap, just burn
+				remainingAccounts: [],
+			};
+
+			if (fullSwap) {
+				const { buildPumpSwapInnerIx } = await import('../_lib/pump-swap-ix.js');
+				const inner = await buildPumpSwapInnerIx({
+					mint: m.mint,
+					currency,
+					amountIn: buyback,
+					slippageBps: m.slippage_bps ?? 500,
+					cluster: m.network,
+				});
+				params.swapInstructionData = inner.data;
+				params.remainingAccounts = inner.accounts;
+			}
+
+			let ix;
+			try {
+				ix = await offline.buybackTrigger(params);
+			} catch (e) {
+				const [run] = await sql`
+					insert into pump_buyback_runs (mint_id, currency_mint, swap_program, status, error)
+					values (${m.id}, ${currencyStr}, ${PUMP_PROGRAM_ID.toBase58()}, 'failed', ${'buybackTrigger build failed: ' + e.message})
+					returning id
+				`;
+				results.push({ mint: m.mint, status: 'failed', error: e.message, run_id: run.id });
+				continue;
+			}
+
+			if (!relayer) {
+				const txBase64 = await buildUnsignedTxBase64({
+					network: m.network,
+					payer: payerPk,
+					instructions: [ix],
+				});
+				const [run] = await sql`
+					insert into pump_buyback_runs (mint_id, currency_mint, swap_program, status, burn_amount)
+					values (${m.id}, ${currencyStr}, ${PUMP_PROGRAM_ID.toBase58()}, 'pending', ${buyback.toString()})
+					returning id
+				`;
+				results.push({
+					mint: m.mint,
+					status: 'pending',
+					run_id: run.id,
+					tx_base64: txBase64,
+				});
+				continue;
+			}
+
+			const connection = getConnection({ network: m.network });
+			// Protected send: priority fee + CU estimate, rebroadcast with blockhash
+			// refresh, hard throw on an on-chain revert.
+			const { signature: sig } = await submitProtected({ network: m.network, connection, payer: relayer, instructions: [ix] });
+
+			const [run] = await sql`
+				insert into pump_buyback_runs
+					(mint_id, currency_mint, swap_program, tx_signature, status, burn_amount)
+				values
+					(${m.id}, ${currencyStr}, ${PUMP_PROGRAM_ID.toBase58()}, ${sig}, 'confirmed', ${buyback.toString()})
+				returning id
+			`;
+			results.push({ mint: m.mint, status: 'confirmed', tx_signature: sig, run_id: run.id });
+		} catch (err) {
+			await sql`
+				insert into pump_buyback_runs (mint_id, currency_mint, status, error)
+				values (${m.id}, ${currencyStr}, 'failed', ${err.message || String(err)})
+			`;
+			results.push({ mint: m.mint, status: 'failed', error: err.message });
+		}
+	}
+
+	return json(res, 200, { ok: true, processed: results.length, results });
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// run-three-buyback — programmatic $THREE buyback (revenue → buy → treasury)
+//
+// Converts accumulated platform USDC revenue into onchain buy pressure: market-buy
+// $THREE on Jupiter and route the bought tokens into the treasury. This is the
+// documented economy policy ("the treasury funds buybacks … buy pressure without
+// deflation", api/_lib/token/config.js) made programmatic, onchain, and publicly
+// auditable. NO platform burn — supply is never destroyed by this lane.
+//
+// Every run records a row in three_buyback_runs (never a silent no-op). Execution
+// is gated by THREE_BUYBACK_ENABLED + THREE_BUYBACK_SECRET_KEY_B64; `?dry_run=1`
+// sizes + quotes the buy without signing, so the wiring is verifiable before a
+// single dollar moves.
+// ═══════════════════════════════════════════════════════════════════════════
+
+// Same over-invocation disease fixed above for run-buyback: economy-tick.js
+// fires /api/cron/run-three-buyback every minute (fan-out TARGETS) on top of
+// its own dedicated vercel.json `0 6 * * *` (once daily) Cloud Scheduler job.
+// Unlike run-buyback's burn-only default, a live run here sizes its spend off
+// the buyback wallet's CURRENT USDC balance (computeSpend), signs a real
+// Jupiter swap, and sweeps to treasury: nothing stops two overlapping real
+// runs from both reading the same pre-spend balance and each deploying up to
+// maxUsdPerRun(), doubling the per-run spend cap the policy relies on. The
+// lease only gates the live path; a dry run never signs, so monitoring/status
+// callers with ?dry_run=1 are never blocked by it.
+const THREE_BUYBACK_LEASE_KEY = 'cron:run-three-buyback:lease';
+const THREE_BUYBACK_LEASE_SECONDS = 23 * 60 * 60;
+
+async function handleRunThreeBuyback(req, res) {
+	if (cors(req, res, { methods: 'GET,POST,OPTIONS', origins: '*' })) return;
+	if (!method(req, res, ['GET', 'POST'])) return;
+	if (!requireCron(req, res)) return;
+
+	const bb = await import('../_lib/token/buyback.js');
+	const dryRunRaw = String(req.query?.dry_run ?? '').toLowerCase();
+	const dryRun = dryRunRaw === '1' || dryRunRaw === 'true';
+
+	if (!dryRun && !(await acquireLock(THREE_BUYBACK_LEASE_KEY, THREE_BUYBACK_LEASE_SECONDS))) {
+		return json(res, 200, { ok: true, skipped: true, reason: 'lease_held' });
+	}
+
+	const slippage = bb.slippageBps();
+	const revenueAtomics = await bb.revenueFeeAtomicsToDate();
+	const revStr = revenueAtomics.toString();
+
+	// Execution gate: a scheduled run is a recorded no-op until an operator funds
+	// the wallet and opts in. A dry run is always allowed (it never signs).
+	if (!dryRun && !bb.isEnabled()) {
+		const [run] = await sql`
+			insert into three_buyback_runs (status, reason, revenue_fee_atomics)
+			values ('skipped', 'disabled', ${revStr}) returning id
+		`;
+		return json(res, 200, { ok: true, status: 'skipped', reason: 'disabled', run_id: run.id });
+	}
+
+	const signer = await bb.loadBuybackSigner();
+	if (!signer) {
+		const [run] = await sql`
+			insert into three_buyback_runs (status, reason, revenue_fee_atomics)
+			values ('skipped', 'not_configured', ${revStr}) returning id
+		`;
+		return json(res, 200, {
+			ok: true,
+			status: 'skipped',
+			reason: 'not_configured',
+			run_id: run.id,
+			message: 'set THREE_BUYBACK_SECRET_KEY_B64 and fund the wallet with USDC to enable buybacks',
+		});
+	}
+
+	// Self-heal a prior partial run (bought $THREE that never reached the treasury)
+	// before sizing a new buy. Non-fatal: the main flow sweeps to treasury anyway.
+	let recoverSig = null;
+	if (!dryRun) {
+		try {
+			recoverSig = await bb.sweepStrandedThree(signer);
+		} catch {
+			recoverSig = null;
+		}
+	}
+
+	let plan;
+	try {
+		plan = await bb.planBuyback(signer.publicKey.toBase58());
+	} catch (e) {
+		const code = e.code || 'plan_failed';
+		const [run] = await sql`
+			insert into three_buyback_runs (status, reason, revenue_fee_atomics, error)
+			values ('failed', ${code}, ${revStr}, ${e.message || String(e)}) returning id
+		`;
+		return json(res, 200, { ok: false, status: 'failed', reason: code, error: e.message, run_id: run.id });
+	}
+
+	if (!plan.ok) {
+		const [run] = await sql`
+			insert into three_buyback_runs (status, reason, revenue_fee_atomics, usdc_spent_atomics)
+			values ('skipped', ${plan.reason}, ${revStr}, 0) returning id
+		`;
+		return json(res, 200, {
+			ok: true,
+			status: 'skipped',
+			reason: plan.reason,
+			run_id: run.id,
+			wallet_usdc: bb.usdcAtomicsToUsd(plan.walletUsdcAtomics),
+		});
+	}
+
+	if (dryRun) {
+		const [run] = await sql`
+			insert into three_buyback_runs
+				(status, revenue_fee_atomics, usdc_spent_atomics, three_bought_atomics, price_usd, slippage_bps)
+			values
+				('dry_run', ${revStr}, ${plan.spendUsdcAtomics.toString()}, ${plan.expectedThreeAtomics.toString()}, ${plan.priceUsd}, ${slippage})
+			returning id
+		`;
+		return json(res, 200, {
+			ok: true,
+			status: 'dry_run',
+			run_id: run.id,
+			usdc_to_spend: bb.usdcAtomicsToUsd(plan.spendUsdcAtomics),
+			expected_three: bb.threeAtomicsToTokens(plan.expectedThreeAtomics),
+			price_usd: plan.priceUsd,
+			slippage_bps: slippage,
+		});
+	}
+
+	try {
+		const receipt = await bb.executeBuyback(signer, plan);
+		const [run] = await sql`
+			insert into three_buyback_runs
+				(status, revenue_fee_atomics, usdc_spent_atomics, three_bought_atomics, price_usd, slippage_bps, buy_signature, sweep_signature, treasury_wallet)
+			values
+				('confirmed', ${revStr}, ${plan.spendUsdcAtomics.toString()}, ${receipt.boughtAtomics.toString()}, ${receipt.priceUsd}, ${slippage}, ${receipt.buySignature}, ${receipt.sweepSignature}, ${receipt.treasury})
+			returning id
+		`;
+		return json(res, 200, {
+			ok: true,
+			status: 'confirmed',
+			run_id: run.id,
+			recover_signature: recoverSig,
+			buy_signature: receipt.buySignature,
+			sweep_signature: receipt.sweepSignature,
+			usdc_spent: bb.usdcAtomicsToUsd(plan.spendUsdcAtomics),
+			three_bought: bb.threeAtomicsToTokens(receipt.boughtAtomics),
+			price_usd: receipt.priceUsd,
+		});
+	} catch (e) {
+		const code = e.code || 'swap_failed';
+		const status = e.status === 'pending' ? 'pending' : 'failed';
+		const [run] = await sql`
+			insert into three_buyback_runs
+				(status, reason, revenue_fee_atomics, usdc_spent_atomics, three_bought_atomics, price_usd, slippage_bps, buy_signature, sweep_signature, error)
+			values
+				(${status}, ${code}, ${revStr}, ${plan.spendUsdcAtomics.toString()}, ${(e.boughtAtomics ?? 0n).toString()}, ${plan.priceUsd}, ${slippage}, ${e.buySignature ?? null}, ${e.sweepSignature ?? null}, ${e.message || String(e)})
+			returning id
+		`;
+		return json(res, 200, {
+			ok: false,
+			status,
+			reason: code,
+			error: e.message,
+			run_id: run.id,
+			buy_signature: e.buySignature ?? null,
+		});
+	}
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// run-dca
+// ═══════════════════════════════════════════════════════════════════════════
+
+const DCA_CHAIN_CONFIG = {
+	84532: {
+		chain: baseSepolia,
+		swap_router: '0x94cC0AaC535CCDB3C01d6787D6413C739ae12bc4',
+		quoter_v2: '0xC5290058841028F1614F3A6F0F5816cAd0df5E27',
+	},
+	8453: {
+		chain: base,
+		swap_router: '0x2626664c2603336E57B271c5C0b26F421741e481',
+		quoter_v2: '0x3d4e44Eb1374240CE5F1B871ab261CD16335B76a',
+	},
+};
+
+const QUOTER_V2_ABI = parseAbi([
+	'function quoteExactInputSingle((address tokenIn, address tokenOut, uint256 amountIn, uint24 fee, uint160 sqrtPriceLimitX96) params) external returns (uint256 amountOut, uint160 sqrtPriceX96After, uint32 initializedTicksCrossed, uint256 gasEstimate)',
+]);
+
+const SWAP_ROUTER_ABI = parseAbi([
+	'function exactInputSingle((address tokenIn, address tokenOut, uint24 fee, address recipient, uint256 amountIn, uint256 amountOutMinimum, uint160 sqrtPriceLimitX96) params) external payable returns (uint256 amountOut)',
+]);
+
+const ERC20_ABI = parseAbi([
+	'function approve(address spender, uint256 amount) external returns (bool)',
+]);
+
+// Uniswap V3 standard fee tier — 0.3% pool is the most liquid USDC/WETH tier
+const FEE_TIER = 3000;
+
+const DCA_RPC_TIMEOUT_MS = 10_000;
+const DCA_RPC_MAX_RETRIES = 2; // total attempts = 1 + retries
+const DCA_RELAYER_TIMEOUT_MS = 30_000;
+const DCA_RELAYER_MAX_RETRIES = 1;
+const DCA_RELAYER_RETRY_BACKOFF_MS = 1_500;
+
+function isTableMissing(err) {
+	return String(err?.message || '').includes('does not exist');
+}
+
+function dcaLog(level, event, fields = {}) {
+	const line = JSON.stringify({
+		level,
+		event,
+		ts: new Date().toISOString(),
+		component: 'cron/run-dca',
+		...fields,
+	});
+	if (level === 'error') console.error(line);
+	else console.log(line);
+}
+
+function dcaIsTransient(err) {
+	// Network-level & RPC transport errors
+	const code = err?.code;
+	const name = err?.name;
+	const status = err?.status;
+	if (name === 'AbortError' || name === 'TimeoutError') return true;
+	if (
+		code === 'ETIMEDOUT' ||
+		code === 'ECONNRESET' ||
+		code === 'ECONNREFUSED' ||
+		code === 'ENOTFOUND' ||
+		code === 'EAI_AGAIN'
+	)
+		return true;
+	if (typeof status === 'number' && status >= 500 && status < 600) return true;
+	// viem transport errors
+	const msg = String(err?.message || '');
+	if (/HttpRequestError|TimeoutError|fetch failed|network|socket hang up/i.test(msg)) return true;
+	return false;
+}
+
+async function dcaWithRetry(fn, { retries, backoffMs = 500, label }) {
+	let attempt = 0;
+	// eslint-disable-next-line no-constant-condition
+	while (true) {
+		try {
+			return await fn();
+		} catch (err) {
+			attempt++;
+			if (attempt > retries || !dcaIsTransient(err)) throw err;
+			const delay = backoffMs * 2 ** (attempt - 1);
+			dcaLog('warn', 'retry', {
+				label,
+				attempt,
+				delay_ms: delay,
+				message: err?.message,
+				code: err?.code,
+			});
+			await new Promise((r) => setTimeout(r, delay));
+		}
+	}
+}
+
+function dcaGetViemClient(chainId) {
+	const cfg = DCA_CHAIN_CONFIG[chainId];
+	if (!cfg) throw new Error(`Unsupported chainId: ${chainId}`);
+	const transport = evmTransport(chainId, {
+		primaryUrl: env.getRpcUrl(chainId),
+		timeout: DCA_RPC_TIMEOUT_MS,
+		retryCount: 0,
+	});
+	return createPublicClient({ chain: cfg.chain, transport });
+}
+
+/**
+ * Fetch a quote twice 15s apart; abort if they diverge by more than 0.5%.
+ * Returns { amountOut, divergenceBps } or throws if divergence exceeds limit.
+ */
+async function dcaGetVerifiedQuote(client, quoterAddress, tokenIn, tokenOut, amountIn, logCtx) {
+	const params = {
+		tokenIn,
+		tokenOut,
+		amountIn: BigInt(amountIn),
+		fee: FEE_TIER,
+		sqrtPriceLimitX96: 0n,
+	};
+
+	const readQuote = () =>
+		client.readContract({
+			address: quoterAddress,
+			abi: QUOTER_V2_ABI,
+			functionName: 'quoteExactInputSingle',
+			args: [params],
+		});
+
+	// First quote (with retry on transient RPC failures)
+	const [q1] = await dcaWithRetry(readQuote, {
+		retries: DCA_RPC_MAX_RETRIES,
+		backoffMs: 500,
+		label: `quote1:${logCtx?.strategy_id ?? ''}`,
+	});
+
+	// Wait 15s then quote again
+	await new Promise((r) => setTimeout(r, 15_000));
+
+	const [q2] = await dcaWithRetry(readQuote, {
+		retries: DCA_RPC_MAX_RETRIES,
+		backoffMs: 500,
+		label: `quote2:${logCtx?.strategy_id ?? ''}`,
+	});
+
+	// Divergence in basis points: |q2-q1| / q1 * 10000
+	const divergenceBps = q1 === 0n ? 0 : Number(((q2 > q1 ? q2 - q1 : q1 - q2) * 10000n) / q1);
+
+	if (divergenceBps > 50) {
+		throw Object.assign(
+			new Error(`Quote divergence ${divergenceBps}bps exceeds 50bps limit — aborting`),
+			{ code: 'quote_divergence', divergenceBps },
+		);
+	}
+
+	// Use the more conservative (lower) of the two quotes
+	const amountOut = q1 < q2 ? q1 : q2;
+	return { amountOut, divergenceBps };
+}
+
+function dcaBuildApproveCalldata(spender, amount) {
+	return encodeFunctionData({
+		abi: ERC20_ABI,
+		functionName: 'approve',
+		args: [spender, BigInt(amount)],
+	});
+}
+
+function dcaBuildSwapCalldata(tokenIn, tokenOut, recipient, amountIn, amountOutMinimum) {
+	return encodeFunctionData({
+		abi: SWAP_ROUTER_ABI,
+		functionName: 'exactInputSingle',
+		args: [
+			{
+				tokenIn,
+				tokenOut,
+				fee: FEE_TIER,
+				recipient,
+				amountIn: BigInt(amountIn),
+				amountOutMinimum: BigInt(amountOutMinimum),
+				sqrtPriceLimitX96: 0n,
+			},
+		],
+	});
+}
+
+async function dcaRedeemViaRelayer(delegationId, calls, logCtx) {
+	const relayerUrl = `${env.APP_ORIGIN}/api/permissions/redeem`;
+
+	const doFetch = async () => {
+		const res = await fetch(relayerUrl, {
+			method: 'POST',
+			headers: {
+				'content-type': 'application/json',
+				authorization: `Bearer ${env.CRON_SECRET}`,
+			},
+			body: JSON.stringify({ id: delegationId, calls }),
+			signal: AbortSignal.timeout(DCA_RELAYER_TIMEOUT_MS),
+		});
+
+		if (!res.ok) {
+			const body = await res.json().catch(() => ({ message: res.statusText }));
+			throw Object.assign(
+				new Error(body.error_description || body.message || `Relayer ${res.status}`),
+				{ code: body.error || 'relayer_error', status: res.status },
+			);
+		}
+		return res.json();
+	};
+
+	return dcaWithRetry(doFetch, {
+		retries: DCA_RELAYER_MAX_RETRIES,
+		backoffMs: DCA_RELAYER_RETRY_BACKOFF_MS,
+		label: `relayer:${logCtx?.strategy_id ?? ''}`,
+	});
+}
+
+async function dcaOnPeriod(strategy) {
+	const {
+		id: strategyId,
+		delegation_id: delegationId,
+		chain_id: chainId,
+		token_in: tokenIn,
+		token_out: tokenOut,
+		amount_per_execution: amountIn,
+		slippage_bps: slippageBps,
+	} = strategy;
+
+	const cfg = DCA_CHAIN_CONFIG[chainId];
+	if (!cfg)
+		throw Object.assign(new Error(`No config for chainId ${chainId}`), {
+			code: 'unsupported_chain',
+		});
+
+	const client = dcaGetViemClient(chainId);
+	const logCtx = { strategy_id: strategyId, chain_id: chainId };
+
+	// Get verified quote
+	const { amountOut, divergenceBps } = await dcaGetVerifiedQuote(
+		client,
+		cfg.quoter_v2,
+		tokenIn,
+		tokenOut,
+		amountIn,
+		logCtx,
+	);
+
+	// Apply slippage: amountOutMinimum = amountOut * (10000 - slippageBps) / 10000
+	const amountOutMinimum = (amountOut * BigInt(10000 - slippageBps)) / 10000n;
+
+	// Resolve recipient — use the delegator address from the delegation row
+	const [delegationRow] = await sql`
+		SELECT delegator_address FROM agent_delegations
+		WHERE id = ${delegationId} AND status = 'active'
+		LIMIT 1
+	`;
+	if (!delegationRow) {
+		throw Object.assign(new Error('Delegation not found or no longer active'), {
+			code: 'delegation_gone',
+		});
+	}
+	const recipient = delegationRow.delegator_address;
+
+	// Build calls: [approve USDC → SwapRouter, exactInputSingle]
+	const calls = [
+		{
+			to: tokenIn,
+			value: '0',
+			data: dcaBuildApproveCalldata(cfg.swap_router, amountIn),
+		},
+		{
+			to: cfg.swap_router,
+			value: '0',
+			data: dcaBuildSwapCalldata(tokenIn, tokenOut, recipient, amountIn, amountOutMinimum),
+		},
+	];
+
+	// Submit via relayer
+	const result = await dcaRedeemViaRelayer(delegationId, calls, logCtx);
+
+	return { txHash: result.txHash, quoteAmountOut: amountOut.toString(), divergenceBps };
+}
+
+async function handleRunDca(req, res) {
+	// Vercel cron passes Authorization: Bearer $CRON_SECRET
+	if (!requireCron(req, res)) return;
+
+	const runId = globalThis.crypto?.randomUUID?.() ?? `run_${Date.now()}`;
+	dcaLog('info', 'tick_start', { run_id: runId });
+
+	// The schedules live in the unified order store (rail 'evm'). Adopt any row
+	// an older image wrote to the legacy table first, so a rollout never strands
+	// a schedule (api/_lib/dca-unified.js).
+	try {
+		const adopted = await adoptLegacyDcaStrategies();
+		if (adopted.strategies || adopted.executions) dcaLog('info', 'legacy_adopted', { run_id: runId, ...adopted });
+	} catch (err) {
+		dcaLog('error', 'legacy_adopt_failed', { run_id: runId, message: err?.message });
+	}
+
+	let strategies;
+	try {
+		strategies = await dueEvmDca(50);
+	} catch (err) {
+		if (isTableMissing(err)) {
+			dcaLog('info', 'tick_skip', { run_id: runId, reason: 'orders table not yet migrated' });
+			return json(res, 200, { ok: true, skipped: true, reason: 'table_not_ready' });
+		}
+		dcaLog('error', 'fetch_due_failed', { run_id: runId, message: err?.message });
+		throw err;
+	}
+
+	const results = [];
+	for (const order of strategies) {
+		const logCtx = { run_id: runId, strategy_id: order.id, chain_id: order.chain_id };
+		const period = Number(order.schedule?.interval_seconds) || 86400;
+		const strategy = {
+			id: order.id,
+			delegation_id: order.delegation_id,
+			chain_id: order.chain_id,
+			token_in: order.quote_mint,
+			token_out: order.mint,
+			amount_per_execution: order.amount_in_raw,
+			slippage_bps: order.slippage_bps,
+		};
+
+		// Check delegation is still alive before spending gas on a quote. The
+		// strategy pauses rather than dying: re-granting the permission and
+		// resuming is a two-click recovery, and the owner sees the exact reason.
+		const expired = order.delegation_expires_at && new Date(order.delegation_expires_at) <= new Date();
+		if (order.delegation_status !== 'active' || expired) {
+			const code = order.delegation_status === 'revoked' ? 'delegation_revoked' : 'delegation_expired';
+			const failure = classifyChargeFailure({
+				code,
+				message: order.delegation_status !== 'active' ? `delegation is ${order.delegation_status}` : 'delegation expiry has passed',
+			});
+			await recordEvmDcaFailure(order, {
+				code: failure.code,
+				reason: failure.reason,
+				aborted: true,
+				status: order.delegation_status !== 'active' ? 'paused' : 'expired',
+			}).catch((e) => dcaLog('error', 'exec_insert_failed', { ...logCtx, message: e?.message }));
+			dcaLog('info', 'skipped', { ...logCtx, code: failure.code });
+			results.push({ id: order.id, skipped: true, code: failure.code });
+			continue;
+		}
+
+		// ── Idempotency claim ───────────────────────────────────────────────
+		// Atomically advance next_fire_at so a concurrent tick (or a retry of
+		// this tick) will not re-pick this row. On failure the classifier decides
+		// whether the claim is released for a retry.
+		const nowIso = new Date().toISOString();
+		const nextIso = new Date(Date.now() + period * 1000).toISOString();
+		if (!(await claimEvmDca(order, { nowIso, nextIso }))) {
+			dcaLog('info', 'claim_lost', { ...logCtx });
+			results.push({ id: order.id, skipped: true, reason: 'claim_lost' });
+			continue;
+		}
+
+		dcaLog('info', 'execute_start', { ...logCtx });
+
+		try {
+			const { txHash, quoteAmountOut, divergenceBps } = await dcaOnPeriod(strategy);
+			await recordEvmDcaSuccess(order, { txHash, quoteAmountOut, divergenceBps }).catch((e) =>
+				dcaLog('error', 'exec_insert_failed', { ...logCtx, message: e?.message }),
+			);
+			dcaLog('info', 'execute_success', { ...logCtx, tx_hash: txHash, divergence_bps: divergenceBps });
+			results.push({ id: order.id, txHash, quoteAmountOut });
+		} catch (err) {
+			// One classifier decides what a failure means, shared with the
+			// subscription cron and with the API that renders it to the owner
+			// (api/_lib/recurring.js).
+			const { code, outcome, reason, platform } = classifyChargeFailure({
+				code: err.code,
+				message: err.message,
+			});
+			const applied = applyChargeFailure({
+				outcome,
+				platform,
+				consecutiveFailures: Number(order.consecutive_failures ?? 0),
+			});
+
+			// Release the idempotency claim only when the swap provably never went
+			// out AND another attempt is still allowed. Everything else keeps the
+			// advanced next_fire_at, so the period is consumed exactly once.
+			await recordEvmDcaFailure(order, {
+				code,
+				reason,
+				aborted: chargeStatusFor(outcome) === 'aborted',
+				unconfirmed: chargeStatusFor(outcome) === 'unknown',
+				apply: { ...applied, nowIso },
+				divergenceBps: err.divergenceBps ?? null,
+			}).catch((e) => dcaLog('error', 'note_failure_failed', { ...logCtx, message: e?.message }));
+
+			dcaLog('error', 'execute_failed', {
+				...logCtx,
+				code,
+				outcome,
+				message: err.message,
+				status: err.status,
+				paused: applied.pause,
+				will_retry_next_tick: applied.retry,
+			});
+			results.push({ id: order.id, error: reason, code, outcome });
+		}
+	}
+
+	dcaLog('info', 'tick_done', { run_id: runId, processed: strategies.length });
+
+	return json(res, 200, {
+		ok: true,
+		processed: strategies.length,
+		results,
+	});
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// run-distribute-payments
+// ═══════════════════════════════════════════════════════════════════════════
+
+const DISTRIBUTE_CRON_RELAYER_SECRET_KEY_B64 = () =>
+	process.env.PUMP_CRON_RELAYER_SECRET_KEY_B64 || null;
+
+async function distributeLoadRelayer() {
+	const b64 = DISTRIBUTE_CRON_RELAYER_SECRET_KEY_B64();
+	if (!b64) return null;
+	const [{ Keypair }] = await Promise.all([import('@solana/web3.js')]);
+	return Keypair.fromSecretKey(Buffer.from(b64, 'base64'));
+}
+
+async function handleRunDistributePayments(req, res) {
+	if (cors(req, res, { methods: 'GET,POST,OPTIONS', origins: '*' })) return;
+	if (!method(req, res, ['GET', 'POST'])) return;
+
+	// Auth: Vercel cron secret (constant-time, unconditional).
+	if (!requireCron(req, res)) return;
+
+	// Pick mints to consider: those with confirmed payments since last
+	// distribute run, or never run before.
+	const mints = await sql`
+		select m.id, m.mint, m.network, m.buyback_bps, m.quote_mint,
+		       coalesce(ap.distribute_min_atomics, 0) as distribute_min_atomics
+		from pump_agent_mints m
+		left join pump_autopilot ap on ap.mint_id = m.id
+		where coalesce(ap.enabled, true) = true
+		  and coalesce(ap.distribute_enabled, true) = true
+		  and exists (
+			select 1 from pump_agent_payments p
+			where p.mint_id = m.id and p.status = 'confirmed'
+			  and (
+				p.confirmed_at > coalesce(
+					(select max(created_at) from pump_distribute_runs r where r.mint_id = m.id),
+					'epoch'::timestamptz
+				)
+			  )
+		)
+		limit 200
+	`;
+
+	const relayer = await distributeLoadRelayer();
+	const results = [];
+
+	for (const m of mints) {
+		// Distribute the payment vault in the coin's quote asset so the whole
+		// earn → distribute → buyback → burn loop stays in one currency that the
+		// curve can swap. USDC coins distribute USDC, SOL coins SOL. Empty vaults
+		// record 'skipped' and SDK errors record 'failed' below — never a silent
+		// no-op.
+		const { currencyStr } = await resolveCoinQuoteCurrency({
+			network: m.network,
+			mint: m.mint,
+			dbQuoteMint: m.quote_mint,
+		});
+		const currency = solanaPubkey(currencyStr);
+
+		try {
+			const { agent } = await getPumpAgent({ network: m.network, mint: m.mint });
+			const balancesBefore = await agent.getBalances(currency);
+			const paymentBalance = BigInt(balancesBefore.paymentVault.balance ?? 0);
+			const minAtomics = BigInt(m.distribute_min_atomics ?? 0);
+
+			if (paymentBalance === 0n || paymentBalance < minAtomics) {
+				const [run] = await sql`
+					insert into pump_distribute_runs (mint_id, currency_mint, status, balances_before)
+					values (${m.id}, ${currencyStr}, 'skipped', ${JSON.stringify({ payment: paymentBalance.toString() })}::jsonb)
+					returning id
+				`;
+				results.push({
+					mint: m.mint,
+					status: 'skipped',
+					run_id: run.id,
+					reason: paymentBalance === 0n ? 'empty' : 'below_threshold',
+				});
+				continue;
+			}
+
+			const { offline } = await getPumpAgentOffline({ network: m.network, mint: m.mint });
+
+			if (!relayer) {
+				// No relayer: build unsigned tx for an external keeper. Persist run as 'pending'.
+				const ixs = await offline.distributePayments({
+					user: solanaPubkey(process.env.PUMP_DISTRIBUTE_FALLBACK_PAYER || m.mint),
+					currencyMint: currency,
+				});
+				const txBase64 = await buildUnsignedTxBase64({
+					network: m.network,
+					payer: solanaPubkey(process.env.PUMP_DISTRIBUTE_FALLBACK_PAYER || m.mint),
+					instructions: Array.isArray(ixs) ? ixs : [ixs],
+				});
+				const [run] = await sql`
+					insert into pump_distribute_runs (mint_id, currency_mint, status, balances_before)
+					values (${m.id}, ${currencyStr}, 'pending', ${JSON.stringify({ payment: paymentBalance.toString() })}::jsonb)
+					returning id
+				`;
+				results.push({
+					mint: m.mint,
+					status: 'pending',
+					run_id: run.id,
+					tx_base64: txBase64,
+				});
+				continue;
+			}
+
+			// Relayer path: sign + send.
+			const ixs = await offline.distributePayments({
+				user: relayer.publicKey,
+				currencyMint: currency,
+			});
+			const connection = getConnection({ network: m.network });
+			// Protected send: priority fee + CU estimate, rebroadcast with blockhash
+			// refresh, hard throw on an on-chain revert.
+			const { signature: sig } = await submitProtected({ network: m.network, connection, payer: relayer, instructions: Array.isArray(ixs) ? ixs : [ixs] });
+
+			const balancesAfter = await agent.getBalances(currency);
+			const [run] = await sql`
+				insert into pump_distribute_runs
+					(mint_id, currency_mint, tx_signature, status, balances_before, balances_after)
+				values
+					(${m.id}, ${currencyStr}, ${sig}, 'confirmed',
+					 ${JSON.stringify({ payment: paymentBalance.toString() })}::jsonb,
+					 ${JSON.stringify({
+							buyback: balancesAfter.buybackVault?.balance?.toString?.(),
+							withdraw: balancesAfter.withdrawVault?.balance?.toString?.(),
+						})}::jsonb)
+				returning id
+			`;
+			results.push({ mint: m.mint, status: 'confirmed', tx_signature: sig, run_id: run.id });
+		} catch (err) {
+			await sql`
+				insert into pump_distribute_runs (mint_id, currency_mint, status, error)
+				values (${m.id}, ${currencyStr}, 'failed', ${err.message || String(err)})
+			`;
+			results.push({ mint: m.mint, status: 'failed', error: err.message });
+		}
+	}
+
+	return json(res, 200, {
+		ok: true,
+		processed: results.length,
+		relayer: relayer ? relayer.publicKey.toBase58() : null,
+		results,
+	});
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// run-subscriptions
+// ═══════════════════════════════════════════════════════════════════════════
+
+// USDC contract addresses by chain ID.
+const USDC_BY_CHAIN = {
+	84532: '0x036CbD53842c5426634e7929541eC2318f3dCF7e', // Base Sepolia
+	11155111: '0x1c7D4B196Cb0C7B01d743Fbc6116a902379C7238', // Sepolia
+};
+
+// Max time we'll wait for the skill's onPeriod (which fetches the relayer).
+// Override via SUBSCRIPTION_CHARGE_TIMEOUT_MS.
+const ONPERIOD_TIMEOUT_MS = parseInt(process.env.SUBSCRIPTION_CHARGE_TIMEOUT_MS ?? '30000', 10);
+
+// Structured log helper — single-line JSON so Vercel log drains can parse it.
+function subLog(event, fields = {}) {
+	try {
+		console.log(JSON.stringify({ ts: new Date().toISOString(), event, ...fields }));
+	} catch {
+		// Never let logging throw.
+	}
+}
+
+function subLogError(event, fields = {}) {
+	try {
+		console.error(JSON.stringify({ ts: new Date().toISOString(), event, ...fields }));
+	} catch {
+		// Never let logging throw.
+	}
+}
+
+// Race a promise against a timeout. Rejects with a tagged error on timeout.
+function subWithTimeout(promise, ms, label) {
+	return new Promise((resolve, reject) => {
+		const t = setTimeout(() => {
+			const err = new Error(`${label} timed out after ${ms}ms`);
+			err.code = 'timeout';
+			reject(err);
+		}, ms);
+		Promise.resolve(promise).then(
+			(v) => {
+				clearTimeout(t);
+				resolve(v);
+			},
+			(e) => {
+				clearTimeout(t);
+				reject(e);
+			},
+		);
+	});
+}
+
+async function handleRunSubscriptions(req, res) {
+	if (cors(req, res, { methods: 'GET,POST,OPTIONS' })) return;
+
+	// Auth: Vercel cron secret (constant-time, unconditional — the scheduler
+	// always sends Authorization: Bearer $CRON_SECRET).
+	if (!requireCron(req, res)) return;
+
+	const runId = `sub-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+	const runStart = Date.now();
+	subLog('subscription_cron.start', { runId });
+
+	const origin = env.APP_ORIGIN;
+	const relayerToken = env.CRON_SECRET ?? '';
+
+	const report = {
+		runId,
+		processed: 0,
+		charged: 0,
+		skipped: 0,
+		paused: 0,
+		// Retryable failures that left the schedule active for the next tick.
+		retrying: 0,
+		claimLost: 0,
+		errors: [],
+	};
+
+	// Load the skill's onPeriod handler once per invocation.
+	let onPeriod;
+	try {
+		({ onPeriod } = await import('../../public/skills/subscription/skill.js'));
+	} catch (err) {
+		subLogError('subscription_cron.skill_load_failed', { runId, message: err.message });
+		return error(res, 500, 'internal_error', 'failed to load subscription skill');
+	}
+
+	// Select all active subscriptions whose charge window has arrived.
+	let rows;
+	try {
+		rows = await sql`
+			SELECT
+				s.id,
+				s.user_id,
+				s.agent_id,
+				s.delegation_id,
+				s.period_seconds,
+				s.amount_per_period,
+				s.next_charge_at,
+				s.last_charge_at,
+				s.consecutive_failures,
+				d.status          AS delegation_status,
+				d.expires_at      AS delegation_expires_at,
+				d.chain_id,
+				ai.wallet_address AS owner_address
+			FROM agent_subscriptions s
+			JOIN agent_delegations d  ON d.id  = s.delegation_id
+			JOIN agent_identities  ai ON ai.id = s.agent_id
+			WHERE s.status = 'active'
+			  AND s.next_charge_at <= NOW()
+		`;
+	} catch (err) {
+		if (isTableMissing(err)) {
+			subLog('subscription_cron.skip', {
+				runId,
+				reason: 'agent_subscriptions table not yet created',
+			});
+			return json(res, 200, { ok: true, skipped: true, reason: 'table_not_ready' });
+		}
+		// Rethrow rather than answering 500 here, so the shared cron wrapper applies
+		// the same degrade every other cron gets: a transient Neon connection
+		// failure becomes a clean `db_unavailable` skip, while a real statement
+		// fault (syntax, constraint, missing column) still surfaces as a 500.
+		// Returning the 500 directly hid the outage class from that classifier, and
+		// because economy-tick fires this engine every minute, a Neon blip read as a
+		// per-minute 500 stream and a permanently failed engine on the heartbeat.
+		subLogError('subscription_cron.select_failed', { runId, message: err.message });
+		throw err;
+	}
+
+	subLog('subscription_cron.selected', { runId, count: rows.length });
+
+	for (const row of rows) {
+		report.processed++;
+		const rowStart = Date.now();
+		const ctx = { runId, subscriptionId: row.id, agentId: row.agent_id };
+
+		try {
+			// Guard: delegation must still be active. Nothing is attempted
+			// on-chain here, but the attempt is still recorded: a creator reading
+			// the ledger has to see why a period produced no money.
+			if (row.delegation_status !== 'active') {
+				const applied = await subApplyFailure(row, ctx, {
+					code:
+						row.delegation_status === 'revoked'
+							? 'delegation_revoked'
+							: 'delegation_expired',
+					message: `delegation is ${row.delegation_status}`,
+				});
+				report.paused++;
+				report.errors.push({ id: row.id, code: applied.code, reason: applied.reason });
+				subLog('subscription_cron.paused', { ...ctx, code: applied.code });
+				continue;
+			}
+
+			// Guard: delegation must not be expired.
+			if (row.delegation_expires_at && new Date(row.delegation_expires_at) <= new Date()) {
+				const applied = await subApplyFailure(row, ctx, {
+					code: 'delegation_expired',
+					message: 'delegation expiry has passed',
+				});
+				report.paused++;
+				report.errors.push({ id: row.id, code: applied.code, reason: applied.reason });
+				subLog('subscription_cron.paused', { ...ctx, code: applied.code });
+				continue;
+			}
+
+			const usdcAddress = USDC_BY_CHAIN[row.chain_id];
+			if (!usdcAddress) {
+				const applied = await subApplyFailure(row, ctx, {
+					code: 'chain_not_supported',
+					message: `chain ${row.chain_id} has no USDC address configured`,
+				});
+				report.skipped++;
+				report.errors.push({ id: row.id, code: applied.code, reason: applied.reason });
+				subLog('subscription_cron.skipped', { ...ctx, code: applied.code });
+				continue;
+			}
+
+			// Atomic claim: mark this period as being processed by writing
+			// last_charge_at = NOW(). Matches only if:
+			//   - the schedule is still active and still due,
+			//   - last_charge_at is NULL OR < next_charge_at (not already claimed for this period).
+			// If 0 rows returned, another worker claimed this period, so skip.
+			//
+			// Dueness is re-tested server-side (`next_charge_at <= NOW()`) rather
+			// than by comparing against the timestamp we selected. Postgres stores
+			// timestamptz to the microsecond and the driver hands it back as a JS
+			// Date, which truncates to the millisecond: an equality check against
+			// the round-tripped value silently never matches for any row whose
+			// next_charge_at carries sub-millisecond digits, and that schedule then
+			// never charges again. The last_charge_at guard is what actually makes
+			// the claim idempotent per period; the equality added nothing but that
+			// failure mode.
+			const claim = await sql`
+				UPDATE agent_subscriptions
+				SET last_charge_at = NOW()
+				WHERE id = ${row.id}
+				  AND status = 'active'
+				  AND next_charge_at <= NOW()
+				  AND (last_charge_at IS NULL OR last_charge_at < next_charge_at)
+				RETURNING id
+			`;
+			if (claim.length === 0) {
+				report.claimLost++;
+				subLog('subscription_cron.claim_lost', ctx);
+				continue;
+			}
+
+			let result;
+			try {
+				result = await subWithTimeout(
+					onPeriod({
+						agent: {
+							agentId: row.agent_id,
+							chainId: row.chain_id,
+							ownerAddress: row.owner_address,
+							usdcAddress,
+							relayerToken,
+							origin,
+						},
+						subscription: {
+							id: row.id,
+							delegationId: row.delegation_id,
+							amountPerPeriod: row.amount_per_period,
+						},
+					}),
+					ONPERIOD_TIMEOUT_MS,
+					'onPeriod',
+				);
+			} catch (err) {
+				const applied = await subApplyFailure(row, ctx, {
+					code: err.code ?? 'unknown',
+					message: err.message ?? 'unknown',
+				});
+				if (applied.pause) report.paused++;
+				else report.retrying++;
+				report.errors.push({ id: row.id, code: applied.code, reason: applied.reason });
+				subLogError('subscription_cron.onperiod_threw', {
+					...ctx,
+					code: applied.code,
+					outcome: applied.outcome,
+					paused: applied.pause,
+					willRetry: applied.retry,
+					message: err.message ?? 'unknown',
+					durationMs: Date.now() - rowStart,
+				});
+				continue;
+			}
+
+			if (result && result.ok) {
+				// Advance next_charge_at by exactly one period to enforce idempotency.
+				const nextChargeAt = new Date(
+					Date.parse(row.next_charge_at) + row.period_seconds * 1000,
+				);
+				try {
+					await sql`
+						UPDATE agent_subscriptions
+						SET next_charge_at       = ${nextChargeAt.toISOString()},
+						    last_error           = NULL,
+						    last_error_code      = NULL,
+						    consecutive_failures = 0,
+						    last_tx_hash         = ${result.txHash ?? null}
+						WHERE id = ${row.id}
+					`;
+				} catch (err) {
+					// Charge succeeded on-chain but we failed to advance — log loudly.
+					// Do NOT pause: next run's claim guard will prevent double-charge
+					// since last_charge_at >= next_charge_at for this period.
+					subLogError('subscription_cron.advance_failed', {
+						...ctx,
+						message: err.message,
+						txHash: result.txHash,
+					});
+					report.errors.push({
+						id: row.id,
+						reason: 'advance_failed',
+						message: err.message,
+					});
+					continue;
+				}
+
+				// Emit usage event — non-fatal if the table schema differs.
+				await sql`
+					INSERT INTO usage_events (user_id, kind, tool, status)
+					VALUES (${row.user_id}, 'subscription_charge', 'subscription', 'success')
+				`.catch((err) =>
+					subLogError('subscription_cron.usage_event_failed', {
+						...ctx,
+						message: err.message,
+					}),
+				);
+
+				await recordSubscriptionCharge(row, ctx, {
+					status: chargeStatusFor(OUTCOME.CHARGED),
+					outcome: OUTCOME.CHARGED,
+					txHash: result.txHash ?? null,
+				});
+
+				report.charged++;
+				subLog('subscription_cron.charged', {
+					...ctx,
+					txHash: result.txHash,
+					durationMs: Date.now() - rowStart,
+				});
+			} else {
+				const applied = await subApplyFailure(row, ctx, {
+					code: result?.code ?? 'unknown',
+					message: result?.message ?? '',
+				});
+				if (applied.pause) report.paused++;
+				else report.retrying++;
+				report.errors.push({ id: row.id, code: applied.code, reason: applied.reason });
+				subLog('subscription_cron.charge_failed', {
+					...ctx,
+					code: applied.code,
+					outcome: applied.outcome,
+					paused: applied.pause,
+					willRetry: applied.retry,
+					durationMs: Date.now() - rowStart,
+				});
+			}
+		} catch (err) {
+			// Catch-all so one bad row can't kill the run.
+			subLogError('subscription_cron.row_unhandled', {
+				...ctx,
+				message: err.message ?? 'unknown',
+				stack: err.stack,
+			});
+			report.errors.push({ id: row.id, reason: 'unhandled', message: err.message });
+			// Best-effort pause so we don't loop on the same broken row next hour.
+			await subSafePause(
+				row.id,
+				`unhandled: ${(err.message ?? 'unknown').slice(0, 480)}`,
+				ctx,
+			);
+			report.paused++;
+		}
+	}
+
+	subLog('subscription_cron.done', {
+		runId,
+		durationMs: Date.now() - runStart,
+		processed: report.processed,
+		charged: report.charged,
+		paused: report.paused,
+		retrying: report.retrying,
+		skipped: report.skipped,
+		claimLost: report.claimLost,
+		errorCount: report.errors.length,
+	});
+
+	return json(res, 200, report);
+}
+
+async function subPause(id, lastError) {
+	await sql`
+		UPDATE agent_subscriptions
+		SET status = 'paused', last_error = ${lastError}, paused_at = NOW()
+		WHERE id = ${id}
+	`;
+}
+
+/**
+ * Append one row to the subscription charge ledger. Best-effort: a ledger write
+ * must never turn a successful charge into a failed cron row, so failures are
+ * logged and swallowed.
+ */
+async function recordSubscriptionCharge(row, ctx, { status, outcome, code, error, txHash }) {
+	await sql`
+		INSERT INTO subscription_charges
+			(subscription_id, agent_id, payer_user_id, chain_id, amount, tx_hash,
+			 status, code, outcome, error, period_start_at)
+		VALUES
+			(${row.id}, ${row.agent_id}, ${row.user_id ?? null}, ${row.chain_id ?? null},
+			 ${row.amount_per_period}, ${txHash ?? null}, ${status}, ${code ?? null},
+			 ${outcome}, ${error ? String(error).slice(0, 500) : null},
+			 ${row.next_charge_at ?? null})
+		ON CONFLICT DO NOTHING
+	`.catch((err) =>
+		subLogError('subscription_cron.charge_record_failed', { ...ctx, message: err.message }),
+	);
+}
+
+/**
+ * Apply a failed charge to the schedule: record it in the ledger, then either
+ * leave the schedule active for another tick or pause it, per the shared rules
+ * in api/_lib/recurring.js.
+ *
+ * Releasing the period claim means restoring last_charge_at to what it was
+ * before this tick claimed the period. That is only safe because the retryable
+ * bucket is exactly the set of failures where the transfer provably never
+ * reached the chain; a timeout is classified ambiguous and never retried.
+ */
+async function subApplyFailure(row, ctx, failure) {
+	const { code, outcome, reason, platform } = classifyChargeFailure(failure);
+	const applied = applyChargeFailure({
+		outcome,
+		platform,
+		consecutiveFailures: Number(row.consecutive_failures ?? 0),
+	});
+
+	await recordSubscriptionCharge(row, ctx, {
+		status: chargeStatusFor(outcome),
+		outcome,
+		code,
+		error: failure.message,
+	});
+
+	try {
+		if (applied.pause) {
+			await sql`
+				UPDATE agent_subscriptions
+				SET status               = 'paused',
+				    paused_at            = NOW(),
+				    last_error           = ${reason.slice(0, 500)},
+				    last_error_code      = ${code},
+				    consecutive_failures = ${applied.consecutiveFailures}
+				WHERE id = ${row.id}
+			`;
+		} else {
+			await sql`
+				UPDATE agent_subscriptions
+				SET last_charge_at       = ${row.last_charge_at ?? null},
+				    last_error           = ${reason.slice(0, 500)},
+				    last_error_code      = ${code},
+				    consecutive_failures = ${applied.consecutiveFailures}
+				WHERE id = ${row.id}
+			`;
+		}
+	} catch (err) {
+		subLogError('subscription_cron.apply_failure_failed', {
+			...ctx,
+			code,
+			message: err.message,
+		});
+	}
+
+	return { ...applied, code, outcome, reason };
+}
+
+// Like subPause but swallows its own errors so a DB hiccup during pause doesn't
+// propagate out of the per-row handler. Logs the failure for ops visibility.
+async function subSafePause(id, lastError, ctx) {
+	try {
+		await subPause(id, lastError);
+	} catch (err) {
+		subLogError('subscription_cron.pause_failed', {
+			...ctx,
+			lastError,
+			message: err.message,
+		});
+	}
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// solana-attest-event-cleanup
+// ═══════════════════════════════════════════════════════════════════════════
+
+const STALE_AFTER_SECS = 60 * 60; // 1 hour
+
+async function handleSolanaAttestEventCleanup(req, res) {
+	if (cors(req, res, { methods: 'GET,POST,OPTIONS' })) return;
+
+	if (!requireCron(req, res)) return;
+
+	const result = await sql`
+		delete from solana_attest_event_claims
+		where signature is null
+		  and claimed_at < now() - (${STALE_AFTER_SECS} || ' seconds')::interval
+		returning agent_asset, network, event_id, claimed_at
+	`;
+
+	return json(res, 200, {
+		deleted: result.length,
+		stale_after_secs: STALE_AFTER_SECS,
+		samples: result.slice(0, 10),
+	});
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// solana-attestations-crawl
+// ═══════════════════════════════════════════════════════════════════════════
+
+const SOL_ATTEST_PER_RUN_MAX = 50; // bound RPC fan-out per cron tick
+
+async function handleSolanaAttestationsCrawl(req, res) {
+	if (cors(req, res, { methods: 'GET,POST,OPTIONS' })) return;
+
+	if (!requireCron(req, res)) return;
+
+	// Pull Solana agents, oldest-cursor first.
+	const agents = await sql`
+		select
+			a.id,
+			a.meta->>'sol_mint_address' as agent_asset,
+			coalesce(a.meta->>'network', 'mainnet') as network,
+			a.wallet_address as owner_wallet,
+			c.last_indexed_at
+		from agent_identities a
+		left join solana_attestations_cursor c
+			on c.agent_asset = a.meta->>'sol_mint_address'
+		where a.deleted_at is null
+		  and a.meta ? 'sol_mint_address'
+		order by c.last_indexed_at nulls first
+		limit ${SOL_ATTEST_PER_RUN_MAX}
+	`;
+
+	const report = { agents: [], errors: [], events: null };
+	for (const row of agents) {
+		try {
+			const r = await crawlAgentAttestations({
+				agentAsset: row.agent_asset,
+				network: row.network,
+				ownerWallet: row.owner_wallet,
+			});
+			report.agents.push({ asset: row.agent_asset, ...r });
+		} catch (err) {
+			report.errors.push({ asset: row.agent_asset, error: err.message || String(err) });
+		}
+	}
+
+	// Second half: the cross-chain event index. Draws its batch from the
+	// platform's own agents AND the external Solana registry directory, which
+	// had no event coverage at all before this ran.
+	report.events = await solanaEventSweep();
+
+	return json(res, 200, report);
+}
+
+async function solanaEventSweep() {
+	// The pool, the batch and the budget live with the crawl they bound, in
+	// api/_lib/solana-agent-events.js, because the freshness sensor derives the
+	// index's cycle time from those same constants. Splitting them across the
+	// cron and the module is how the sweep spent a year at a batch nobody could
+	// tie back to the median lag it produced.
+	const { sweepAgentEvents } = await import('../_lib/solana-agent-events.js');
+	return sweepAgentEvents();
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// process-subscriptions
+// ═══════════════════════════════════════════════════════════════════════════
+
+async function handleProcessSubscriptions(req, res) {
+	if (cors(req, res, { methods: 'GET,POST,OPTIONS' })) return;
+
+	if (!requireCron(req, res)) return;
+
+	const runId = `psub-${Date.now()}`;
+	const report = {
+		runId,
+		processed: 0,
+		charged: 0, // succeeded outright (instantaneous settlement)
+		pendingApproval: 0, // payment intent created; subscriber must approve
+		pastDue: 0,
+		errors: [],
+	};
+
+	// Find subscriptions whose period ends within the next hour (charge a bit
+	// early to allow for retry windows before period actually expires).
+	const dues = await sql`
+		SELECT
+			cs.id, cs.subscriber_user_id, cs.plan_id, cs.current_period_end,
+			sp.price_usd,
+			u.email AS subscriber_email,
+			u.display_name AS subscriber_name
+		FROM creator_subscriptions cs
+		JOIN subscription_plans sp ON sp.id = cs.plan_id
+		JOIN users u ON u.id = cs.subscriber_user_id
+		WHERE cs.status = 'active'
+		  AND cs.current_period_end < now() + interval '1 hour'
+		ORDER BY cs.current_period_end ASC
+		LIMIT 200
+	`;
+
+	for (const row of dues) {
+		report.processed++;
+		try {
+			// Count prior failed payments to decide retry vs. past_due.
+			const [{ failCount }] = await sql`
+				SELECT count(*)::int AS "failCount"
+				FROM subscription_payments
+				WHERE subscription_id = ${row.id} AND status = 'failed'
+			`;
+
+			if (failCount >= 3) {
+				// Mark past_due and notify subscriber.
+				await sql`
+					UPDATE creator_subscriptions
+					SET status = 'past_due'
+					WHERE id = ${row.id} AND status = 'active'
+				`;
+				report.pastDue++;
+				console.log(
+					JSON.stringify({
+						event: 'process_subscriptions.past_due',
+						runId,
+						subscriptionId: row.id,
+						failCount,
+					}),
+				);
+				// Fire-and-forget email notification.
+				sendEmail({
+					to: row.subscriber_email,
+					subject: 'Action required: subscription payment failed',
+					html: `<p>Hi ${row.subscriber_name || 'there'},</p>
+<p>We were unable to process your subscription payment of $${row.price_usd}. Your subscription has been paused. Please update your payment method to continue.</p>
+<p><a href="${env.APP_ORIGIN}/dashboard#subscriptions">Manage subscriptions</a></p>`,
+					text: `Your subscription payment of $${row.price_usd} could not be processed. Visit ${env.APP_ORIGIN}/dashboard#subscriptions to manage your subscriptions.`,
+				}).catch((e) =>
+					console.error(
+						JSON.stringify({
+							event: 'process_subscriptions.email_failed',
+							subscriptionId: row.id,
+							error: e.message,
+						}),
+					),
+				);
+				continue;
+			}
+
+			const result = await chargeSubscription(row.id);
+			if (result.success) {
+				report.charged++;
+			} else if (result.pending) {
+				// A payment intent was created and the subscriber was notified
+				// in-app. Do not increment `charged` — the subscription has
+				// NOT been paid yet. A follow-up email reminder is best-effort
+				// and only fires when subscriber_email is present.
+				report.pendingApproval++;
+				if (row.subscriber_email && result.payUrl) {
+					sendEmail({
+						to: row.subscriber_email,
+						subject: 'Your subscription renewal is due',
+						html: `<p>Hi ${row.subscriber_name || 'there'},</p>
+<p>Your subscription is up for renewal. The amount is $${result.amount_usd?.toFixed(2) || row.price_usd}.</p>
+<p><a href="${result.payUrl}">Approve renewal payment</a></p>`,
+						text: `Your subscription renewal of $${result.amount_usd?.toFixed(2) || row.price_usd} is ready. Approve at ${result.payUrl}`,
+					}).catch((e) =>
+						console.error(
+							JSON.stringify({
+								event: 'process_subscriptions.email_failed',
+								subscriptionId: row.id,
+								error: e.message,
+							}),
+						),
+					);
+				}
+			} else {
+				if (result.paymentId) {
+					await failPayment(result.paymentId, row.id);
+				}
+				report.errors.push({ id: row.id, error: result.error || 'charge_failed' });
+			}
+		} catch (e) {
+			report.errors.push({ id: row.id, error: e.message || String(e) });
+			console.error(
+				JSON.stringify({
+					event: 'process_subscriptions.row_error',
+					runId,
+					subscriptionId: row.id,
+					error: e.message,
+				}),
+			);
+		}
+	}
+
+	// Page on genuine charge failures so a billing outage doesn't hide behind a
+	// green cron. 'charge_in_progress' is the benign idempotency signal (another
+	// pass already owns this period) and is intentionally not a failure.
+	const realErrors = report.errors.filter((e) => e.error !== 'charge_in_progress');
+	if (realErrors.length > 0) {
+		const { sendOpsAlert } = await import('../_lib/alerts.js');
+		await sendOpsAlert(
+			`${realErrors.length} subscription charge(s) failed this run`,
+			realErrors.slice(0, 10).map((e) => `• ${e.id}: ${e.error}`).join('\n'),
+			{ signature: 'subscriptions-charge-failed' },
+		);
+	}
+
+	console.log(JSON.stringify({ event: 'process_subscriptions.done', ...report }));
+	return json(res, 200, report);
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// settle-royalties
+// ═══════════════════════════════════════════════════════════════════════════
+
+async function handleSettleRoyalties(req, res) {
+	if (cors(req, res, { methods: 'GET,POST,OPTIONS' })) return;
+
+	if (!requireCron(req, res)) return;
+
+	const { settleAllPendingRoyalties } = await import('../_lib/royalty.js');
+	const report = await settleAllPendingRoyalties();
+	return json(res, 200, { ok: true, ...report });
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// audit-log-cleanup — retention policy: keep 365 days of audit_log rows.
+// Legal acceptance records (Terms of Service and Risk Disclosure clickwrap,
+// written by api/legal/tos-ack.js, api/legal/risk-ack.js, and the auth
+// endpoints) are exempt: they are the durable evidence that a user agreed,
+// and must survive for the life of the account and beyond.
+// ═══════════════════════════════════════════════════════════════════════════
+
+const AUDIT_LOG_RETENTION_DAYS = 365;
+const AUDIT_LOG_RETENTION_EXEMPT_ACTIONS = ['tos-accept', 'risk-ack-accept'];
+
+async function handleAuditLogCleanup(req, res) {
+	if (cors(req, res, { methods: 'GET,POST,OPTIONS' })) return;
+
+	if (!requireCron(req, res)) return;
+
+	const result = await sql`
+		delete from audit_log
+		where created_at < now() - (${AUDIT_LOG_RETENTION_DAYS} || ' days')::interval
+			and action != all(${AUDIT_LOG_RETENTION_EXEMPT_ACTIONS})
+		returning id
+	`;
+	return json(res, 200, { deleted: result.length, retention_days: AUDIT_LOG_RETENTION_DAYS });
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// expire-pending-purchases — fail-close stale pending skill purchases.
+// Schedule: every 5 minutes. Marks rows past expires_at as 'expired' so the
+// idempotent-create path issues a fresh reference on the buyer's next attempt.
+// ═══════════════════════════════════════════════════════════════════════════
+
+async function handleExpirePendingPurchases(req, res) {
+	if (!method(req, res, ['GET'])) return;
+	if (!requireCron(req, res)) return;
+	const result = await sql`
+		UPDATE skill_purchases
+		SET status = 'expired', updated_at = now()
+		WHERE status = 'pending' AND expires_at IS NOT NULL AND expires_at < now()
+		RETURNING id
+	`;
+	return json(res, 200, { expired: result.length });
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// confirm-pending-purchases: server-side settlement sweep for paid skill buys.
+// Schedule: every 2 minutes (well inside the 30-minute pending TTL, so a paid
+// purchase confirms long before expire-pending-purchases fail-closes it).
+//
+// Why this exists: a paid purchase is otherwise confirmed ONLY by the buyer's
+// browser polling /api/marketplace/purchase/confirm for ~60s after it broadcasts
+// the payment. If the tab closes, the network stalls, or a mobile Solana-Pay QR
+// buyer pays and walks away, the on-chain payment lands but the row stays
+// 'pending': the buyer is charged, gets no skill grant, and the sale never
+// reaches the Money Pulse. This sweep locates each pending paid row's payment by
+// its Solana-Pay reference and finalizes it exactly like the buyer poll would
+// (idempotent: finalizeSkillConfirmation flips the row only from 'pending', and
+// re-confirms are no-ops). Solana only; EVM confirm needs the buyer's tx hash.
+// ═══════════════════════════════════════════════════════════════════════════
+
+async function handleConfirmPendingPurchases(req, res) {
+	if (!method(req, res, ['GET'])) return;
+	if (!requireCron(req, res)) return;
+
+	// Only rows that (a) are a real paid purchase, (b) settle on Solana, (c) are
+	// still within their pending window, and (d) are recent enough that a payment
+	// could plausibly have landed. mint_decimals rides in from the price row so the
+	// on-chain amount check matches the quote. LIMIT bounds the per-tick RPC work;
+	// the next tick continues any remainder.
+	const pending = await sql`
+		SELECT sp.id, sp.user_id, sp.agent_id, sp.skill, sp.status, sp.reference,
+		       sp.amount, sp.currency_mint, sp.chain, sp.tx_signature,
+		       sp.expires_at, sp.referrer_user_id, sp.recipient_user_id,
+		       sp.platform_fee_amount, sp.platform_fee_wallet,
+		       COALESCE(asp.mint_decimals, 6) AS mint_decimals
+		FROM skill_purchases sp
+		LEFT JOIN agent_skill_prices asp
+		       ON asp.agent_id = sp.agent_id AND asp.skill = sp.skill
+		WHERE sp.status = 'pending'
+		  AND sp.kind IN ('purchase', 'time_pass')
+		  AND sp.chain = 'solana'
+		  AND (sp.expires_at IS NULL OR sp.expires_at > now())
+		  AND sp.created_at > now() - interval '2 hours'
+		ORDER BY sp.created_at ASC
+		LIMIT 50
+	`;
+
+	let confirmed = 0, tipped = 0, mismatched = 0, stillPending = 0, errors = 0;
+	for (const pur of pending) {
+		try {
+			const r = await confirmSkillPurchase(pur);
+			if (r.status === 'confirmed') confirmed++;
+			else if (r.status === 'tipped') tipped++;
+			else if (r.status === 'mismatch') mismatched++;
+			else stillPending++; // 'pending' (no on-chain payment yet) or 'expired'
+		} catch (e) {
+			errors++;
+			console.error('[confirm-pending-purchases] confirm failed', pur.reference, e?.message);
+		}
+	}
+
+	return json(res, 200, {
+		scanned: pending.length,
+		confirmed,
+		tipped,
+		mismatched,
+		still_pending: stillPending,
+		errors,
+	});
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// cleanup-csrf-tokens — drop expired tokens. Run hourly.
+// ═══════════════════════════════════════════════════════════════════════════
+
+async function handleCleanupCsrfTokens(req, res) {
+	if (!method(req, res, ['GET'])) return;
+	if (!requireCron(req, res)) return;
+	// RETURNING 1, not RETURNING token: the row count is all this reports, and
+	// shipping every expired token value back over the wire puts live-until-a-
+	// moment-ago CSRF secrets in the response path for no gain.
+	const result = await sql`DELETE FROM csrf_tokens WHERE expires_at < now() RETURNING 1`;
+	return json(res, 200, { deleted: result.length });
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// siwx-gc — prune SIWX nonces (replay window) and expired payment grants.
+// Daily at 03:00 UTC. Nonce window of 10 min (600s) is well above the 5-min
+// SIWX maxAge; payments grace of 7 days avoids cutting off slow clients at
+// the boundary.
+// ═══════════════════════════════════════════════════════════════════════════
+
+async function handleSiwxGc(req, res) {
+	if (cors(req, res, { methods: 'GET,POST,OPTIONS' })) return;
+
+	if (!requireCron(req, res)) return;
+
+	const { pruneOldNonces, pruneExpiredPayments } = await import('../_lib/siwx-storage.js');
+
+	// 10-minute nonce window — well over the 5-minute SIWX message maxAge.
+	const noncesDeleted = await pruneOldNonces(10 * 60);
+
+	// 7-day grace on expired payments so a slow client doesn't lose access
+	// mid-session right at the boundary.
+	const paymentsDeleted = await pruneExpiredPayments(7 * 24 * 3600);
+
+	return json(res, 200, {
+		ok: true,
+		noncesDeleted,
+		paymentsDeleted,
+		ranAt: new Date().toISOString(),
+	});
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// process-withdrawals — pick up pending Solana USDC withdrawals and execute
+// them from the treasury keypair. Runs hourly.
+// State machine: pending → processing → completed (with tx_signature) | failed (with error_message)
+// ═══════════════════════════════════════════════════════════════════════════
+
+const WITHDRAWALS_BATCH = 20;
+
+async function handleProcessWithdrawals(req, res) {
+	if (cors(req, res, { methods: 'GET,POST,OPTIONS' })) return;
+
+	if (!requireCron(req, res)) return;
+
+	const treasuryKeypair = process.env.TREASURY_KEYPAIR || process.env.PLATFORM_TREASURY_KEYPAIR;
+	const evmTreasuryKey = process.env.EVM_TREASURY_PRIVATE_KEY;
+	if (!treasuryKeypair && !evmTreasuryKey) {
+		return json(res, 200, {
+			skipped: true,
+			reason: 'No treasury key configured (set TREASURY_KEYPAIR or PLATFORM_TREASURY_KEYPAIR for Solana, EVM_TREASURY_PRIVATE_KEY for EVM)',
+		});
+	}
+
+	const { transferSolanaUSDC } = await import('../_lib/solana-transfer.js');
+	const { sendEvmUsdc, resolveEvmChainId } = await import('../_lib/evm-transfer.js');
+	const { insertNotification } = await import('../_lib/notify.js');
+	const { sendOpsAlert } = await import('../_lib/alerts.js');
+
+	// Reconciliation: a crash between the on-chain send and the 'completed' write
+	// strands a row in 'processing'. The main loop only claims 'pending', so it is
+	// never retried. We do NOT auto-resend — without an on-chain idempotency
+	// reference a blind retry could double-pay — we page an operator to reconcile
+	// by hand (confirm the transfer settled, then complete or re-queue the row).
+	const stranded = await sql`
+		SELECT id, amount, currency_mint, chain, updated_at
+		FROM agent_withdrawals
+		WHERE status = 'processing' AND updated_at < now() - interval '15 minutes'
+		ORDER BY updated_at ASC LIMIT 50
+	`;
+	if (stranded.length) {
+		await sendOpsAlert(
+			`${stranded.length} withdrawal(s) stranded in 'processing' >15m`,
+			stranded
+				.map((s) => `• ${s.id} — ${s.amount} ${s.currency_mint} (${s.chain})`)
+				.join('\n') +
+				'\nManual reconciliation required: verify whether the on-chain transfer ' +
+				'settled BEFORE completing or re-queuing — a blind retry can double-pay.',
+			{ signature: 'withdrawals-stranded' },
+		);
+	}
+
+	// Build the chain filter to match what we can actually process. A row whose
+	// chain has no treasury key configured stays 'pending' for the next pass
+	// once an operator wires the key.
+	const supportedChains = [];
+	if (treasuryKeypair) supportedChains.push('solana');
+	if (evmTreasuryKey)
+		supportedChains.push(
+			'ethereum',
+			'base',
+			'optimism',
+			'arbitrum',
+			'polygon',
+			'sepolia',
+			'base-sepolia',
+			'1',
+			'8453',
+			'10',
+			'42161',
+			'137',
+			'11155111',
+			'84532',
+		);
+
+	// Fetch pending withdrawals across all supported chains, join user earnings
+	// to verify available balance.
+	const pending = await sql`
+		SELECT
+			w.id,
+			w.user_id,
+			w.amount,
+			w.currency_mint,
+			w.to_address,
+			w.chain,
+			(
+				SELECT coalesce(sum(re.net_amount), 0)::bigint
+				FROM agent_revenue_events re
+				JOIN agent_identities ai ON ai.id = re.agent_id
+				WHERE coalesce(re.owner_user_id, ai.user_id) = w.user_id AND re.currency_mint = w.currency_mint
+				  AND NOT re.settled_to_wallet
+			) -
+			(
+				SELECT coalesce(sum(w2.amount), 0)::bigint
+				FROM agent_withdrawals w2
+				WHERE w2.user_id = w.user_id
+				  AND w2.id != w.id
+				  AND w2.status IN ('pending', 'processing', 'completed')
+				  AND w2.currency_mint = w.currency_mint
+			) AS available
+		FROM agent_withdrawals w
+		WHERE w.status = 'pending' AND w.chain = ANY(${supportedChains})
+		ORDER BY w.created_at ASC
+		LIMIT ${WITHDRAWALS_BATCH}
+	`;
+
+	const report = { processed: 0, completed: 0, failed: 0, skipped: 0, sendFailed: 0, errors: [] };
+
+	for (const w of pending) {
+		report.processed++;
+		const available = Number(w.available ?? 0);
+
+		// Skip if user doesn't have enough available balance
+		if (w.amount > available) {
+			await sql`
+				UPDATE agent_withdrawals
+				SET status = 'failed',
+				    error_message = 'Insufficient referral balance at processing time',
+				    updated_at = now()
+				WHERE id = ${w.id}
+			`;
+			insertNotification(w.user_id, 'withdrawal_failed', {
+				withdrawal_id: w.id,
+				amount: w.amount,
+				currency_mint: w.currency_mint,
+				reason: 'insufficient_balance',
+			});
+			report.failed++;
+			report.errors.push({ id: w.id, error: 'insufficient_balance' });
+			continue;
+		}
+
+		// Mark as processing atomically — only if still pending
+		const [claimed] = await sql`
+			UPDATE agent_withdrawals
+			SET status = 'processing', updated_at = now()
+			WHERE id = ${w.id} AND status = 'pending'
+			RETURNING id
+		`;
+		if (!claimed) {
+			report.skipped++;
+			continue;
+		}
+
+		const EVM_USDC_BASE_LC = EVM_USDC[8453].toLowerCase();
+		try {
+			let sig;
+			// Pay only the chain's USDC against a USDC balance. The EVM leg always
+			// sends Base USDC, so a row carrying any other mint would turn a balance
+			// in a worthless token into real dollars.
+			const solUsdc = w.chain === 'solana' && w.currency_mint === SOLANA_USDC_MINT;
+			const evmUsdc = w.chain !== 'solana' && String(w.currency_mint || '').toLowerCase() === EVM_USDC_BASE_LC;
+			if (!solUsdc && !evmUsdc) {
+				throw new Error(`withdrawal mint ${w.currency_mint} is not USDC on ${w.chain}`);
+			}
+			if (w.chain === 'solana') {
+				if (!treasuryKeypair) {
+					throw new Error('TREASURY_KEYPAIR not configured for solana withdrawal');
+				}
+				sig = await transferSolanaUSDC({
+					fromWallet: treasuryKeypair,
+					toAddress: w.to_address,
+					amount: BigInt(w.amount),
+					mint: w.currency_mint,
+				});
+			} else {
+				// EVM dispatch — resolve the chain name/id to a viem chain ID,
+				// then send the real USDC transfer.
+				const chainId = resolveEvmChainId(w.chain);
+				if (!chainId) {
+					throw new Error(`unsupported chain for withdrawal: ${w.chain}`);
+				}
+				const result = await sendEvmUsdc({
+					chainId,
+					recipient: w.to_address,
+					amount: BigInt(w.amount),
+				});
+				sig = result.hash;
+			}
+
+			await sql`
+				UPDATE agent_withdrawals
+				SET status = 'completed', tx_signature = ${sig}, updated_at = now()
+				WHERE id = ${w.id}
+			`;
+
+			// Deduct from referral_earnings_total (best-effort; earnings are tracked via revenue_events)
+			await sql`
+				UPDATE users
+				SET referral_earnings_total = greatest(0, coalesce(referral_earnings_total, 0) - ${w.amount})
+				WHERE id = ${w.user_id}
+			`.catch((e) => console.error('[process-withdrawals] referral deduct failed:', e.message));
+
+			await insertNotification(w.user_id, 'withdrawal_completed', {
+				withdrawal_id: w.id,
+				amount: w.amount,
+				currency_mint: w.currency_mint,
+				chain: w.chain,
+				tx_signature: sig,
+			}).catch((e) => console.error('[process-withdrawals] notify completed failed:', e.message));
+
+			report.completed++;
+		} catch (err) {
+			const msg = err.message || String(err);
+			// The row was already claimed to 'processing'. A failure HERE may mean the
+			// on-chain send threw before broadcast (safe to fail) OR after (funds may
+			// have moved). Mark failed so the user is told, but record it as a send
+			// failure so the batch alert fires and an operator reconciles.
+			await sql`
+				UPDATE agent_withdrawals
+				SET status = 'failed', error_message = ${msg}, updated_at = now()
+				WHERE id = ${w.id}
+			`;
+			await insertNotification(w.user_id, 'withdrawal_failed', {
+				withdrawal_id: w.id,
+				amount: w.amount,
+				currency_mint: w.currency_mint,
+				reason: msg,
+			}).catch((e) => console.error('[process-withdrawals] notify failed failed:', e.message));
+			report.failed++;
+			report.sendFailed++;
+			report.errors.push({ id: w.id, error: msg });
+		}
+	}
+
+	// A green cron with failing payouts is invisible — page on real send failures
+	// (treasury out of gas/SOL, RPC down, transfer reverted) so a payout outage
+	// doesn't sit silently. Balance-rejections above are normal and excluded.
+	if (report.sendFailed > 0) {
+		await sendOpsAlert(
+			`${report.sendFailed} withdrawal payout(s) failed on-chain this run`,
+			report.errors.slice(0, 10).map((e) => `• ${e.id}: ${e.error}`).join('\n'),
+			{ signature: 'withdrawals-send-failed' },
+		);
+	}
+
+	return json(res, 200, { ok: true, ...report });
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// run-x-scheduled-posts
+//
+// Publishes due rows from x_scheduled_posts. Terminal errors (quota, dedup,
+// not connected, reauth) are recorded once; transient errors retry up to 3x.
+// ═══════════════════════════════════════════════════════════════════════════
+
+async function handleRunXScheduledPosts(req, res) {
+	if (cors(req, res, { methods: 'GET,POST,OPTIONS' })) return;
+	if (!requireCron(req, res)) return;
+
+	const { publishTweet, XPostError } = await import('../_lib/x-post.js');
+
+	const due = await sql`
+		select id, user_id, agent_id, text, thread_parts, reply_to_tweet_id, attempts
+		from x_scheduled_posts
+		where posted_at is null and error is null
+		  and scheduled_at <= now()
+		order by scheduled_at asc
+		limit 50
+	`;
+
+	const report = { processed: 0, posted: 0, errored: 0 };
+	const TERMINAL = new Set([
+		'quota_exceeded',
+		'duplicate',
+		'not_connected',
+		'validation_error',
+		'reauth_required',
+	]);
+
+	for (const row of due) {
+		report.processed++;
+		try {
+			const result = await publishTweet({
+				userId: row.user_id,
+				agentId: row.agent_id,
+				text: row.thread_parts ? null : row.text,
+				threadParts: Array.isArray(row.thread_parts) ? row.thread_parts : null,
+				replyTo: row.reply_to_tweet_id || null,
+				appendLink: Boolean(row.agent_id),
+			});
+			await sql`
+				update x_scheduled_posts
+				set posted_at = now(), tweet_id = ${result.tweet_id}, attempts = attempts + 1
+				where id = ${row.id}
+			`;
+			report.posted++;
+		} catch (err) {
+			report.errored++;
+			const code = err instanceof XPostError ? err.code : 'internal_error';
+			const terminal = TERMINAL.has(code) || row.attempts >= 2;
+			await sql`
+				update x_scheduled_posts
+				set attempts = attempts + 1,
+				    error = ${terminal ? `${code}: ${err.message}`.slice(0, 500) : null}
+				where id = ${row.id}
+			`;
+		}
+	}
+
+	return json(res, 200, report);
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// run-x-triggers
+//
+// Evaluates enabled rows in x_triggers. Each kind has its own predicate;
+// when it fires, we draft post text (LLM for personas, formatted for
+// milestones) and insert into x_scheduled_posts with scheduled_at=now().
+// The run-x-scheduled-posts cron picks it up on the next tick.
+// ═══════════════════════════════════════════════════════════════════════════
+
+const TRIGGER_BUDGET_MS = 60_000;
+const SOL_USD_FALLBACK = 150;
+
+// x-mentions: read new mentions of our X accounts, decide, and answer each once
+// (dry run until X_MENTION_BOT_LIVE=1 and the owner flips it). See
+// api/_lib/x-mention-poll.js.
+async function handleXMentions(req, res) {
+	if (cors(req, res, { methods: 'GET,POST,OPTIONS' })) return;
+	if (!requireCron(req, res)) return;
+	const { runMentionTick } = await import('../_lib/x-mention-poll.js');
+	return json(res, 200, await runMentionTick());
+}
+
+async function handleRunXTriggers(req, res) {
+	if (cors(req, res, { methods: 'GET,POST,OPTIONS' })) return;
+	if (!requireCron(req, res)) return;
+
+	const started = Date.now();
+	let rows;
+	try {
+		rows = await sql`
+			select id, user_id, agent_id, kind, config, auto_publish, last_fired_at, last_state
+			from x_triggers
+			where enabled = true
+			order by coalesce(last_fired_at, '1970-01-01'::timestamptz) asc
+			limit 200
+		`;
+	} catch (err) {
+		if (err.code === '42703') {
+			rows = await sql`
+				select id, user_id, null::uuid as agent_id, kind, config,
+				       coalesce(auto_publish, false) as auto_publish,
+				       last_fired_at,
+				       null::jsonb as last_state
+				from x_triggers
+				where enabled = true
+				order by coalesce(last_fired_at, '1970-01-01'::timestamptz) asc
+				limit 200
+			`;
+		} else {
+			throw err;
+		}
+	}
+
+	const report = { evaluated: 0, fired: 0, skipped: 0, errors: 0 };
+	for (const t of rows) {
+		if (Date.now() - started > TRIGGER_BUDGET_MS) break;
+		report.evaluated++;
+		try {
+			const fired = await evalTrigger(t);
+			if (fired) report.fired++;
+			else report.skipped++;
+		} catch (err) {
+			report.errors++;
+			console.error('[run-x-triggers] error', t.id, t.kind, err.message);
+		}
+	}
+	return json(res, 200, report);
+}
+
+async function evalTrigger(t) {
+	if (t.kind === 'daily_persona') return await evalDailyPersona(t);
+	if (t.kind === 'weekly_digest') return await evalWeeklyDigest(t);
+	if (t.kind === 'price_milestone') return await evalPriceMilestone(t);
+	if (t.kind === 'payment_received') return await evalPaymentReceived(t);
+	return false;
+}
+
+function utcHour(d) {
+	return d.getUTCHours();
+}
+function utcDay(d) {
+	return d.getUTCDay();
+}
+function ymdUTC(d) {
+	return `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, '0')}-${String(d.getUTCDate()).padStart(2, '0')}`;
+}
+
+// Either enqueue for immediate publish (auto_publish=true) or stash in the
+// pending-review queue for the user to approve (auto_publish=false).
+async function enqueueTriggerPost(t, text) {
+	if (t.auto_publish === false) {
+		try {
+			await sql`
+				insert into x_pending_reviews (user_id, trigger_id, agent_id, text)
+				values (${t.user_id}, ${t.id}, ${t.agent_id}, ${text})
+			`;
+		} catch (err) {
+			if (err.code !== '42703') throw err;
+			// agent_id column not yet present — insert without it
+			await sql`
+				insert into x_pending_reviews (user_id, trigger_id, text)
+				values (${t.user_id}, ${t.id}, ${text})
+			`;
+		}
+		return;
+	}
+	try {
+		await sql`
+			insert into x_scheduled_posts (user_id, agent_id, text, scheduled_at)
+			values (${t.user_id}, ${t.agent_id}, ${text}, now())
+		`;
+	} catch (err) {
+		if (err.code !== '42703') throw err;
+		await sql`
+			insert into x_scheduled_posts (user_id, text, scheduled_at)
+			values (${t.user_id}, ${text}, now())
+		`;
+	}
+}
+
+async function setTriggerState(t, state) {
+	await sql`update x_triggers set last_state = ${JSON.stringify(state)}::jsonb, last_fired_at = now() where id = ${t.id}`;
+}
+
+async function loadAvatarFromAgent(agentId) {
+	if (!agentId) return null;
+	// avatars has no direct agent_id column — the link is agent_identities.avatar_id.
+	// Look up the avatar by joining through agent_identities, or fall back to the
+	// case where the caller passes an avatar id directly (legacy behavior).
+	const r = await sql`
+		select a.id, a.name, a.description, ai.id as agent_id
+		from avatars a
+		left join agent_identities ai on ai.avatar_id = a.id
+		where a.id::text = ${agentId} OR ai.id::text = ${agentId}
+		limit 1
+	`;
+	return r[0] || null;
+}
+
+const DRAFT_SYSTEM = `You write tweets for AI agents on three.ws. Tweets must be:
+- Under 280 characters (hard limit).
+- In the agent's voice (first person, matching the description).
+- No hashtag spam. At most 1 hashtag.
+- No leading/trailing quotes. Plain text only.
+- Avoid em-dashes.
+Output ONLY the tweet text, nothing else.`;
+
+// Draft short post text on the platform LLM chain (api/_lib/llm.js): free
+// providers first with full failover, paid keys as the automatic last resort.
+// The old pick-first-and-die routing meant one Groq 429 dropped the post.
+async function llmDraft({ system, user, max = 200 }) {
+	const { text: raw } = await llmComplete({
+		system,
+		user,
+		maxTokens: max,
+		track: { tool: 'cron.x-trigger-draft' },
+	});
+	let text = (raw || '').trim();
+	if (text.startsWith('"') && text.endsWith('"')) text = text.slice(1, -1).trim();
+	if (text.length > 280) text = text.slice(0, 279) + '…';
+	return text;
+}
+
+async function evalDailyPersona(t) {
+	const now = new Date();
+	if (utcHour(now) !== Number(t.config.hour_utc)) return false;
+	const today = ymdUTC(now);
+	if (t.last_state?.fired_ymd === today) return false;
+
+	const avatar = await loadAvatarFromAgent(t.agent_id);
+	const ctx = avatar
+		? `Agent name: ${avatar.name || 'Unnamed'}\nAgent description: ${avatar.description || '(none)'}`
+		: '';
+	const topic = t.config.topic
+		? `Topic for today: ${t.config.topic}`
+		: 'Write something engaging and in-character about being an autonomous AI agent today.';
+	const text = await llmDraft({
+		system: DRAFT_SYSTEM,
+		user: [ctx, topic].filter(Boolean).join('\n\n'),
+	});
+	await enqueueTriggerPost(t, text);
+	await setTriggerState(t, { fired_ymd: today });
+	return true;
+}
+
+async function evalWeeklyDigest(t) {
+	const now = new Date();
+	if (utcDay(now) !== Number(t.config.day_of_week) || utcHour(now) !== Number(t.config.hour_utc))
+		return false;
+	const week = `${now.getUTCFullYear()}-W${Math.floor((now.getUTCDate() + 6) / 7)}`;
+	if (t.last_state?.fired_week === week) return false;
+
+	const avatar = await loadAvatarFromAgent(t.agent_id);
+	const mint = avatar
+		? (
+				await sql`
+		select m.symbol, m.name, s.recent_tx_count
+		from pump_agent_mints m left join pump_agent_stats s on s.mint_id = m.id
+		where m.agent_id::text = ${avatar.agent_id ?? null} or m.agent_id::text = ${avatar.id}
+		order by m.created_at desc limit 1
+	`
+			)[0]
+		: null;
+
+	const ctx = avatar
+		? `Agent name: ${avatar.name || 'Unnamed'}\nDescription: ${avatar.description || '(none)'}`
+		: '';
+	const stats = mint
+		? `\nToken: $${mint.symbol || 'TOKEN'} on pump.fun. Recent transactions: ${mint.recent_tx_count || 0}.`
+		: '';
+	const text = await llmDraft({
+		system: DRAFT_SYSTEM,
+		user: `${ctx}${stats}\n\nWrite a weekly recap tweet covering the agent's progress this week. If token stats are present, mention them naturally.`,
+	});
+	await enqueueTriggerPost(t, text);
+	await setTriggerState(t, { fired_week: week });
+	return true;
+}
+
+async function evalPriceMilestone(t) {
+	const thresholds = (t.config.thresholds_usd || []).slice().sort((a, b) => a - b);
+	if (!thresholds.length) return false;
+	const avatar = await loadAvatarFromAgent(t.agent_id);
+	if (!avatar) return false;
+	const mintRow = (
+		await sql`
+		select m.id as mint_id, m.symbol, p.market_cap_lamports
+		from pump_agent_mints m
+		left join lateral (
+			select market_cap_lamports from pump_agent_price_points
+			where mint_id = m.id order by ts desc limit 1
+		) p on true
+		where m.agent_id::text = ${avatar.agent_id ?? null} or m.agent_id::text = ${avatar.id}
+		order by m.created_at desc limit 1
+	`
+	)[0];
+	if (!mintRow || !mintRow.market_cap_lamports) return false;
+
+	const solUsd = Number(t.config.sol_usd) || SOL_USD_FALLBACK;
+	const mcapUsd = (Number(mintRow.market_cap_lamports) / 1e9) * solUsd;
+	const lastFired = Number(t.last_state?.last_threshold_fired_usd || 0);
+	const nextThreshold = thresholds.find((th) => mcapUsd >= th && th > lastFired);
+	if (!nextThreshold) return false;
+
+	const text = await llmDraft({
+		system: DRAFT_SYSTEM,
+		user: `Agent name: ${avatar.name || 'Unnamed'}\nDescription: ${avatar.description || '(none)'}\nToken: $${mintRow.symbol || 'TOKEN'} on pump.fun.\nMilestone: market cap just crossed $${nextThreshold.toLocaleString()} (now ≈ $${Math.round(mcapUsd).toLocaleString()}).\n\nWrite a tweet celebrating this milestone in the agent's voice.`,
+	});
+	await enqueueTriggerPost(t, text);
+	await setTriggerState(t, { last_threshold_fired_usd: nextThreshold, mcap_usd: mcapUsd });
+	return true;
+}
+
+async function evalPaymentReceived(t) {
+	const avatar = await loadAvatarFromAgent(t.agent_id);
+	if (!avatar) return false;
+	const since = t.last_state?.last_payment_id ?? '00000000-0000-0000-0000-000000000000';
+	const minUsd = Number(t.config.min_amount_usd || 0);
+
+	const payments = await sql`
+		select p.id, p.amount_atomics, p.currency_mint, p.skill_id, p.tool_name, m.symbol
+		from pump_agent_payments p
+		join pump_agent_mints m on m.id = p.mint_id
+		where (m.agent_id::text = ${avatar.agent_id ?? null} or m.agent_id::text = ${avatar.id})
+		  and p.status = 'confirmed'
+		  and p.id::text > ${since}
+		order by p.confirmed_at asc
+		limit 3
+	`;
+	if (!payments.length) return false;
+
+	let lastId = null;
+	for (const p of payments) {
+		const approxUsd = Number(p.amount_atomics) / 1e6;
+		if (approxUsd < minUsd) {
+			lastId = p.id;
+			continue;
+		}
+		const label = p.tool_name
+			? `for "${p.tool_name}"`
+			: p.skill_id
+				? `for skill ${p.skill_id}`
+				: 'for a paid action';
+		const text = await llmDraft({
+			system: DRAFT_SYSTEM,
+			user: `Agent name: ${avatar.name || 'Unnamed'}\nDescription: ${avatar.description || '(none)'}\nA user just paid ~$${approxUsd.toFixed(2)} ${label}.\n\nWrite a short thank-you tweet in the agent's voice.`,
+		});
+		await enqueueTriggerPost(t, text);
+		lastId = p.id;
+	}
+	if (lastId) await setTriggerState(t, { last_payment_id: lastId });
+	return true;
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// fetch-x-metrics
+//
+// Pulls public_metrics (likes, retweets, replies, impressions) for posts
+// older than ~1h and not refreshed in last 6h. Stored on x_posts.metrics.
+// ═══════════════════════════════════════════════════════════════════════════
+
+async function handleFetchXMetrics(req, res) {
+	if (cors(req, res, { methods: 'GET,POST,OPTIONS' })) return;
+	if (!requireCron(req, res)) return;
+
+	const { decryptToken } = await import('../auth/x/[action].js');
+
+	// Pick distinct users with posts needing refresh.
+	const users = await sql`
+		select distinct user_id
+		from x_posts
+		where created_at < now() - interval '1 hour'
+		  and (metrics_fetched_at is null or metrics_fetched_at < now() - interval '6 hours')
+		limit 50
+	`;
+
+	const report = { users: 0, fetched: 0, errors: 0 };
+	for (const u of users) {
+		report.users++;
+		const conn = (
+			await sql`
+			select access_token, expires_at, refresh_token, id
+			from social_connections
+			where user_id = ${u.user_id} and provider = 'x' and disconnected_at is null
+			limit 1
+		`
+		)[0];
+		if (!conn || !conn.access_token) continue;
+		let accessToken;
+		try {
+			accessToken = decryptToken(conn.access_token);
+		} catch {
+			continue;
+		}
+
+		const posts = await sql`
+			select id, tweet_id from x_posts
+			where user_id = ${u.user_id}
+			  and created_at < now() - interval '1 hour'
+			  and (metrics_fetched_at is null or metrics_fetched_at < now() - interval '6 hours')
+			order by created_at desc
+			limit 100
+		`;
+		if (!posts.length) continue;
+
+		// X allows up to 100 ids per /2/tweets lookup.
+		const ids = posts.map((p) => p.tweet_id).join(',');
+		// Unbounded, this held the whole cron invocation open whenever X was slow,
+		// and the loop below runs it once per account.
+		const r = await fetchUpstream(
+			`https://api.twitter.com/2/tweets?ids=${ids}&tweet.fields=public_metrics`,
+			{ headers: { authorization: `Bearer ${accessToken}` } },
+			{ name: 'x:tweets-lookup', timeoutMs: 15_000, attempts: 2, okWhen: () => true },
+		);
+		if (!r.ok) {
+			report.errors++;
+			continue;
+		}
+		const { data = [] } = await r.json();
+		const byId = new Map(data.map((d) => [d.id, d.public_metrics]));
+
+		for (const p of posts) {
+			const m = byId.get(p.tweet_id);
+			if (!m) continue;
+			await sql`
+				update x_posts
+				set metrics = ${JSON.stringify(m)}::jsonb, metrics_fetched_at = now()
+				where id = ${p.id}
+			`;
+			report.fetched++;
+		}
+	}
+
+	return json(res, 200, report);
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// run-coin-cycle
+// ═══════════════════════════════════════════════════════════════════════════
+//
+// One unified pass over every active coin_launches row:
+//   1. refresh holder snapshot via Helius RPC
+//   2. claim creator-vault SOL from pump.fun and split into pots
+//   3. commit the next lottery draw (one per draw_interval_seconds)
+//   4. resolve any committed draws whose Drand round has been published
+//   5. allocate the reflection pot pro-rata to eligible holders
+//
+// Payouts (SOL transfers) are NOT done here — see run-coin-payouts which
+// drains the coin_payouts queue. Splitting these two crons means a slow
+// or stuck payout tx can't block the next cycle from being committed.
+//
+// Scheduled every 5 minutes by Vercel. Each step is idempotent — running
+// twice within the same draw/reflection bucket is a no-op.
+
+async function handleRunCoinCycle(req, res) {
+	if (cors(req, res, { methods: 'GET,POST,OPTIONS' })) return;
+	if (!method(req, res, ['GET', 'POST'])) return;
+
+	if (!requireCron(req, res)) return;
+
+	// Demo gate: cron is wired in vercel.json but stays a no-op until the
+	// operator opts in by setting COIN_DEMO_ENABLED=true in env. Until then
+	// neither Vercel cron nor a manual call can touch any coin_launches row.
+	if (process.env.COIN_DEMO_ENABLED !== 'true') {
+		return json(res, 200, {
+			ok: true,
+			disabled: true,
+			hint: 'set COIN_DEMO_ENABLED=true to enable',
+		});
+	}
+
+	const coinLib = await import('../_lib/coin/index.js');
+	const coins = await coinLib.listActiveCoins();
+
+	const phaseFilter = (req.query?.phase || '').toString();
+	const onlyPhase = phaseFilter
+		? new Set(
+				phaseFilter
+					.split(',')
+					.map((s) => s.trim())
+					.filter(Boolean),
+			)
+		: null;
+	const wantPhase = (name) => !onlyPhase || onlyPhase.has(name);
+
+	const report = { coins: [], errors: [] };
+
+	for (const coin of coins) {
+		const result = { mint: coin.mint, symbol: coin.symbol, steps: {} };
+		try {
+			if (wantPhase('snapshot')) {
+				result.steps.snapshot = await coinLib.snapshotHolders(coin);
+			}
+		} catch (err) {
+			result.steps.snapshot = { error: err.message || String(err) };
+			report.errors.push({
+				mint: coin.mint,
+				step: 'snapshot',
+				error: result.steps.snapshot.error,
+			});
+		}
+
+		// Refresh row after snapshot so we have current last_snapshot_at.
+		const refreshed1 = await coinLib.loadCoinById(coin.id);
+		const c1 = refreshed1 || coin;
+
+		try {
+			if (wantPhase('claim')) {
+				result.steps.claim = await coinLib.claimAndSplit(c1);
+			}
+		} catch (err) {
+			result.steps.claim = { error: err.message || String(err) };
+			report.errors.push({ mint: coin.mint, step: 'claim', error: result.steps.claim.error });
+		}
+
+		const refreshed2 = await coinLib.loadCoinById(coin.id);
+		const c2 = refreshed2 || c1;
+
+		try {
+			if (wantPhase('commit')) {
+				result.steps.commit_lottery = await coinLib.commitLottery(c2);
+			}
+		} catch (err) {
+			result.steps.commit_lottery = { error: err.message || String(err) };
+			report.errors.push({
+				mint: coin.mint,
+				step: 'commit_lottery',
+				error: result.steps.commit_lottery.error,
+			});
+		}
+
+		try {
+			if (wantPhase('resolve')) {
+				result.steps.resolve_lottery = await coinLib.resolvePendingDraws(c2);
+			}
+		} catch (err) {
+			result.steps.resolve_lottery = { error: err.message || String(err) };
+			report.errors.push({
+				mint: coin.mint,
+				step: 'resolve_lottery',
+				error: result.steps.resolve_lottery.error,
+			});
+		}
+
+		const refreshed3 = await coinLib.loadCoinById(coin.id);
+		const c3 = refreshed3 || c2;
+
+		try {
+			if (wantPhase('reflection')) {
+				result.steps.reflection = await coinLib.allocateReflection(c3);
+			}
+		} catch (err) {
+			result.steps.reflection = { error: err.message || String(err) };
+			report.errors.push({
+				mint: coin.mint,
+				step: 'reflection',
+				error: result.steps.reflection.error,
+			});
+		}
+
+		report.coins.push(result);
+	}
+
+	return json(res, 200, { ok: true, processed: report.coins.length, report });
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// run-coin-payouts
+// ═══════════════════════════════════════════════════════════════════════════
+//
+// Drains pending coin_payouts rows for every active coin. Each row already has
+// a committed amount + recipient (queued by run-coin-cycle); this cron just
+// signs + submits the batched SystemProgram.transfer txs.
+//
+// Runs on a separate schedule from run-coin-cycle so RPC issues on the
+// payout side never block fresh draws/reflection from being committed.
+
+async function handleRunCoinPayouts(req, res) {
+	if (cors(req, res, { methods: 'GET,POST,OPTIONS' })) return;
+	if (!method(req, res, ['GET', 'POST'])) return;
+
+	if (!requireCron(req, res)) return;
+
+	// Demo gate — see handleRunCoinCycle. Until COIN_DEMO_ENABLED=true is set,
+	// the payout drainer cannot fire even if rows are pending.
+	if (process.env.COIN_DEMO_ENABLED !== 'true') {
+		return json(res, 200, {
+			ok: true,
+			disabled: true,
+			hint: 'set COIN_DEMO_ENABLED=true to enable',
+		});
+	}
+
+	const coinLib = await import('../_lib/coin/index.js');
+	const coins = await coinLib.listActiveCoins();
+
+	const report = { coins: [], errors: [] };
+	for (const coin of coins) {
+		try {
+			const result = await coinLib.drainPendingPayouts(coin);
+			report.coins.push({ mint: coin.mint, ...result });
+		} catch (err) {
+			report.errors.push({ mint: coin.mint, error: err.message || String(err) });
+		}
+	}
+
+	return json(res, 200, { ok: true, processed: report.coins.length, report });
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// club-payouts — sweep unpaid Pole Club tips to each dancer's wallet
+// ═══════════════════════════════════════════════════════════════════════════
+
+async function handleClubPayouts(req, res) {
+	if (cors(req, res, { methods: 'GET,POST,OPTIONS' })) return;
+	if (!method(req, res, ['GET', 'POST'])) return;
+
+	if (!requireCron(req, res)) return;
+
+	const { runClubPayoutSweep, expireStaleClaims } = await import('../_lib/club/sweep.js');
+
+	// Pre-pass: any PENDING-* claim older than 10min came from a crashed
+	// earlier invocation. Release them so this cycle can retry.
+	try {
+		await expireStaleClaims();
+	} catch (err) {
+		console.error('[club-payouts] expireStaleClaims failed', err);
+	}
+
+	const summary = await runClubPayoutSweep();
+	return json(res, 200, { ok: true, ...summary });
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// unstoppable-tick — autonomous agent lifecycle (sense → think → act → settle)
+// ═══════════════════════════════════════════════════════════════════════════
+
+async function handleUnstoppableTick(req, res) {
+	if (cors(req, res, { methods: 'GET,POST,OPTIONS' })) return;
+	if (!method(req, res, ['GET', 'POST'])) return;
+
+	if (!requireCron(req, res)) return;
+
+	try {
+		const { tick } = await import('../../agents/unstoppable/src/loop.js');
+		const result = await tick();
+		return json(res, 200, { ok: true, ...result });
+	} catch (err) {
+		console.error('[unstoppable-tick]', err?.message || err);
+		return json(res, 200, { ok: false, error: err?.message || 'tick failed' });
+	}
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// cosmetic-splits-sweep — retry pending/failed cosmetic creator payouts
+// ═══════════════════════════════════════════════════════════════════════════
+//
+// When a cosmetic is sold inside a coin's /play world, the creator's USDC cut
+// is paid on-chain immediately (best-effort). Any row that didn't land —
+// because the treasury wasn't funded, a transient RPC hiccup, or a slow ATA
+// creation — stays 'pending' or 'failed'. This cron retries those rows in
+// settlement-time order, bounded per run so a large backlog can't stall the
+// function. Runs hourly; each cycle processes at most 25 rows.
+
+async function handleCosmeticSplitsSweep(req, res) {
+	if (cors(req, res, { methods: 'GET,POST,OPTIONS' })) return;
+	if (!method(req, res, ['GET', 'POST'])) return;
+
+	if (!requireCron(req, res)) return;
+
+	const { sweepPendingCreatorPayouts } = await import('../_lib/cosmetics-economy.js');
+	let result;
+	try {
+		result = await sweepPendingCreatorPayouts({ limit: 25 });
+	} catch (err) {
+		console.error('[cosmetic-splits-sweep] sweep failed:', err?.message || err);
+		return json(res, 200, { ok: false, swept: 0, error: err?.message || 'sweep failed' });
+	}
+	return json(res, 200, { ok: true, ...result });
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// treasury-autopilot — run every armed agent's treasury policy on a cadence.
+//
+// Each armed, non-killed agent gets one autopilot cycle: self-fund compute,
+// maintain the buffer, DCA income into $THREE, compound coin fees into buybacks,
+// and sweep profit — every action real, idempotent, spend-policy-gated, audited.
+// Per-agent failures are isolated; one bad agent never aborts the sweep.
+// ═══════════════════════════════════════════════════════════════════════════
+
+async function handleTreasuryAutopilot(req, res) {
+	if (!requireCron(req, res)) return;
+	const { runAutopilotCycle } = await import('../_lib/treasury-autopilot.js');
+
+	let agents;
+	try {
+		agents = await sql`
+			SELECT id
+			FROM agent_identities
+			WHERE deleted_at IS NULL
+			  AND (meta->'autopilot'->>'armed')::boolean = true
+			  AND COALESCE((meta->'autopilot'->>'kill_switch')::boolean, false) = false
+			  AND meta->>'solana_address' IS NOT NULL
+			ORDER BY (meta->'autopilot'->>'updated_at') ASC NULLS FIRST
+			LIMIT 200
+		`;
+	} catch (err) {
+		console.error('[treasury-autopilot] fetch armed agents failed:', err?.message || err);
+		return json(res, 200, { ok: false, error: 'fetch_failed' });
+	}
+
+	let ran = 0;
+	let actions = 0;
+	const summary = [];
+	for (const a of agents) {
+		try {
+			const result = await runAutopilotCycle({ agentId: a.id, userId: null, network: 'mainnet', trigger: 'cron' });
+			if (result?.ran) {
+				ran += 1;
+				const did = (result.results || []).filter((r) => r.last_status === 'ok').length;
+				actions += did;
+				summary.push({ agent: a.id, actions: did, reasons: (result.results || []).map((r) => `${r.kind}:${r.last_status}`) });
+			}
+		} catch (err) {
+			console.error('[treasury-autopilot] agent cycle failed:', a.id, err?.message || err);
+		}
+	}
+	return json(res, 200, { ok: true, agents: agents.length, ran, actions, summary });
+}

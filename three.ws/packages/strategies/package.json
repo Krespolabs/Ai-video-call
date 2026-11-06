@@ -1,0 +1,55 @@
+{
+  "name": "@three-ws/strategies",
+  "version": "0.1.2",
+  "description": "Automated on-chain trading strategies for agents — DCA, copy-trading, and mirror execution, in one import. Rule-based Strategy Objects that run inside the agent's spend leash.",
+  "type": "module",
+  "main": "./src/index.js",
+  "module": "./src/index.js",
+  "types": "./src/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./src/index.d.ts",
+      "import": "./src/index.js",
+      "default": "./src/index.js"
+    },
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "src",
+    "README.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "test": "node --test test/*.test.js"
+  },
+  "keywords": [
+    "trading",
+    "strategy",
+    "dca",
+    "copy-trading",
+    "mirror-trading",
+    "solana",
+    "agents",
+    "on-chain",
+    "automation",
+    "three.ws"
+  ],
+  "author": "nirholas <support@three.ws>",
+  "license": "Apache-2.0",
+  "homepage": "https://three.ws/strategies",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/nirholas/three.ws.git",
+    "directory": "packages/strategies"
+  },
+  "bugs": {
+    "url": "https://github.com/nirholas/three.ws/issues"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "dependencies": {},
+  "publishConfig": {
+    "access": "public"
+  }
+}

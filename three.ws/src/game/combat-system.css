@@ -1,0 +1,95 @@
+/* PlayCombat (W07) — mob HP bars, the loot prompt, the touch Attack button,
+   hit feedback and the death overlay. Reuses the /play monochrome design
+   tokens (--cc-*) defined in coincommunities.css so combat reads as part of
+   the same product, not a bolted-on minigame. */
+
+/* Parked off-screen until the first projection places it. A billboard anchored
+   at left:0 with a -50% shift otherwise spends its first frames half over the
+   left edge of the screen, which is a nameplate and a health bar flashing in the
+   corner every time a mob spawns. The placement code writes `transform` inline,
+   so this default only ever applies before that first write. */
+.combat-mob-label {
+	position: fixed; left: 0; top: 0; z-index: 15; pointer-events: none;
+	transform: translate(-50%, -100%) translate(-9999px, -9999px);
+	display: flex; flex-direction: column; align-items: center; gap: 3px;
+}
+.combat-mob-name {
+	font-size: 11px; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase;
+	color: var(--cc-text, #f5f5f6); text-shadow: 0 1px 3px rgba(0, 0, 0, 0.85);
+}
+.combat-mob-hpbar {
+	width: 54px; height: 5px; border-radius: 3px; overflow: hidden;
+	background: rgba(0, 0, 0, 0.55); border: 1px solid rgba(255, 255, 255, 0.18);
+}
+.combat-mob-hpfill {
+	display: block; height: 100%; width: 100%;
+	background: linear-gradient(90deg, #ff5a4d, #ffcf5c);
+	transition: width var(--duration-fast) var(--ease-standard);
+}
+
+.combat-prompt, .combat-zone-label {
+	position: fixed; left: 0; top: 0; z-index: 16; pointer-events: none;
+	transform: translate(-50%, -100%); white-space: nowrap;
+	background: var(--cc-panel-solid, #0c0c0e); border: 1px solid var(--cc-edge, rgba(255, 255, 255, 0.12));
+	color: var(--cc-text, #f5f5f6); font-size: 12px; font-weight: 700; letter-spacing: 0.04em;
+	padding: 6px 11px; border-radius: var(--cc-radius, 4px); box-shadow: var(--cc-glow, 0 0 14px rgba(255, 255, 255, 0.25));
+	text-transform: uppercase; transition: opacity var(--duration-fast) var(--ease-standard); opacity: 0; display: none;
+}
+.combat-prompt.combat-show, .combat-zone-label.combat-show { opacity: 1; }
+.combat-prompt .combat-key {
+	display: inline-block; min-width: 16px; text-align: center; margin-right: 5px;
+	background: #fff; color: var(--cc-ink, #060607); border-radius: 3px; padding: 0 4px;
+}
+.combat-zone-label {
+	color: #ffb4ac; border-color: rgba(255, 90, 77, 0.4);
+	box-shadow: 0 0 14px rgba(255, 90, 77, 0.25);
+}
+
+.combat-attack-btn {
+	position: fixed; right: 22px; bottom: 132px; z-index: 14;
+	display: flex; align-items: center; gap: 8px;
+	padding: 11px 18px; font-size: 13px; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase;
+	color: #fff; background: rgba(178, 30, 24, 0.88); border: 1px solid rgba(255, 120, 108, 0.6);
+	border-radius: var(--cc-radius, 4px); box-shadow: var(--cc-shadow, 0 16px 50px rgba(0, 0, 0, 0.7)), 0 0 14px rgba(255, 60, 48, 0.35);
+	cursor: pointer; transition: transform var(--duration-instant) var(--ease-standard), filter var(--duration-fast) var(--ease-standard);
+}
+.combat-attack-btn:hover { filter: brightness(1.1); transform: translateY(-2px); }
+.combat-attack-btn:active { transform: scale(0.96); }
+.combat-attack-btn:focus-visible { outline: 2px solid var(--focus-ring-color); outline-offset: 2px; }
+.combat-attack-glyph { font-size: 16px; }
+
+.combat-hitflash {
+	position: fixed; inset: 0; z-index: 40; pointer-events: none;
+	background: radial-gradient(ellipse at center, rgba(178, 20, 16, 0) 45%, rgba(178, 20, 16, 0.55) 100%);
+	opacity: 0;
+}
+.combat-hitflash.is-flash { animation: combat-flash 0.26s ease-out; }
+@keyframes combat-flash {
+	0% { opacity: 1; }
+	100% { opacity: 0; }
+}
+
+.combat-death {
+	position: fixed; inset: 0; z-index: 50; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px;
+	background: rgba(6, 6, 7, 0.72); backdrop-filter: blur(2px);
+	opacity: 0; transition: opacity var(--duration-slow) var(--ease-standard);
+}
+.combat-death.is-in { opacity: 1; }
+.combat-death-title {
+	font-size: 34px; font-weight: 800; letter-spacing: 0.06em; text-transform: uppercase; color: #ff5a4d;
+	text-shadow: 0 0 24px rgba(255, 90, 77, 0.55);
+}
+.combat-death-sub { font-size: 14px; color: var(--cc-dim, #8c8c92); letter-spacing: 0.02em; }
+
+.combat-dmg {
+	position: fixed; left: 0; top: 0; z-index: 17; pointer-events: none;
+	transform: translate(-50%, -100%); font-size: 15px; font-weight: 800;
+	text-shadow: 0 1px 4px rgba(0, 0, 0, 0.85); transition: opacity var(--duration-instant) var(--ease-standard);
+}
+.combat-dmg.is-dealt { color: #ffcf5c; }
+.combat-dmg.is-taken { color: #ff5a4d; font-size: 17px; }
+
+@media (max-width: 720px) {
+	.combat-attack-btn { bottom: 118px; right: 16px; padding: 10px 14px; }
+	.combat-attack-label { display: none; }
+}

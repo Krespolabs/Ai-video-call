@@ -1,0 +1,941 @@
+/* Marketplace v2 — chat preview, creator modal, detail 3D avatar, mobile.
+ * Loaded as a separate file so inline-style linting doesn't compete with edits. */
+
+/* ── Body grid layout ─────────────────────────────────────────────────────
+ * body.market-page is a 2-col CSS grid (240px sidebar + 1fr main). Direct
+ * children with no grid-column rule auto-place into individual cells, which
+ * shoved the global nav into the 240px col and .market-sidebar into the wide
+ * col, with .market-main wrapping to a second row. Force the page chrome
+ * (top header, bottom footer) to span both columns so the sidebar/main row
+ * lays out correctly. The global header now mounts inside #nav-container
+ * (via /nav.js), so that wrapper — not a bare .site-header — is the direct
+ * body child that must span; keep .site-header for any page still using it. */
+body.market-page > #nav-container,
+body.market-page > .site-header,
+body.market-page > #footer-container {
+	grid-column: 1 / -1;
+	/* Grid items default to min-width: auto (= min-content), so the global
+	   header's `white-space: nowrap` (set in style.css for the 3D-viewer
+	   pages) can blow the column past the viewport on mobile. Pin to 0 so
+	   the grid actually constrains the header to the column width. */
+	min-width: 0;
+}
+
+/* ── Detail header 3D avatar ──────────────────────────────────────────── */
+.market-detail-avatar {
+	position: relative;
+	overflow: hidden;
+}
+.market-detail-avatar model-viewer {
+	width: 100%;
+	height: 100%;
+	--poster-color: transparent;
+	background: transparent;
+}
+.market-detail-avatar .d-avatar-fallback {
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	width: 100%;
+	height: 100%;
+}
+.market-detail-avatar.has-img {
+	background-size: cover;
+	background-position: center;
+}
+.market-detail-avatar.has-img .d-avatar-fallback {
+	display: none;
+}
+.market-detail-avatar.has-3d {
+	background: radial-gradient(circle at 50% 60%, rgba(255, 255, 255, 0.06), transparent 70%),
+		linear-gradient(180deg, #050505, #0d0d0d);
+}
+.market-detail-avatar.has-3d .d-avatar-fallback {
+	display: none;
+}
+/* Header avatar doubles as a jump-to-viewer button (wired in
+   renderDetailModelStage). */
+.market-detail-avatar[role='button'] {
+	cursor: pointer;
+	transition: transform var(--duration-fast) var(--ease-standard), box-shadow var(--duration-fast) var(--ease-standard);
+}
+.market-detail-avatar[role='button']:hover {
+	transform: scale(1.04);
+	box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.25);
+}
+.market-detail-avatar[role='button']:focus-visible {
+	outline: 2px solid #fafafa;
+	outline-offset: 2px;
+}
+
+/* ── Detail 3D model stage ────────────────────────────────────────────── */
+.d-model-card {
+	padding: 0;
+	overflow: hidden;
+}
+.d-model-card.flash {
+	animation: d-model-flash 1.2s ease;
+}
+@keyframes d-model-flash {
+	0%,
+	60% {
+		border-color: rgba(255, 255, 255, 0.55);
+	}
+	100% {
+		border-color: var(--stroke);
+	}
+}
+.d-model-head {
+	display: flex;
+	align-items: center;
+	gap: 10px;
+	flex-wrap: wrap;
+	padding: 12px 16px;
+	border-bottom: 1px solid var(--stroke);
+}
+.d-model-head h3 {
+	margin: 0;
+}
+.d-model-hint {
+	flex: 1;
+	min-width: 0;
+	font-size: 12px;
+	color: var(--ink-dim);
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
+}
+.d-model-actions {
+	display: flex;
+	gap: 8px;
+	margin-left: auto;
+}
+.d-model-btn {
+	appearance: none;
+	background: var(--surface-2);
+	border: 1px solid var(--stroke);
+	border-radius: 999px;
+	color: var(--ink);
+	font: inherit;
+	font-size: 12px;
+	font-weight: 600;
+	line-height: 1;
+	padding: 7px 12px;
+	cursor: pointer;
+	text-decoration: none;
+	white-space: nowrap;
+	transition: border-color var(--duration-fast) var(--ease-standard), background var(--duration-fast) var(--ease-standard), color var(--duration-fast) var(--ease-standard);
+}
+.d-model-btn:hover {
+	border-color: rgba(255, 255, 255, 0.35);
+	background: rgba(255, 255, 255, 0.06);
+}
+.d-model-btn:active {
+	background: rgba(255, 255, 255, 0.12);
+}
+.d-model-btn:focus-visible {
+	outline: 2px solid #fafafa;
+	outline-offset: 2px;
+}
+.d-model-stage {
+	position: relative;
+	height: 380px;
+	background: radial-gradient(circle at 50% 65%, rgba(255, 255, 255, 0.07), transparent 65%),
+		linear-gradient(180deg, #060606, #0e0e0e);
+}
+.d-model-stage model-viewer {
+	width: 100%;
+	height: 100%;
+	--poster-color: transparent;
+	background: transparent;
+}
+.d-model-card:fullscreen {
+	display: flex;
+	flex-direction: column;
+	border-radius: 0;
+	background: #000;
+}
+.d-model-card:fullscreen .d-model-stage {
+	flex: 1;
+	height: auto;
+}
+@media (max-width: 640px) {
+	.d-model-stage {
+		height: 260px;
+	}
+	.d-model-hint {
+		display: none;
+	}
+}
+
+.market-author-btn {
+	background: none;
+	border: 0;
+	color: inherit;
+	font: inherit;
+	padding: 0;
+	cursor: pointer;
+	text-decoration: underline;
+	text-decoration-color: rgba(255, 255, 255, 0.18);
+	text-underline-offset: 3px;
+	transition: text-decoration-color var(--duration-fast) var(--ease-standard), color var(--duration-fast) var(--ease-standard);
+}
+.market-author-btn:hover {
+	text-decoration-color: #fafafa;
+	color: #fafafa;
+}
+
+/* ── Live chat preview on agent detail ─────────────────────────────────── */
+.market-preview-card {
+	margin-top: 16px;
+	background: linear-gradient(180deg, #0e0e0e, var(--bg-0));
+	border: 1px solid #1f1f1f;
+	border-radius: 16px;
+	padding: 18px;
+	display: flex;
+	flex-direction: column;
+	gap: 14px;
+}
+.market-preview-head {
+	display: flex;
+	justify-content: space-between;
+	align-items: baseline;
+	gap: 12px;
+	flex-wrap: wrap;
+}
+.market-preview-hint {
+	color: #71717a;
+	font-size: 12px;
+}
+.market-preview-thread {
+	display: flex;
+	flex-direction: column;
+	gap: 10px;
+	min-height: 64px;
+	max-height: 360px;
+	overflow-y: auto;
+	padding-right: 4px;
+}
+.market-preview-thread:empty::before {
+	content: 'The agent will reply here. Try "What can you do?"';
+	color: #52525b;
+	font-size: 13px;
+	font-style: italic;
+	display: block;
+	padding: 8px 12px;
+}
+.market-preview-msg {
+	display: flex;
+	gap: 8px;
+	align-items: flex-start;
+}
+.market-preview-msg.user {
+	flex-direction: row-reverse;
+}
+.market-preview-bubble {
+	background: #161616;
+	border: 1px solid #222;
+	border-radius: 12px;
+	padding: 10px 14px;
+	font-size: 14px;
+	line-height: 1.5;
+	color: #f4f4f5;
+	white-space: pre-wrap;
+	word-break: break-word;
+	max-width: 80%;
+}
+.market-preview-msg.user .market-preview-bubble {
+	background: #fafafa;
+	color: #000000;
+	border-color: #fafafa;
+}
+.market-preview-msg.assistant .market-preview-bubble {
+	background: #131313;
+}
+.market-preview-bubble.streaming::after {
+	content: '▌';
+	display: inline-block;
+	margin-left: 2px;
+	animation: mk-cursor-blink 0.9s infinite;
+	color: #ffffff;
+}
+@keyframes mk-cursor-blink {
+	0%, 49% { opacity: 1; }
+	50%, 100% { opacity: 0; }
+}
+.market-preview-form {
+	display: flex;
+	gap: 8px;
+}
+.market-preview-input {
+	flex: 1;
+	background: #0d0d0d;
+	border: 1px solid #2a2a2a;
+	border-radius: 10px;
+	padding: 10px 14px;
+	color: #fafafa;
+	font-size: 14px;
+	font-family: inherit;
+}
+.market-preview-input:focus {
+	outline: none;
+	border-color: #4a4a4a;
+}
+.market-preview-send {
+	background: #fafafa;
+	color: #000000;
+	border: 0;
+	padding: 10px 18px;
+	border-radius: 10px;
+	font-weight: 600;
+	cursor: pointer;
+	font-size: 13px;
+}
+.market-preview-send:disabled {
+	opacity: 0.5;
+	cursor: not-allowed;
+}
+.market-preview-send:hover:not(:disabled) {
+	transform: translateY(-1px);
+}
+.market-preview-footer {
+	font-size: 11px;
+	color: #52525b;
+	min-height: 14px;
+}
+.market-preview-footer.err {
+	color: var(--danger);
+}
+
+/* ── Creator profile modal ─────────────────────────────────────────────── */
+.creator-modal-overlay {
+	position: fixed;
+	inset: 0;
+	background: rgba(0, 0, 0, 0.78);
+	backdrop-filter: blur(6px);
+	z-index: 200;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	padding: 24px;
+	opacity: 0;
+	transition: opacity var(--duration-base) var(--ease-standard);
+}
+.creator-modal-overlay.show {
+	opacity: 1;
+}
+.creator-modal {
+	background: #0d0d0d;
+	border: 1px solid #1f1f1f;
+	border-radius: 18px;
+	width: min(900px, 100%);
+	max-height: 90vh;
+	display: flex;
+	flex-direction: column;
+	overflow: hidden;
+	box-shadow: 0 30px 80px rgba(0, 0, 0, 0.5);
+	position: relative;
+}
+.creator-modal-close {
+	position: absolute;
+	top: 12px;
+	right: 14px;
+	background: rgba(0, 0, 0, 0.4);
+	border: 1px solid #1f1f1f;
+	color: #fafafa;
+	width: 30px;
+	height: 30px;
+	border-radius: 50%;
+	cursor: pointer;
+	font-size: 18px;
+	line-height: 1;
+	z-index: 2;
+}
+.creator-modal-head {
+	display: flex;
+	gap: 18px;
+	align-items: center;
+	padding: 24px 26px 18px;
+	border-bottom: 1px solid var(--bg-1);
+}
+.creator-modal-avatar {
+	width: 64px;
+	height: 64px;
+	border-radius: 50%;
+	background: var(--bg-1) center/cover no-repeat;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	font-family: var(--font-display);
+	font-weight: 700;
+	font-size: 24px;
+	color: #fafafa;
+	flex: 0 0 auto;
+	border: 1px solid #2a2a2a;
+}
+.creator-modal-meta {
+	display: flex;
+	flex-direction: column;
+	gap: 4px;
+	min-width: 0;
+	flex: 1;
+}
+.creator-modal-eyebrow {
+	font-family: var(--font-display);
+	font-size: 10px;
+	letter-spacing: 0.18em;
+	text-transform: uppercase;
+	color: #ffffff;
+	font-weight: 600;
+}
+.creator-modal-title {
+	font-family: var(--font-display);
+	font-size: 22px;
+	font-weight: 700;
+	color: #fafafa;
+	margin: 0;
+	line-height: 1.2;
+}
+.creator-modal-handle {
+	color: #a1a1aa;
+	font-size: 13px;
+}
+.creator-modal-stats {
+	display: flex;
+	gap: 16px;
+	margin-top: 6px;
+	font-size: 12px;
+	color: #a1a1aa;
+	flex-wrap: wrap;
+}
+.creator-modal-stats strong {
+	color: #fafafa;
+	font-family: var(--font-display);
+	font-weight: 700;
+	margin-right: 4px;
+}
+.creator-modal-body {
+	flex: 1;
+	overflow-y: auto;
+	padding: 18px 26px 26px;
+	display: flex;
+	flex-direction: column;
+	gap: 24px;
+}
+.creator-modal-sectiontitle {
+	font-size: 14px;
+	font-weight: 600;
+	color: #fafafa;
+	margin: 0 0 12px;
+}
+.creator-modal-sectiontitle .muted {
+	color: #71717a;
+	font-weight: 500;
+	font-size: 12px;
+	margin-left: 6px;
+}
+.creator-modal-grid {
+	display: grid;
+	grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+	gap: 12px;
+}
+.creator-mini-card {
+	background: #111;
+	border: 1px solid #1f1f1f;
+	border-radius: 12px;
+	padding: 12px;
+	cursor: pointer;
+	transition: border-color var(--duration-fast) var(--ease-standard), transform var(--duration-fast) var(--ease-standard);
+}
+.creator-mini-card:hover {
+	border-color: #2a2a2a;
+	transform: translateY(-1px);
+}
+.creator-mini-card .thumb {
+	aspect-ratio: 1 / 1;
+	border-radius: 8px;
+	background: #050505 center/cover no-repeat;
+	margin-bottom: 8px;
+	border: 1px solid var(--bg-1);
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	color: rgba(255, 255, 255, 0.18);
+	font-size: 28px;
+}
+.creator-mini-card .name {
+	font-size: 13px;
+	font-weight: 600;
+	color: #fafafa;
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
+}
+.creator-mini-card .meta {
+	font-size: 11px;
+	color: #a1a1aa;
+	margin-top: 4px;
+}
+
+/* ── Reviews & Ratings ──────────────────────────────────────────────────── */
+.d-rating-widget {
+	margin-bottom: 24px;
+}
+#d-rating-summary {
+	display: flex;
+	align-items: baseline;
+	gap: 10px;
+	margin-bottom: 12px;
+}
+#d-rating-avg {
+	font-size: 36px;
+	font-weight: 700;
+	color: #fafafa;
+	line-height: 1;
+}
+#d-rating-stars {
+	font-size: 18px;
+	color: #f59e0b;
+	letter-spacing: 1px;
+}
+.stars-filled {
+	color: #f59e0b;
+}
+#d-rating-count {
+	font-size: 13px;
+	color: #71717a;
+}
+.d-rating-breakdown {
+	display: flex;
+	flex-direction: column;
+	gap: 4px;
+	margin-bottom: 12px;
+}
+.breakdown-row {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	font-size: 12px;
+}
+.breakdown-label {
+	width: 22px;
+	color: #a1a1aa;
+	text-align: right;
+	flex-shrink: 0;
+}
+.breakdown-track {
+	flex: 1;
+	height: 6px;
+	background: var(--bg-1);
+	border-radius: 3px;
+	overflow: hidden;
+}
+.breakdown-fill {
+	height: 100%;
+	background: #f59e0b;
+	border-radius: 3px;
+	transition: width var(--duration-slow) var(--ease-standard);
+}
+.breakdown-count {
+	width: 18px;
+	color: #71717a;
+	font-size: 11px;
+	text-align: right;
+	flex-shrink: 0;
+}
+#d-rating-input {
+	margin-bottom: 20px;
+	padding: 16px;
+	background: #0e0e0e;
+	border: 1px solid #1c1c1c;
+	border-radius: 10px;
+}
+.review-star-picker {
+	display: inline-flex;
+	gap: 2px;
+	margin: 8px 0;
+}
+.star-pick {
+	background: none;
+	border: none;
+	font-size: 22px;
+	color: #404040;
+	cursor: pointer;
+	padding: 2px;
+	line-height: 1;
+	transition: color var(--duration-instant), transform var(--duration-instant);
+}
+.star-pick.active,
+.star-pick.hover {
+	color: #f59e0b;
+}
+.star-pick:hover {
+	transform: scale(1.15);
+}
+#d-rating-input textarea,
+#d-review-body,
+#d-review-body-edit {
+	width: 100%;
+	margin-top: 8px;
+	padding: 10px 12px;
+	background: #080808;
+	border: 1px solid #242424;
+	border-radius: 8px;
+	color: #e4e4e7;
+	font-size: 13px;
+	font-family: inherit;
+	resize: vertical;
+	min-height: 80px;
+	box-sizing: border-box;
+	outline: none;
+	transition: border-color var(--duration-fast);
+}
+#d-rating-input textarea:focus,
+#d-review-body:focus,
+#d-review-body-edit:focus {
+	border-color: #404040;
+}
+.submit-review {
+	margin-top: 10px;
+	padding: 8px 18px;
+	background: #fff;
+	color: #000;
+	border: none;
+	border-radius: 7px;
+	font-size: 13px;
+	font-weight: 600;
+	cursor: pointer;
+	transition: opacity var(--duration-fast);
+}
+.submit-review:disabled {
+	opacity: 0.35;
+	cursor: not-allowed;
+}
+.submit-review:hover:not(:disabled) {
+	opacity: 0.88;
+}
+.review-login-cta {
+	color: #fff;
+	font-size: 13px;
+	font-weight: 500;
+	text-decoration: underline;
+	text-underline-offset: 2px;
+}
+.review-mine-notice {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 12px;
+	font-size: 13px;
+	color: #a1a1aa;
+}
+.review-mine-actions {
+	display: flex;
+	gap: 8px;
+}
+.review-edit-btn,
+.review-delete-btn,
+.review-cancel-btn {
+	background: none;
+	border: 1px solid #2a2a2a;
+	color: #a1a1aa;
+	padding: 4px 10px;
+	border-radius: 6px;
+	font-size: 12px;
+	cursor: pointer;
+	transition: border-color var(--duration-fast), color var(--duration-fast);
+}
+.review-edit-btn:hover { border-color: #4a4a4a; color: #fafafa; }
+.review-delete-btn:hover { border-color: #7f1d1d; color: var(--danger); }
+.review-cancel-btn:hover { border-color: #404040; color: #d4d4d8; }
+.review-edit-form {
+	margin-top: 12px;
+}
+.review-edit-actions {
+	display: flex;
+	gap: 8px;
+	align-items: center;
+	margin-top: 6px;
+}
+#d-rating-msg {
+	font-size: 12px;
+	margin-top: 8px;
+	color: #71717a;
+}
+#d-rating-msg.ok { color: var(--success); }
+#d-rating-msg.err { color: var(--danger); }
+.d-reviews-list {
+	display: flex;
+	flex-direction: column;
+	gap: 12px;
+}
+.review-card {
+	padding: 14px 16px;
+	background: var(--bg-0);
+	border: 1px solid var(--bg-1);
+	border-radius: 10px;
+}
+.review-card.skeleton {
+	pointer-events: none;
+}
+.review-header {
+	display: flex;
+	align-items: center;
+	gap: 10px;
+	margin-bottom: 8px;
+}
+.review-avatar {
+	width: 32px;
+	height: 32px;
+	border-radius: 50%;
+	background: var(--bg-1) center/cover no-repeat;
+	flex-shrink: 0;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	font-size: 13px;
+	font-weight: 600;
+	color: #71717a;
+}
+.review-author {
+	flex: 1;
+	min-width: 0;
+}
+.review-author-name {
+	font-size: 13px;
+	font-weight: 600;
+	color: #e4e4e7;
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
+}
+.review-date {
+	font-size: 11px;
+	color: #52525b;
+	margin-top: 1px;
+}
+.review-stars {
+	font-size: 14px;
+	color: #f59e0b;
+	letter-spacing: 1px;
+}
+.review-body {
+	font-size: 13px;
+	color: #a1a1aa;
+	line-height: 1.6;
+	margin: 0;
+	word-break: break-word;
+}
+.reviews-empty {
+	text-align: center;
+	padding: 40px 20px;
+	color: #52525b;
+}
+.reviews-empty-icon {
+	font-size: 32px;
+	display: block;
+	margin-bottom: 10px;
+	opacity: 0.5;
+}
+.reviews-empty p {
+	margin: 4px 0;
+	font-size: 13px;
+}
+.reviews-empty-hint {
+	font-size: 12px;
+	color: #404040;
+}
+.review-skeleton-line {
+	height: 12px;
+	background: var(--bg-1);
+	border-radius: 4px;
+	margin-bottom: 8px;
+	animation: skeleton-pulse 1.4s ease-in-out infinite;
+}
+.review-skeleton-line.w60 { width: 60%; }
+.review-skeleton-line.w80 { width: 80%; }
+.review-skeleton-line.w40 { width: 40%; }
+@keyframes skeleton-pulse {
+	0%, 100% { opacity: 0.5; }
+	50% { opacity: 1; }
+}
+
+/* ── Microinteractions (B11) — focus rings, press states, modal motion ── */
+
+/* Shared focus ring for every interactive element this sheet introduces. */
+.market-author-btn:focus-visible,
+.market-preview-input:focus-visible,
+.market-preview-send:focus-visible,
+.market-sidebar-toggle:focus-visible,
+.creator-modal-close:focus-visible,
+.creator-mini-card:focus-visible,
+.star-pick:focus-visible,
+.submit-review:focus-visible,
+.review-login-cta:focus-visible,
+.review-edit-btn:focus-visible,
+.review-delete-btn:focus-visible,
+.review-cancel-btn:focus-visible,
+#d-rating-input textarea:focus-visible,
+#d-review-body:focus-visible,
+#d-review-body-edit:focus-visible {
+	outline: var(--focus-ring-width, 2px) solid var(--focus-ring-color, #fff);
+	outline-offset: var(--focus-ring-offset, 2px);
+}
+
+/* Chat preview send — transition the hover lift it already had, add press. */
+.market-preview-send {
+	transition:
+		transform var(--duration-fast) var(--ease-standard),
+		opacity var(--duration-fast) var(--ease-standard);
+}
+.market-preview-send:active:not(:disabled) { transform: translateY(0) scale(0.97); }
+.market-author-btn:active { color: rgba(255, 255, 255, 0.7); }
+
+/* Creator modal — panel scales/slides in with the overlay fade, never pops. */
+.creator-modal {
+	transform: translateY(10px) scale(0.98);
+	transition:
+		transform var(--duration-base) var(--ease-emphasized, var(--ease-standard)),
+		opacity var(--duration-base) var(--ease-standard);
+}
+.creator-modal-overlay.show .creator-modal { transform: translateY(0) scale(1); }
+.creator-modal-close {
+	transition:
+		background var(--duration-instant) var(--ease-standard),
+		border-color var(--duration-instant) var(--ease-standard),
+		color var(--duration-instant) var(--ease-standard);
+}
+.creator-modal-close:hover { background: rgba(255, 255, 255, 0.1); border-color: #2a2a2a; }
+.creator-modal-close:active { background: rgba(255, 255, 255, 0.16); }
+.creator-mini-card:active { transform: translateY(0) scale(0.98); }
+
+/* Review controls — press feedback to match their hover states. */
+.star-pick:active { transform: scale(0.95); }
+.submit-review:active:not(:disabled) { opacity: 0.76; }
+.review-edit-btn:active,
+.review-cancel-btn:active { background: rgba(255, 255, 255, 0.06); }
+.review-delete-btn:active { background: rgba(248, 113, 113, 0.1); }
+
+/* Reduced motion: literal durations in this sheet need an explicit kill. */
+@media (prefers-reduced-motion: reduce) {
+	.market-preview-bubble.streaming::after { animation: none; opacity: 1; }
+	.review-skeleton-line { animation: none; opacity: 0.7; }
+	.creator-modal,
+	.creator-modal-overlay,
+	.creator-modal-close,
+	.creator-mini-card,
+	.market-author-btn,
+	.market-preview-send,
+	.star-pick,
+	.breakdown-fill,
+	.market-sidebar {
+		transition: none !important;
+	}
+	.creator-modal { transform: none; }
+	.star-pick:hover,
+	.creator-mini-card:hover,
+	.market-preview-send:hover:not(:disabled) { transform: none; }
+}
+
+/* ── Mobile responsive ─────────────────────────────────────────────────── */
+.market-sidebar-toggle {
+	display: none;
+	position: fixed;
+	/* Clear the sticky site header. The toggle only ever shows under the 880px
+	   breakpoint, where public/nav.css makes the nav 65px tall: anchoring it to
+	   the viewport top put it entirely behind the nav, so on a phone the only
+	   way into the sidebar was invisible and unclickable. */
+	top: calc(65px + max(10px, env(safe-area-inset-top, 0px)));
+	left: max(14px, env(safe-area-inset-left, 14px));
+	z-index: 50;
+	background: #111;
+	border: 1px solid #2a2a2a;
+	color: #fafafa;
+	width: 44px;
+	height: 44px;
+	border-radius: 10px;
+	cursor: pointer;
+	font-size: 18px;
+	line-height: 1;
+}
+.market-sidebar-backdrop {
+	position: fixed;
+	inset: 0;
+	background: rgba(0, 0, 0, 0.6);
+	z-index: 40;
+	display: none;
+}
+body.market-sidebar-open .market-sidebar-backdrop {
+	display: block;
+}
+@media (max-width: 880px) {
+	body.market-page {
+		grid-template-columns: 1fr;
+	}
+	.market-sidebar {
+		position: fixed;
+		top: 0;
+		left: -260px;
+		width: 240px;
+		/* dvh (dynamic viewport height) tracks the actual visible viewport on
+		   iOS Safari as the URL bar collapses, so the sidebar drawer no longer
+		   spills below the home indicator. vh kept as a fallback for older UAs. */
+		height: 100vh;
+		height: 100dvh;
+		background: var(--bg-0);
+		z-index: 45;
+		transition: left var(--duration-base) var(--ease-standard);
+		overflow-y: auto;
+		padding-bottom: env(safe-area-inset-bottom, 0);
+	}
+	body.market-sidebar-open .market-sidebar {
+		left: 0;
+	}
+	.market-sidebar-toggle {
+		display: flex;
+		align-items: center;
+		justify-content: center;
+	}
+	.market-topbar {
+		padding-left: 64px;
+		flex-wrap: wrap;
+		gap: 8px;
+	}
+	.market-hero {
+		margin: 16px 12px 0;
+		padding: 20px;
+	}
+	.market-grid {
+		padding: 0 12px;
+	}
+	.market-body {
+		padding: 0;
+	}
+	.creator-modal {
+		max-height: 95vh;
+	}
+	.creator-modal-grid {
+		grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+	}
+}
+
+/* Sidebar drawer toggle + backdrop — hover/press states and a soft fade-in
+   (the backdrop is display-toggled, so it animates in via keyframe). */
+.market-sidebar-toggle {
+	transition:
+		background var(--duration-instant) var(--ease-standard),
+		border-color var(--duration-instant) var(--ease-standard);
+}
+.market-sidebar-toggle:hover { background: #181818; border-color: #3a3a3a; }
+.market-sidebar-toggle:active { background: #222; }
+body.market-sidebar-open .market-sidebar-backdrop {
+	animation: mk2-backdrop-in var(--duration-base, 220ms) var(--ease-out, ease-out) both;
+}
+@keyframes mk2-backdrop-in {
+	from { opacity: 0; }
+	to   { opacity: 1; }
+}
+@media (prefers-reduced-motion: reduce) {
+	body.market-sidebar-open .market-sidebar-backdrop { animation: none; }
+	.market-sidebar-toggle { transition: none; }
+}

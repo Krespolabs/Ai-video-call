@@ -1,0 +1,640 @@
+/* Diorama — surface styles.
+   Built on the global tokens in /style.css (--accent, --ink, --surface-*,
+   --stroke*, --radius-*, --space-*, --shadow-*). Self-contained: every class
+   here is namespaced under .dio so it can never bleed into other surfaces. */
+
+.dio {
+	--dio-glow: var(--accent, #7ec8ff);
+	--dio-panel: var(--surface-glass, rgba(255, 255, 255, 0.04));
+	--dio-stroke: var(--stroke, rgba(255, 255, 255, 0.1));
+	--dio-stroke-strong: var(--stroke-strong, rgba(255, 255, 255, 0.18));
+	--dio-ink: var(--ink, #eee);
+	--dio-dim: var(--ink-dim, rgba(255, 255, 255, 0.62));
+	max-width: 1240px;
+	margin: 0 auto;
+	padding: clamp(1rem, 3vw, 2.5rem) clamp(1rem, 4vw, 2rem) 5rem;
+	display: flex;
+	flex-direction: column;
+	gap: clamp(1.5rem, 4vw, 3rem);
+}
+
+.sr-only {
+	position: absolute;
+	width: 1px;
+	height: 1px;
+	padding: 0;
+	margin: -1px;
+	overflow: hidden;
+	clip: rect(0, 0, 0, 0);
+	white-space: nowrap;
+	border: 0;
+}
+
+/* ░░ Hero / composer ░░ */
+.dio-hero {
+	text-align: center;
+	padding-top: clamp(0.5rem, 4vw, 2.5rem);
+}
+.dio-hero__copy {
+	max-width: 720px;
+	margin: 0 auto;
+}
+.dio-eyebrow {
+	font-size: 0.75rem;
+	letter-spacing: 0.18em;
+	text-transform: uppercase;
+	color: var(--dio-dim);
+	margin: 0 0 0.75rem;
+}
+.dio-h1 {
+	font-family: var(--font-display, var(--font-body));
+	font-size: clamp(2rem, 6vw, 3.4rem);
+	line-height: 1.05;
+	letter-spacing: -0.02em;
+	margin: 0 0 0.9rem;
+	background: linear-gradient(120deg, var(--dio-ink), var(--dio-glow));
+	-webkit-background-clip: text;
+	background-clip: text;
+	color: transparent;
+}
+.dio-lede {
+	font-size: clamp(1rem, 2.2vw, 1.18rem);
+	line-height: 1.55;
+	color: var(--dio-dim);
+	margin: 0 auto 1.75rem;
+	max-width: 60ch;
+}
+
+.dio-compose {
+	display: flex;
+	gap: 0.6rem;
+	max-width: 620px;
+	margin: 0 auto;
+}
+.dio-compose__field {
+	flex: 1;
+	display: block;
+}
+.dio-compose__input {
+	width: 100%;
+	box-sizing: border-box;
+	padding: 0.95rem 1.1rem;
+	font-size: 1.02rem;
+	color: var(--dio-ink);
+	background: var(--dio-panel);
+	border: 1px solid var(--dio-stroke-strong);
+	border-radius: var(--radius-control, 0.7rem);
+	transition: border-color var(--duration-fast) var(--ease-standard), box-shadow var(--duration-fast) var(--ease-standard), background var(--duration-fast) var(--ease-standard);
+}
+.dio-compose__input::placeholder {
+	color: var(--dio-dim);
+}
+.dio-compose__input:focus-visible {
+	outline: none;
+	border-color: var(--dio-glow);
+	box-shadow: 0 0 0 3px color-mix(in srgb, var(--dio-glow) 28%, transparent);
+}
+.dio-compose__go {
+	white-space: nowrap;
+	padding-inline: 1.4rem;
+}
+.dio-compose__go[aria-busy='true'] {
+	pointer-events: none;
+	opacity: 0.75;
+}
+.dio-compose__help {
+	font-size: 0.85rem;
+	color: var(--dio-dim);
+	margin: 0.7rem auto 0;
+}
+
+.dio-examples {
+	list-style: none;
+	display: flex;
+	flex-wrap: wrap;
+	justify-content: center;
+	gap: 0.5rem;
+	padding: 0;
+	margin: 1.4rem auto 0;
+	max-width: 700px;
+}
+.dio-chip {
+	font-size: 0.85rem;
+	color: var(--dio-dim);
+	background: var(--dio-panel);
+	border: 1px solid var(--dio-stroke);
+	border-radius: var(--radius-pill, 999px);
+	padding: 0.42rem 0.85rem;
+	cursor: pointer;
+	transition: color var(--duration-fast) var(--ease-standard), border-color var(--duration-fast) var(--ease-standard), transform var(--duration-fast) var(--ease-standard), background var(--duration-fast) var(--ease-standard);
+}
+.dio-chip:hover {
+	color: var(--dio-ink);
+	border-color: var(--dio-stroke-strong);
+	transform: translateY(-1px);
+}
+.dio-chip:active {
+	transform: translateY(0);
+}
+.dio-chip:focus-visible {
+	outline: 2px solid var(--dio-glow);
+	outline-offset: 2px;
+}
+
+/* ░░ Stage + side panel layout ░░ */
+.dio-stage-wrap {
+	display: grid;
+	grid-template-columns: minmax(0, 1fr) 320px;
+	gap: 1rem;
+	align-items: stretch;
+}
+@media (max-width: 880px) {
+	.dio-stage-wrap {
+		grid-template-columns: 1fr;
+	}
+}
+
+.dio-stage {
+	position: relative;
+	aspect-ratio: 16 / 10;
+	min-height: 360px;
+	border-radius: var(--radius-card, 1rem);
+	overflow: hidden;
+	border: 1px solid var(--dio-stroke);
+	background:
+		radial-gradient(120% 90% at 50% 0%, color-mix(in srgb, var(--dio-glow) 12%, transparent), transparent 60%),
+		linear-gradient(180deg, #0b1020, #05060c);
+	box-shadow: var(--shadow-2);
+	touch-action: none;
+}
+.dio-stage canvas {
+	display: block;
+	width: 100% !important;
+	height: 100% !important;
+}
+
+/* Idle / loading overlay */
+.dio-stage__loader {
+	position: absolute;
+	inset: 0;
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	justify-content: center;
+	gap: 1.2rem;
+	transition: opacity var(--duration-slow) var(--ease-standard);
+}
+.dio-stage__loader[hidden] {
+	display: none;
+}
+.dio-stage__hint {
+	color: var(--dio-dim);
+	font-size: 0.95rem;
+	margin: 0;
+}
+.dio-orb {
+	position: relative;
+	width: 88px;
+	height: 88px;
+	display: grid;
+	place-items: center;
+}
+.dio-orb__core {
+	width: 26px;
+	height: 26px;
+	border-radius: 50%;
+	background: radial-gradient(circle at 35% 30%, #fff, var(--dio-glow));
+	box-shadow: 0 0 28px color-mix(in srgb, var(--dio-glow) 70%, transparent);
+	animation: dio-pulse 2.6s ease-in-out infinite;
+}
+.dio-orb__ring {
+	position: absolute;
+	inset: 0;
+	border-radius: 50%;
+	border: 1px solid color-mix(in srgb, var(--dio-glow) 45%, transparent);
+	animation: dio-ripple 2.8s ease-out infinite;
+}
+.dio-orb__ring:nth-child(2) {
+	animation-delay: 1.4s;
+}
+@keyframes dio-ripple {
+	0% {
+		transform: scale(0.45);
+		opacity: 0.9;
+	}
+	100% {
+		transform: scale(1.15);
+		opacity: 0;
+	}
+}
+@keyframes dio-pulse {
+	0%,
+	100% {
+		transform: scale(1);
+		opacity: 1;
+	}
+	50% {
+		transform: scale(1.12);
+		opacity: 0.85;
+	}
+}
+
+/* In-canvas HUD */
+.dio-hud {
+	position: absolute;
+	left: 0;
+	bottom: 0;
+	right: 0;
+	display: flex;
+	flex-direction: column;
+	gap: 0.15rem;
+	padding: 1rem 1.1rem;
+	background: linear-gradient(180deg, transparent, rgba(0, 0, 0, 0.55));
+	pointer-events: none;
+}
+.dio-hud[hidden] {
+	display: none;
+}
+.dio-hud__title {
+	font-family: var(--font-display, var(--font-body));
+	font-size: 1.15rem;
+	font-weight: 600;
+	color: #fff;
+	text-shadow: 0 1px 8px rgba(0, 0, 0, 0.6);
+}
+.dio-hud__meta {
+	font-size: 0.8rem;
+	color: rgba(255, 255, 255, 0.78);
+	text-transform: capitalize;
+}
+.hud-author-link {
+	color: rgba(255, 255, 255, 0.92);
+	text-decoration: none;
+	text-transform: none;
+	pointer-events: auto;
+	border-bottom: 1px solid rgba(255, 255, 255, 0.35);
+}
+.hud-author-link:hover,
+.hud-author-link:focus-visible {
+	color: #fff;
+	border-bottom-color: rgba(255, 255, 255, 0.85);
+}
+
+/* Side panel */
+.dio-side {
+	display: flex;
+	flex-direction: column;
+	gap: 0.85rem;
+}
+.dio-status {
+	background: var(--dio-panel);
+	border: 1px solid var(--dio-stroke);
+	border-radius: var(--radius-md, 0.7rem);
+	padding: 0.9rem 1rem;
+}
+.dio-status[hidden] {
+	display: none;
+}
+.dio-status__row {
+	display: flex;
+	justify-content: space-between;
+	align-items: baseline;
+	margin-bottom: 0.6rem;
+}
+.dio-status__label {
+	font-size: 0.9rem;
+	color: var(--dio-ink);
+}
+.dio-status__count {
+	font-size: 0.8rem;
+	color: var(--dio-dim);
+	font-variant-numeric: tabular-nums;
+}
+.dio-progress {
+	height: 6px;
+	border-radius: 999px;
+	background: var(--dio-stroke);
+	overflow: hidden;
+}
+.dio-progress__fill {
+	height: 100%;
+	width: 0%;
+	border-radius: 999px;
+	background: linear-gradient(90deg, var(--dio-glow), color-mix(in srgb, var(--dio-glow) 40%, #fff));
+	transition: width var(--duration-slow) var(--ease-standard);
+}
+
+.dio-objects {
+	list-style: none;
+	padding: 0;
+	margin: 0;
+	display: flex;
+	flex-direction: column;
+	gap: 0.4rem;
+}
+.dio-objects:empty {
+	display: none;
+}
+.dio-object {
+	display: flex;
+	align-items: center;
+	gap: 0.6rem;
+	padding: 0.5rem 0.7rem;
+	border-radius: var(--radius-md, 0.6rem);
+	background: var(--dio-panel);
+	border: 1px solid var(--dio-stroke);
+	font-size: 0.88rem;
+	color: var(--dio-ink);
+	transition: border-color var(--duration-base) var(--ease-standard), opacity var(--duration-base) var(--ease-standard);
+}
+.dio-object__dot {
+	width: 8px;
+	height: 8px;
+	border-radius: 50%;
+	flex: none;
+	background: var(--dio-dim);
+}
+.dio-object[data-status='forging'] .dio-object__dot {
+	background: var(--warn, #fbbf24);
+	box-shadow: 0 0 0 0 color-mix(in srgb, var(--warn, #fbbf24) 70%, transparent);
+	animation: dio-blink 1.2s ease-in-out infinite;
+}
+.dio-object[data-status='ready'] .dio-object__dot {
+	background: var(--success, #4ade80);
+}
+.dio-object[data-status='failed'] .dio-object__dot {
+	background: var(--danger, #f87171);
+}
+.dio-object[data-status='failed'] {
+	border-color: color-mix(in srgb, var(--danger, #f87171) 40%, transparent);
+}
+.dio-object__label {
+	flex: 1;
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
+}
+.dio-object__retry {
+	font-size: 0.78rem;
+	color: var(--dio-glow);
+	background: none;
+	border: none;
+	cursor: pointer;
+	padding: 0;
+}
+@keyframes dio-blink {
+	0%,
+	100% {
+		opacity: 1;
+	}
+	50% {
+		opacity: 0.35;
+	}
+}
+
+.dio-actions {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 0.5rem;
+}
+.dio-actions[hidden] {
+	display: none;
+}
+.dio-act {
+	flex: 1 1 auto;
+}
+
+/* Share panel */
+.dio-share {
+	background: var(--dio-panel);
+	border: 1px solid var(--dio-stroke-strong);
+	border-radius: var(--radius-md, 0.7rem);
+	padding: 0.95rem 1rem;
+	animation: dio-rise 0.4s cubic-bezier(0.22, 1, 0.36, 1);
+}
+.dio-share[hidden] {
+	display: none;
+}
+.dio-share__title {
+	margin: 0 0 0.7rem;
+	font-weight: 600;
+	color: var(--dio-ink);
+}
+.dio-share__link {
+	display: flex;
+	gap: 0.4rem;
+	margin-bottom: 0.55rem;
+}
+.dio-share__input {
+	flex: 1;
+	min-width: 0;
+	padding: 0.55rem 0.7rem;
+	font-size: 0.82rem;
+	color: var(--dio-dim);
+	background: var(--bg-0, #0a0a0a);
+	border: 1px solid var(--dio-stroke);
+	border-radius: var(--radius-control, 0.5rem);
+}
+.dio-share__row {
+	display: flex;
+	gap: 0.4rem;
+}
+.dio-share__row .btn,
+.dio-share__copy {
+	flex: 1;
+}
+@keyframes dio-rise {
+	from {
+		opacity: 0;
+		transform: translateY(8px);
+	}
+	to {
+		opacity: 1;
+		transform: translateY(0);
+	}
+}
+
+/* ░░ Error state ░░ */
+.dio-error {
+	text-align: center;
+	padding: 2.5rem 1rem;
+	background: var(--dio-panel);
+	border: 1px solid color-mix(in srgb, var(--danger, #f87171) 30%, var(--dio-stroke));
+	border-radius: var(--radius-card, 1rem);
+}
+.dio-error[hidden] {
+	display: none;
+}
+.dio-error__title {
+	margin: 0 0 0.5rem;
+	font-size: 1.3rem;
+}
+.dio-error__body {
+	color: var(--dio-dim);
+	margin: 0 0 1.2rem;
+}
+
+/* ░░ Gallery ░░ */
+.dio-gallery__head {
+	text-align: center;
+	margin-bottom: 1.4rem;
+}
+.dio-h2 {
+	font-family: var(--font-display, var(--font-body));
+	font-size: clamp(1.5rem, 3.5vw, 2.1rem);
+	margin: 0 0 0.4rem;
+	letter-spacing: -0.01em;
+}
+.dio-gallery__sub {
+	color: var(--dio-dim);
+	margin: 0;
+}
+.dio-gallery__empty {
+	text-align: center;
+	color: var(--dio-dim);
+	padding: 2.5rem 1rem;
+	border: 1px dashed var(--dio-stroke);
+	border-radius: var(--radius-card, 1rem);
+}
+.dio-gallery__empty[hidden] {
+	display: none;
+}
+.dio-gallery__grid {
+	display: grid;
+	grid-template-columns: repeat(auto-fill, minmax(230px, 1fr));
+	gap: 1rem;
+}
+.dio-gallery__grid[aria-busy='true'] .dio-card {
+	pointer-events: none;
+}
+
+/* Gallery cards (gallery.js builds these; styles live here) */
+.dio-card {
+	position: relative;
+	display: flex;
+	flex-direction: column;
+	gap: 0.6rem;
+	padding: 0;
+	border-radius: var(--radius-card, 1rem);
+	overflow: hidden;
+	background: var(--dio-panel);
+	border: 1px solid var(--dio-stroke);
+	cursor: pointer;
+	text-align: left;
+	color: inherit;
+	transition: border-color var(--duration-fast) var(--ease-standard), transform var(--duration-fast) var(--ease-standard), box-shadow var(--duration-fast) var(--ease-standard);
+}
+.dio-card:hover {
+	border-color: var(--dio-stroke-strong);
+	transform: translateY(-3px);
+	box-shadow: var(--shadow-2);
+}
+.dio-card:focus-visible {
+	outline: 2px solid var(--dio-glow);
+	outline-offset: 2px;
+}
+.dio-card__thumb {
+	aspect-ratio: 16 / 11;
+	width: 100%;
+	background: linear-gradient(160deg, #1a2238, #0a0e1a);
+	position: relative;
+}
+.dio-card__thumb canvas,
+.dio-card__thumb model-viewer,
+.dio-card__thumb img {
+	width: 100%;
+	height: 100%;
+	display: block;
+	object-fit: cover;
+}
+.dio-card__body {
+	padding: 0 0.85rem 0.95rem;
+}
+.dio-card__title {
+	font-weight: 600;
+	font-size: 0.98rem;
+	margin: 0 0 0.2rem;
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
+}
+.dio-card__prompt {
+	font-size: 0.82rem;
+	color: var(--dio-dim);
+	margin: 0;
+	display: -webkit-box;
+	-webkit-line-clamp: 2;
+	-webkit-box-orient: vertical;
+	overflow: hidden;
+}
+.dio-card__foot {
+	display: flex;
+	justify-content: space-between;
+	align-items: center;
+	margin-top: 0.55rem;
+	font-size: 0.74rem;
+	color: var(--dio-dim);
+}
+.dio-card__mood {
+	text-transform: capitalize;
+}
+.dio-card__by {
+	display: inline-block;
+	margin-top: 0.4rem;
+	font-size: 0.72rem;
+	color: var(--dio-dim);
+	text-decoration: none;
+}
+.dio-card__by:hover,
+.dio-card__by:focus-visible {
+	color: var(--dio-fg, #fff);
+	text-decoration: underline;
+}
+
+/* Skeleton cards while the gallery loads */
+.dio-card--skeleton {
+	pointer-events: none;
+}
+.dio-card--skeleton .dio-card__thumb {
+	background: linear-gradient(
+		100deg,
+		var(--skeleton-base, rgba(255, 255, 255, 0.04)) 30%,
+		var(--skeleton-sheen, rgba(255, 255, 255, 0.08)) 50%,
+		var(--skeleton-base, rgba(255, 255, 255, 0.04)) 70%
+	);
+	background-size: 200% 100%;
+	animation: dio-shimmer 1.4s linear infinite;
+}
+@keyframes dio-shimmer {
+	to {
+		background-position: -200% 0;
+	}
+}
+
+@media (prefers-reduced-motion: reduce) {
+	.dio-orb__core,
+	.dio-orb__ring,
+	.dio-object[data-status='forging'] .dio-object__dot,
+	.dio-card--skeleton .dio-card__thumb {
+		animation: none;
+	}
+	.dio-card:hover {
+		transform: none;
+	}
+}
+
+/* ── Interactive states (QB-07) ────────────────────────────────────────────
+   A retry button appears only after a load already failed. With no hover it
+   reads as part of the failure rather than the way out of it. */
+.dio-object__retry {
+	transition:
+		color var(--duration-fast) var(--ease-standard),
+		text-decoration-thickness var(--duration-fast) var(--ease-standard);
+	text-decoration: underline;
+	text-decoration-thickness: 1px;
+}
+
+.dio-object__retry:hover {
+	color: var(--ink-bright);
+	text-decoration-thickness: 2px;
+}

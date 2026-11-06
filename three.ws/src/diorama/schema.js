@@ -1,0 +1,251 @@
+// Diorama — the shared data contract.
+//
+// One sentence becomes a little explorable 3D world. This module is the single
+// source of truth for that world's shape: every other diorama module (the
+// renderer, the create-flow controller, the gallery, the API) imports the
+// constants, validators, and the sample fixture from here so they cannot drift.
+//
+// A Diorama is a plan first (objects with prompts + placement, no meshes yet)
+// and a populated world second (each object gains a `glbUrl` once it is forged
+// on the free text→3D lane). The renderer accepts a diorama at any stage of
+// population and shows objects as luminous "forming" seeds until their mesh
+// arrives — that progressive materialization is the heart of the experience.
+//
+// Shapes (JSDoc so editors type-check call sites without a build step):
+//
+// @typedef {'dawn'|'day'|'dusk'|'night'} DioramaMood
+// @typedef {'grass'|'sand'|'snow'|'stone'|'water'|'meadow'|'void'} DioramaGround
+// @typedef {'round'|'craggy'|'plateau'} IslandShape
+//
+// @typedef {Object} DioramaPalette
+// @property {[string,string]} sky      two hex stops, top → horizon
+// @property {string} ground            island surface tint (hex)
+// @property {string} fog               atmospheric fog colour (hex)
+// @property {string} accent            light/glow accent (hex)
+//
+// @typedef {Object} DioramaObject
+// @property {string} id                stable id within the diorama
+// @property {string} prompt            the forge prompt for this single object
+// @property {string} label             short human label ("red canoe")
+// @property {[number,number,number]} position  metres on the island; y is lift
+// @property {number} scale             uniform scale multiplier (0.2–4)
+// @property {number} rotationY         yaw in radians
+// @property {('pending'|'forging'|'ready'|'failed')} status
+// @property {string|null} glbUrl       durable GLB once forged
+//
+// @typedef {Object} Diorama
+// @property {string} id
+// @property {string} prompt            the original sentence
+// @property {string} title            short evocative title
+// @property {DioramaMood} mood
+// @property {DioramaPalette} palette
+// @property {DioramaGround} ground
+// @property {IslandShape} island
+// @property {DioramaObject[]} objects
+// @property {{handle?:string, wallet?:string}|null} author
+// @property {string} createdAt         ISO 8601
+// @property {number} views
+// @property {boolean} featured
+
+export const MOODS = /** @type {const} */ (['dawn', 'day', 'dusk', 'night']);
+export const GROUNDS = /** @type {const} */ ([
+	'grass',
+	'sand',
+	'snow',
+	'stone',
+	'water',
+	'meadow',
+	'void',
+]);
+export const ISLANDS = /** @type {const} */ (['round', 'craggy', 'plateau']);
+
+// Bounds. A diorama is a *miniature* — a handful of objects on a small island,
+// not an open world. These caps keep one creation to a bounded generation cost
+// (each object is one free forge job) and a bounded render budget.
+export const MAX_OBJECTS = 8;
+export const MIN_OBJECTS = 3;
+export const MAX_PROMPT_LEN = 240;
+export const ISLAND_RADIUS = 6.2; // metres; placement must stay inside this
+
+// Per-mood lighting presets the renderer reads so sky, sun, and fog stay
+// coherent with the palette the composer chose. Pure data — no Three.js here.
+export const MOOD_LIGHT = {
+	dawn: { sunElevation: 0.18, sunIntensity: 1.1, ambient: 0.55, fog: 0.02 },
+	day: { sunElevation: 0.62, sunIntensity: 1.6, ambient: 0.7, fog: 0.012 },
+	dusk: { sunElevation: 0.1, sunIntensity: 0.9, ambient: 0.45, fog: 0.03 },
+	night: { sunElevation: -0.08, sunIntensity: 0.35, ambient: 0.3, fog: 0.04 },
+};
+
+const HEX = /^#[0-9a-fA-F]{6}$/;
+const isHex = (v) => typeof v === 'string' && HEX.test(v);
+const isFiniteNum = (v) => typeof v === 'number' && Number.isFinite(v);
+const clamp = (v, lo, hi) => Math.min(hi, Math.max(lo, v));
+
+/** A safe, fully-populated palette for a mood — used as a fallback. */
+export function defaultPalette(mood = 'day') {
+	switch (mood) {
+		case 'dawn':
+			return { sky: ['#ffd9a0', '#ff9e7d'], ground: '#7fae6b', fog: '#ffc0a8', accent: '#ffd76b' };
+		case 'dusk':
+			return { sky: ['#3a2a6b', '#ff7a59'], ground: '#5d7a59', fog: '#6b4b7a', accent: '#ff9d5c' };
+		case 'night':
+			return { sky: ['#0a1230', '#1d2a5e'], ground: '#3a4a52', fog: '#10183a', accent: '#9db1ff' };
+		case 'day':
+		default:
+			return { sky: ['#7ec8ff', '#dff0ff'], ground: '#86c06a', fog: '#cfe8ff', accent: '#ffe08a' };
+	}
+}
+
+/** Coerce a palette-ish object into a valid DioramaPalette (never throws). */
+export function coercePalette(p, mood = 'day') {
+	const d = defaultPalette(mood);
+	if (!p || typeof p !== 'object') return d;
+	const sky =
+		Array.isArray(p.sky) && p.sky.length === 2 && p.sky.every(isHex) ? [p.sky[0], p.sky[1]] : d.sky;
+	return {
+		sky,
+		ground: isHex(p.ground) ? p.ground : d.ground,
+		fog: isHex(p.fog) ? p.fog : d.fog,
+		accent: isHex(p.accent) ? p.accent : d.accent,
+	};
+}
+
+/**
+ * Validate + normalize an untrusted diorama (from the API or a composer) into a
+ * guaranteed-renderable object. Returns { ok, diorama, errors }. Never throws —
+ * boundaries clean their input; internal code then trusts the result.
+ */
+export function normalizeDiorama(input) {
+	const errors = [];
+	const src = input && typeof input === 'object' ? input : {};
+
+	const prompt = String(src.prompt ?? '').slice(0, MAX_PROMPT_LEN).trim();
+	if (!prompt) errors.push('prompt is required');
+
+	const mood = MOODS.includes(src.mood) ? src.mood : 'day';
+	const ground = GROUNDS.includes(src.ground) ? src.ground : 'grass';
+	const island = ISLANDS.includes(src.island) ? src.island : 'round';
+	const palette = coercePalette(src.palette, mood);
+
+	const rawObjects = Array.isArray(src.objects) ? src.objects : [];
+	const objects = rawObjects
+		.slice(0, MAX_OBJECTS)
+		.map((o, i) => normalizeObject(o, i))
+		.filter(Boolean);
+	if (objects.length < 1) errors.push('at least one object is required');
+
+	const title = String(src.title ?? '').slice(0, 80).trim() || titleFromPrompt(prompt);
+
+	const diorama = {
+		id: typeof src.id === 'string' ? src.id : '',
+		prompt,
+		title,
+		mood,
+		palette,
+		ground,
+		island,
+		objects,
+		author: normalizeAuthor(src.author),
+		createdAt: typeof src.createdAt === 'string' ? src.createdAt : '',
+		views: isFiniteNum(src.views) ? Math.max(0, Math.floor(src.views)) : 0,
+		featured: Boolean(src.featured),
+	};
+
+	return { ok: errors.length === 0, diorama, errors };
+}
+
+function normalizeObject(o, i) {
+	if (!o || typeof o !== 'object') return null;
+	const prompt = String(o.prompt ?? '').slice(0, MAX_PROMPT_LEN).trim();
+	if (!prompt) return null;
+	const pos = Array.isArray(o.position) ? o.position : [];
+	let [x, y, z] = [Number(pos[0]) || 0, Number(pos[1]) || 0, Number(pos[2]) || 0];
+	// Keep placement on the island disc.
+	const r = Math.hypot(x, z);
+	if (r > ISLAND_RADIUS) {
+		const k = ISLAND_RADIUS / r;
+		x *= k;
+		z *= k;
+	}
+	const status = ['pending', 'forging', 'ready', 'failed'].includes(o.status)
+		? o.status
+		: o.glbUrl
+			? 'ready'
+			: 'pending';
+	return {
+		id: typeof o.id === 'string' && o.id ? o.id : `obj-${i}`,
+		prompt,
+		label: String(o.label ?? prompt).slice(0, 48).trim() || `object ${i + 1}`,
+		position: [round2(x), round2(clamp(y, 0, 4)), round2(z)],
+		scale: round2(clamp(Number(o.scale) || 1, 0.2, 4)),
+		rotationY: round3(Number(o.rotationY) || 0),
+		status,
+		glbUrl: typeof o.glbUrl === 'string' && /^https?:\/\//.test(o.glbUrl) ? o.glbUrl : null,
+	};
+}
+
+function normalizeAuthor(a) {
+	if (!a || typeof a !== 'object') return null;
+	const handle = typeof a.handle === 'string' ? a.handle.slice(0, 48) : undefined;
+	const wallet = typeof a.wallet === 'string' ? a.wallet.slice(0, 64) : undefined;
+	if (!handle && !wallet) return null;
+	return { ...(handle ? { handle } : {}), ...(wallet ? { wallet } : {}) };
+}
+
+/** Derive a short Title Case title from the prompt when none is supplied. */
+export function titleFromPrompt(prompt) {
+	const words = String(prompt || 'A little world')
+		.replace(/[^\p{L}\p{N}\s]/gu, ' ')
+		.split(/\s+/)
+		.filter(Boolean)
+		.slice(0, 6);
+	if (!words.length) return 'A little world';
+	return words
+		.map((w) => w.charAt(0).toUpperCase() + w.slice(1))
+		.join(' ');
+}
+
+const round2 = (n) => Math.round(n * 100) / 100;
+const round3 = (n) => Math.round(n * 1000) / 1000;
+
+/** True once every object has a mesh (the world is fully forged). */
+export function isComplete(diorama) {
+	return (
+		!!diorama &&
+		Array.isArray(diorama.objects) &&
+		diorama.objects.length > 0 &&
+		diorama.objects.every((o) => o.status === 'ready' && o.glbUrl)
+	);
+}
+
+/** Progress 0..1 across forging (ready or failed both count as settled). */
+export function forgeProgress(diorama) {
+	const objs = diorama?.objects || [];
+	if (!objs.length) return 0;
+	const settled = objs.filter((o) => o.status === 'ready' || o.status === 'failed').length;
+	return settled / objs.length;
+}
+
+// A hand-authored sample world. The renderer and gallery use this for local
+// development and for the empty-state preview so the page is never a blank void
+// before the first real diorama loads. GLB URLs point at durable, already-forged
+// public meshes on the three.ws CDN-backed forge store.
+export const SAMPLE_DIORAMA = Object.freeze(
+	normalizeDiorama({
+		id: 'sample-campsite',
+		prompt: 'a cozy autumn campsite by a lake at dusk',
+		title: 'Autumn Campsite',
+		mood: 'dusk',
+		ground: 'meadow',
+		island: 'round',
+		palette: { sky: ['#3a2a6b', '#ff7a59'], ground: '#6b7a4a', fog: '#5a3f6b', accent: '#ff9d5c' },
+		objects: [
+			{ id: 'tent', prompt: 'a small orange canvas camping tent', label: 'tent', position: [-1.6, 0, 0.4], scale: 1.1, rotationY: 0.5 },
+			{ id: 'fire', prompt: 'a glowing campfire with stacked logs', label: 'campfire', position: [0.4, 0, 0.2], scale: 0.7, rotationY: 0 },
+			{ id: 'pine-1', prompt: 'a tall pine tree with autumn needles', label: 'pine', position: [2.4, 0, -1.8], scale: 1.6, rotationY: 1.2 },
+			{ id: 'pine-2', prompt: 'a short round pine bush', label: 'shrub', position: [-2.8, 0, -1.2], scale: 0.9, rotationY: 2.1 },
+			{ id: 'canoe', prompt: 'a red wooden canoe', label: 'canoe', position: [1.8, 0, 2.6], scale: 1.2, rotationY: -0.6 },
+			{ id: 'log', prompt: 'a fallen mossy log bench', label: 'log', position: [-0.6, 0, 1.8], scale: 0.8, rotationY: 0.3 },
+		].map((o) => ({ ...o, status: 'pending', glbUrl: null })),
+	}).diorama,
+);

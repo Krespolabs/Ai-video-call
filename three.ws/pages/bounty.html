@@ -1,0 +1,76 @@
+<!doctype html>
+<html lang="en">
+	<head>
+		<style>/* three.ws hidden-guard — make the `hidden` attribute authoritative; see scripts/lib/hidden-guard.mjs */[hidden]{display:none!important}</style>
+		<script>/* three.ws theme boot — no-flash; runtime in /theme-switcher.js */(function(){try{var m=localStorage.getItem('twx_theme');var l=m==='auto'?(window.matchMedia&&window.matchMedia('(prefers-color-scheme: light)').matches):m==='light';document.documentElement.setAttribute('data-theme',l?'light':'dark');}catch(e){document.documentElement.setAttribute('data-theme','dark');}})();</script>
+		<meta charset="utf-8" />
+		<link rel="icon" href="/favicon.ico" sizes="any" />
+		<link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+		<link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png" />
+		<link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png" />
+		<link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+		<link rel="manifest" href="/manifest.webmanifest" />
+		<title data-i18n="bounty.meta_title">Bounty · three.ws</title>
+		<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+		<meta
+			name="description"
+			content="A pump.fun GO bounty on three.ws — brief, reward, on-chain escrow, and submissions."
+		 data-i18n-attr="content:bounty.meta_description"/>
+		<meta name="theme-color" content="#0a0a0f" />
+		<meta property="og:type" content="website" />
+		<meta property="og:site_name" content="three.ws" />
+		<meta property="og:title" content="Bounty · three.ws"  data-i18n-attr="content:bounty.meta_og_title"/>
+	<meta property="og:type" content="website" />
+	<meta property="og:site_name" content="three.ws" />
+	<meta property="og:url" content="https://three.ws/bounty" />
+	<meta property="og:title" content="Bounty · three.ws"  data-i18n-attr="content:bounty.meta_og_title_2"/>
+	<meta property="og:description" content="Complete this three.ws bounty, submit proof, and earn rewards paid on-chain."  data-i18n-attr="content:bounty.meta_og_description"/>
+	<meta property="og:image" content="https://three.ws/og-image.png" />
+	<meta property="og:image:width" content="1200" />
+	<meta property="og:image:height" content="630" />
+	<meta name="twitter:card" content="summary_large_image" />
+	<meta name="twitter:site" content="@trythreews" />
+	<meta name="twitter:title" content="Bounty · three.ws"  data-i18n-attr="content:bounty.meta_twitter_title"/>
+	<meta name="twitter:description" content="Complete this three.ws bounty, submit proof, and earn rewards paid on-chain."  data-i18n-attr="content:bounty.meta_twitter_description"/>
+	<meta name="twitter:image" content="https://three.ws/og-image.png" />
+		<link rel="stylesheet" href="/pump-bounties.css" />
+	</head>
+	<body>
+		<header class="topbar">
+			<a href="/" class="brand" data-i18n-html="bounty.three_ws_bounties">
+				<span class="dot"></span>
+				three.ws
+				<span class="badge-go">Bounties</span>
+			</a>
+			<div class="topbar-right">
+				<a href="/bounties" class="btn btn-ghost btn-sm" data-i18n="bounty.all_bounties">← All bounties</a>
+			</div>
+		</header>
+
+		<main class="wrap">
+			<div id="root">
+				<div class="detail">
+					<div>
+						<div class="skeleton skel-line" style="width: 40%"></div>
+						<div class="skeleton skel-line" style="width: 80%; height: 30px"></div>
+						<div class="detail-section">
+							<div class="skeleton skel-line" style="width: 100%"></div>
+							<div class="skeleton skel-line" style="width: 90%"></div>
+							<div class="skeleton skel-line" style="width: 70%"></div>
+						</div>
+					</div>
+					<div>
+						<div class="side-card">
+							<div class="skeleton skel-line" style="width: 50%; height: 30px"></div>
+							<div class="skeleton skel-line" style="width: 80%"></div>
+						</div>
+					</div>
+				</div>
+			</div>
+		</main>
+
+		<script type="module" src="/src/bounty-detail.js"></script>
+		<!-- Runtime i18n: detects locale, swaps annotated copy, mounts <lang-switcher>. -->
+	<script type="module" src="/i18n.js"></script>
+</body>
+</html>

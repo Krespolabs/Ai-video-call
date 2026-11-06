@@ -1,0 +1,108 @@
+<!doctype html>
+<html lang="en" class="cv-page">
+	<head>
+		<script>
+			/* three.ws theme boot — no-flash; runtime in /theme-switcher.js */ (function () {
+				try {
+					var m = localStorage.getItem('twx_theme');
+					var l =
+						m === 'auto'
+							? window.matchMedia &&
+								window.matchMedia('(prefers-color-scheme: light)').matches
+							: m === 'light';
+					document.documentElement.setAttribute('data-theme', l ? 'light' : 'dark');
+				} catch (e) {
+					document.documentElement.setAttribute('data-theme', 'dark');
+				}
+			})();
+		</script>
+		<meta charset="utf-8" />
+		<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+		<title data-i18n="heatmap.meta_title">Crypto Heatmap · three.ws</title>
+		<meta
+			name="description"
+			content="A live market heatmap of the top cryptocurrencies — each tile sized by market cap and colored by its 24h or 7d move. See where money is flowing at a glance."
+		 data-i18n-attr="content:heatmap.meta_description"/>
+		<meta property="og:type" content="website" />
+		<meta property="og:site_name" content="three.ws" />
+		<meta property="og:url" content="https://three.ws/heatmap" />
+		<meta property="og:title" content="Crypto Heatmap · three.ws"  data-i18n-attr="content:heatmap.meta_og_title"/>
+		<meta
+			property="og:description"
+			content="A live market heatmap — each coin sized by market cap and colored by its price move. See where money is flowing at a glance."
+		 data-i18n-attr="content:heatmap.meta_og_description"/>
+		<meta
+			property="og:image"
+			content="https://three.ws/api/page-og?s=crypto&amp;t=Crypto+Market+Heatmap&amp;d=A+live+market+heatmap+of+the+top+cryptocurrencies%3A+every+tile+is+a+coin%2C+sized+by+market+cap+and+colored+by+its+24h+or+7d+price+move.+See+where+money+is&amp;p=%2Fheatmap"
+		/>
+		<meta property="og:image:width" content="1200" />
+		<meta property="og:image:height" content="630" />
+		<meta name="twitter:card" content="summary_large_image" />
+		<meta name="twitter:site" content="@trythreews" />
+		<meta name="twitter:title" content="Crypto Heatmap · three.ws"  data-i18n-attr="content:heatmap.meta_twitter_title"/>
+		<meta
+			name="twitter:description"
+			content="A live market heatmap — each coin sized by market cap and colored by its price move."
+		 data-i18n-attr="content:heatmap.meta_twitter_description"/>
+		<meta
+			name="twitter:image"
+			content="https://three.ws/api/page-og?s=crypto&amp;t=Crypto+Market+Heatmap&amp;d=A+live+market+heatmap+of+the+top+cryptocurrencies%3A+every+tile+is+a+coin%2C+sized+by+market+cap+and+colored+by+its+24h+or+7d+price+move.+See+where+money+is&amp;p=%2Fheatmap"
+		/>
+		<meta name="theme-color" content="#09090b" />
+		<link rel="icon" href="/favicon.ico" sizes="any" />
+		<link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+		<link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+		<link rel="manifest" href="/manifest.webmanifest" />
+		<link rel="stylesheet" href="/fonts/fonts.css" />
+		<link rel="stylesheet" href="/nav.css" />
+		<link rel="stylesheet" href="/src/coin-pages.css" />
+		<link rel="stylesheet" href="/footer.css" />
+		<link rel="canonical" href="https://three.ws/heatmap" />
+		<meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1" />
+		<meta property="og:locale" content="en_US" />
+		<meta property="og:image:alt" content="Crypto Market Heatmap — three.ws" />
+	
+	<script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"WebPage","name":"Crypto Market Heatmap","description":"A live market heatmap of the top cryptocurrencies: every tile is a coin, sized by market cap and colored by its 24h or 7d price move. See where money is flowing across the whole market at a glance, then click any tile for its full profile.","url":"https://three.ws/heatmap","isPartOf":{"@type":"WebSite","name":"three.ws","url":"https://three.ws"},"primaryImageOfPage":"https://three.ws/api/page-og?s=crypto&t=Crypto+Market+Heatmap&d=A+live+market+heatmap+of+the+top+cryptocurrencies%3A+every+tile+is+a+coin%2C+sized+by+market+cap+and+colored+by+its+24h+or+7d+price+move.+See+where+money+is+flowing&p=%2Fheatmap"}]}</script>
+</head>
+	<body>
+		<header><div id="nav-container"></div></header>
+		<script src="/nav.js"></script>
+
+		<main class="cv-container">
+			<nav class="cv-crumbs" aria-label="Breadcrumb">
+				<a href="/markets" data-i18n="heatmap.markets">Markets</a><span class="sep">/</span
+				><span class="here" data-i18n="heatmap.heatmap">Heatmap</span>
+			</nav>
+			<h1 class="cv-h1" data-i18n="heatmap.market_heatmap">Market Heatmap</h1>
+			<p class="cv-sub" data-i18n="heatmap.the_whole_market_in_one_view_every">
+				The whole market in one view — every tile is a coin, sized by market cap and colored
+				by its price move. Green is up, red is down. Click any tile for its full profile.
+			</p>
+
+			<div class="hm-toolbar">
+				<div class="hm-seg" role="group" aria-label="Color by timeframe" id="hm-timeframe">
+					<button type="button" data-key="change_24h" aria-pressed="true" data-i18n="heatmap.24h">24h</button>
+					<button type="button" data-key="change_7d" aria-pressed="false" data-i18n="heatmap.7d">7d</button>
+				</div>
+				<div class="hm-seg" role="group" aria-label="Number of coins" id="hm-count">
+					<button type="button" data-count="50" aria-pressed="true" data-i18n="heatmap.top_50">Top 50</button>
+					<button type="button" data-count="100" aria-pressed="false" data-i18n="heatmap.top_100">Top 100</button>
+				</div>
+				<div class="hm-legend" aria-hidden="true">
+					<span>−</span><span class="bar"></span><span>+</span>
+				</div>
+			</div>
+
+			<!-- Treemap. Hydrated by src/heatmap.js. -->
+			<section id="hm-grid" class="hm-grid" aria-label="Market heatmap"></section>
+			<p class="cv-updated" id="hm-updated"></p>
+		</main>
+
+		<script type="module" src="/src/heatmap.js"></script>
+		<script src="/brand.js" defer></script>
+		<div id="footer-container"></div>
+		<script src="/footer.js"></script>
+		<!-- Runtime i18n: detects locale, swaps annotated copy, mounts <lang-switcher>. -->
+	<script type="module" src="/i18n.js"></script>
+</body>
+</html>

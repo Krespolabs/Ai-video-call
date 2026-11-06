@@ -1,0 +1,150 @@
+{
+	"measuredAt": "2026-09-09T06:27:22.422Z",
+	"source": "https://analytics.home-assistant.io/data.json",
+	"results": [
+		{
+			"tag": "2026.9",
+			"share": 34.19281092865948,
+			"role": "current stable",
+			"installs": 232427,
+			"haVersion": "2026.9.1",
+			"cells": {
+				"connect": {
+					"ok": true,
+					"note": "2026.9.1"
+				},
+				"registries": {
+					"ok": true,
+					"note": "1f/4a/62d/92e"
+				},
+				"stream": {
+					"ok": true,
+					"note": "push"
+				},
+				"call": {
+					"ok": true,
+					"note": "gated"
+				},
+				"scenes": {
+					"ok": true,
+					"note": "scene"
+				},
+				"mcp": {
+					"ok": true,
+					"note": "29 tools"
+				}
+			},
+			"notes": [
+				"exposes via `homeassistant/expose_entity`"
+			]
+		},
+		{
+			"tag": "2026.8",
+			"share": 23.601626470752656,
+			"role": "previous release",
+			"installs": 160433,
+			"haVersion": "2026.8.3",
+			"cells": {
+				"connect": {
+					"ok": true,
+					"note": "2026.8.3"
+				},
+				"registries": {
+					"ok": true,
+					"note": "1f/4a/62d/92e"
+				},
+				"stream": {
+					"ok": true,
+					"note": "push"
+				},
+				"call": {
+					"ok": true,
+					"note": "gated"
+				},
+				"scenes": {
+					"ok": true,
+					"note": "scene"
+				},
+				"mcp": {
+					"ok": true,
+					"note": "29 tools"
+				}
+			},
+			"notes": [
+				"exposes via `homeassistant/expose_entity`"
+			]
+		},
+		{
+			"tag": "2026.7",
+			"share": 11.408391859407962,
+			"role": "previous release",
+			"installs": 77549,
+			"haVersion": "2026.7.4",
+			"cells": {
+				"connect": {
+					"ok": true,
+					"note": "2026.7.4"
+				},
+				"registries": {
+					"ok": true,
+					"note": "1f/4a/62d/92e"
+				},
+				"stream": {
+					"ok": true,
+					"note": "push"
+				},
+				"call": {
+					"ok": true,
+					"note": "gated"
+				},
+				"scenes": {
+					"ok": true,
+					"note": "scene"
+				},
+				"mcp": {
+					"ok": true,
+					"note": "29 tools"
+				}
+			},
+			"notes": [
+				"exposes via `homeassistant/expose_entity`"
+			]
+		},
+		{
+			"tag": "2025.10",
+			"share": 1.018162452887368,
+			"role": "oldest in wide use",
+			"installs": 6921,
+			"haVersion": "2025.10.4",
+			"cells": {
+				"connect": {
+					"ok": true,
+					"note": "2025.10.4"
+				},
+				"registries": {
+					"ok": true,
+					"note": "1f/4a/52d/79e"
+				},
+				"stream": {
+					"ok": true,
+					"note": "push"
+				},
+				"call": {
+					"ok": true,
+					"note": "gated"
+				},
+				"scenes": {
+					"ok": true,
+					"note": "scene"
+				},
+				"mcp": {
+					"ok": true,
+					"note": "22 tools"
+				}
+			},
+			"notes": [
+				"exposes via `homeassistant/expose_entity`"
+			]
+		}
+	]
+}

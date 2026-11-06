@@ -1,0 +1,468 @@
+<!doctype html>
+<html lang="en">
+	<head>
+		<style>/* three.ws hidden-guard: make the `hidden` attribute authoritative; see scripts/lib/hidden-guard.mjs */[hidden]{display:none!important}</style>
+		<script>/* three.ws theme boot */(function(){try{var m=localStorage.getItem('twx_theme');var l=m==='auto'?(window.matchMedia&&window.matchMedia('(prefers-color-scheme: light)').matches):m==='light';document.documentElement.setAttribute('data-theme',l?'light':'dark');}catch(e){document.documentElement.setAttribute('data-theme','dark');}})();</script>
+		<meta charset="utf-8" />
+		<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+		<title data-i18n="monitor.page_title">Agent Monitor · three.ws</title>
+		<meta name="description" content="Mission-control dashboard for the three.ws 3D AI agent fleet: live agent activity, on-chain money pulse, agent-to-agent hires, launches and platform health, all on one screen." data-i18n-attr="content:monitor.meta_desc" />
+		<meta name="theme-color" content="#0a0a0a" />
+		<link rel="icon" href="/favicon.ico" sizes="any" />
+		<link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+		<link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png" />
+		<link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png" />
+		<link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+		<link rel="manifest" href="/manifest.webmanifest" />
+		<link rel="stylesheet" href="/fonts/fonts.css" />
+		<link rel="canonical" href="https://three.ws/monitor" />
+		<meta property="og:type" content="website" />
+		<meta property="og:site_name" content="three.ws" />
+		<meta property="og:title" content="Agent Monitor · three.ws" data-i18n-attr="content:monitor.share_title" />
+		<meta property="og:description" content="Mission-control dashboard for the three.ws 3D AI agent fleet: live activity, money pulse, agent-to-agent hires and platform health." data-i18n-attr="content:monitor.share_desc" />
+		<meta property="og:url" content="https://three.ws/monitor" />
+		<meta property="og:image" content="https://three.ws/api/page-og?s=build&amp;t=Agent+Monitor&amp;d=Ops-room+dashboard+for+the+3D+AI+agent+fleet%3A+live+agent+activity+with+a+3D+spotlight%2C+on-chain+money+pulse%2C+agent-to-agent+hires%2C+coin+launches%2C+the+community&amp;p=%2Fmonitor" />
+		<meta property="og:image:width" content="1200" />
+		<meta property="og:image:height" content="630" />
+		<meta property="og:image:alt" content="Agent Monitor - three.ws" />
+		<meta property="og:locale" content="en_US" />
+		<meta name="twitter:card" content="summary_large_image" />
+		<meta name="twitter:site" content="@trythreews" />
+		<meta name="twitter:title" content="Agent Monitor · three.ws" data-i18n-attr="content:monitor.share_title" />
+		<meta name="twitter:description" content="Mission-control dashboard for the three.ws 3D AI agent fleet: live activity, money pulse, agent-to-agent hires and platform health." data-i18n-attr="content:monitor.share_desc" />
+		<meta name="twitter:image" content="https://three.ws/api/page-og?s=build&amp;t=Agent+Monitor&amp;d=Ops-room+dashboard+for+the+3D+AI+agent+fleet%3A+live+agent+activity+with+a+3D+spotlight%2C+on-chain+money+pulse%2C+agent-to-agent+hires%2C+coin+launches%2C+the+community&amp;p=%2Fmonitor" />
+		<meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1" />
+		<script type="application/ld+json">{"@context":"https://schema.org","@type":"WebPage","name":"Agent Monitor","description":"Mission-control dashboard for the three.ws 3D AI agent fleet: live activity, money pulse, agent-to-agent hires and platform health.","url":"https://three.ws/monitor","isPartOf":{"@type":"WebSite","name":"three.ws","url":"https://three.ws"}}</script>
+		<script type="module" src="https://three.ws/agent-3d/latest/agent-3d.js"></script>
+		<style>
+			:root {
+				--mon-bg: #0a0a0a;
+				--mon-surface: #121212;
+				--mon-surface-2: #181818;
+				--mon-border: #262626;
+				--mon-border-2: #333;
+				--mon-text: #e8e8e8;
+				--mon-dim: #8a8a8a;
+				--mon-faint: #5c5c5c;
+				--mon-green: var(--success, #4ade80);
+				--mon-red: var(--danger, #f87171);
+				--mon-amber: var(--warn, #fbbf24);
+				--mon-cyan: #57c7ff;
+				--mon-violet: var(--accent-violet-strong, #a78bfa);
+				--mon-mono: 'JetBrains Mono', 'SF Mono', 'Fira Code', ui-monospace, monospace;
+			}
+			[data-theme="light"] {
+				--mon-bg: #f4f4f4;
+				--mon-surface: #ffffff;
+				--mon-surface-2: #fafafa;
+				--mon-border: #dcdcdc;
+				--mon-border-2: #c4c4c4;
+				--mon-text: #141414;
+				--mon-dim: #5f5f5f;
+				--mon-faint: #969696;
+				--mon-green: #16a34a;
+				--mon-red: #dc2626;
+				--mon-amber: #b45309;
+				--mon-cyan: #0284c7;
+				--mon-violet: #7c3aed;
+			}
+			* { box-sizing: border-box; margin: 0; padding: 0; }
+			html, body { background: var(--mon-bg); color: var(--mon-text); min-height: 100vh; }
+			body { font-family: var(--mon-mono); font-size: 12px; line-height: 1.5; }
+			a { color: inherit; text-decoration: none; }
+			.mon-shell { max-width: 1560px; margin: 0 auto; padding: 12px 12px 64px; }
+
+			/* Command bar */
+			.mon-bar {
+				display: flex; align-items: center; flex-wrap: wrap; gap: 10px 18px;
+				background: var(--mon-surface); border: 1px solid var(--mon-border);
+				padding: 10px 14px; margin-bottom: 8px;
+			}
+			.mon-bar h1 { font-size: 13px; font-weight: 700; letter-spacing: 2px; text-transform: uppercase; display: flex; align-items: center; gap: 8px; }
+			.mon-live-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--mon-green); animation: mon-pulse 2s infinite; }
+			.mon-live-dot[data-state="degraded"] { background: var(--mon-amber); }
+			.mon-live-dot[data-state="down"] { background: var(--mon-red); }
+			@keyframes mon-pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.4; } }
+			@media (prefers-reduced-motion: reduce) { .mon-live-dot, .mon-flash { animation: none !important; } }
+			.mon-bar-stats { display: flex; flex-wrap: wrap; gap: 4px 18px; margin-left: auto; }
+			.mon-bar-stat { font-size: 11px; color: var(--mon-dim); white-space: nowrap; }
+			.mon-bar-stat b { color: var(--mon-text); font-weight: 600; font-variant-numeric: tabular-nums; }
+			.mon-clock { font-size: 11px; color: var(--mon-dim); font-variant-numeric: tabular-nums; white-space: nowrap; }
+
+			/* Panel grid */
+			.mon-grid {
+				display: grid; gap: 8px;
+				grid-template-columns: repeat(12, minmax(0, 1fr));
+				/* Capped rows are what makes this a board rather than a stack of
+				   pages: a panel with 30 rows scrolls inside itself instead of
+				   stretching its whole row, which would also hand the 3D spotlight
+				   an absurdly tall viewport and sink the avatar out of frame. */
+				grid-auto-rows: minmax(220px, 460px);
+			}
+			.panel {
+				background: var(--mon-surface); border: 1px solid var(--mon-border);
+				display: flex; flex-direction: column; overflow: hidden; min-height: 220px;
+				transition: border-color 0.2s;
+			}
+			.panel:hover { border-color: var(--mon-border-2); }
+			.panel:focus-within { border-color: var(--mon-border-2); }
+			.panel-head {
+				display: flex; align-items: center; justify-content: space-between; gap: 8px;
+				padding: 7px 11px; border-bottom: 1px solid var(--mon-border);
+				background: rgba(127, 127, 127, 0.04); flex-shrink: 0;
+			}
+			.panel-title { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 1.2px; display: flex; align-items: center; gap: 7px; }
+			.panel-title a:hover { text-decoration: underline; }
+			.panel-badge {
+				font-size: 9px; letter-spacing: 0.5px; padding: 1px 7px; border-radius: 9px;
+				color: var(--mon-dim); background: var(--mon-surface-2); border: 1px solid var(--mon-border);
+				font-variant-numeric: tabular-nums; white-space: nowrap;
+			}
+			.panel-badge[data-tone="err"] { color: var(--mon-red); border-color: var(--mon-red); }
+			.panel-body { flex: 1; overflow-y: auto; padding: 9px 11px; min-height: 0; scrollbar-width: thin; }
+			.panel-empty { color: var(--mon-faint); font-size: 11px; padding: 14px 2px; line-height: 1.6; }
+			.panel-empty a { color: var(--mon-dim); border-bottom: 1px solid var(--mon-border-2); }
+			.panel-empty a:hover { color: var(--mon-text); }
+			.panel-err { color: var(--mon-red); font-size: 11px; padding: 12px 2px; }
+			.panel-err button {
+				appearance: none; font: inherit; color: var(--mon-text); background: var(--mon-surface-2);
+				border: 1px solid var(--mon-border-2); padding: 3px 10px; cursor: pointer; margin-left: 8px;
+			}
+			.panel-err button:hover, .panel-err button:focus-visible { border-color: var(--mon-text); outline: none; }
+
+			/* Column spans */
+			.span-3 { grid-column: span 3; }
+			.span-4 { grid-column: span 4; }
+			.span-5 { grid-column: span 5; }
+			.span-6 { grid-column: span 6; }
+			.span-8 { grid-column: span 8; }
+			.span-12 { grid-column: span 12; }
+			.tall { min-height: 430px; }
+			@media (max-width: 680px) {
+				.mon-grid { grid-auto-rows: minmax(220px, 380px); }
+			}
+			@media (max-width: 1180px) {
+				.span-3, .span-4, .span-5 { grid-column: span 6; }
+				.span-6, .span-8 { grid-column: span 12; }
+			}
+			@media (max-width: 680px) {
+				.span-3, .span-4, .span-5, .span-6 { grid-column: span 12; }
+				.mon-bar-stats { margin-left: 0; }
+			}
+
+			/* Panel controls */
+			.panel-ctrl { display: flex; align-items: center; gap: 6px; padding: 6px 10px; border-bottom: 1px solid var(--mon-border); background: rgba(127, 127, 127, 0.02); flex-wrap: wrap; flex-shrink: 0; }
+			.ctrl-input { flex: 1; min-width: 80px; background: var(--mon-bg); border: 1px solid var(--mon-border); color: var(--mon-text); font: inherit; font-size: 11px; padding: 3px 8px; }
+			.ctrl-input::placeholder { color: var(--mon-faint); }
+			.ctrl-input:focus { outline: none; border-color: var(--mon-green); }
+			.ctrl-select { background: var(--mon-bg); border: 1px solid var(--mon-border); color: var(--mon-text); font: inherit; font-size: 10px; padding: 3px 6px; cursor: pointer; }
+			.ctrl-select:hover, .ctrl-select:focus-visible { border-color: var(--mon-border-2); outline: none; }
+			.seg { display: inline-flex; border: 1px solid var(--mon-border); }
+			.seg button { appearance: none; background: transparent; border: none; color: var(--mon-dim); font: inherit; font-size: 9px; letter-spacing: 0.5px; text-transform: uppercase; padding: 3px 8px; cursor: pointer; transition: color 0.12s, background 0.12s; }
+			.seg button:hover { color: var(--mon-text); }
+			.seg button[aria-pressed="true"] { background: var(--mon-surface-2); color: var(--mon-text); }
+			.seg button:focus-visible { outline: 1px solid var(--mon-green); outline-offset: -1px; }
+			.chip { appearance: none; background: transparent; border: 1px solid var(--mon-border); color: var(--mon-dim); font: inherit; font-size: 8px; font-weight: 700; letter-spacing: 0.8px; text-transform: uppercase; padding: 2px 7px; border-radius: 3px; cursor: pointer; transition: color 0.12s, border-color 0.12s; }
+			.chip:hover { color: var(--mon-text); border-color: var(--mon-border-2); }
+			.chip[aria-pressed="true"] { color: var(--mon-green); border-color: var(--mon-green); }
+			.chip:focus-visible { outline: 1px solid var(--mon-green); outline-offset: 1px; }
+			.icon-btn { appearance: none; background: transparent; border: 1px solid var(--mon-border); color: var(--mon-dim); font: inherit; font-size: 10px; line-height: 1.2; padding: 3px 8px; cursor: pointer; transition: color 0.12s, border-color 0.12s; }
+			.icon-btn:hover, .icon-btn:focus-visible { color: var(--mon-text); border-color: var(--mon-border-2); outline: none; }
+			.icon-btn[aria-pressed="true"] { color: var(--mon-amber); border-color: var(--mon-amber); }
+			.mon-kbd { font-size: 9px; color: var(--mon-faint); border: 1px solid var(--mon-border); border-radius: 3px; padding: 0 4px; }
+
+			/* Forge feed */
+			.forge-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(96px, 1fr)); gap: 6px; }
+			.forge-cell { position: relative; display: block; aspect-ratio: 1; background: var(--mon-surface-2); border: 1px solid var(--mon-border); overflow: hidden; }
+			.forge-cell img { width: 100%; height: 100%; object-fit: cover; display: block; transition: transform 0.2s; }
+			.forge-cell:hover img, .forge-cell:focus-visible img { transform: scale(1.06); }
+			.forge-cell:focus-visible { outline: 1px solid var(--mon-green); }
+			.forge-cell-fb { width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; font-size: 20px; font-weight: 700; color: #0a0a0a; background: linear-gradient(135deg, var(--mon-violet), var(--mon-cyan)); }
+			.forge-tag { position: absolute; left: 0; right: 0; bottom: 0; font-size: 8px; color: #e8e8e8; background: linear-gradient(transparent, rgba(0, 0, 0, 0.82)); padding: 12px 5px 3px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+			/* Skeletons */
+			.sk { background: rgba(127,127,127,0.08); border-radius: 3px; animation: mon-shimmer 1.3s ease-in-out infinite; }
+			@keyframes mon-shimmer { 0%, 100% { opacity: 0.6; } 50% { opacity: 1; } }
+			.sk-row { height: 13px; margin: 9px 0; }
+
+			/* Fleet rows */
+			.fleet-row {
+				display: grid; grid-template-columns: 26px 1fr auto auto; gap: 10px; align-items: center;
+				padding: 5px 6px; border-bottom: 1px solid var(--mon-border); cursor: pointer;
+				transition: background 0.12s;
+			}
+			.fleet-row:last-child { border-bottom: none; }
+			.fleet-row:hover, .fleet-row:focus-visible { background: var(--mon-surface-2); outline: none; }
+			.fleet-row[aria-selected="true"] { background: var(--mon-surface-2); box-shadow: inset 2px 0 0 var(--mon-green); }
+			.fleet-av { width: 26px; height: 26px; border-radius: 4px; object-fit: cover; background: var(--mon-surface-2); border: 1px solid var(--mon-border); display: block; }
+			.fleet-av-fb { width: 26px; height: 26px; border-radius: 4px; background: linear-gradient(135deg, var(--mon-violet), var(--mon-cyan)); display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 700; color: #0a0a0a; }
+			.fleet-meta { min-width: 0; }
+			.fleet-name { font-size: 12px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+			.fleet-sub { font-size: 10px; color: var(--mon-faint); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+			.fleet-actions { font-size: 11px; color: var(--mon-dim); font-variant-numeric: tabular-nums; text-align: right; white-space: nowrap; }
+			.fleet-when { font-size: 10px; color: var(--mon-faint); font-variant-numeric: tabular-nums; text-align: right; white-space: nowrap; min-width: 52px; }
+			.fleet-when[data-hot="1"] { color: var(--mon-green); }
+			.reg-chip { font-size: 8px; letter-spacing: 0.6px; color: var(--mon-cyan); border: 1px solid var(--mon-cyan); border-radius: 3px; padding: 0 4px; margin-left: 6px; vertical-align: 1px; }
+
+			/* Spotlight */
+			/* overflow:hidden keeps the widget's own chrome inside the stage: it is
+			   absolutely positioned and would otherwise print over the footer that
+			   names the agent, showing two labels stacked on each other. */
+			.spot-stage { position: relative; flex: 1; min-height: 200px; overflow: hidden; background: radial-gradient(ellipse at 50% 30%, rgba(87,199,255,0.06), transparent 65%); }
+			.spot-stage agent-3d { position: absolute; inset: 0; width: 100%; height: 100%; }
+			.spot-foot { border-top: 1px solid var(--mon-border); padding: 8px 11px; flex-shrink: 0; }
+			.spot-name { font-size: 12px; font-weight: 700; }
+			.spot-desc { font-size: 10px; color: var(--mon-dim); margin-top: 2px; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+			.spot-links { margin-top: 6px; display: flex; gap: 12px; }
+			.spot-links a { font-size: 10px; color: var(--mon-cyan); }
+			.spot-links a:hover, .spot-links a:focus-visible { text-decoration: underline; outline: none; }
+
+			/* Stat tiles */
+			.tile-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(105px, 1fr)); gap: 6px; }
+			.tile { background: var(--mon-surface-2); border: 1px solid var(--mon-border); padding: 9px 10px; }
+			.tile-val { font-size: 17px; font-weight: 700; letter-spacing: -0.02em; font-variant-numeric: tabular-nums; }
+			.tile-val[data-tone="green"] { color: var(--mon-green); }
+			.tile-lbl { font-size: 9px; text-transform: uppercase; letter-spacing: 0.8px; color: var(--mon-faint); margin-top: 3px; }
+			.spark-wrap { margin-top: 10px; }
+			.spark-lbl { font-size: 9px; text-transform: uppercase; letter-spacing: 0.8px; color: var(--mon-faint); margin-bottom: 4px; }
+			.spark { display: flex; align-items: flex-end; gap: 3px; height: 44px; }
+			.spark-col { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 3px; min-width: 0; }
+			.spark-bar { width: 100%; background: var(--mon-green); opacity: 0.75; border-radius: 1px 1px 0 0; min-height: 2px; transition: height 0.4s var(--ease-standard, ease); }
+			.spark-day { font-size: 8px; color: var(--mon-faint); }
+
+			/* Wire feed */
+			.wire-row { display: flex; align-items: baseline; gap: 8px; padding: 4px 2px; border-bottom: 1px solid var(--mon-border); font-size: 11px; }
+			.wire-row:last-child { border-bottom: none; }
+			.wire-row.mon-flash { animation: mon-flash-in 1.6s ease-out; }
+			@keyframes mon-flash-in { 0% { background: rgba(74, 222, 128, 0.18); } 100% { background: transparent; } }
+			.wire-kind { font-size: 8px; font-weight: 700; letter-spacing: 0.8px; text-transform: uppercase; padding: 1px 5px; border-radius: 3px; flex-shrink: 0; min-width: 52px; text-align: center; }
+			.wire-kind[data-kind="tip"] { color: var(--mon-amber); border: 1px solid var(--mon-amber); }
+			.wire-kind[data-kind="trade"] { color: var(--mon-cyan); border: 1px solid var(--mon-cyan); }
+			.wire-kind[data-kind="snipe"] { color: var(--mon-violet); border: 1px solid var(--mon-violet); }
+			.wire-kind[data-kind="payment"] { color: var(--mon-green); border: 1px solid var(--mon-green); }
+			.wire-kind[data-kind="launch"] { color: var(--mon-red); border: 1px solid var(--mon-red); }
+			.wire-body { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+			.wire-body a:hover, .wire-body a:focus-visible { text-decoration: underline; outline: none; }
+			.wire-agent { font-weight: 600; }
+			.wire-amt { color: var(--mon-text); font-weight: 600; font-variant-numeric: tabular-nums; white-space: nowrap; }
+			.wire-when { color: var(--mon-faint); font-size: 10px; font-variant-numeric: tabular-nums; flex-shrink: 0; }
+			.wire-tx { color: var(--mon-faint); font-size: 10px; flex-shrink: 0; }
+			.wire-tx:hover, .wire-tx:focus-visible { color: var(--mon-cyan); outline: none; }
+
+			/* Revenue bars */
+			.rev-tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(100px, 1fr)); gap: 6px; margin-bottom: 10px; }
+			.bar-row { display: grid; grid-template-columns: 1fr auto; gap: 8px; align-items: center; padding: 3px 0; font-size: 10px; }
+			.bar-name { color: var(--mon-dim); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+			.bar-track { grid-column: 1 / -1; height: 4px; background: var(--mon-surface-2); border-radius: 2px; overflow: hidden; }
+			.bar-fill { height: 100%; background: var(--mon-green); border-radius: 2px; transition: width 0.5s ease; }
+			.bar-val { color: var(--mon-text); font-variant-numeric: tabular-nums; white-space: nowrap; }
+
+			/* Desks / on air */
+			.desk-row { display: flex; align-items: center; gap: 10px; padding: 6px 4px; border-bottom: 1px solid var(--mon-border); }
+			.desk-row:last-child { border-bottom: none; }
+			.desk-live { font-size: 8px; font-weight: 700; letter-spacing: 1px; color: var(--mon-red); border: 1px solid var(--mon-red); padding: 1px 5px; border-radius: 3px; animation: mon-pulse 1.6s infinite; }
+
+			/* Launches */
+			.launch-row { display: flex; align-items: center; gap: 8px; padding: 5px 2px; border-bottom: 1px solid var(--mon-border); font-size: 11px; }
+			.launch-row:last-child { border-bottom: none; }
+			.launch-sym { font-weight: 700; color: var(--mon-amber); min-width: 64px; }
+			.launch-name { flex: 1; min-width: 0; color: var(--mon-dim); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+			.launch-row a:hover, .launch-row a:focus-visible { text-decoration: underline; outline: none; }
+
+			/* Systems */
+			.sys-row { display: grid; grid-template-columns: 10px 1fr auto auto; gap: 10px; align-items: center; padding: 6px 2px; border-bottom: 1px solid var(--mon-border); font-size: 11px; }
+			.sys-row:last-child { border-bottom: none; }
+			.sys-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--mon-green); }
+			.sys-dot[data-up="false"] { background: var(--mon-red); animation: mon-pulse 1s infinite; }
+			.sys-lat { color: var(--mon-dim); font-variant-numeric: tabular-nums; }
+			.sys-up { color: var(--mon-faint); font-size: 10px; font-variant-numeric: tabular-nums; }
+			.mon-foot { color: var(--mon-faint); font-size: 10px; margin-top: 10px; line-height: 1.6; }
+			.mon-foot a { color: var(--mon-dim); border-bottom: 1px solid var(--mon-border-2); }
+			.mon-foot a:hover { color: var(--mon-text); }
+		</style>
+	</head>
+	<body>
+		<header class="site-header"><div id="nav-container"></div></header>
+		<script src="/nav.js"></script>
+
+		<main class="mon-shell">
+			<div class="mon-bar">
+				<h1><span class="mon-live-dot" id="bar-dot"></span> <span data-i18n="monitor.bar_title_label">Agent Monitor</span></h1>
+				<span class="mon-clock" id="mon-clock" aria-label="Current UTC time" data-i18n-attr="aria-label:monitor.clock_aria">--:--:-- UTC</span>
+				<div class="mon-bar-stats" id="bar-stats" aria-label="Platform totals" data-i18n-attr="aria-label:monitor.bar_stats_aria">
+					<span class="mon-bar-stat"><span data-i18n="monitor.stat_agents_label">agents</span> <b id="t-agents">·</b></span>
+					<span class="mon-bar-stat"><span data-i18n="monitor.stat_onchain_label">on-chain</span> <b id="t-onchain">·</b></span>
+					<span class="mon-bar-stat"><span data-i18n="monitor.stat_avatars_label">avatars</span> <b id="t-avatars">·</b></span>
+					<span class="mon-bar-stat"><span data-i18n="monitor.stat_forge_label">3D models forged</span> <b id="t-forge">·</b></span>
+					<span class="mon-bar-stat"><span data-i18n="monitor.stat_widgets_label">live widgets</span> <b id="t-widgets">·</b></span>
+					<span class="mon-bar-stat"><span data-i18n="monitor.stat_chains_label">chains</span> <b id="t-chains">·</b></span>
+					<span class="mon-bar-stat"><span data-i18n="monitor.stat_countries_label">countries</span> <b id="t-countries">·</b></span>
+				</div>
+				<button type="button" class="icon-btn" id="refresh-all" title="Refresh every panel now (r)" aria-label="Refresh every panel now" data-i18n-html="monitor.refresh_btn" data-i18n-attr="title:monitor.refresh_title;aria-label:monitor.refresh_aria">refresh <span class="mon-kbd">r</span></button>
+			</div>
+
+			<div class="mon-grid">
+				<section class="panel span-5 tall" aria-labelledby="p-fleet-t">
+					<div class="panel-head">
+						<span class="panel-title" id="p-fleet-t"><a href="/agents" data-i18n="monitor.panel_fleet_title">Fleet</a></span>
+						<span class="panel-badge" id="fleet-badge" data-i18n="monitor.badge_loading">loading</span>
+					</div>
+					<div class="panel-ctrl">
+						<input type="search" class="ctrl-input" id="fleet-search" placeholder="Search agents... ( f )" aria-label="Search agents by name or description" data-i18n-attr="placeholder:monitor.fleet_search_placeholder;aria-label:monitor.fleet_search_aria" />
+						<select class="ctrl-select" id="fleet-sort" aria-label="Sort fleet" data-i18n-attr="aria-label:monitor.fleet_sort_aria">
+							<option value="live" selected data-i18n="monitor.sort_recent">recently active</option>
+							<option value="newest" data-i18n="monitor.sort_newest">newest</option>
+							<option value="popular" data-i18n="monitor.sort_popular">popular</option>
+							<option value="name" data-i18n="monitor.sort_name">name</option>
+						</select>
+					</div>
+					<div class="panel-body" id="fleet-body" role="listbox" aria-label="Agents ranked by most recent activity" data-i18n-attr="aria-label:monitor.fleet_body_aria">
+						<div class="sk sk-row"></div><div class="sk sk-row"></div><div class="sk sk-row"></div><div class="sk sk-row"></div><div class="sk sk-row"></div>
+					</div>
+				</section>
+
+				<section class="panel span-4 tall" aria-labelledby="p-spot-t">
+					<div class="panel-head">
+						<span class="panel-title" id="p-spot-t" data-i18n="monitor.panel_spot_title">Spotlight</span>
+						<span style="display:flex;gap:5px;align-items:center">
+							<button type="button" class="icon-btn" id="spot-prev" title="Previous agent" aria-label="Previous agent" data-i18n-attr="title:monitor.spot_prev_aria;aria-label:monitor.spot_prev_aria">&lt;</button>
+							<button type="button" class="icon-btn" id="spot-next" title="Next agent" aria-label="Next agent" data-i18n-attr="title:monitor.spot_next_aria;aria-label:monitor.spot_next_aria">&gt;</button>
+							<button type="button" class="icon-btn" id="spot-full" title="Open avatar fullscreen" aria-label="Open avatar fullscreen" data-i18n="monitor.spot_full_btn" data-i18n-attr="title:monitor.spot_full_aria;aria-label:monitor.spot_full_aria">full</button>
+							<span class="panel-badge" id="spot-badge" data-i18n="monitor.badge_3d_live">3D live</span>
+						</span>
+					</div>
+					<div class="spot-stage" id="spot-stage"></div>
+					<div class="spot-foot">
+						<div class="spot-name" id="spot-name" data-i18n="monitor.spot_name_default">Select an agent</div>
+						<div class="spot-desc" id="spot-desc" data-i18n="monitor.spot_desc_default">Click any agent in the fleet to load its live 3D avatar.</div>
+						<div class="spot-links" id="spot-links" hidden>
+							<a id="spot-profile" href="/agents" data-i18n="monitor.spot_profile">Profile</a>
+							<a id="spot-chat" href="/agents" data-i18n="monitor.spot_chat">Chat</a>
+						</div>
+					</div>
+				</section>
+
+				<section class="panel span-3 tall" aria-labelledby="p-air-t">
+					<div class="panel-head">
+						<span class="panel-title" id="p-air-t"><a href="/agents-live" data-i18n="monitor.panel_air_title">On Air</a></span>
+						<span class="panel-badge" id="air-badge">·</span>
+					</div>
+					<div class="panel-body" id="air-body">
+						<div class="sk sk-row"></div><div class="sk sk-row"></div>
+					</div>
+				</section>
+
+				<section class="panel span-6" aria-labelledby="p-pulse-t">
+					<div class="panel-head">
+						<span class="panel-title" id="p-pulse-t"><a href="/pulse" data-i18n="monitor.panel_pulse_title">Money Pulse · 24h</a></span>
+						<span style="display:flex;gap:5px;align-items:center">
+							<span class="seg" id="pulse-net" role="group" aria-label="Network" data-i18n-attr="aria-label:monitor.pulse_net_aria">
+								<button type="button" data-net="mainnet" aria-pressed="true" data-i18n="monitor.pulse_main">main</button>
+								<button type="button" data-net="devnet" aria-pressed="false" data-i18n="monitor.pulse_dev">dev</button>
+							</span>
+							<span class="panel-badge" id="pulse-badge">·</span>
+						</span>
+					</div>
+					<div class="panel-body" id="pulse-body">
+						<div class="sk sk-row"></div><div class="sk sk-row"></div><div class="sk sk-row"></div>
+					</div>
+				</section>
+
+				<section class="panel span-6" aria-labelledby="p-a2a-t">
+					<div class="panel-head">
+						<span class="panel-title" id="p-a2a-t"><a href="/agent-economy-volume" data-i18n="monitor.panel_a2a_title">A2A Hires</a></span>
+						<span style="display:flex;gap:5px;align-items:center">
+							<span class="seg" id="a2a-window" role="group" aria-label="Hire window" data-i18n-attr="aria-label:monitor.a2a_window_aria">
+								<button type="button" data-window="7" aria-pressed="false">7d</button>
+								<button type="button" data-window="30" aria-pressed="true">30d</button>
+								<button type="button" data-window="90" aria-pressed="false">90d</button>
+							</span>
+							<span class="panel-badge" id="a2a-badge">x402</span>
+						</span>
+					</div>
+					<div class="panel-body" id="a2a-body">
+						<div class="sk sk-row"></div><div class="sk sk-row"></div><div class="sk sk-row"></div>
+					</div>
+				</section>
+
+				<section class="panel span-6" aria-labelledby="p-wire-t">
+					<div class="panel-head">
+						<span class="panel-title" id="p-wire-t"><a href="/pulse" data-i18n="monitor.panel_wire_title">Live Wire</a></span>
+						<span style="display:flex;gap:5px;align-items:center">
+							<button type="button" class="icon-btn" id="wire-pause" aria-pressed="false" title="Pause the stream" aria-label="Pause or resume the stream" data-i18n="monitor.wire_pause_btn" data-i18n-attr="title:monitor.wire_pause_title;aria-label:monitor.wire_pause_aria">pause</button>
+							<span class="panel-badge" id="wire-badge">·</span>
+						</span>
+					</div>
+					<div class="panel-ctrl" id="wire-filters" role="group" aria-label="Filter events by kind" data-i18n-attr="aria-label:monitor.wire_filters_aria">
+						<button type="button" class="chip" data-kind="all" aria-pressed="true" data-i18n="monitor.wire_all">all</button>
+						<button type="button" class="chip" data-kind="tip" aria-pressed="false" data-i18n="monitor.wire_tips">tips</button>
+						<button type="button" class="chip" data-kind="trade" aria-pressed="false" data-i18n="monitor.wire_trades">trades</button>
+						<button type="button" class="chip" data-kind="snipe" aria-pressed="false" data-i18n="monitor.wire_snipes">snipes</button>
+						<button type="button" class="chip" data-kind="payment" aria-pressed="false" data-i18n="monitor.wire_payments">payments</button>
+						<button type="button" class="chip" data-kind="launch" aria-pressed="false" data-i18n="monitor.wire_launches">launches</button>
+					</div>
+					<div class="panel-body" id="wire-body" aria-live="polite">
+						<div class="sk sk-row"></div><div class="sk sk-row"></div><div class="sk sk-row"></div><div class="sk sk-row"></div>
+					</div>
+				</section>
+
+				<section class="panel span-3" aria-labelledby="p-lead-t">
+					<div class="panel-head">
+						<span class="panel-title" id="p-lead-t"><a href="/pulse" data-i18n="monitor.panel_lead_title">Leaders · 24h</a></span>
+						<span class="panel-badge" id="lead-badge" data-i18n="monitor.lead_badge">tips</span>
+					</div>
+					<div class="panel-body" id="lead-body">
+						<div class="sk sk-row"></div><div class="sk sk-row"></div>
+					</div>
+				</section>
+
+				<section class="panel span-3" aria-labelledby="p-launch-t">
+					<div class="panel-head">
+						<span class="panel-title" id="p-launch-t"><a href="/launches" data-i18n="monitor.panel_launch_title">Launches</a></span>
+						<span class="panel-badge" id="launch-badge">·</span>
+					</div>
+					<div class="panel-body" id="launch-body">
+						<div class="sk sk-row"></div><div class="sk sk-row"></div>
+					</div>
+				</section>
+
+				<section class="panel span-6" aria-labelledby="p-forge-t">
+					<div class="panel-head">
+						<span class="panel-title" id="p-forge-t"><a href="/creations" data-i18n="monitor.panel_forge_title">Forge Feed</a></span>
+						<span class="panel-badge" id="forge-badge" data-i18n="monitor.forge_badge">text to 3D</span>
+					</div>
+					<div class="panel-body" id="forge-body">
+						<div class="sk sk-row"></div><div class="sk sk-row"></div>
+					</div>
+				</section>
+
+				<section class="panel span-3" aria-labelledby="p-crew-t">
+					<div class="panel-head">
+						<span class="panel-title" id="p-crew-t"><a href="/crews" data-i18n="monitor.panel_crew_title">Crews</a></span>
+						<span class="panel-badge" id="crew-badge">·</span>
+					</div>
+					<div class="panel-body" id="crew-body">
+						<div class="sk sk-row"></div><div class="sk sk-row"></div>
+					</div>
+				</section>
+
+				<section class="panel span-3" aria-labelledby="p-sys-t">
+					<div class="panel-head">
+						<span class="panel-title" id="p-sys-t"><a href="/status" data-i18n="monitor.panel_sys_title">Systems</a></span>
+						<span class="panel-badge" id="sys-badge">·</span>
+					</div>
+					<div class="panel-body" id="sys-body">
+						<div class="sk sk-row"></div><div class="sk sk-row"></div><div class="sk sk-row"></div>
+					</div>
+				</section>
+			</div>
+
+			<p class="mon-foot" data-i18n-html="monitor.foot">Every number on this board is live platform data: the fleet ranks by real recorded agent actions, the wire streams settled on-chain events with Solscan proofs, and hires read the settled x402 hire ledger. Nothing is simulated. Deeper views: <a href="/agents-live">live screens</a>, <a href="/pulse">money pulse</a>, <a href="/flow">money flow map</a>, <a href="/status">status</a>.</p>
+		</main>
+
+		<div id="footer-container"></div>
+		<script src="/footer.js"></script>
+		<script type="module" src="/src/monitor.js"></script>
+		<script type="module" src="/i18n.js"></script>
+	</body>
+</html>

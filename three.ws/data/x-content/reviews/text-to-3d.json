@@ -1,0 +1,77 @@
+{
+	"id": "text-to-3d",
+	"contentHash": "8c3ea382ddc27c31879fb9ef2a0b6c86f99a1a826f737f81be21715ab7843396",
+	"reviewedAt": "2026-09-18T09:34:20.260Z",
+	"passed": true,
+	"blockers": [],
+	"texts": [
+		"Type a sentence. Get a 3D model.\n\nIt is free, with no account and no API key.\n\nWe typed \"a worn leather armchair with brass studs\" and had a textured 3D model 106 seconds later. Download it and use it anywhere.\n\nthree.ws/forge"
+	],
+	"lint": [],
+	"verification": {
+		"ok": true,
+		"checks": [
+			{
+				"claim": "no account and no API key",
+				"kind": "evidence:file",
+				"target": ".agents/skills/generate-3d-model/SKILL.md",
+				"ok": true,
+				"detail": "file supports the claim"
+			},
+			{
+				"claim": "106 seconds later",
+				"kind": "evidence:file",
+				"target": "docs/announcements/text-to-3d.md",
+				"ok": true,
+				"detail": "file supports the claim"
+			},
+			{
+				"kind": "probe:api",
+				"target": "the generated model is served",
+				"ok": true,
+				"detail": "HTTP 200, expectations met"
+			},
+			{
+				"kind": "probe:api",
+				"target": "the forge page is live",
+				"ok": true,
+				"detail": "HTTP 200, expectations met"
+			},
+			{
+				"kind": "link",
+				"target": "https://three.ws/forge",
+				"ok": true,
+				"detail": "HTTP 200"
+			}
+		]
+	},
+	"editor": {
+		"verdict": "publish",
+		"scores": {
+			"accuracy": 5,
+			"clarity": 5,
+			"specificity": 5,
+			"voice": 5,
+			"professionalism": 5,
+			"visual": 5
+		},
+		"issues": [],
+		"rewrite": {
+			"posts": [
+				"Type a sentence. Get a 3D model.\n\nIt is free, with no account and no API key.\n\nWe typed \"a worn leather armchair with brass studs\" and had a textured 3D model 106 seconds later. Download it and use it anywhere.\n\nthree.ws/forge"
+			],
+			"altText": [
+				"A three.ws card reading 'Type a sentence. Get a 3D model.' beside a browser window showing a textured 3D model of a worn leather armchair with brass studs, generated from that prompt in 106 seconds"
+			]
+		},
+		"summary": "Both claims (no account or API key; 106 seconds) pass verification, and the card matches the copy exactly, including the prompt, the timing, and the Download GLB button. The post is within the character wall, in house voice, with one link and accurate alt text; it ships unchanged.",
+		"model": "nvidia:moonshotai/kimi-k3",
+		"fallbacks": [
+			"No GCP credentials found. Set GCP_SERVICE_ACCOUNT_JSON, run `gcloud auth application-default login`, or run on GCE/Cloud Run.",
+			"openrouter 402: {\"error\":{\"message\":\"Insufficient credits. Add more using https://openrouter.ai/settings/credits\",\"code\":402,\"metadata\":{\"limit_source\":\"openrouter_credits\",\"remedy_hint\":\"Add credits at https://openr",
+			"openai 429: {\n    \"error\": {\n        \"message\": \"Your account is not active, please check your billing details on our website.\",\n        \"type\": \"billing_not_active\",\n        \"param\": null,\n        \"code\": \"billi"
+		],
+		"rewriteFindings": []
+	},
+	"editorError": null
+}

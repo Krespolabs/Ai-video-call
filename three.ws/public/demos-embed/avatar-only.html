@@ -1,0 +1,51 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="robots" content="noindex">
+<script type="module" src="/dist-lib/agent-3d.js"></script>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+html,body{width:100%;height:100%;background:transparent;overflow:hidden}
+agent-3d{display:block;width:100%;height:100%;--agent-bg:transparent}
+</style>
+</head>
+<body>
+<agent-3d id="av" src="/avatars/michelle.glb" viewer></agent-3d>
+<script>
+const el = document.getElementById('av');
+
+function killUI() {
+  const s = el.shadowRoot;
+  if (!s) return;
+  const hide = ['.gui-wrap','.gui-toggle','.chrome','.nich-panel',
+                '.nich-toggle','.alert-banner','.tool-indicator',
+                '.drag-handle','.avatar-anchor'];
+  hide.forEach(sel => {
+    s.querySelectorAll(sel).forEach(n => {
+      n.style.cssText = 'display:none!important;visibility:hidden!important';
+    });
+  });
+}
+
+// Run immediately, then watch for any new nodes
+function watchAndKill() {
+  killUI();
+  new MutationObserver(killUI).observe(el.shadowRoot, { childList: true, subtree: true });
+}
+
+// shadowRoot may not exist until customElements upgrades the element
+if (el.shadowRoot) {
+  watchAndKill();
+} else {
+  customElements.whenDefined('agent-3d').then(() => {
+    // Give the element one tick to attach shadow
+    requestAnimationFrame(() => requestAnimationFrame(watchAndKill));
+  });
+}
+</script>
+	<!-- Runtime i18n: detects locale, swaps annotated copy, mounts <lang-switcher>. -->
+	<script type="module" src="/i18n.js"></script>
+</body>
+</html>

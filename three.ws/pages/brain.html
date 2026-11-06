@@ -1,0 +1,246 @@
+<!doctype html>
+<html lang="en">
+	<head>
+		<script>/* three.ws theme boot — no-flash; runtime in /theme-switcher.js */(function(){try{var m=localStorage.getItem('twx_theme');var l=m==='auto'?(window.matchMedia&&window.matchMedia('(prefers-color-scheme: light)').matches):m==='light';document.documentElement.setAttribute('data-theme',l?'light':'dark');}catch(e){document.documentElement.setAttribute('data-theme','dark');}})();</script>
+		<meta charset="utf-8" />
+		<link rel="icon" href="/favicon.ico" sizes="any" />
+		<link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+		<link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png" />
+		<link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png" />
+		<link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+		<link rel="manifest" href="/manifest.webmanifest" />
+		<meta name="viewport" content="width=device-width, initial-scale=1" />
+		<title data-i18n="brain.meta_title">Multi-LLM Brain · three.ws</title>
+		<meta name="description" content="Send one prompt to Claude, GPT, Qwen, ModelScope, and Groq simultaneously. Side-by-side streaming with latency and token stats."  data-i18n-attr="content:brain.meta_description"/>
+		<link rel="canonical" href="https://three.ws/brain" />
+		<meta property="og:title" content="Multi-LLM Brain · three.ws"  data-i18n-attr="content:brain.meta_og_title"/>
+		<meta property="og:description" content="Send one prompt to Claude, GPT, Qwen, ModelScope, and Groq simultaneously. Side-by-side streaming with latency and token stats."  data-i18n-attr="content:brain.meta_og_description"/>
+		<meta property="og:url" content="https://three.ws/brain" />
+		<meta name="twitter:card" content="summary_large_image" />
+		<link rel="stylesheet" href="/style.css" />
+		<link rel="stylesheet" href="/nav.css" />
+		<link rel="stylesheet" href="/brain.css" />
+	
+	<meta property="og:type" content="website">
+	<meta property="og:site_name" content="three.ws">
+	<meta property="og:image" content="https://three.ws/api/page-og?s=labs&amp;t=Multi-LLM+Brain&amp;d=Send+one+prompt+to+Claude%2C+GPT%2C+Qwen%2C+ModelScope%2C+and+Groq+simultaneously.+Side-by-side+streaming+with+latency+and+token+stats.&amp;p=%2Fbrain">
+	<meta property="og:image:width" content="1200">
+	<meta property="og:image:height" content="630">
+	<meta name="twitter:title" content="Multi-LLM Brain · three.ws" data-i18n-attr="content:brain.meta_twitter_title">
+	<meta name="twitter:description" content="Send one prompt to Claude, GPT, Qwen, ModelScope, and Groq simultaneously. Side-by-side streaming with latency and token stats." data-i18n-attr="content:brain.meta_twitter_description">
+	<meta name="twitter:image" content="https://three.ws/api/page-og?s=labs&amp;t=Multi-LLM+Brain&amp;d=Send+one+prompt+to+Claude%2C+GPT%2C+Qwen%2C+ModelScope%2C+and+Groq+simultaneously.+Side-by-side+streaming+with+latency+and+token+stats.&amp;p=%2Fbrain">
+	<script type="application/ld+json">{"@context":"https://schema.org","@type":"WebPage","name":"Multi-LLM Brain","description":"Send one prompt to Claude, GPT, Qwen, ModelScope, and Groq simultaneously. Side-by-side streaming with latency and token stats.","url":"https://three.ws/brain","isPartOf":{"@type":"WebSite","name":"three.ws","url":"https://three.ws"}}</script>
+
+	<meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1">
+	<meta property="og:locale" content="en_US">
+	<meta property="og:image:alt" content="Multi-LLM Brain — three.ws">
+	<meta name="twitter:site" content="@trythreews">
+</head>
+	<body>
+		<header><div id="nav-container"></div></header>
+
+		<div class="br-root">
+			<aside class="br-side" id="brSide">
+				<div class="br-side-head">
+					<span class="br-side-title" data-i18n="brain.sessions">Sessions</span>
+					<button class="br-side-new" id="brNewChat" type="button" title="New session" data-i18n="brain.new" data-i18n-attr="title:brain.new_session_title">+ New</button>
+				</div>
+				<div class="br-sessions" id="brSessions"></div>
+				<div class="br-side-persona" id="brSidePersona">
+					<span class="br-side-persona-label" data-i18n="brain.active_persona">Active Persona</span>
+					<div class="br-persona-mini" id="brPersonaMini">
+						<div class="br-persona-mini-tone" id="brMiniTone"></div>
+						<div class="br-persona-mini-style" id="brMiniStyle"></div>
+						<button class="br-persona-mini-clear" id="brMiniClear" type="button" data-i18n="brain.clear_persona">Clear persona</button>
+					</div>
+					<button class="br-btn br-btn-secondary br-btn-sm" id="brBuildPersonaBtn" style="width:100%" data-i18n="brain.build_persona">Build Persona</button>
+				</div>
+			</aside>
+			<div class="br-side-backdrop" id="brSideBackdrop"></div>
+
+			<div class="br-body">
+				<div class="br-topbar">
+					<button class="br-side-toggle" id="brSideToggle" type="button" aria-expanded="false" aria-controls="brSide" aria-label="Show sessions">☰</button>
+					<button class="br-tab active" type="button" data-tab="persona" data-i18n-html="brain.persona">Persona<span class="br-tab-badge" id="brPersonaBadge"></span></button>
+					<button class="br-tab" type="button" data-tab="playground" data-i18n="brain.playground">Playground</button>
+					<div class="br-topbar-right">
+						<button class="br-topbar-btn" id="brExport" type="button" data-i18n="brain.export">Export</button>
+						<a href="/dashboard/agents" class="br-topbar-btn" data-i18n="brain.my_agents">My Agents</a>
+					</div>
+				</div>
+
+				<!-- Persona panel -->
+				<div class="br-panel active" id="brPanelPersona">
+					<div class="br-persona">
+						<div class="br-persona-inner">
+
+							<!-- Agent target bar -->
+							<div class="br-agent-bar" id="brAgentBar">
+								<label class="br-agent-bar-label" for="brAgentSelect" data-i18n="brain.persona_for">Persona for</label>
+								<select class="br-agent-bar-sel" id="brAgentSelect" disabled>
+									<option value="" data-i18n="brain.loading_agents">Loading agents…</option>
+								</select>
+								<a href="/dashboard/agents" class="br-agent-bar-manage" data-i18n="brain.manage_agents">Manage agents</a>
+							</div>
+
+							<!-- Hero -->
+							<div class="br-persona-hero">
+								<h1 data-i18n="brain.pick_a_vibe">Pick a vibe</h1>
+								<p data-i18n="brain.one_tap_gives_your_agent_a_personality">One tap gives your agent a personality. No extra steps.</p>
+							</div>
+
+							<!-- Quick-pick archetypes — one tap = done -->
+							<div class="br-archetype-grid" id="brArchetypeGrid"></div>
+
+							<!-- Describe input -->
+							<div class="br-describe-section">
+								<div class="br-describe-divider"><span data-i18n="brain.or_describe_your_agent">or describe your agent</span></div>
+								<div class="br-describe-wrap">
+									<textarea class="br-describe-input" id="brDescribeInput"
+										aria-label="Describe your agent's personality"
+										placeholder="A sharp crypto trader who speaks plainly and hates buzzwords. Direct, a little sardonic, always on-chain."
+										rows="2"></textarea>
+									<div class="br-describe-hint">Press Enter to generate · Shift+Enter for new line</div>
+								</div>
+							</div>
+
+							<!-- Loading -->
+							<div class="br-loading" id="brLoading" role="status">
+								<div class="br-loading-spinner"></div>
+								<span data-i18n="brain.synthesizing_persona">Synthesizing persona…</span>
+							</div>
+
+							<!-- Status bar (replaces the full card for normal flow) -->
+							<div class="br-status-bar" id="brStatusBar">
+								<span class="br-status-icon">✓</span>
+								<span class="br-status-text" id="brStatusText"></span>
+								<div class="br-status-actions">
+									<button class="br-status-btn" id="brTestInPlayground" type="button" data-i18n="brain.test_it">Test it</button>
+									<button class="br-status-btn" id="brToggleAdvanced" type="button" data-i18n="brain.customize">Customize</button>
+									<button class="br-status-btn br-status-btn-clear" id="brResetPersona" type="button" data-i18n="brain.clear">Clear</button>
+								</div>
+							</div>
+
+							<!-- Advanced / full persona card (hidden by default) -->
+							<div class="br-persona-card" id="brPersonaCard">
+								<div class="br-pc-header">
+									<h3 data-i18n="brain.persona_details">Persona details</h3>
+									<div class="br-pc-header-actions">
+										<button class="br-btn br-btn-ghost br-btn-sm" id="brEditPersona" data-i18n="brain.edit">Edit</button>
+										<button class="br-btn br-btn-ghost br-btn-sm" id="brToggleRaw" data-i18n="brain.json">JSON</button>
+										<button class="br-btn br-btn-ghost br-btn-sm" id="brCopyJson" data-i18n="brain.copy">Copy</button>
+									</div>
+								</div>
+								<div class="br-pc-body" id="brPcBody">
+									<div class="br-pc-field">
+										<div class="br-pc-label">Tone</div>
+										<div class="br-pc-value" id="brPcTone"></div>
+									</div>
+									<div class="br-pc-field">
+										<div class="br-pc-label">Style</div>
+										<div class="br-pc-value"><span class="br-pc-badge" id="brPcStyle"></span></div>
+									</div>
+									<div class="br-pc-field">
+										<div class="br-pc-label">Vocabulary</div>
+										<div class="br-chips" id="brPcVocab"></div>
+									</div>
+									<div class="br-pc-field">
+										<div class="br-pc-label">Interests</div>
+										<div class="br-chips" id="brPcInterests"></div>
+									</div>
+									<div class="br-pc-field">
+										<div class="br-pc-label">Avoid</div>
+										<div class="br-chips" id="brPcDont"></div>
+									</div>
+									<div class="br-pc-field full">
+										<div class="br-pc-label">Sample Greeting</div>
+										<div class="br-pc-greeting" id="brPcGreet"></div>
+									</div>
+								</div>
+								<!-- Inline editor (hidden by default) -->
+								<div class="br-pc-edit-body" id="brPcEditBody" style="display:none">
+									<div class="br-edit-row">
+										<label class="br-edit-label" for="brEditTone" data-i18n="brain.tone">Tone</label>
+										<input class="br-edit-input" id="brEditTone" />
+									</div>
+									<div class="br-edit-row">
+										<label class="br-edit-label" for="brEditStyle" data-i18n="brain.style">Style</label>
+										<select class="br-agent-select" id="brEditStyle" style="width:100%">
+											<option value="terse" data-i18n="brain.terse">Terse</option>
+											<option value="detailed" data-i18n="brain.detailed">Detailed</option>
+											<option value="playful" data-i18n="brain.playful">Playful</option>
+											<option value="analytical" data-i18n="brain.analytical">Analytical</option>
+											<option value="warm" data-i18n="brain.warm">Warm</option>
+										</select>
+									</div>
+									<div class="br-edit-row">
+										<label class="br-edit-label" for="brEditVocab" data-i18n="brain.vocabulary">Vocabulary</label>
+										<input class="br-edit-input" id="brEditVocab" placeholder="Comma-separated" />
+									</div>
+									<div class="br-edit-row">
+										<label class="br-edit-label" for="brEditInterests" data-i18n="brain.interests">Interests</label>
+										<input class="br-edit-input" id="brEditInterests" placeholder="Comma-separated" />
+									</div>
+									<div class="br-edit-row">
+										<label class="br-edit-label" for="brEditDont" data-i18n="brain.don_t_say">Don't Say</label>
+										<input class="br-edit-input" id="brEditDont" placeholder="Comma-separated" />
+									</div>
+									<div class="br-edit-row">
+										<label class="br-edit-label" for="brEditGreet" data-i18n="brain.greeting">Greeting</label>
+										<textarea class="br-edit-textarea" id="brEditGreet" rows="2"></textarea>
+									</div>
+									<div class="br-actions" style="justify-content:flex-start">
+										<button class="br-btn br-btn-primary br-btn-sm" id="brSaveEdit" data-i18n="brain.save_changes">Save Changes</button>
+										<button class="br-btn br-btn-ghost br-btn-sm" id="brCancelEdit" data-i18n="brain.cancel">Cancel</button>
+									</div>
+								</div>
+								<div class="br-raw-json" id="brRawJson"></div>
+							</div>
+
+						</div>
+					</div>
+				</div>
+
+				<!-- Playground panel -->
+				<div class="br-panel" id="brPanelPlayground">
+					<div class="br-play">
+						<div class="br-play-bar" id="brPlayBar">
+							<div class="br-mode-toggle" role="group" aria-label="Playground mode">
+								<button class="br-mode-btn active" type="button" data-mode="compare" aria-pressed="true" data-i18n="brain.compare">Compare</button>
+								<button class="br-mode-btn" type="button" data-mode="chat" aria-pressed="false" data-i18n="brain.chat">Chat</button>
+							</div>
+							<span class="br-play-label" id="brPlayLabel" data-i18n="brain.models">Models</span>
+							<div id="brPlayControls"></div>
+						</div>
+						<div class="br-persona-banner" id="brPersonaBanner">
+							<span class="br-persona-banner-dot"></span>
+							Persona active: <strong id="brBannerTone"></strong>
+							<button class="br-persona-banner-dismiss" id="brBannerDismiss" type="button" data-i18n="brain.disable_for_session">Disable for session</button>
+						</div>
+						<div class="br-canvas" id="brCanvas"></div>
+						<div class="br-input-wrap">
+							<div class="br-notice" id="brNotice" role="status"></div>
+							<details class="br-sys-details" id="brSysDetails">
+								<summary data-i18n="brain.system_prompt">System prompt</summary>
+								<textarea class="br-sys-textarea" id="brSystem" aria-label="System prompt" placeholder="You are a helpful assistant..." rows="3"></textarea>
+							</details>
+							<div class="br-input-row">
+								<textarea class="br-prompt" id="brPrompt" aria-label="Message" placeholder="Send a message..." rows="1"></textarea>
+								<button class="br-send" id="brSend" type="button" data-i18n="brain.send">Send</button>
+							</div>
+							<div class="br-hint">Ctrl+Enter to send</div>
+						</div>
+					</div>
+				</div>
+			</div>
+		</div>
+
+		<div class="br-toast" id="brToast" role="status" aria-live="polite"></div>
+
+		<script src="/nav.js" defer></script>
+		<script type="module" src="/src/brain.js"></script>
+		<script src="/brand.js" defer></script>
+	<!-- Runtime i18n: detects locale, swaps annotated copy, mounts <lang-switcher>. -->
+	<script type="module" src="/i18n.js"></script>
+</body>
+</html>

@@ -1,0 +1,588 @@
+<!doctype html>
+<html lang="en">
+	<head>
+		<script>
+			/* three.ws theme boot — no-flash; runtime in /theme-switcher.js */ (function () {
+				try {
+					var m = localStorage.getItem('twx_theme');
+					var l =
+						m === 'auto'
+							? window.matchMedia && window.matchMedia('(prefers-color-scheme: light)').matches
+							: m === 'light';
+					document.documentElement.setAttribute('data-theme', l ? 'light' : 'dark');
+				} catch (e) {
+					document.documentElement.setAttribute('data-theme', 'dark');
+				}
+			})();
+		</script>
+		<meta charset="utf-8" />
+		<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+		<title data-i18n="bnb_latency.meta_title">BNB Chain live block race — 0.45s vs Base, Ethereum, Solana · three.ws</title>
+		<meta
+			name="description"
+			content="A live, honest block race: BNB Chain's ~0.45s blocks measured right now against Base, Ethereum, and Solana off real public RPCs. No wallet, no payment, no hardcoded numbers — every figure is a fresh on-chain measurement."
+		 data-i18n-attr="content:bnb_latency.meta_description"/>
+		<meta property="og:type" content="website" />
+		<meta property="og:site_name" content="three.ws" />
+		<meta property="og:url" content="https://three.ws/bnb-latency" />
+		<meta property="og:title" content="BNB Chain live block race · three.ws"  data-i18n-attr="content:bnb_latency.meta_og_title"/>
+		<meta
+			property="og:description"
+			content="Watch BNB Chain confirm blocks in real time next to Base, Ethereum, and Solana — measured live off public RPCs, never a hardcoded '0.45s'."
+		 data-i18n-attr="content:bnb_latency.meta_og_description"/>
+		<meta
+			property="og:image"
+			content="https://three.ws/api/page-og?s=crypto&amp;t=BNB+Chain+Live+Block+Race%3A+0.45s+vs+Base%2C+Ethereum%2C+Solana&amp;d=A+live%2C+honest+race%3A+BNB+Chain%2C+Base%2C+Ethereum%2C+and+Solana+block+times+measured+fresh+off+real+public+RPCs+every+few+seconds%2C+with+a+rolling+sparkline+per&amp;p=%2Fbnb-latency"
+		/>
+		<meta property="og:image:width" content="1200" />
+		<meta property="og:image:height" content="630" />
+		<meta name="twitter:card" content="summary_large_image" />
+		<meta name="twitter:site" content="@trythreews" />
+		<meta name="twitter:title" content="BNB Chain live block race · three.ws"  data-i18n-attr="content:bnb_latency.meta_twitter_title"/>
+		<meta
+			name="twitter:description"
+			content="Watch BNB Chain confirm blocks in real time next to Base, Ethereum, and Solana — measured live off public RPCs, never a hardcoded '0.45s'."
+		 data-i18n-attr="content:bnb_latency.meta_twitter_description"/>
+		<meta
+			name="twitter:image"
+			content="https://three.ws/api/page-og?s=crypto&amp;t=BNB+Chain+Live+Block+Race%3A+0.45s+vs+Base%2C+Ethereum%2C+Solana&amp;d=A+live%2C+honest+race%3A+BNB+Chain%2C+Base%2C+Ethereum%2C+and+Solana+block+times+measured+fresh+off+real+public+RPCs+every+few+seconds%2C+with+a+rolling+sparkline+per&amp;p=%2Fbnb-latency"
+		/>
+		<meta name="theme-color" content="#09090b" />
+		<link rel="icon" href="/favicon.ico" sizes="any" />
+		<link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+		<link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+		<link rel="manifest" href="/manifest.webmanifest" />
+		<link rel="stylesheet" href="/fonts/fonts.css" />
+		<link rel="stylesheet" href="/style.css" />
+		<link rel="stylesheet" href="/nav.css" />
+		<link rel="stylesheet" href="/footer.css" />
+		<link rel="canonical" href="https://three.ws/bnb-latency" />
+		<meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1" />
+		<meta property="og:locale" content="en_US" />
+		<meta property="og:image:alt" content="BNB Chain × three.ws — live block race" />
+
+		<script type="application/ld+json">
+			{
+				"@context": "https://schema.org",
+				"@graph": [
+					{
+						"@type": "WebPage",
+						"name": "BNB Chain live block race",
+						"description": "A live, honest race showing BNB Chain confirming blocks next to Base, Ethereum, and Solana — every number measured fresh off public RPCs, no hardcoded claims.",
+						"url": "https://three.ws/bnb-latency",
+						"isPartOf": { "@type": "WebSite", "name": "three.ws", "url": "https://three.ws" }
+					}
+				]
+			}
+		</script>
+
+		<style>
+			:root {
+				color-scheme: dark;
+			}
+			:root[data-theme='light'] {
+				color-scheme: light;
+			}
+			.bnbl-wrap {
+				max-width: 1180px;
+				margin: 0 auto;
+				padding: 0 24px;
+			}
+			@media (max-width: 600px) {
+				.bnbl-wrap {
+					padding: 0 16px;
+				}
+			}
+
+			/* ── Hero ─────────────────────────────────────────────────────── */
+			.bnbl-hero {
+				padding: 76px 0 36px;
+				border-bottom: 1px solid var(--stroke, rgba(255, 255, 255, 0.08));
+			}
+			.bnbl-eyebrow {
+				display: inline-flex;
+				align-items: center;
+				gap: 8px;
+				font-size: 12px;
+				font-weight: 600;
+				letter-spacing: 0.1em;
+				text-transform: uppercase;
+				color: var(--gold, #f0b90b);
+				margin: 0 0 16px;
+			}
+			.bnbl-eyebrow .dot {
+				width: 6px;
+				height: 6px;
+				border-radius: 50%;
+				background: #f0b90b;
+			}
+			.bnbl-eyebrow a {
+				color: inherit;
+				text-decoration: underline;
+				text-underline-offset: 2px;
+			}
+			.bnbl-hero h1 {
+				font-family: var(--font-display, 'Space Grotesk', system-ui, sans-serif);
+				font-size: clamp(30px, 4.6vw, 50px);
+				font-weight: 700;
+				letter-spacing: -0.03em;
+				line-height: 1.08;
+				margin: 0 0 18px;
+				max-width: 20ch;
+			}
+			.bnbl-hero p.lede {
+				font-size: 16px;
+				line-height: 1.65;
+				color: var(--ink-dim, #888);
+				margin: 0;
+				max-width: 66ch;
+			}
+
+			/* ── Headline number ──────────────────────────────────────────── */
+			.bnbl-headline {
+				padding: 36px 0;
+				border-bottom: 1px solid var(--stroke, rgba(255, 255, 255, 0.08));
+			}
+			.bnbl-headline-card {
+				display: flex;
+				flex-wrap: wrap;
+				align-items: baseline;
+				justify-content: space-between;
+				gap: 16px 28px;
+				padding: 26px 28px;
+				border: 1px solid var(--stroke, rgba(255, 255, 255, 0.08));
+				border-radius: var(--radius-card, 14px);
+				background: var(--surface-1, rgba(255, 255, 255, 0.03));
+			}
+			.bnbl-headline-num {
+				font-family: var(--font-mono, ui-monospace, monospace);
+				font-size: clamp(36px, 7vw, 72px);
+				font-weight: 700;
+				line-height: 1;
+				color: var(--ink, #e8e8e8);
+				white-space: nowrap;
+				max-width: 100%;
+			}
+			@media (max-width: 380px) {
+				.bnbl-headline-num {
+					white-space: normal;
+				}
+			}
+			.bnbl-headline-num .unit {
+				font-size: 0.32em;
+				color: var(--ink-dim, #888);
+				font-weight: 500;
+				margin-left: 6px;
+			}
+			/* A reading whose chain has gone quiet: dimmed so it can never be
+			   mistaken for the live number, and paired with its age in the
+			   sub-line below. */
+			.bnbl-headline-num.bnbl-stale {
+				opacity: 0.45;
+			}
+			.bnbl-headline-sub {
+				font-size: 13.5px;
+				color: var(--ink-dim, #888);
+				max-width: 46ch;
+				line-height: 1.6;
+			}
+			#bnbl-updated {
+				font-family: var(--font-mono, ui-monospace, monospace);
+				font-size: 12px;
+				color: var(--ink-faint, rgba(255, 255, 255, 0.4));
+				white-space: nowrap;
+			}
+
+			/* ── Page error (all lanes down) ─────────────────────────────── */
+			.bnbl-page-error {
+				margin: 36px 0 0;
+				padding: 20px 24px;
+				border: 1px solid rgba(251, 191, 36, 0.25);
+				border-radius: var(--radius-card, 14px);
+				background: rgba(251, 191, 36, 0.06);
+				display: flex;
+				flex-wrap: wrap;
+				align-items: center;
+				gap: 14px;
+				/* Keep Retry beside its message rather than pushed to the right
+				   edge: the shared bottom-right corner stack (public/corner-stack.js)
+				   floats over that column, and at common viewport heights it was
+				   swallowing clicks on the only recovery control this page has. */
+				justify-content: flex-start;
+			}
+			.bnbl-page-error p {
+				margin: 0;
+				font-size: 14px;
+				color: var(--ink, #e8e8e8);
+				max-width: 56ch;
+				line-height: 1.6;
+			}
+			.bnbl-retry {
+				padding: 8px 18px;
+				border-radius: var(--radius-control, 10px);
+				border: 1px solid var(--stroke-strong, rgba(255, 255, 255, 0.14));
+				background: var(--surface-2, rgba(255, 255, 255, 0.05));
+				color: var(--ink, #e8e8e8);
+				font-family: inherit;
+				font-size: 13px;
+				cursor: pointer;
+				transition: background var(--duration-fast);
+				flex-shrink: 0;
+			}
+			.bnbl-retry:hover {
+				background: rgba(255, 255, 255, 0.1);
+			}
+			.bnbl-retry:active {
+				transform: translateY(1px);
+			}
+			.bnbl-retry:focus-visible {
+				outline: 2px solid rgba(255, 255, 255, 0.4);
+				outline-offset: 2px;
+			}
+			.bnbl-retry:disabled {
+				opacity: 0.55;
+				cursor: progress;
+			}
+			.bnbl-retry:disabled:hover {
+				background: var(--surface-2, rgba(255, 255, 255, 0.05));
+			}
+
+			/* ── Race grid ────────────────────────────────────────────────── */
+			.bnbl-race-section {
+				padding: 44px 0 24px;
+			}
+			.bnbl-section-heading {
+				font-family: var(--font-display, 'Space Grotesk', system-ui, sans-serif);
+				font-size: 20px;
+				font-weight: 700;
+				letter-spacing: -0.01em;
+				margin: 0 0 8px;
+			}
+			.bnbl-section-sub {
+				font-size: 13.5px;
+				color: var(--ink-dim, #888);
+				margin: 0 0 28px;
+				max-width: 68ch;
+				line-height: 1.6;
+			}
+			.bnbl-grid {
+				display: grid;
+				grid-template-columns: repeat(4, 1fr);
+				gap: 16px;
+			}
+			@media (max-width: 1040px) {
+				.bnbl-grid {
+					grid-template-columns: repeat(2, 1fr);
+				}
+			}
+			@media (max-width: 560px) {
+				.bnbl-grid {
+					grid-template-columns: 1fr;
+				}
+			}
+			.bnbl-lane {
+				display: flex;
+				flex-direction: column;
+				gap: 10px;
+				padding: 20px 20px 18px;
+				border: 1px solid var(--stroke, rgba(255, 255, 255, 0.08));
+				border-radius: var(--radius-card, 14px);
+				background: var(--surface-1, rgba(255, 255, 255, 0.03));
+				transition: border-color var(--duration-fast), box-shadow var(--duration-fast);
+			}
+			.bnbl-lane[data-state='live'] {
+				border-color: rgba(74, 222, 128, 0.22);
+			}
+			.bnbl-lane[data-state='reconnecting'] {
+				border-color: rgba(251, 191, 36, 0.25);
+			}
+			.bnbl-lane.bnbl-tick {
+				animation: bnbl-tick-flash 0.5s ease-out;
+			}
+			@media (prefers-reduced-motion: reduce) {
+				.bnbl-lane.bnbl-tick {
+					animation: none;
+				}
+			}
+			@keyframes bnbl-tick-flash {
+				0% {
+					box-shadow: 0 0 0 1px rgba(74, 222, 128, 0.45);
+				}
+				100% {
+					box-shadow: 0 0 0 1px transparent;
+				}
+			}
+			.bnbl-lane-head {
+				display: flex;
+				align-items: center;
+				justify-content: space-between;
+				gap: 10px;
+			}
+			.bnbl-lane-name {
+				font-family: var(--font-display, 'Space Grotesk', system-ui, sans-serif);
+				font-size: 15px;
+				font-weight: 650;
+				color: var(--ink, #e8e8e8);
+			}
+			.bnbl-lane-status {
+				display: inline-flex;
+				align-items: center;
+				gap: 5px;
+				font-size: 10.5px;
+				font-weight: 500;
+				padding: 3px 8px;
+				border-radius: 999px;
+				white-space: nowrap;
+				flex-shrink: 0;
+			}
+			.bnbl-lane-status::before {
+				content: '';
+				width: 6px;
+				height: 6px;
+				border-radius: 50%;
+				flex-shrink: 0;
+			}
+			.bnbl-lane-status[data-state='live'] {
+				background: rgba(74, 222, 128, 0.1);
+				color: var(--success);
+				border: 1px solid rgba(74, 222, 128, 0.2);
+			}
+			.bnbl-lane-status[data-state='live']::before {
+				background: var(--success);
+			}
+			.bnbl-lane-status[data-state='reconnecting'] {
+				background: rgba(251, 191, 36, 0.1);
+				color: var(--warn);
+				border: 1px solid rgba(251, 191, 36, 0.2);
+				animation: bnbl-pulse 1.8s ease-in-out infinite;
+			}
+			.bnbl-lane-status[data-state='reconnecting']::before {
+				background: var(--warn);
+			}
+			.bnbl-lane-status[data-state='measuring'] {
+				background: var(--surface-2, rgba(255, 255, 255, 0.05));
+				color: var(--ink-dim, #888);
+				border: 1px solid var(--stroke, rgba(255, 255, 255, 0.08));
+				animation: bnbl-pulse 1.8s ease-in-out infinite;
+			}
+			.bnbl-lane-status[data-state='measuring']::before {
+				background: var(--ink-dim, #888);
+			}
+			@media (prefers-reduced-motion: reduce) {
+				.bnbl-lane-status[data-state='reconnecting'],
+				.bnbl-lane-status[data-state='measuring'] {
+					animation: none;
+				}
+			}
+			@keyframes bnbl-pulse {
+				0%,
+				100% {
+					opacity: 1;
+				}
+				50% {
+					opacity: 0.45;
+				}
+			}
+			.bnbl-lane-kicker {
+				font-family: var(--font-mono, ui-monospace, monospace);
+				font-size: 10.5px;
+				color: var(--ink-dim, #888);
+				text-transform: uppercase;
+				letter-spacing: 0.04em;
+				margin: 0;
+			}
+			.bnbl-lane-num {
+				font-family: var(--font-mono, ui-monospace, monospace);
+				font-size: 30px;
+				font-weight: 700;
+				line-height: 1;
+				color: var(--ink, #e8e8e8);
+				min-height: 34px;
+				display: flex;
+				align-items: center;
+			}
+			.bnbl-lane-num .unit {
+				font-size: 0.36em;
+				color: var(--ink-dim, #888);
+				font-weight: 500;
+				margin-left: 5px;
+			}
+			.bnbl-lane-num-stale {
+				opacity: 0.4;
+			}
+			.bnbl-spinner {
+				width: 16px;
+				height: 16px;
+				border-radius: 50%;
+				border: 2px solid var(--stroke-strong, rgba(255, 255, 255, 0.14));
+				border-top-color: var(--ink, #e8e8e8);
+				animation: bnbl-spin 0.8s linear infinite;
+				flex-shrink: 0;
+			}
+			@media (prefers-reduced-motion: reduce) {
+				.bnbl-spinner {
+					animation: none;
+					border-top-color: var(--stroke-strong, rgba(255, 255, 255, 0.14));
+				}
+			}
+			@keyframes bnbl-spin {
+				to {
+					transform: rotate(360deg);
+				}
+			}
+			.bnbl-sparkline {
+				display: flex;
+				align-items: flex-end;
+				gap: 2px;
+				height: 32px;
+			}
+			.bnbl-bar {
+				flex: 1 1 auto;
+				min-width: 2px;
+				background: var(--ink-faint, rgba(255, 255, 255, 0.22));
+				border-radius: 1px;
+				transition: height var(--duration-base) var(--ease-out);
+			}
+			@media (prefers-reduced-motion: reduce) {
+				.bnbl-bar {
+					transition: none;
+				}
+			}
+			.bnbl-lane[data-state='live'] .bnbl-bar {
+				background: rgba(74, 222, 128, 0.55);
+			}
+			.bnbl-sparkline-empty {
+				font-size: 11px;
+				color: var(--ink-faint, rgba(255, 255, 255, 0.3));
+			}
+			.bnbl-lane-meta {
+				font-size: 11.5px;
+				color: var(--ink-dim, #888);
+				margin: 0;
+				line-height: 1.5;
+			}
+
+			/* ── Honesty footer ───────────────────────────────────────────── */
+			.bnbl-honesty {
+				padding: 36px 0 80px;
+			}
+			.bnbl-honesty-card {
+				padding: 22px 24px;
+				border: 1px solid var(--stroke, rgba(255, 255, 255, 0.08));
+				border-radius: var(--radius-card, 14px);
+				background: var(--surface-1, rgba(255, 255, 255, 0.03));
+			}
+			.bnbl-honesty-card h3 {
+				font-size: 14px;
+				font-weight: 600;
+				margin: 0 0 10px;
+			}
+			.bnbl-honesty-card ul {
+				margin: 0;
+				padding-left: 18px;
+				display: flex;
+				flex-direction: column;
+				gap: 6px;
+			}
+			.bnbl-honesty-card li {
+				font-size: 12.5px;
+				line-height: 1.6;
+				color: var(--ink-dim, #888);
+			}
+			.bnbl-honesty-card code {
+				font-family: var(--font-mono, ui-monospace, monospace);
+				background: var(--surface-2, rgba(255, 255, 255, 0.05));
+				padding: 1px 5px;
+				border-radius: 4px;
+				font-size: 11.5px;
+			}
+			.bnbl-honesty-card a {
+				color: var(--ink, #e8e8e8);
+			}
+		</style>
+	</head>
+	<body>
+		<header><div id="nav-container"></div></header>
+		<script src="/nav.js" defer></script>
+
+		<main id="main-content">
+			<div class="bnbl-wrap">
+				<!-- Hero -->
+				<section class="bnbl-hero" aria-labelledby="bnbl-heading">
+					<p class="bnbl-eyebrow" data-i18n-html="bnb_latency.bnb_chain_three_ws">
+						<span class="dot" aria-hidden="true"></span><a href="/bnb">BNB Chain × three.ws</a>
+					</p>
+					<h1 id="bnbl-heading" data-i18n="bnb_latency.watch_bnb_chain_confirm_blocks_in_real">Watch BNB Chain confirm blocks in real time.</h1>
+					<p class="lede" data-i18n="bnb_latency.four_lanes_one_honest_race_bnb_chain">
+						Four lanes, one honest race: BNB Chain, Base, Ethereum, and Solana, each measured live off a
+						public RPC every few seconds — never a hardcoded "0.45s." A lane that goes quiet shows
+						"reconnecting," not a frozen fake number, while the others keep racing.
+					</p>
+				</section>
+
+				<!-- Headline BNB number -->
+				<section class="bnbl-headline" aria-label="Live BNB Chain block-time headline">
+					<div class="bnbl-headline-card">
+						<div>
+							<div class="bnbl-headline-num" id="bnbl-headline-num">
+								<span class="bnbl-spinner" aria-hidden="true"></span>
+							</div>
+							<p class="bnbl-headline-sub" id="bnbl-headline-sub" data-i18n="bnb_latency.measuring_live_bnb_chain_block_time_from">
+								Measuring live BNB Chain block time from a public RPC…
+							</p>
+						</div>
+						<span id="bnbl-updated"></span>
+					</div>
+					<div class="bnbl-page-error" id="bnbl-page-error" role="alert" hidden>
+						<p data-i18n="bnb_latency.every_chain_s_public_rpc_is_unreachable">
+							Every chain's public RPC is unreachable right now — this is a real outage, not a bug.
+							Retry, or check back shortly.
+						</p>
+						<button class="bnbl-retry" id="bnbl-retry" type="button" data-i18n="bnb_latency.retry">Retry</button>
+					</div>
+				</section>
+
+				<!-- Race lanes -->
+				<section class="bnbl-race-section" id="bnbl-race" aria-label="Live block-race lanes">
+					<h2 class="bnbl-section-heading" data-i18n="bnb_latency.the_race_lane_by_lane">The race, lane by lane</h2>
+					<p class="bnbl-section-sub" data-i18n="bnb_latency.each_card_samples_real_blocks_or_slots">
+						Each card samples real blocks (or slots, for Solana) off a public RPC and reports the
+						measured average interval — the sparkline is the last 24 live readings, tallest bar = fastest
+						measurement.
+					</p>
+					<div class="bnbl-grid" id="bnbl-grid"></div>
+				</section>
+
+				<!-- Honesty / methodology -->
+				<section class="bnbl-honesty" aria-label="How this race is measured">
+					<div class="bnbl-honesty-card">
+						<h3 data-i18n="bnb_latency.how_we_keep_this_race_honest">How we keep this race honest</h3>
+						<ul>
+							<li data-i18n-html="bnb_latency.every_number_comes_from_which_samples_real">
+								Every number comes from <code>/api/bnb/latency</code>, which samples real blocks (BNB
+								via <code>probeBlockTime</code>, the same function backing the
+								<a href="/bnb">/bnb hub</a>'s proof strip) off public RPCs on every poll — nothing is
+								precomputed or hardcoded.
+							</li>
+							<li data-i18n="bnb_latency.we_never_claim_bnb_s_roadmap_targets">
+								We never claim BNB's roadmap targets — 20,000 TPS or BEP-670's 250ms finality — as
+								shipped. This page only shows what it measured itself, right now.
+							</li>
+							<li data-i18n="bnb_latency.a_chain_s_rpc_going_quiet_shows">
+								A chain's RPC going quiet shows "reconnecting" on that lane only; the rest of the race
+								keeps running. All four down at once shows a designed error with a retry, never a
+								blank page.
+							</li>
+						</ul>
+					</div>
+				</section>
+			</div>
+		</main>
+
+		<div id="footer-container"></div>
+		<script type="module" src="/src/bnb-latency.js"></script>
+		<script src="/footer.js" defer></script>
+		<!-- Runtime i18n: detects locale, swaps annotated copy, mounts <lang-switcher>. -->
+	<script type="module" src="/i18n.js"></script>
+</body>
+</html>

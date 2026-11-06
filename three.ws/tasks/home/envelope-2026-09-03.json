@@ -1,0 +1,474 @@
+{
+  "measuredAt": "2026-09-03T04:42:39.739Z",
+  "machine": {
+    "node": "v24.14.0",
+    "platform": "linux 6.8.0-1052-azure",
+    "cpus": 16,
+    "cpuModel": "AMD EPYC 7763 64-Core Processor",
+    "totalMemBytes": 67427409920,
+    "freeMemBytes": 10242940928,
+    "ulimitNofile": 524288,
+    "loadAverage": [
+      206.75,
+      203.65,
+      189.5
+    ]
+  },
+  "fleet": {
+    "image": "ghcr.io/home-assistant/home-assistant:stable",
+    "houses": 12,
+    "small": 11,
+    "large": 1,
+    "entitiesPerSmallHouse": 117,
+    "entitiesPerLargeHouse": 624,
+    "haBootMs": {
+      "n": 12,
+      "min": 11053,
+      "p50": 17117,
+      "p95": 45587,
+      "p99": 45587,
+      "max": 45587,
+      "mean": 18912.08
+    },
+    "realNote": "Every house is a real Home Assistant container with a real long-lived access token, started by scripts/home-fleet.mjs. Connections are real WebSocket sessions through home-assistant-js-websocket, the same client the product uses."
+  },
+  "coldStart": {
+    "bootToModulesReadyMs": 3165,
+    "connectMs": 551.7,
+    "totalToFirstConnectedHomeMs": 3716.7,
+    "entities": 123,
+    "rooms": 7,
+    "note": "Measured in a freshly spawned node process. bootToModulesReadyMs covers node start plus this harness module graph; the API container loads more than this and its own cold start is measured separately in docs/home-operations.md."
+  },
+  "connections": [
+    {
+      "requested": 10,
+      "connected": 10,
+      "loadAverage": [
+        224.14,
+        208,
+        191.31
+      ],
+      "failures": [],
+      "house": "small",
+      "entitiesHeld": 1230,
+      "entitiesPerConnection": 123,
+      "roomsHeld": 70,
+      "openMs": 831.5,
+      "openMsPerConnection": 83.15,
+      "heapUsedDelta": 4166240,
+      "heapPerConnection": 416624,
+      "rssDelta": 26902528,
+      "rssPerConnection": 2690253,
+      "externalDelta": 365638,
+      "fdBefore": 22,
+      "fdAfter": 32,
+      "fdPerConnection": 1,
+      "openCpuMs": 323.5,
+      "idleCpuMsPer10s": 19.1,
+      "idleCpuMsPerConnectionPerMinute": 11.477,
+      "actionLatencyMs": {
+        "n": 40,
+        "min": 2.07,
+        "p50": 3.75,
+        "p95": 12.25,
+        "p99": 14.36,
+        "max": 14.36,
+        "mean": 5.08
+      },
+      "heapAfterCloseDelta": 1639104,
+      "heapRetainedPerConnection": 163910,
+      "fdAfterClose": 22
+    },
+    {
+      "requested": 50,
+      "connected": 50,
+      "loadAverage": [
+        233.32,
+        211.57,
+        192.94
+      ],
+      "failures": [],
+      "house": "small",
+      "entitiesHeld": 6150,
+      "entitiesPerConnection": 123,
+      "roomsHeld": 350,
+      "openMs": 1865.5,
+      "openMsPerConnection": 37.31,
+      "heapUsedDelta": 14322552,
+      "heapPerConnection": 286451,
+      "rssDelta": 52539392,
+      "rssPerConnection": 1050788,
+      "externalDelta": 1021318,
+      "fdBefore": 22,
+      "fdAfter": 72,
+      "fdPerConnection": 1,
+      "openCpuMs": 685,
+      "idleCpuMsPer10s": 30.3,
+      "idleCpuMsPerConnectionPerMinute": 3.638,
+      "actionLatencyMs": {
+        "n": 40,
+        "min": 3.48,
+        "p50": 9.67,
+        "p95": 43.53,
+        "p99": 55.67,
+        "max": 55.67,
+        "mean": 14.04
+      },
+      "heapAfterCloseDelta": 1857184,
+      "heapRetainedPerConnection": 37144,
+      "fdAfterClose": 22
+    },
+    {
+      "requested": 100,
+      "connected": 100,
+      "loadAverage": [
+        231,
+        212.89,
+        193.88
+      ],
+      "failures": [],
+      "house": "small",
+      "entitiesHeld": 12300,
+      "entitiesPerConnection": 123,
+      "roomsHeld": 700,
+      "openMs": 2277.7,
+      "openMsPerConnection": 22.78,
+      "heapUsedDelta": 26611128,
+      "heapPerConnection": 266111,
+      "rssDelta": 96821248,
+      "rssPerConnection": 968212,
+      "externalDelta": 1840918,
+      "fdBefore": 22,
+      "fdAfter": 122,
+      "fdPerConnection": 1,
+      "openCpuMs": 1062.1,
+      "idleCpuMsPer10s": 50.4,
+      "idleCpuMsPerConnectionPerMinute": 3.023,
+      "actionLatencyMs": {
+        "n": 40,
+        "min": 3.16,
+        "p50": 14.35,
+        "p95": 52.92,
+        "p99": 105.79,
+        "max": 105.79,
+        "mean": 20.59
+      },
+      "heapAfterCloseDelta": 1915368,
+      "heapRetainedPerConnection": 19154,
+      "fdAfterClose": 22
+    },
+    {
+      "requested": 200,
+      "connected": 200,
+      "loadAverage": [
+        227.1,
+        213.38,
+        194.55
+      ],
+      "failures": [],
+      "house": "small",
+      "entitiesHeld": 24600,
+      "entitiesPerConnection": 123,
+      "roomsHeld": 1400,
+      "openMs": 3702.6,
+      "openMsPerConnection": 18.51,
+      "heapUsedDelta": 51220384,
+      "heapPerConnection": 256102,
+      "rssDelta": 146649088,
+      "rssPerConnection": 733245,
+      "externalDelta": 3480118,
+      "fdBefore": 22,
+      "fdAfter": 222,
+      "fdPerConnection": 1,
+      "openCpuMs": 1982.4,
+      "idleCpuMsPer10s": 118.5,
+      "idleCpuMsPerConnectionPerMinute": 3.555,
+      "actionLatencyMs": {
+        "n": 40,
+        "min": 8.59,
+        "p50": 15.5,
+        "p95": 49.82,
+        "p99": 103.58,
+        "max": 103.58,
+        "mean": 24.21
+      },
+      "heapAfterCloseDelta": 1952880,
+      "heapRetainedPerConnection": 9764,
+      "fdAfterClose": 22
+    },
+    {
+      "requested": 400,
+      "connected": 400,
+      "loadAverage": [
+        220.04,
+        212.82,
+        194.86
+      ],
+      "failures": [],
+      "house": "small",
+      "entitiesHeld": 49200,
+      "entitiesPerConnection": 123,
+      "roomsHeld": 2800,
+      "openMs": 2421.8,
+      "openMsPerConnection": 6.05,
+      "heapUsedDelta": 100520072,
+      "heapPerConnection": 251300,
+      "rssDelta": 263565312,
+      "rssPerConnection": 658913,
+      "externalDelta": 6758518,
+      "fdBefore": 22,
+      "fdAfter": 422,
+      "fdPerConnection": 1,
+      "openCpuMs": 3393.2,
+      "idleCpuMsPer10s": 309.1,
+      "idleCpuMsPerConnectionPerMinute": 4.637,
+      "actionLatencyMs": {
+        "n": 40,
+        "min": 5.82,
+        "p50": 10.13,
+        "p95": 18.54,
+        "p99": 28.46,
+        "max": 28.46,
+        "mean": 11.89
+      },
+      "heapAfterCloseDelta": 2052040,
+      "heapRetainedPerConnection": 5130,
+      "fdAfterClose": 22
+    }
+  ],
+  "ladder": {
+    "rows": [
+      {
+        "label": "rung 1: acquire under the cap",
+        "admitted": true,
+        "rung": "normal",
+        "connection": "pooled",
+        "source": null,
+        "requiresConfirmation": null,
+        "retryAfterSeconds": null,
+        "reason": null
+      },
+      {
+        "label": "rung 2: acquire at the cap",
+        "admitted": true,
+        "rung": "unpooled",
+        "connection": "unpooled",
+        "source": null,
+        "requiresConfirmation": null,
+        "retryAfterSeconds": null,
+        "reason": "This instance is at its pooled connection cap, so this home got a short-lived connection. It works the same and takes longer to open."
+      },
+      {
+        "label": "rung 2: read is still from the database",
+        "admitted": true,
+        "rung": "unpooled",
+        "connection": null,
+        "source": "database",
+        "requiresConfirmation": null,
+        "retryAfterSeconds": null,
+        "reason": null
+      },
+      {
+        "label": "rung 3: read with the database down",
+        "admitted": true,
+        "rung": "degraded_read",
+        "connection": null,
+        "source": "graph",
+        "requiresConfirmation": null,
+        "retryAfterSeconds": null,
+        "reason": "Showing live state from this instance. Saved history is briefly unavailable."
+      },
+      {
+        "label": "rung 3: write policy with the database down",
+        "attempt": true,
+        "persistAudit": false
+      },
+      {
+        "label": "rung 4: stream while 3 of 8 actions are in flight",
+        "admitted": true,
+        "rung": "unpooled",
+        "connection": null,
+        "source": null,
+        "requiresConfirmation": null,
+        "retryAfterSeconds": null,
+        "reason": null
+      },
+      {
+        "label": "rung 4: stream once actions pass the yield floor",
+        "admitted": false,
+        "rung": "shed_streams",
+        "connection": null,
+        "source": null,
+        "requiresConfirmation": null,
+        "retryAfterSeconds": 5,
+        "reason": "Live updates are paused while this instance finishes the actions people asked for. The page will reconnect on its own."
+      },
+      {
+        "label": "rung 4: an action at the same moment",
+        "admitted": true,
+        "rung": "shed_streams",
+        "connection": null,
+        "source": null,
+        "requiresConfirmation": false,
+        "retryAfterSeconds": null,
+        "reason": null
+      },
+      {
+        "label": "rung 5: an action with every slot taken",
+        "admitted": false,
+        "rung": "shed",
+        "connection": null,
+        "source": null,
+        "requiresConfirmation": false,
+        "retryAfterSeconds": 5,
+        "reason": "This instance is busy. Nothing was sent to your home, so nothing is half done. Try again in a moment."
+      },
+      {
+        "label": "rung 5: a GUARDED action with every slot taken",
+        "admitted": false,
+        "rung": "shed",
+        "connection": null,
+        "source": null,
+        "requiresConfirmation": true,
+        "retryAfterSeconds": 5,
+        "reason": "This instance is busy. Nothing was sent to your home, so nothing is half done. Try again in a moment."
+      }
+    ],
+    "finalSnapshot": {
+      "rung": "shed",
+      "databaseHealthy": true,
+      "pooled": 4,
+      "unpooled": 1,
+      "streams": 1,
+      "inflightActions": 8,
+      "limits": {
+        "maxPooled": 4,
+        "maxUnpooled": 2,
+        "maxStreams": 6,
+        "maxInflightActions": 8,
+        "streamYieldRatio": 0.5,
+        "retryAfterSeconds": 5
+      },
+      "saturation": {
+        "pooled": 1,
+        "streams": 0.16666666666666666,
+        "actions": 1
+      },
+      "counters": {
+        "streamsShed": 1,
+        "actionsShed": 8,
+        "unpooledOpened": 1,
+        "acquisitionsShed": 0,
+        "degradedReads": 1
+      }
+    }
+  },
+  "largeHouse": {
+    "requested": 10,
+    "connected": 10,
+    "loadAverage": [
+      214.31,
+      212.05,
+      195
+    ],
+    "failures": [],
+    "house": "large",
+    "entitiesHeld": 6240,
+    "entitiesPerConnection": 624,
+    "roomsHeld": 70,
+    "openMs": 239.9,
+    "openMsPerConnection": 23.99,
+    "heapUsedDelta": 8766728,
+    "heapPerConnection": 876673,
+    "rssDelta": 44867584,
+    "rssPerConnection": 4486758,
+    "externalDelta": 365638,
+    "fdBefore": 22,
+    "fdAfter": 32,
+    "fdPerConnection": 1,
+    "openCpuMs": 414.1,
+    "idleCpuMsPer10s": 31,
+    "idleCpuMsPerConnectionPerMinute": 18.6,
+    "actionLatencyMs": {
+      "n": 40,
+      "min": 3.33,
+      "p50": 4.97,
+      "p95": 8.83,
+      "p99": 11.51,
+      "max": 11.51,
+      "mean": 5.55
+    },
+    "heapAfterCloseDelta": 1679632,
+    "heapRetainedPerConnection": 167963,
+    "fdAfterClose": 22
+  },
+  "burst": {
+    "connectionsHeld": 1,
+    "houseEntities": 624,
+    "houseRooms": 7,
+    "updates": 100,
+    "dispatchMs": 57,
+    "absorbMs": 3059.2,
+    "cpuMs": 44.1,
+    "cpuMsPerUpdate": 0.441,
+    "graphRebuilds": 1,
+    "coalescingRatio": 100,
+    "heapDeltaAcrossBurst": 48064,
+    "graphRebuildMs": {
+      "n": 30,
+      "min": 0.257,
+      "p50": 0.493,
+      "p95": 1.02,
+      "p99": 1.268,
+      "max": 1.268,
+      "mean": 0.55
+    },
+    "note": "cpuMs covers the whole absorb window: the 100 outbound service calls, the state pushes they caused, and every graph rebuild that survived coalescing."
+  },
+  "sse": {
+    "subscribersRequested": 200,
+    "subscribersAttached": 200,
+    "heapDelta": 7983992,
+    "heapPerSubscriber": 39920,
+    "rssDelta": 29282304,
+    "rssPerSubscriber": 146412,
+    "fdPerSubscriberBothEnds": 2,
+    "fdPerSubscriberServerSide": 1,
+    "stateChangesDriven": 20,
+    "framesWritten": 4000,
+    "framesPerSubscriber": 20,
+    "bytesWritten": 100672800,
+    "bytesPerFrame": 25168,
+    "windowSeconds": 10,
+    "cpuMsInWindow": 1207.3,
+    "cpuMsPerSubscriberPerMinute": 36.22,
+    "note": "One live house fanning its real room graph to N real HTTP subscribers over a real socket each, with the house being changed throughout so frames actually flow. Both halves of the cost, the held response and the per-frame serialization, are in these numbers. Both ends of every socket are in this process, so the descriptor and RSS figures are an upper bound on what a server pays."
+  },
+  "gate": {
+    "steps": 400,
+    "lock": "lock.front_door",
+    "rungsSeen": [
+      "degraded_read",
+      "shed",
+      "shed_streams"
+    ],
+    "guardedActionsSeen": 400,
+    "everWavedThrough": 0,
+    "violations": [],
+    "refusedByGateWhileAdmitted": 174,
+    "shedByLoad": 226,
+    "liveCallOutcome": "needs_confirmation",
+    "lockStateBefore": "locked",
+    "lockStateAfter": "locked",
+    "passed": true
+  },
+  "machineAtEnd": {
+    "loadAverage": [
+      210.77,
+      211.41,
+      195.24
+    ],
+    "freeMemBytes": 6802911232
+  }
+}

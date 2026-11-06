@@ -1,0 +1,725 @@
+<!doctype html>
+<html lang="en">
+	<head>
+		<style>/* three.ws hidden-guard — make the `hidden` attribute authoritative; see scripts/lib/hidden-guard.mjs */[hidden]{display:none!important}</style>
+		<script>/* three.ws theme boot — no-flash; runtime in /theme-switcher.js */(function(){try{var m=localStorage.getItem('twx_theme');var l=m==='auto'?(window.matchMedia&&window.matchMedia('(prefers-color-scheme: light)').matches):m==='light';document.documentElement.setAttribute('data-theme',l?'light':'dark');}catch(e){document.documentElement.setAttribute('data-theme','dark');}})();</script>
+		<meta charset="utf-8" />
+		<title data-i18n="import_rpm.meta_title">Import Your 3D Avatar · three.ws</title>
+		<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+		<meta
+			name="description"
+			content="Import your 3D avatar into three.ws. Paste the GLB URL or upload the file directly — your avatar lives on three.ws, on-chain-ready."
+		 data-i18n-attr="content:import_rpm.meta_description"/>
+		<meta name="robots" content="noindex" />
+		<link rel="icon" href="/favicon.ico" sizes="any" />
+		<link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+		<link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png" />
+		<link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png" />
+		<link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+		<link rel="manifest" href="/manifest.webmanifest" />
+		<style>
+			*, *::before, *::after { box-sizing: border-box; }
+			:root {
+				--bg: #0d0d0d;
+				--panel: #151515;
+				--panel-2: #1c1c1c;
+				--border: rgba(255,255,255,0.07);
+				--border-2: rgba(255,255,255,0.13);
+				--text: #e9ecef;
+				--text-2: rgba(255,255,255,0.65);
+				--text-3: rgba(255,255,255,0.38);
+				--accent: #ffffff;
+				--accent-dim: rgba(255,255,255,0.10);
+				--warn: #f59e0b;
+				--warn-dim: rgba(245,158,11,0.10);
+				--ok: var(--success, #4ade80);
+				--err: var(--danger, #f87171);
+				--err-dim: rgba(248,113,113,0.10);
+				--radius: 12px;
+			}
+			html, body {
+				margin: 0; padding: 0;
+				background: var(--bg);
+				color: var(--text);
+				font-family: system-ui, -apple-system, sans-serif;
+				font-size: 15px;
+				line-height: 1.55;
+				min-height: 100vh;
+			}
+			a { color: var(--accent); }
+			code {
+				font-family: ui-monospace, 'SF Mono', monospace;
+				font-size: 0.9em;
+				color: var(--text-2);
+				background: rgba(255,255,255,0.05);
+				padding: 1px 5px;
+				border-radius: 4px;
+			}
+
+			/* ── Layout ─────────────────────────────────────────────────── */
+			.page {
+				max-width: 640px;
+				margin: 0 auto;
+				padding: 48px 20px 80px;
+			}
+			.back-link {
+				display: inline-flex;
+				align-items: center;
+				gap: 6px;
+				color: var(--text-3);
+				text-decoration: none;
+				font-size: 13px;
+				margin-bottom: 32px;
+				letter-spacing: 0.01em;
+			}
+			.back-link:hover { color: var(--text-2); }
+			h1 {
+				font-size: 26px;
+				font-weight: 700;
+				letter-spacing: -0.02em;
+				margin: 0 0 6px;
+			}
+			.lede {
+				color: var(--text-2);
+				margin: 0 0 28px;
+				font-size: 14px;
+				line-height: 1.6;
+			}
+
+			/* ── Warning banner ─────────────────────────────────────────── */
+			.warn-banner {
+				display: flex;
+				gap: 12px;
+				align-items: flex-start;
+				background: var(--warn-dim);
+				border: 1px solid rgba(245,158,11,0.22);
+				border-radius: var(--radius);
+				padding: 14px 16px;
+				margin-bottom: 24px;
+				font-size: 13px;
+				color: var(--text-2);
+				line-height: 1.5;
+			}
+			.warn-banner-icon { font-size: 16px; flex-shrink: 0; margin-top: 1px; }
+
+			/* ── Import card ────────────────────────────────────────────── */
+			.import-card {
+				background: var(--panel);
+				border: 1px solid var(--border-2);
+				border-radius: var(--radius);
+				overflow: hidden;
+			}
+
+			/* Tab switcher */
+			.tab-bar {
+				display: flex;
+				border-bottom: 1px solid var(--border);
+			}
+			.tab-btn {
+				flex: 1;
+				padding: 13px 14px;
+				min-height: 48px;
+				background: none;
+				border: none;
+				border-bottom: 2px solid transparent;
+				color: var(--text-3);
+				font: inherit;
+				font-size: 13px;
+				font-weight: 500;
+				cursor: pointer;
+				letter-spacing: 0.02em;
+				text-align: center;
+				transition: color 0.15s, border-color 0.15s;
+				margin-bottom: -1px;
+			}
+			.tab-btn:hover { color: var(--text-2); }
+			.tab-btn.active { color: var(--accent); border-bottom-color: var(--accent); }
+
+			/* Tab panels */
+			.tab-panel { display: none; padding: 24px; }
+			.tab-panel.active { display: block; }
+
+			/* Form elements */
+			label {
+				display: block;
+				font-size: 12px;
+				font-weight: 600;
+				letter-spacing: 0.05em;
+				text-transform: uppercase;
+				color: var(--text-3);
+				margin-bottom: 8px;
+			}
+			.field-hint {
+				font-size: 12px;
+				color: var(--text-3);
+				margin: 6px 0 0;
+				font-weight: 400;
+				text-transform: none;
+				letter-spacing: 0;
+			}
+			input[type="text"], input[type="url"] {
+				display: block;
+				width: 100%;
+				padding: 11px 14px;
+				min-height: 48px;
+				background: var(--panel-2);
+				border: 1px solid var(--border-2);
+				border-radius: 8px;
+				color: var(--text);
+				font: inherit;
+				font-size: 16px;
+				outline: none;
+				transition: border-color 0.15s, box-shadow 0.15s;
+			}
+			input[type="text"]:focus, input[type="url"]:focus {
+				border-color: var(--accent);
+				box-shadow: 0 0 0 3px rgba(255,255,255,0.10);
+			}
+
+			/* Drop zone */
+			.drop-zone {
+				border: 1.5px dashed var(--border-2);
+				border-radius: 10px;
+				padding: 40px 20px;
+				text-align: center;
+				cursor: pointer;
+				transition: border-color 0.15s, background 0.15s;
+				position: relative;
+			}
+			.drop-zone:hover, .drop-zone.dragover {
+				border-color: var(--accent);
+				background: var(--accent-dim);
+			}
+			.drop-zone input[type="file"] {
+				position: absolute;
+				inset: 0;
+				opacity: 0;
+				cursor: pointer;
+				width: 100%;
+				height: 100%;
+			}
+			.drop-zone-icon {
+				font-size: 32px;
+				margin-bottom: 10px;
+				line-height: 1;
+			}
+			.drop-zone-title {
+				font-size: 14px;
+				font-weight: 600;
+				color: var(--text);
+				margin-bottom: 4px;
+			}
+			.drop-zone-sub {
+				font-size: 12px;
+				color: var(--text-3);
+			}
+			.drop-zone.has-file .drop-zone-icon { font-size: 22px; margin-bottom: 6px; }
+			.drop-zone.has-file .drop-zone-title { color: var(--ok); }
+
+			/* Submit button */
+			.submit-btn {
+				display: block;
+				width: 100%;
+				margin-top: 20px;
+				padding: 14px 20px;
+				min-height: 52px;
+				background: var(--accent);
+				color: #0f0f0f;
+				font: inherit;
+				font-weight: 700;
+				font-size: 15px;
+				border: none;
+				border-radius: 8px;
+				cursor: pointer;
+				transition: opacity 0.15s, transform 0.1s;
+				letter-spacing: 0.01em;
+			}
+			.submit-btn:hover:not(:disabled) { opacity: 0.9; }
+			.submit-btn:active:not(:disabled) { transform: scale(0.99); }
+			.submit-btn:disabled { opacity: 0.45; cursor: not-allowed; }
+
+			/* On touch devices: hide drag-drop language, surface tap-to-browse */
+			@media (hover: none) and (pointer: coarse) {
+				.drop-zone-title { display: none; }
+				.drop-zone-title-touch { display: block; }
+				.drop-zone {
+					padding: 32px 20px;
+				}
+				.page {
+					padding: 28px 16px 80px;
+				}
+			}
+			.drop-zone-title-touch {
+				display: none;
+				font-size: 14px;
+				font-weight: 600;
+				color: var(--text);
+				margin-bottom: 4px;
+			}
+
+			/* ── Progress ────────────────────────────────────────────────── */
+			.progress-wrap {
+				display: none;
+				padding: 24px;
+				border-top: 1px solid var(--border);
+			}
+			.progress-wrap.visible { display: block; }
+			.progress-label {
+				font-size: 13px;
+				color: var(--text-2);
+				margin-bottom: 10px;
+				display: flex;
+				justify-content: space-between;
+			}
+			.progress-bar-track {
+				height: 4px;
+				background: var(--border-2);
+				border-radius: 999px;
+				overflow: hidden;
+			}
+			.progress-bar-fill {
+				height: 100%;
+				background: var(--accent);
+				border-radius: 999px;
+				transition: width 0.3s ease;
+				width: 0%;
+			}
+			.progress-stage {
+				font-size: 11px;
+				color: var(--text-3);
+				margin-top: 8px;
+				letter-spacing: 0.03em;
+			}
+
+			/* ── Status messages ─────────────────────────────────────────── */
+			.status-msg {
+				display: none;
+				padding: 14px 16px;
+				border-radius: 10px;
+				font-size: 13px;
+				line-height: 1.5;
+				margin-top: 16px;
+			}
+			.status-msg.err { display: block; background: var(--err-dim); border: 1px solid rgba(248,113,113,0.2); color: var(--err); }
+			.status-msg.ok { display: block; background: rgba(74,222,128,0.07); border: 1px solid rgba(74,222,128,0.2); color: var(--ok); }
+
+			/* ── Success state ───────────────────────────────────────────── */
+			.success-card {
+				display: none;
+				background: var(--panel);
+				border: 1px solid var(--border-2);
+				border-radius: var(--radius);
+				padding: 32px 24px;
+				text-align: center;
+				margin-top: 20px;
+			}
+			.success-card.visible { display: block; }
+			.success-icon { font-size: 40px; margin-bottom: 12px; }
+			.success-card h2 { font-size: 20px; margin: 0 0 8px; letter-spacing: -0.01em; }
+			.success-card p { color: var(--text-2); font-size: 14px; margin: 0 0 20px; }
+			.success-btn {
+				display: inline-block;
+				padding: 12px 28px;
+				background: var(--accent);
+				color: #0f0f0f;
+				font-weight: 700;
+				font-size: 14px;
+				border-radius: 8px;
+				text-decoration: none;
+				transition: opacity 0.15s;
+			}
+			.success-btn:hover { opacity: 0.9; }
+
+			/* ── Info blocks ─────────────────────────────────────────────── */
+			.info-section { margin-top: 32px; }
+			.info-section h3 { font-size: 14px; font-weight: 600; color: var(--text-2); margin: 0 0 10px; }
+			.info-steps { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+			.info-steps li {
+				display: flex;
+				gap: 12px;
+				font-size: 13px;
+				color: var(--text-2);
+				align-items: flex-start;
+			}
+			.info-steps li::before {
+				content: attr(data-step);
+				flex-shrink: 0;
+				width: 22px;
+				height: 22px;
+				background: var(--panel-2);
+				border: 1px solid var(--border-2);
+				border-radius: 50%;
+				font-size: 11px;
+				font-weight: 700;
+				color: var(--accent);
+				display: flex;
+				align-items: center;
+				justify-content: center;
+			}
+		</style>
+	
+	<link rel="canonical" href="https://three.ws/import/rpm">
+	<meta property="og:type" content="website">
+	<meta property="og:site_name" content="three.ws">
+	<meta property="og:title" content="Import an avatar URL · three.ws" data-i18n-attr="content:import_rpm.meta_og_title">
+	<meta property="og:description" content="Import any GLB or glTF avatar into three.ws and give it an agent brain." data-i18n-attr="content:import_rpm.meta_og_description">
+	<meta property="og:url" content="https://three.ws/import/rpm">
+	<meta property="og:image" content="https://three.ws/api/page-og?s=build&amp;t=Import+an+avatar+URL&amp;d=Import+any+GLB+or+glTF+avatar+into+three.ws+and+give+it+an+agent+brain.&amp;p=%2Fimport%2Frpm">
+	<meta property="og:image:width" content="1200">
+	<meta property="og:image:height" content="630">
+	<meta name="twitter:card" content="summary_large_image">
+	<meta name="twitter:title" content="Import an avatar URL · three.ws" data-i18n-attr="content:import_rpm.meta_twitter_title">
+	<meta name="twitter:description" content="Import any GLB or glTF avatar into three.ws and give it an agent brain." data-i18n-attr="content:import_rpm.meta_twitter_description">
+	<meta name="twitter:image" content="https://three.ws/api/page-og?s=build&amp;t=Import+an+avatar+URL&amp;d=Import+any+GLB+or+glTF+avatar+into+three.ws+and+give+it+an+agent+brain.&amp;p=%2Fimport%2Frpm">
+	<script type="application/ld+json">{"@context":"https://schema.org","@type":"WebPage","name":"Import an avatar URL","description":"Import any GLB or glTF avatar into three.ws and give it an agent brain.","url":"https://three.ws/import/rpm","isPartOf":{"@type":"WebSite","name":"three.ws","url":"https://three.ws"}}</script>
+
+	<meta property="og:locale" content="en_US">
+	<meta property="og:image:alt" content="Import an avatar URL — three.ws">
+	<meta name="twitter:site" content="@trythreews">
+</head>
+	<body>
+		<main class="page">
+			<a class="back-link" href="/create" data-i18n="import_rpm.back_to_create">
+				← Back to Create
+			</a>
+
+			<h1 data-i18n="import_rpm.import_your_3d_avatar">Import Your 3D Avatar</h1>
+			<p class="lede" data-i18n="import_rpm.bring_your_existing_avatar_to_three_ws">
+				Bring your existing avatar to three.ws — it'll live here, fully
+				owned by you, on-chain-ready.
+			</p>
+
+			<div class="warn-banner">
+				<span class="warn-banner-icon">⚠</span>
+				<span data-i18n-html="import_rpm.paste_any_live_glb_url_we_fetch">
+					<strong>Paste any live GLB or VRM URL</strong>, we fetch it on our servers,
+					so CORS-restricted CDNs (CloudFront, Arweave, your own storage) all
+					work. If the original host is gone, or you already have the file on
+					disk, use the <em>Upload</em> tab instead.
+				</span>
+			</div>
+
+			<div class="import-card" id="import-card">
+				<div class="tab-bar" role="tablist">
+					<button class="tab-btn active" data-tab="url" role="tab" aria-selected="true" id="tab-url" data-i18n="import_rpm.paste_url">
+						Paste URL
+					</button>
+					<button class="tab-btn" data-tab="file" role="tab" aria-selected="false" id="tab-file" data-i18n="import_rpm.upload_glb">
+						Upload File
+					</button>
+				</div>
+
+				<!-- URL tab -->
+				<div class="tab-panel active" id="panel-url">
+					<label for="rpm-url" data-i18n="import_rpm.avatar_glb_url_or_cdn_link">Avatar GLB/VRM URL or CDN link</label>
+					<input
+						type="url"
+						id="rpm-url"
+						placeholder="https://d1a370nemizbjq.cloudfront.net/64c3f8e2….glb"
+						autocomplete="off"
+						spellcheck="false"
+					/>
+					<p class="field-hint" data-i18n="import_rpm.accepts_any_glb_url_cloudfront_arweave_or">
+						Accepts any GLB or VRM URL: CloudFront, Arweave, or your own storage.
+						The file is fetched server-side so CORS is not an issue.
+					</p>
+
+					<label for="rpm-name" style="margin-top: 18px" data-i18n="import_rpm.avatar_name_optional">Avatar name (optional)</label>
+					<input
+						type="text"
+						id="rpm-name"
+						placeholder="My Avatar"
+						maxlength="64"
+						autocomplete="off"
+					/>
+
+					<button class="submit-btn" id="submit-url" type="button" data-i18n="import_rpm.import_from_url">Import from URL</button>
+					<div class="status-msg" id="url-status"></div>
+				</div>
+
+				<!-- File upload tab -->
+				<div class="tab-panel" id="panel-file">
+					<label data-i18n="import_rpm.glb_file">GLB or VRM file</label>
+					<div class="drop-zone" id="drop-zone">
+						<input
+							type="file"
+							id="glb-file"
+							accept=".glb,.vrm,model/gltf-binary,application/octet-stream"
+							aria-label="Choose a GLB or VRM file"
+						/>
+						<div class="drop-zone-icon">📦</div>
+						<div class="drop-zone-title" id="drop-title">Drag &amp; drop your GLB or VRM here</div>
+						<div class="drop-zone-title-touch">Tap to choose your GLB or VRM file</div>
+						<div class="drop-zone-sub">or click to browse · .glb or .vrm · max 100 MB</div>
+					</div>
+
+					<label for="file-name" style="margin-top: 18px" data-i18n="import_rpm.avatar_name_optional_2">Avatar name (optional)</label>
+					<input
+						type="text"
+						id="file-name"
+						placeholder="My Avatar"
+						maxlength="64"
+						autocomplete="off"
+					/>
+
+					<button class="submit-btn" id="submit-file" type="button" disabled data-i18n="import_rpm.upload_glb_2">Upload GLB</button>
+					<div class="status-msg" id="file-status"></div>
+				</div>
+
+				<!-- Progress (shared, shown below whichever tab is active) -->
+				<div class="progress-wrap" id="progress-wrap">
+					<div class="progress-label">
+						<span id="progress-text" data-i18n="import_rpm.importing">Importing…</span>
+						<span id="progress-pct">0%</span>
+					</div>
+					<div class="progress-bar-track">
+						<div class="progress-bar-fill" id="progress-fill"></div>
+					</div>
+					<div class="progress-stage" id="progress-stage">Fetching model…</div>
+				</div>
+			</div>
+
+			<!-- Success state (replaces the card) -->
+			<div class="success-card" id="success-card">
+				<div class="success-icon">🎉</div>
+				<h2 data-i18n="import_rpm.avatar_imported">Avatar imported!</h2>
+				<p id="success-name" data-i18n="import_rpm.your_avatar_is_ready_on_three_ws">Your avatar is ready on three.ws.</p>
+				<a class="success-btn" id="success-link" href="/gallery" data-i18n="import_rpm.view_avatar">View avatar</a>
+			</div>
+
+			<div class="info-section">
+				<h3 data-i18n="import_rpm.how_to_find_your_avatar_s_glb">How to find your avatar's GLB or VRM URL</h3>
+				<ul class="info-steps">
+					<li data-step="1" data-i18n-html="import_rpm.if_your_avatar_was_hosted_at_a">
+						If your avatar was hosted at a CDN (e.g.
+						<code>d1a370nemizbjq.cloudfront.net</code>), paste that URL
+						directly — the file is fetched server-side so CORS is not an issue.
+					</li>
+					<li data-step="2" data-i18n-html="import_rpm.if_your_app_fetched_the_glb_on">
+						If your app fetched the model on load, open your browser's
+						DevTools → Network tab, filter by <code>.glb</code> or <code>.vrm</code>,
+						and copy the request URL from there.
+					</li>
+					<li data-step="3" data-i18n-html="import_rpm.if_you_already_have_the_file_on">
+						If you already have the file on disk, use the
+						<em>Upload</em> tab above.
+					</li>
+				</ul>
+			</div>
+		</main>
+
+		<script type="module">
+			import { saveRemoteGlbToAccount } from '/src/account.js';
+
+			// ── Tab switching ──────────────────────────────────────────────
+			document.querySelectorAll('.tab-btn').forEach((btn) => {
+				btn.addEventListener('click', () => {
+					document.querySelectorAll('.tab-btn').forEach((b) => {
+						b.classList.toggle('active', b === btn);
+						b.setAttribute('aria-selected', String(b === btn));
+					});
+					const target = btn.dataset.tab;
+					document.querySelectorAll('.tab-panel').forEach((p) => {
+						p.classList.toggle('active', p.id === `panel-${target}`);
+					});
+				});
+			});
+
+			// ── File drop zone ─────────────────────────────────────────────
+			const dropZone = document.getElementById('drop-zone');
+			const fileInput = document.getElementById('glb-file');
+			const dropTitle = document.getElementById('drop-title');
+			const submitFile = document.getElementById('submit-file');
+			let selectedFile = null;
+
+			function setFile(f) {
+				if (!f || !/\.(glb|vrm)$/i.test(f.name)) {
+					showStatus('file-status', 'err', 'Please choose a .glb or .vrm file.');
+					return;
+				}
+				if (f.size > 100 * 1024 * 1024) {
+					showStatus('file-status', 'err', `File too large (${prettyBytes(f.size)}). Max 100 MB.`);
+					return;
+				}
+				selectedFile = f;
+				dropZone.classList.add('has-file');
+				dropTitle.textContent = `${f.name}  (${prettyBytes(f.size)})`;
+				submitFile.disabled = false;
+				clearStatus('file-status');
+			}
+
+			fileInput.addEventListener('change', () => {
+				if (fileInput.files[0]) setFile(fileInput.files[0]);
+			});
+			dropZone.addEventListener('dragover', (e) => { e.preventDefault(); dropZone.classList.add('dragover'); });
+			dropZone.addEventListener('dragleave', () => dropZone.classList.remove('dragover'));
+			dropZone.addEventListener('drop', (e) => {
+				e.preventDefault();
+				dropZone.classList.remove('dragover');
+				const f = e.dataTransfer?.files?.[0];
+				if (f) setFile(f);
+			});
+
+			// ── Import from URL ────────────────────────────────────────────
+			document.getElementById('submit-url').addEventListener('click', async () => {
+				const rawUrl = document.getElementById('rpm-url').value.trim();
+				if (!rawUrl) {
+					showStatus('url-status', 'err', 'Please enter a GLB URL.');
+					return;
+				}
+				let url;
+				try {
+					url = new URL(rawUrl);
+					if (!['http:', 'https:'].includes(url.protocol)) throw new Error('bad protocol');
+				} catch {
+					showStatus('url-status', 'err', 'Enter a valid http:// or https:// URL.');
+					return;
+				}
+				const name = document.getElementById('rpm-name').value.trim() || deriveName(rawUrl);
+				clearStatus('url-status');
+				await runImport(rawUrl, name, 'url-status', { source: 'readyplayer', import_method: 'url', source_url: rawUrl });
+			});
+
+			// ── Upload from file ───────────────────────────────────────────
+			document.getElementById('submit-file').addEventListener('click', async () => {
+				if (!selectedFile) {
+					showStatus('file-status', 'err', 'Please choose a GLB file first.');
+					return;
+				}
+				const name = document.getElementById('file-name').value.trim() || selectedFile.name.replace(/\.(glb|vrm)$/i, '');
+				clearStatus('file-status');
+				await runImport(selectedFile, name, 'file-status', { source: 'readyplayer', import_method: 'file' });
+			});
+
+			// ── Core import flow ───────────────────────────────────────────
+			async function runImport(source, name, statusId, meta) {
+				setFormBusy(true);
+				showProgress(true, 'Starting…');
+
+				const abortCtrl = new AbortController();
+
+				try {
+					const avatar = await saveRemoteGlbToAccount(source, {
+						name,
+						visibility: 'public',
+						tags: ['rpm', 'imported'],
+						source: meta.source || 'readyplayer',
+						source_meta: meta,
+					}, {
+						signal: abortCtrl.signal,
+						onProgress: (pct) => {
+							const stage = pct < 10 ? 'Fetching model…'
+								: pct < 30 ? 'Normalizing bones…'
+								: pct < 95 ? 'Uploading to three.ws…'
+								: 'Saving avatar record…';
+							updateProgress(pct, stage);
+						},
+					});
+
+					showProgress(false);
+					showSuccess(avatar);
+				} catch (err) {
+					console.error('[import-rpm]', err);
+					showProgress(false);
+
+					if (err.code === 'not_signed_in' || err.status === 401) {
+						const returnTo = encodeURIComponent(location.pathname + location.search);
+						location.href = `/login?return=${returnTo}`;
+						return;
+					}
+
+					const msg = friendlyError(err);
+					showStatus(statusId, 'err', msg);
+					setFormBusy(false);
+				}
+			}
+
+			function showSuccess(avatar) {
+				document.getElementById('import-card').style.display = 'none';
+				const card = document.getElementById('success-card');
+				card.classList.add('visible');
+				document.getElementById('success-name').textContent =
+					avatar?.name ? `"${avatar.name}" is ready on three.ws.` : 'Your avatar is ready on three.ws.';
+				const link = document.getElementById('success-link');
+				if (avatar?.id) link.href = `/avatars/${encodeURIComponent(avatar.id)}`;
+			}
+
+			// ── Progress UI ────────────────────────────────────────────────
+			function showProgress(visible, label) {
+				const wrap = document.getElementById('progress-wrap');
+				wrap.classList.toggle('visible', visible);
+				if (label) {
+					document.getElementById('progress-text').textContent = label;
+					document.getElementById('progress-stage').textContent = '';
+					document.getElementById('progress-fill').style.width = '0%';
+					document.getElementById('progress-pct').textContent = '0%';
+				}
+			}
+
+			function updateProgress(pct, stageLabel) {
+				document.getElementById('progress-fill').style.width = `${pct}%`;
+				document.getElementById('progress-pct').textContent = `${pct}%`;
+				if (stageLabel) document.getElementById('progress-stage').textContent = stageLabel;
+				if (pct === 0) document.getElementById('progress-text').textContent = 'Starting…';
+				else if (pct < 50) document.getElementById('progress-text').textContent = 'Uploading…';
+				else if (pct < 95) document.getElementById('progress-text').textContent = 'Almost there…';
+				else document.getElementById('progress-text').textContent = 'Finishing…';
+			}
+
+			// ── Helpers ────────────────────────────────────────────────────
+			function setFormBusy(busy) {
+				['submit-url', 'submit-file'].forEach((id) => {
+					const btn = document.getElementById(id);
+					if (btn) btn.disabled = busy;
+				});
+				const fileEl = document.getElementById('glb-file');
+				if (fileEl) fileEl.disabled = busy;
+			}
+
+			function showStatus(id, tone, msg) {
+				const el = document.getElementById(id);
+				if (!el) return;
+				el.className = `status-msg ${tone}`;
+				el.textContent = msg;
+			}
+
+			function clearStatus(id) {
+				const el = document.getElementById(id);
+				if (el) el.className = 'status-msg';
+			}
+
+			function deriveName(url) {
+				try {
+					const path = new URL(url).pathname;
+					const seg = path.split('/').pop()?.replace(/\.(glb|vrm)$/i, '') || '';
+					return seg.length > 2 ? seg : 'Imported Avatar';
+				} catch {
+					return 'Imported Avatar';
+				}
+			}
+
+			function prettyBytes(n) {
+				if (n < 1024) return `${n} B`;
+				if (n < 1024 * 1024) return `${(n / 1024).toFixed(1)} KB`;
+				return `${(n / 1024 / 1024).toFixed(1)} MB`;
+			}
+
+			function friendlyError(err) {
+				const code = err.code || '';
+				const stage = err.stage || '';
+				if (code === 'upload_blocked') return 'Upload blocked — check your network or try a different connection.';
+				if (code === 'upload_failed') return 'Upload failed — the file may be too large or invalid.';
+				if (code === 'upload_aborted') return 'Upload cancelled.';
+				if (code === 'size_mismatch') return 'File size mismatch — please try again.';
+				if (code === 'upload_missing') return 'Upload did not reach storage — try again.';
+				if (stage === 'fetch') return `Could not fetch that URL: ${err.message}. The file may no longer exist.`;
+				if (stage === 'presign') return "Couldn't start upload — are you signed in?";
+				if (stage === 'commit') return 'File uploaded but save failed — please retry.';
+				return err.message || 'Import failed. Please try again.';
+			}
+		</script>
+		<script src="/brand.js" defer></script>
+	<!-- Runtime i18n: detects locale, swaps annotated copy, mounts <lang-switcher>. -->
+	<script type="module" src="/i18n.js"></script>
+</body>
+</html>

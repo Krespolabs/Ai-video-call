@@ -1,0 +1,322 @@
+// Sub-sitemap by entity type: agents, avatars, widgets, profiles, core, news.
+//
+// Each request streams up to 45k URLs (capped under the sitemaps.org 50k
+// ceiling). Beyond that we'd shard into agents-1.xml, agents-2.xml, etc.
+// Only news currently reaches the cap, and it drains newest month first so
+// the truncation always falls on the oldest, least crawled stories.
+//
+// Cached at the edge for 10 min: long enough to absorb crawl bursts,
+// short enough that newly minted agents are discoverable within minutes
+// (and IndexNow gives them an instant push too).
+
+import { readFile } from 'node:fs/promises';
+import path from 'node:path';
+import { sql } from '../_lib/db.js';
+import { env } from '../_lib/env.js';
+import { reportServerError, redactUrl } from '../_lib/http.js';
+import { getMonths, loadMonth } from '../_lib/news-archive-store.js';
+import { storyPath } from '../../src/shared/news-links.js';
+import { isSuppressed } from '../_lib/news-rights.js';
+import { isIndexableAgent, isIndexableAvatar } from '../_lib/indexable-entity.js';
+
+const ORIGIN = env.APP_ORIGIN;
+const MAX_URLS = 45_000;
+
+function fmtDate(d) {
+	const t = d instanceof Date ? d : new Date(d || Date.now());
+	if (Number.isNaN(t.getTime())) return new Date().toISOString().slice(0, 10);
+	return t.toISOString().slice(0, 10);
+}
+
+function xmlEscape(s) {
+	return String(s || '')
+		.replace(/&/g, '&amp;')
+		.replace(/</g, '&lt;')
+		.replace(/>/g, '&gt;')
+		.replace(/"/g, '&quot;')
+		.replace(/'/g, '&apos;');
+}
+
+function urlsetXml(entries) {
+	// Advertise the xhtml namespace only when at least one entry carries hreflang
+	// alternates, so entity sitemaps that don't localize stay byte-identical.
+	const hasAlternates = entries.some((e) => e.alternates?.length);
+	const ns =
+		`<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"` +
+		(hasAlternates ? ` xmlns:xhtml="http://www.w3.org/1999/xhtml"` : ``) +
+		`>`;
+	return (
+		`<?xml version="1.0" encoding="UTF-8"?>\n` +
+		`${ns}\n` +
+		entries
+			.map((e) => {
+				const parts = [`\t\t<loc>${xmlEscape(e.loc)}</loc>`];
+				if (e.lastmod) parts.push(`\t\t<lastmod>${e.lastmod}</lastmod>`);
+				if (e.changefreq) parts.push(`\t\t<changefreq>${e.changefreq}</changefreq>`);
+				if (e.priority) parts.push(`\t\t<priority>${e.priority}</priority>`);
+				for (const alt of e.alternates || []) {
+					parts.push(
+						`\t\t<xhtml:link rel="alternate" hreflang="${xmlEscape(alt.hreflang)}" href="${xmlEscape(alt.href)}"/>`,
+					);
+				}
+				return `\t<url>\n${parts.join('\n')}\n\t</url>`;
+			})
+			.join('\n') +
+		`\n</urlset>\n`
+	);
+}
+
+// Load the committed locale manifest + the list of localized page paths so the
+// core sitemap can advertise each translated route's language alternates. Both
+// ship in public/locales; read defensively (missing files → no alternates,
+// never a 500 for the crawler).
+async function loadI18n() {
+	const readJson = async (rel) => {
+		for (const base of [path.join(process.cwd(), 'public'), process.cwd()]) {
+			try {
+				return JSON.parse(await readFile(path.join(base, rel), 'utf8'));
+			} catch {
+				// try next base
+			}
+		}
+		return null;
+	};
+	const manifest = await readJson('locales/manifest.json');
+	const localized = await readJson('locales/localized-pages.json');
+	const locales = manifest?.locales?.map((l) => l.code) || [];
+	const def = manifest?.default || 'en';
+	return { locales, def, paths: new Set(localized?.paths || []) };
+}
+
+// Build hreflang alternates for one path. Each locale gets a distinct URL
+// (?lang=xx); the default locale and x-default share the bare canonical URL.
+function alternatesFor(pathname, { locales, def }) {
+	if (locales.length < 2) return undefined;
+	const url = (code) =>
+		code === def ? `${ORIGIN}${pathname}` : `${ORIGIN}${pathname}?lang=${code}`;
+	const alts = locales.map((code) => ({ hreflang: code, href: url(code) }));
+	alts.push({ hreflang: 'x-default', href: `${ORIGIN}${pathname}` });
+	return alts;
+}
+
+function send(res, body) {
+	res.setHeader('content-type', 'application/xml; charset=utf-8');
+	res.setHeader('cache-control', 'public, s-maxage=600, stale-while-revalidate=86400');
+	res.statusCode = 200;
+	res.end(body);
+}
+
+// Core (static) routes are read from data/pages.json, the same source of
+// truth that build-page-index.mjs uses for llms.txt / sitemap.html / the
+// features manifest. One file to edit; this route + the human sitemap + the
+// AI indexes all stay in lockstep.
+async function loadPagesManifest() {
+	// In the Vercel bundle data/ ships alongside the function via includeFiles;
+	// in dev it's at repo root. Try both.
+	const candidates = [
+		path.join(process.cwd(), 'data', 'pages.json'),
+		path.join(process.cwd(), 'public', 'features.json'),
+	];
+	for (const file of candidates) {
+		try {
+			const raw = await readFile(file, 'utf8');
+			return JSON.parse(raw);
+		} catch {
+			// try next
+		}
+	}
+	return null;
+}
+
+async function coreSitemap() {
+	const today = fmtDate(new Date());
+	const [manifest, i18n] = await Promise.all([loadPagesManifest(), loadI18n()]);
+	if (!manifest?.sections) {
+		// Fallback to the home page only, so we never 500 the crawler.
+		return [{ loc: `${ORIGIN}/`, lastmod: today, changefreq: 'daily', priority: '1.0' }];
+	}
+	const out = [];
+	for (const section of manifest.sections) {
+		// Skip news (it has its own long-tail) and any non-indexable section.
+		if (section.id === 'news') continue;
+		for (const p of section.pages || []) {
+			if (p.indexable === false) continue;
+			if (p.auth === 'required') continue;
+			if (!p.path || p.path.startsWith('http')) continue;
+			out.push({
+				loc: `${ORIGIN}${p.path === '/' ? '/' : p.path}`,
+				lastmod: p.lastmod || today,
+				changefreq: p.changefreq || 'weekly',
+				priority: typeof p.priority === 'number' ? p.priority.toFixed(1) : '0.6',
+				alternates: i18n.paths.has(p.path) ? alternatesFor(p.path, i18n) : undefined,
+			});
+		}
+	}
+	return out.length ? out : [{ loc: `${ORIGIN}/`, lastmod: today, changefreq: 'daily', priority: '1.0' }];
+}
+
+async function agentsSitemap() {
+	// Drop the untouched onboarding rows: 1,359 of the 3,397 public agents still
+	// carried the starter name and description on 2026-09-07, and they are
+	// duplicates of each other by construction (api/_lib/indexable-entity.js).
+	// The filter runs in JS rather than SQL so one definition of "indexable"
+	// serves both this file and the crawler page, which must agree. The
+	// predicate only tests whether the prose is empty and whether it opens with
+	// the starter copy, so a prefix is all it needs and the row stays small.
+	const rows = await sql`
+		select id, name, left(description, 64) as description, updated_at, created_at
+		from agent_identities
+		where deleted_at is null and is_public = true
+		order by coalesce(updated_at, created_at) desc
+		limit ${MAX_URLS}
+	`;
+	return rows
+		.filter(isIndexableAgent)
+		.map((r) => ({
+			loc: `${ORIGIN}/agents/${r.id}`,
+			lastmod: fmtDate(r.updated_at || r.created_at),
+			changefreq: 'weekly',
+			priority: '0.7',
+		}));
+}
+
+async function avatarsSitemap() {
+	// Same filter as agentsSitemap: an avatar still carrying its default name with
+	// nothing written about it cannot be told apart from the next one. It removes
+	// far less here (170 of 67,164 on 2026-09-07) because a generated avatar
+	// still gets its own description and tags. Filtering after the cap rather
+	// than widening the fetch is deliberate: the public set is already half again
+	// larger than the 45k ceiling, so the file is truncated either way and
+	// pulling 90k rows into memory to reclaim 0.25% of the slots is not a trade.
+	const rows = await sql`
+		select id, name, left(description, 64) as description, left(alt_text, 64) as alt_text,
+		       updated_at, created_at
+		from avatars
+		where deleted_at is null and visibility = 'public'
+		order by coalesce(updated_at, created_at) desc
+		limit ${MAX_URLS}
+	`;
+	return rows
+		.filter(isIndexableAvatar)
+		.map((r) => ({
+			loc: `${ORIGIN}/avatars/${r.id}`,
+			lastmod: fmtDate(r.updated_at || r.created_at),
+			changefreq: 'weekly',
+			priority: '0.6',
+		}));
+}
+
+async function widgetsSitemap() {
+	// Only widgets surfaced on a public profile/showcase are worth indexing; the
+	// raw embed endpoint isn't human content. Filtering on is_public matches the
+	// front-end's listing behavior.
+	const rows = await sql`
+		select id, updated_at, created_at
+		from widgets
+		where deleted_at is null and is_public = true
+		order by coalesce(updated_at, created_at) desc
+		limit ${MAX_URLS}
+	`;
+	return rows.map((r) => ({
+		loc: `${ORIGIN}/w/${r.id}`,
+		lastmod: fmtDate(r.updated_at || r.created_at),
+		changefreq: 'monthly',
+		priority: '0.5',
+	}));
+}
+
+async function profilesSitemap() {
+	// Public user profiles. We index /u/<username>, the canonical profile URL
+	// the app itself links to (stored casing, matching every `/u/${username}`
+	// link in src/), and skip raw user IDs.
+	//
+	// service_account rows are excluded. Those are the machine accounts the
+	// avaturn/forge/circulation seed crons mint (see the 2026-07-25 migration
+	// that added the flag) at a rate of roughly one per minute, and on
+	// 2026-08-16 they were 29,600 of the 29,642 profile rows. Submitting 30k
+	// auto-generated `calm144`-style profile wrappers buries the 42 real human
+	// profiles and spends crawl budget on pages whose actual content (the
+	// avatars and agents those accounts own) is already listed in
+	// avatars.xml and agents.xml. Same predicate the metrics queries use.
+	const rows = await sql`
+		select u.username, u.updated_at, u.created_at
+		from users u
+		where u.deleted_at is null
+		  and u.username is not null
+		  and u.service_account = false
+		order by coalesce(u.updated_at, u.created_at) desc
+		limit ${MAX_URLS}
+	`;
+	return rows.map((r) => ({
+		loc: `${ORIGIN}/u/${r.username}`,
+		lastmod: fmtDate(r.updated_at || r.created_at),
+		changefreq: 'weekly',
+		priority: '0.6',
+	}));
+}
+
+// Story pages (/markets/news/<YYYY-MM>/<id>-<slug>) for the newest archive
+// months. The full 660k-article corpus would blow the 50k/URL cap many times
+// over. Recent months are where crawl demand is, and older stories are
+// reachable through the archive UI and inter-article links. Months come from
+// the same GCS store the archive endpoint serves, so this stays in lockstep
+// with what actually resolves.
+const NEWS_SITEMAP_MONTHS = 3;
+
+async function newsSitemap() {
+	const months = await getMonths();
+	const recent = months.slice(-NEWS_SITEMAP_MONTHS).reverse(); // newest first
+	const out = [];
+	for (const month of recent) {
+		const records = await loadMonth(month).catch(() => []);
+		for (const a of records) {
+			if (isSuppressed(a)) continue; // withdrawn at the rightsholder's demand, so never submit it for crawling
+			const loc = storyPath(a);
+			if (!loc) continue; // undated/id-less corpus rows have no story page
+			out.push({
+				loc: `${ORIGIN}${loc}`,
+				lastmod: fmtDate(a.pub_date),
+				changefreq: 'monthly',
+				priority: '0.6',
+			});
+			if (out.length >= MAX_URLS) return out;
+		}
+	}
+	return out;
+}
+
+// A Map, not an object literal: `BUILDERS.constructor` on a literal resolves to
+// Object via the prototype chain, so /api/sitemap/constructor (and toString,
+// valueOf, hasOwnProperty) passed the lookup guard, called a non-builder, and
+// answered a scanner with a 500 plus a bogus sitemap_failed error report. A Map
+// only ever returns what was put in it.
+const BUILDERS = new Map([
+	['core', coreSitemap],
+	['agents', agentsSitemap],
+	['avatars', avatarsSitemap],
+	['widgets', widgetsSitemap],
+	['profiles', profilesSitemap],
+	['news', newsSitemap],
+]);
+
+export default async function handler(req, res) {
+	const raw = String(req.query?.type || req.query?.id || '').replace(/\.xml$/i, '');
+	const builder = BUILDERS.get(raw);
+	if (!builder) {
+		res.statusCode = 404;
+		res.setHeader('content-type', 'text/plain; charset=utf-8');
+		res.setHeader('cache-control', 'no-store');
+		res.end(`unknown sitemap. known types: ${[...BUILDERS.keys()].join(', ')}\n`);
+		return;
+	}
+	try {
+		const entries = await builder();
+		return send(res, urlsetXml(entries));
+	} catch (err) {
+		const ref = reportServerError(err, { code: 'sitemap_failed', context: { url: redactUrl(req.url), type: raw } });
+		res.statusCode = 500;
+		res.setHeader('content-type', 'text/plain; charset=utf-8');
+		res.setHeader('cache-control', 'no-store');
+		res.end(`sitemap failed, quote ref ${ref} to support\n`);
+	}
+}

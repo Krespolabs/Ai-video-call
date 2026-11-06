@@ -1,0 +1,484 @@
+<!doctype html>
+<html lang="en">
+	<head>
+		<script>/* three.ws theme boot (no-flash) */(function(){try{var m=localStorage.getItem('twx_theme');var l=m==='auto'?(window.matchMedia&&window.matchMedia('(prefers-color-scheme: light)').matches):m==='light';document.documentElement.setAttribute('data-theme',l?'light':'dark');}catch(e){document.documentElement.setAttribute('data-theme','dark');}})();</script>
+		<meta charset="utf-8" />
+		<title data-i18n="agent_identities.meta_title">Agent Identity Studio: 3D avatars for AI agents · three.ws</title>
+		<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+		<meta
+			name="description"
+			content="Every AI agent deserves a face. The Agent Identity Studio turns a brand brief into a rigged 3D avatar plus posed studio renders. See the demo identities, then mint your agent's own."
+		 data-i18n-attr="content:agent_identities.meta_description"/>
+		<link rel="canonical" href="https://three.ws/agent-identities" />
+		<meta property="og:type" content="website" />
+		<meta property="og:site_name" content="three.ws" />
+		<meta property="og:title" content="Agent Identity Studio: 3D avatars for AI agents"  data-i18n-attr="content:agent_identities.meta_og_title"/>
+		<meta
+			property="og:description"
+			content="Brand brief in, rigged 3D avatar + studio renders out. Demo identities generated end-to-end by the pipeline."
+		 data-i18n-attr="content:agent_identities.meta_og_description"/>
+		<meta property="og:url" content="https://three.ws/agent-identities" />
+		<link rel="icon" href="/favicon.ico" sizes="any" />
+		<link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+		<link rel="stylesheet" href="/nav.css" />
+		<link rel="stylesheet" href="/style.css" />
+		<style>
+			.ai-wrap {
+				max-width: 1160px;
+				margin: 0 auto;
+				padding: calc(var(--header-h, 64px) + var(--space-xl)) var(--space-lg) var(--space-2xl);
+				/* The body is a column flex container, so this main is a flex item with
+				   min-width:auto: its min-content width (a couple of pixels over 320)
+				   was widening the whole document and scrolling the page sideways on a
+				   320px screen. Nothing inside needs more than the viewport. */
+				min-width: 0;
+			}
+			.ai-hero {
+				max-width: 720px;
+				margin-bottom: var(--space-2xl);
+			}
+			.ai-hero h1 {
+				font-family: var(--font-display);
+				font-size: var(--text-3xl);
+				line-height: var(--leading-tight);
+				margin: 0 0 var(--space-sm);
+			}
+			.ai-hero p {
+				color: var(--ink-dim);
+				font-size: var(--text-md);
+				line-height: var(--leading-normal);
+				margin: 0 0 var(--space-md);
+			}
+			.ai-hero .ai-cta {
+				display: flex;
+				gap: var(--space-sm);
+				flex-wrap: wrap;
+			}
+			.ai-badge {
+				display: inline-flex;
+				align-items: center;
+				gap: 0.5ch;
+				font-size: var(--text-xs);
+				font-family: var(--font-mono);
+				color: var(--ink-dim);
+				border: 1px solid var(--stroke);
+				border-radius: var(--radius-pill);
+				padding: 2px 10px;
+				margin-bottom: var(--space-sm);
+			}
+			.ai-price {
+				color: var(--accent);
+			}
+			.ai-grid {
+				display: grid;
+				/* min() keeps the track from forcing a 300px column (and a horizontally
+				   scrolling page) inside a ~288px viewport at 320px wide. */
+				grid-template-columns: repeat(auto-fill, minmax(min(300px, 100%), 1fr));
+				gap: var(--space-lg);
+			}
+			.ai-card {
+				background: var(--surface-1);
+				border: 1px solid var(--stroke);
+				border-radius: var(--radius-card);
+				overflow: hidden;
+				display: flex;
+				flex-direction: column;
+				transition: transform var(--duration-fast) var(--ease-standard), border-color var(--duration-fast) var(--ease-standard), box-shadow var(--duration-fast) var(--ease-standard);
+			}
+			.ai-card:hover {
+				transform: translateY(-3px);
+				border-color: var(--stroke-strong);
+				box-shadow: 0 12px 32px rgba(0, 0, 0, 0.35);
+			}
+			.ai-card:focus-within {
+				border-color: var(--accent);
+			}
+			.ai-stage {
+				position: relative;
+				aspect-ratio: 4 / 5;
+				background: radial-gradient(120% 90% at 50% 40%, #1a2030 0%, #10141d 55%, #0a0c10 100%);
+			}
+			.ai-stage img,
+			.ai-stage model-viewer,
+			.ai-stage .ai-pending {
+				position: absolute;
+				inset: 0;
+				width: 100%;
+				height: 100%;
+			}
+			.ai-stage img {
+				object-fit: contain;
+				transition: opacity var(--duration-base) var(--ease-standard);
+			}
+			.ai-stage model-viewer {
+				--poster-color: transparent;
+				background: transparent;
+			}
+			.ai-pending {
+				display: grid;
+				place-items: center;
+				align-content: center;
+				gap: var(--space-2xs);
+				color: var(--ink-dim);
+				font-size: var(--text-sm);
+				text-align: center;
+				padding: var(--space-lg);
+			}
+			.ai-pending strong {
+				color: var(--ink);
+				font-family: var(--font-display);
+			}
+			.ai-3d-status {
+				position: absolute;
+				left: var(--space-sm);
+				right: var(--space-sm);
+				bottom: var(--space-sm);
+				display: flex;
+				align-items: center;
+				justify-content: center;
+				gap: 0.6ch;
+				flex-wrap: wrap;
+				padding: 8px 10px;
+				border-radius: var(--radius-control);
+				border: 1px solid var(--stroke);
+				background: rgba(10, 12, 16, 0.82);
+				backdrop-filter: blur(6px);
+				color: var(--ink-dim);
+				font-size: var(--text-xs);
+				font-family: var(--font-mono);
+				text-align: center;
+			}
+			.ai-3d-status a {
+				color: var(--accent);
+			}
+			.ai-3d-error {
+				border-color: var(--danger, #ff6b6b);
+			}
+			.ai-spinner {
+				width: 12px;
+				height: 12px;
+				border-radius: 50%;
+				border: 2px solid var(--stroke-strong);
+				border-top-color: var(--accent);
+				animation: ai-spin 0.8s linear infinite;
+			}
+			@keyframes ai-spin {
+				to {
+					transform: rotate(360deg);
+				}
+			}
+			@media (prefers-reduced-motion: reduce) {
+				.ai-spinner {
+					animation-duration: 2.4s;
+				}
+				.ai-skel {
+					animation: none;
+				}
+			}
+			.ai-pfp {
+				position: absolute;
+				left: var(--space-sm);
+				bottom: var(--space-sm);
+				width: 72px;
+				height: 72px;
+				border-radius: var(--radius-md);
+				border: 1px solid var(--stroke-strong);
+				box-shadow: 0 4px 14px rgba(0, 0, 0, 0.5);
+				background: #10141d;
+				overflow: hidden;
+			}
+			.ai-pfp img {
+				position: static;
+				width: 100%;
+				height: 100%;
+				object-fit: cover;
+			}
+			.ai-body {
+				padding: var(--space-md);
+				display: flex;
+				flex-direction: column;
+				gap: var(--space-xs);
+				flex: 1;
+			}
+			.ai-kind {
+				font-family: var(--font-mono);
+				font-size: var(--text-2xs);
+				text-transform: uppercase;
+				letter-spacing: 0.08em;
+				color: var(--accent);
+			}
+			.ai-name {
+				font-family: var(--font-display);
+				font-size: var(--text-lg);
+				margin: 0;
+			}
+			.ai-brief {
+				color: var(--ink-dim);
+				font-size: var(--text-sm);
+				line-height: var(--leading-normal);
+				margin: 0;
+				flex: 1;
+			}
+			.ai-shots {
+				display: flex;
+				gap: var(--space-2xs);
+			}
+			.ai-shots button {
+				flex: 1;
+				aspect-ratio: 4 / 5;
+				padding: 0;
+				border: 1px solid var(--stroke);
+				border-radius: var(--radius-sm);
+				background: #10141d;
+				overflow: hidden;
+				cursor: pointer;
+				transition: border-color var(--duration-fast) var(--ease-standard), transform var(--duration-fast) var(--ease-standard);
+			}
+			.ai-shots button:hover,
+			.ai-shots button:focus-visible {
+				border-color: var(--accent);
+				transform: translateY(-1px);
+			}
+			.ai-shots button[aria-pressed='true'] {
+				border-color: var(--accent);
+			}
+			.ai-shots img {
+				width: 100%;
+				height: 100%;
+				object-fit: cover;
+				display: block;
+			}
+			.ai-actions {
+				display: flex;
+				gap: var(--space-xs);
+				margin-top: var(--space-2xs);
+			}
+			.ai-actions a,
+			.ai-actions button {
+				flex: 1;
+				text-align: center;
+				font-size: var(--text-xs);
+				font-family: var(--font-mono);
+				padding: 8px 10px;
+				border-radius: var(--radius-control);
+				border: 1px solid var(--stroke);
+				color: var(--ink);
+				background: var(--surface-2);
+				text-decoration: none;
+				cursor: pointer;
+				transition: border-color var(--duration-fast) var(--ease-standard), background var(--duration-fast) var(--ease-standard);
+			}
+			.ai-actions a:hover,
+			.ai-actions button:hover,
+			.ai-actions a:focus-visible,
+			.ai-actions button:focus-visible {
+				border-color: var(--accent);
+				background: var(--surface-3);
+			}
+			.ai-meta {
+				font-family: var(--font-mono);
+				font-size: var(--text-2xs);
+				color: var(--ink-dim);
+				margin: 0;
+			}
+			.ai-skel {
+				background: linear-gradient(
+					90deg,
+					var(--surface-2) 0%,
+					var(--surface-3) 50%,
+					var(--surface-2) 100%
+				);
+				background-size: 200% 100%;
+				animation: ai-shimmer 1.4s ease-in-out infinite;
+				border-radius: var(--radius-sm);
+			}
+			@keyframes ai-shimmer {
+				to {
+					background-position: -200% 0;
+				}
+			}
+			.ai-card-skeleton {
+				pointer-events: none;
+			}
+			.ai-card-skeleton:hover {
+				transform: none;
+				box-shadow: none;
+			}
+			.ai-skel-line {
+				display: block;
+				height: 0.75rem;
+			}
+			.ai-skel-kind {
+				width: 38%;
+				height: 0.6rem;
+			}
+			.ai-skel-name {
+				width: 62%;
+				height: 1.1rem;
+			}
+			.ai-skel-short {
+				width: 45%;
+			}
+			.ai-state {
+				grid-column: 1 / -1;
+				background: var(--surface-1);
+				border: 1px solid var(--stroke);
+				border-radius: var(--radius-card);
+				padding: var(--space-xl);
+				text-align: center;
+				display: flex;
+				flex-direction: column;
+				align-items: center;
+				gap: var(--space-sm);
+			}
+			.ai-state-title {
+				font-family: var(--font-display);
+				font-size: var(--text-lg);
+				margin: 0;
+			}
+			.ai-state-msg {
+				color: var(--ink-dim);
+				font-size: var(--text-sm);
+				line-height: var(--leading-normal);
+				max-width: 56ch;
+				margin: 0;
+			}
+			.ai-state-actions {
+				display: flex;
+				gap: var(--space-sm);
+				flex-wrap: wrap;
+				justify-content: center;
+			}
+			.ai-noscript {
+				grid-column: 1 / -1;
+				color: var(--ink-dim);
+				font-size: var(--text-sm);
+			}
+			.ai-how {
+				margin-top: var(--space-2xl);
+				border-top: 1px solid var(--hairline);
+				padding-top: var(--space-xl);
+				display: grid;
+				grid-template-columns: repeat(auto-fit, minmax(min(240px, 100%), 1fr));
+				gap: var(--space-lg);
+			}
+			.ai-how h2 {
+				grid-column: 1 / -1;
+				font-family: var(--font-display);
+				font-size: var(--text-xl);
+				margin: 0;
+			}
+			.ai-step {
+				background: var(--surface-1);
+				border: 1px solid var(--stroke);
+				border-radius: var(--radius-card);
+				padding: var(--space-md);
+			}
+			.ai-step h3 {
+				font-size: var(--text-md);
+				margin: 0 0 var(--space-2xs);
+			}
+			.ai-step p {
+				color: var(--ink-dim);
+				font-size: var(--text-sm);
+				margin: 0;
+			}
+			.ai-step code {
+				font-family: var(--font-mono);
+				font-size: var(--text-xs);
+				color: var(--accent);
+				word-break: break-all;
+			}
+			@media (max-width: 480px) {
+				.ai-wrap {
+					padding-left: var(--space-md);
+					padding-right: var(--space-md);
+				}
+			}
+		</style>
+	
+	<meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1">
+	<meta property="og:locale" content="en_US">
+	<meta property="og:image" content="https://three.ws/api/page-og?s=agent-tools&amp;t=Agent+Identity+Studio%3A+3D+avatars+for+AI+agents&amp;d=Every+AI+agent+deserves+a+face.+A+brand+brief+becomes+a+rigged+3D+avatar+plus+posed+studio+renders%3A+see+the+demo+identities+generated+end-to-end+by+the&amp;p=%2Fagent-identities">
+	<meta property="og:image:width" content="1200">
+	<meta property="og:image:height" content="630">
+	<meta property="og:image:type" content="image/png">
+	<meta property="og:image:alt" content="Agent Identity Studio: 3D avatars for AI agents - three.ws">
+	<meta name="twitter:card" content="summary_large_image">
+	<meta name="twitter:site" content="@trythreews">
+	<meta name="twitter:title" content="Agent Identity Studio: 3D avatars for AI agents · three.ws" data-i18n-attr="content:agent_identities.meta_twitter_title">
+	<meta name="twitter:description" content="Every AI agent deserves a face. A brand brief becomes a rigged 3D avatar plus posed studio renders. See the demo identities generated end-to-end by the pipeline." data-i18n-attr="content:agent_identities.meta_twitter_description">
+	<meta name="twitter:image" content="https://three.ws/api/page-og?s=agent-tools&amp;t=Agent+Identity+Studio%3A+3D+avatars+for+AI+agents&amp;d=Every+AI+agent+deserves+a+face.+A+brand+brief+becomes+a+rigged+3D+avatar+plus+posed+studio+renders%3A+see+the+demo+identities+generated+end-to-end+by+the&amp;p=%2Fagent-identities">
+	<script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"WebPage","name":"Agent Identity Studio: 3D avatars for AI agents","description":"Every AI agent deserves a face. A brand brief becomes a rigged 3D avatar plus posed studio renders. See the demo identities generated end-to-end by the pipeline.","url":"https://three.ws/agent-identities","isPartOf":{"@type":"WebSite","name":"three.ws","url":"https://three.ws"},"primaryImageOfPage":"https://three.ws/api/page-og?s=agent-tools&t=Agent+Identity+Studio+%E2%80%94+3D+avatars+for+AI+agents&d=Every+AI+agent+deserves+a+face.+A+brand+brief+becomes+a+rigged+3D+avatar+plus+posed+studio+renders+%E2%80%94+see+the+demo+identities+generated+end-to-end+by+the+pipelin&p=%2Fagent-identities"}]}</script>
+</head>
+	<body>
+		<main class="ai-wrap">
+			<header class="ai-hero">
+				<span class="ai-badge">
+					<span data-i18n="agent_identities.a2mcp_service_live_on_okx_ai_rails">A2MCP service · live on OKX.AI rails</span>
+					<!-- Price comes from the OKX catalog at runtime, never from page copy. -->
+					<span class="ai-price" id="ai-service-price" hidden></span>
+				</span>
+				<h1 data-i18n="agent_identities.every_ai_agent_deserves_a_face">Every AI agent deserves a face.</h1>
+				<p data-i18n="agent_identities.the_agent_identity_studio_turns_a_brand">
+					The Agent Identity Studio turns a brand brief into a complete 3D identity: a rigged,
+					animation-ready GLB avatar plus posed, studio-lit renders, including a profile picture
+					that stays sharp at marketplace thumbnail size. The identities below were generated
+					end-to-end by the pipeline from the briefs shown, no manual touch-ups.
+				</p>
+				<div class="ai-cta">
+					<a class="btn btn-primary" href="/docs/okx-marketplace" data-i18n="agent_identities.read_the_service_docs">Read the service docs</a>
+					<a class="btn" href="/api/okx/3d/catalog" data-i18n="agent_identities.service_catalog_json">Service catalog (JSON)</a>
+				</div>
+			</header>
+
+			<section
+				class="ai-grid"
+				id="identity-grid"
+				aria-label="Demo agent identities"
+				aria-busy="true"
+			>
+				<!-- Cards render from /api/agent-identities via src/agent-identities.js. -->
+				<noscript>
+					<p class="ai-noscript">
+						The identity gallery renders in the browser. With JavaScript off, read the
+						<a href="/docs/okx-marketplace">service docs</a> or fetch the showcase feed at
+						<a href="/api/agent-identities">/api/agent-identities</a>.
+					</p>
+				</noscript>
+			</section>
+
+			<section class="ai-how">
+				<h2 data-i18n="agent_identities.how_agents_buy_it">How agents buy it</h2>
+				<div class="ai-step">
+					<h3 data-i18n="agent_identities.1_call_create_identity">1 · Call create_identity</h3>
+					<p data-i18n-html="agent_identities.post_an_mcp_to_with_an_agent">
+						POST an MCP <code>tools/call</code> to
+						<code>https://three.ws/api/okx/3d/identity-studio</code> with an agent name and brief.
+						The 402 challenge quotes $1.50 in USDC; pay it and replay.
+					</p>
+				</div>
+				<div class="ai-step">
+					<h3 data-i18n="agent_identities.2_poll_for_free">2 · Poll for free</h3>
+					<p data-i18n-html="agent_identities.costs_nothing_and_drives_the_job_generation">
+						<code>identity_status</code> costs nothing and drives the job: generation, humanoid
+						auto-rig, then each studio render. Typical time to done: 3 to 6 minutes.
+					</p>
+				</div>
+				<div class="ai-step">
+					<h3 data-i18n="agent_identities.3_own_the_identity">3 · Own the identity</h3>
+					<p data-i18n="agent_identities.deliverables_square_pfp_1024_128_preview_ful">
+						Deliverables: square PFP (1024 + 128 preview), full-body render set, and the rigged
+						GLB, usable in three.ws scenes, games, and any glTF runtime.
+					</p>
+				</div>
+			</section>
+		</main>
+
+		<script src="/nav.js"></script>
+		<script type="module" src="/src/agent-identities.js"></script>
+		<script src="/footer.js" defer></script>
+		<!-- Runtime i18n: detects locale, swaps annotated copy, mounts <lang-switcher>. -->
+	<script type="module" src="/i18n.js"></script>
+</body>
+</html>

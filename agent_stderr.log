@@ -1,0 +1,41 @@
+2026-10-31 05:25:37.060 | INFO     | pipecat:<module>:54 - \u14da\u160f\u15e2 Pipecat 1.14.0 (Python 3.11.9 (tags/v3.11.9:de54cf5, Apr  2 2024, 10:12:12) [MSC v.1938 64 bit (AMD64)]) \u14da\u160f\u15e2
+2026-10-31 05:25:48.321 | INFO     | pipecat.runner.livekit:configure_with_args:188 - User token: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJuYW1lIjoiVXNlciIsInZpZGVvIjp7InJvb21Kb2luIjp0cnVlLCJyb29tIjoiZGVmYXVsdC1yb29tIiwiY2FuUHVibGlzaCI6dHJ1ZSwiY2FuU3Vic2NyaWJlIjp0cnVlLCJjYW5QdWJsaXNoRGF0YSI6dHJ1ZX0sInN1YiI6IlVzZXIiLCJpc3MiOiJBUElkUXBGVmEzbWVkQzMiLCJuYmYiOjE3OTM0MjA3NDgsImV4cCI6MTc5MzQ0MjM0OH0.1kMuapUPjaPxxwssMFoEFaL4zumitlgOCihFwUmEB6o
+2026-10-31 05:25:49.215 | DEBUG    | pipecat.services.anthropic.llm:__init__:371 - AnthropicLLMService#0: Using system instruction: You are a friendly, helpful voice assistant talking with a user over a live video call. Keep your responses short, natural, and conversational since they will be read aloud. Avoid emojis, markdown, bullet points, or any formatting that can't be spoken.
+2026-10-31 05:25:49.217 | DEBUG    | pipecat.audio.vad.silero:__init__:169 - Loading Silero VAD model...
+2026-10-31 05:25:49.347 | DEBUG    | pipecat.audio.vad.silero:__init__:194 - Loaded Silero VAD
+2026-10-31 05:25:49.361 | DEBUG    | pipecat.audio.turn.smart_turn.local_smart_turn_v3:__init__:68 - Loading Local Smart Turn v3.x model from C:\Users\USER\AppData\Local\Programs\Python\Python311\Lib\site-packages\pipecat\audio\turn\smart_turn\data\smart-turn-v3.2-cpu.onnx...
+2026-10-31 05:25:49.518 | DEBUG    | pipecat.audio.turn.smart_turn.local_smart_turn_v3:__init__:78 - Loaded Local Smart Turn v3.x
+2026-10-31 05:25:49.519 | DEBUG    | pipecat.processors.frame_processor:link:696 - Linking Pipeline#0::Source -> LiveKitInputTransport#0
+2026-10-31 05:25:49.520 | DEBUG    | pipecat.processors.frame_processor:link:696 - Linking LiveKitInputTransport#0 -> DeepgramSTTService#0
+2026-10-31 05:25:49.520 | DEBUG    | pipecat.processors.frame_processor:link:696 - Linking DeepgramSTTService#0 -> LLMUserAggregator#0
+2026-10-31 05:25:49.520 | DEBUG    | pipecat.processors.frame_processor:link:696 - Linking LLMUserAggregator#0 -> AnthropicLLMService#0
+2026-10-31 05:25:49.521 | DEBUG    | pipecat.processors.frame_processor:link:696 - Linking AnthropicLLMService#0 -> CartesiaTTSService#0
+2026-10-31 05:25:49.521 | DEBUG    | pipecat.processors.frame_processor:link:696 - Linking CartesiaTTSService#0 -> ThreeWsAvatarProcessor#0
+2026-10-31 05:25:49.521 | DEBUG    | pipecat.processors.frame_processor:link:696 - Linking ThreeWsAvatarProcessor#0 -> LiveKitOutputTransport#0
+2026-10-31 05:25:49.521 | DEBUG    | pipecat.processors.frame_processor:link:696 - Linking LiveKitOutputTransport#0 -> LLMAssistantAggregator#0
+2026-10-31 05:25:49.522 | DEBUG    | pipecat.processors.frame_processor:link:696 - Linking LLMAssistantAggregator#0 -> Pipeline#0::Sink
+2026-10-31 05:25:49.522 | DEBUG    | pipecat.processors.frame_processor:link:696 - Linking PipelineWorker#0::Source -> RTVIProcessor#0
+2026-10-31 05:25:49.523 | DEBUG    | pipecat.processors.frame_processor:link:696 - Linking RTVIProcessor#0 -> Pipeline#0
+2026-10-31 05:25:49.523 | DEBUG    | pipecat.processors.frame_processor:link:696 - Linking Pipeline#0 -> PipelineWorker#0::Sink
+2026-10-31 05:25:49.524 | DEBUG    | pipecat.workers.runner:add_workers:230 - WorkerRunner 'runner-2388c277': added worker 'PipelineWorker#0'
+2026-10-31 05:25:49.525 | DEBUG    | pipecat.workers.runner:run:273 - WorkerRunner 'runner-2388c277': started running
+2026-10-31 05:25:49.525 | DEBUG    | pipecat.workers.runner:_start_worker:459 - WorkerRunner 'runner-2388c277': starting worker 'PipelineWorker#0'
+2026-10-31 05:25:49.527 | INFO     | pipecat.transports.livekit.transport:connect:336 - Connecting to default-room
+2026-10-31 05:25:49.534 | DEBUG    | pipecat.services.deepgram.stt:_connect:630 - Connecting to Deepgram
+2026-10-31 05:25:49.535 | DEBUG    | pipecat.audio.vad.vad_analyzer:set_params:157 - Setting VAD params to: confidence=0.7 start_secs=0.2 stop_secs=0.2 min_volume=0.6
+2026-10-31 05:25:49.536 | DEBUG    | pipecat.services.cartesia.tts:_connect_websocket:685 - Connecting to Cartesia TTS
+2026-10-31 05:25:49.538 | DEBUG    | pipecat.pipeline.worker:_wait_for_pipeline_start:1309 - PipelineWorker#0: Starting. Waiting for StartFrame#0 to reach the end of the pipeline...
+livekit_signaling:433:livekit_signaling - signal connection failed on v1 path: Timeout("transport timed out")
+2026-10-31 05:25:59.397 | DEBUG    | pipecat.services.deepgram.stt:_connection_handler:677 - DeepgramSTTService#0: Websocket connection initialized
+2026-10-31 05:25:59.562 | ERROR    | pipecat.processors.frame_processor:push_error_frame:1023 - CartesiaTTSService#0 exception (C:\Users\USER\AppData\Local\Programs\Python\Python311\Lib\site-packages\websockets\asyncio\client.py:581): Unknown error occurred: timed out during opening handshake
+livekit_signaling:272:livekit_signaling - failed to fetch region urls: failed to retrieve region info: region fetch timed out; surfacing original connection error
+livekit::rtc_engine:562:livekit::rtc_engine - failed to connect: Signal(Timeout("transport timed out")), retrying... (1/3)
+livekit_signaling:433:livekit_signaling - signal connection failed on v1 path: Timeout("transport timed out")
+2026-10-31 05:26:09.548 | ERROR    | pipecat.pipeline.worker:_watch_pipeline_setup:1204 - PipelineWorker#0: timeout setting the pipeline up (a processor blocked while connecting?), stopping the pipeline.
+2026-10-31 05:26:09.550 | DEBUG    | pipecat.services.deepgram.stt:_disconnect:640 - DeepgramSTTService#0: Disconnecting from Deepgram
+livekit_signaling:272:livekit_signaling - failed to fetch region urls: failed to retrieve region info: region fetch timed out; surfacing original connection error
+livekit::rtc_engine:562:livekit::rtc_engine - failed to connect: Signal(Timeout("transport timed out")), retrying... (2/3)
+2026-10-31 05:26:13.403 | WARNING  | pipecat.utils.asyncio.task_manager:cancel_task:254 - DeepgramSTTService#0::_connection_handler: timed out waiting for task to cancel
+2026-10-31 05:26:13.404 | DEBUG    | pipecat.pipeline.worker:run:909 - Pipeline worker PipelineWorker#0 is finishing...
+2026-10-31 05:26:13.404 | DEBUG    | pipecat.pipeline.worker:run:914 - Pipeline worker PipelineWorker#0 has finished
+2026-10-31 05:26:13.405 | DEBUG    | pipecat.workers.runner:run:316 - WorkerRunner 'runner-2388c277': finished running

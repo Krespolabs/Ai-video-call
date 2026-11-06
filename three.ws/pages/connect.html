@@ -1,0 +1,840 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+	<script>/* three.ws theme boot: no-flash */(function(){try{var m=localStorage.getItem('twx_theme');var l=m==='auto'?(window.matchMedia&&window.matchMedia('(prefers-color-scheme: light)').matches):m==='light';document.documentElement.setAttribute('data-theme',l?'light':'dark');}catch(e){document.documentElement.setAttribute('data-theme','dark');}})();</script>
+	<meta charset="utf-8" />
+	<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+	<title data-i18n="connect.meta_title">Connect three.ws to Claude, ChatGPT, Grok Bot, Cursor &amp; VS Code · three.ws</title>
+	<meta name="description" content="Add three.ws to your AI client in two clicks. One connector URL gives Claude, ChatGPT, Grok Bot, Cursor, VS Code or Claude Code the three.ws MCP tools: 3D generation, agents, wallets and x402 payments. Sign in once, no API key to copy."  data-i18n-attr="content:connect.meta_description"/>
+	<link rel="canonical" href="https://three.ws/connect" />
+	<link rel="icon" href="/favicon.ico" sizes="any" />
+	<link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+	<link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+	<link rel="manifest" href="/manifest.webmanifest" />
+	<link rel="stylesheet" href="/style.css" />
+	<link rel="stylesheet" href="/nav.css" />
+	<link rel="stylesheet" href="/mobile.css" />
+	<meta property="og:type" content="website" />
+	<meta property="og:title" content="Connect three.ws to your AI client"  data-i18n-attr="content:connect.meta_og_title"/>
+	<meta property="og:description" content="One URL gives Claude, ChatGPT, Grok Bot, Cursor, VS Code or Claude Code the three.ws MCP tools. Sign in once, no key to copy."  data-i18n-attr="content:connect.meta_og_description"/>
+	<meta property="og:url" content="https://three.ws/connect" />
+	<meta property="og:image" content="https://three.ws/api/page-og?s=learn&amp;t=Connect+three.ws+to+Claude%2C+ChatGPT%2C+Cursor+%26+VS+Code&amp;d=Add+three.ws+to+your+AI+client+in+two+clicks%3A+one+connector+URL+gives+Claude%2C+ChatGPT%2C+Cursor%2C+VS+Code+or+Claude+Code+the+three.ws+MCP+tools+for+3D+generation&amp;p=%2Fconnect" />
+	<meta name="twitter:card" content="summary_large_image" />
+	<meta name="twitter:title" content="Connect three.ws to your AI client"  data-i18n-attr="content:connect.meta_twitter_title"/>
+	<meta name="twitter:description" content="One URL, two clicks: three.ws MCP tools in Claude, ChatGPT, Grok Bot, Cursor, VS Code and Claude Code."  data-i18n-attr="content:connect.meta_twitter_description"/>
+	<meta name="twitter:image" content="https://three.ws/api/page-og?s=learn&amp;t=Connect+three.ws+to+Claude%2C+ChatGPT%2C+Cursor+%26+VS+Code&amp;d=Add+three.ws+to+your+AI+client+in+two+clicks%3A+one+connector+URL+gives+Claude%2C+ChatGPT%2C+Cursor%2C+VS+Code+or+Claude+Code+the+three.ws+MCP+tools+for+3D+generation&amp;p=%2Fconnect" />
+	<meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1" />
+	<meta property="og:locale" content="en_US" />
+	<meta property="og:image:alt" content="Connect three.ws to your AI client" />
+	<meta name="twitter:site" content="@trythreews" />
+	<style>
+		:root { --cn-maxw: 1080px; }
+		* { box-sizing: border-box; }
+		html, body { margin: 0; background: var(--bg-0); color: var(--ink); }
+		body { font-family: var(--font-body, 'Inter', system-ui, sans-serif); min-height: 100vh; }
+		.site-header { position: sticky; top: 0; z-index: 50; background: color-mix(in srgb, var(--bg-0) 82%, transparent); backdrop-filter: blur(10px); }
+		a { color: inherit; }
+		code, pre, kbd { font-family: var(--font-mono, ui-monospace, monospace); }
+
+		/* body is a column flex container, where auto margins shrink-wrap an item
+		   to its content: width: 100% keeps a long connector URL scrolling inside
+		   its box instead of widening the page past the viewport, and min-width: 0
+		   stops the server cards' min-content width from pushing main past a
+		   phone viewport. */
+		.cn-wrap { width: 100%; min-width: 0; max-width: var(--cn-maxw); margin: 0 auto; padding: 0 18px 96px; }
+
+		/* ── hero ───────────────────────────────────────────────────────── */
+		.cn-hero { padding: 40px 0 10px; }
+		.cn-eyebrow { font-size: 0.74rem; text-transform: uppercase; letter-spacing: 0.08em; color: var(--accent); font-weight: 650; margin: 0 0 10px; }
+		.cn-hero h1 { font-size: clamp(1.8rem, 4.6vw, 2.8rem); line-height: 1.1; margin: 0 0 12px; letter-spacing: -0.025em; color: var(--ink-bright, var(--ink)); }
+		.cn-hero p { margin: 0; max-width: 64ch; color: var(--ink-dim); line-height: 1.6; font-size: 1.02rem; }
+		.cn-hero p a { text-decoration: underline; text-underline-offset: 3px; }
+		.cn-hero p a:hover { color: var(--ink-bright, var(--ink)); }
+
+		/* ── section chrome ─────────────────────────────────────────────── */
+		.cn-step { margin-top: 34px; }
+		.cn-step-head { display: flex; align-items: baseline; gap: 12px; margin: 0 0 12px; }
+		.cn-step-num {
+			flex: none; width: 26px; height: 26px; display: inline-grid; place-items: center; border-radius: 999px;
+			font-size: 0.8rem; font-weight: 700; color: var(--accent); border: 1px solid color-mix(in srgb, var(--accent) 55%, transparent);
+			transform: translateY(-2px);
+		}
+		.cn-step-head h2 { margin: 0; font-size: 1.15rem; letter-spacing: -0.01em; color: var(--ink-bright, var(--ink)); }
+		.cn-step-head p { margin: 2px 0 0; font-size: 0.88rem; color: var(--ink-dim); }
+
+		/* ── server picker ──────────────────────────────────────────────── */
+		.cn-servers { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 10px; }
+		.cn-server {
+			position: relative; display: flex; flex-direction: column; gap: 6px; text-align: left; font: inherit; cursor: pointer;
+			padding: 14px 15px 13px; color: var(--ink); background: var(--surface-1, rgba(255,255,255,0.03));
+			border: 1px solid var(--stroke); border-radius: var(--radius-md, 10px);
+			transition: border-color var(--duration-fast) var(--ease-standard), background var(--duration-fast) var(--ease-standard), transform var(--duration-instant) var(--ease-standard);
+		}
+		.cn-server:hover { border-color: var(--stroke-strong); background: var(--surface-2, rgba(255,255,255,0.06)); }
+		.cn-server:active { transform: translateY(1px); }
+		.cn-server:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+		.cn-server[aria-checked="true"] { border-color: var(--accent); background: var(--accent-soft, var(--surface-3)); }
+		.cn-server-top { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+		.cn-server-name { font-weight: 650; font-size: 0.95rem; color: var(--ink-bright, var(--ink)); }
+		.cn-server-desc { font-size: 0.8rem; line-height: 1.45; color: var(--ink-dim); }
+		.cn-server-meta { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 2px; }
+		.cn-pill {
+			font-size: 0.7rem; font-weight: 600; letter-spacing: 0.02em; padding: 3px 8px; border-radius: 999px;
+			border: 1px solid var(--stroke); color: var(--ink-dim); font-variant-numeric: tabular-nums; white-space: nowrap;
+		}
+		.cn-pill[data-tone="free"] { color: var(--success); border-color: color-mix(in srgb, var(--success) 45%, transparent); }
+		.cn-pill[data-tone="oauth"] { color: var(--accent); border-color: color-mix(in srgb, var(--accent) 45%, transparent); }
+		.cn-pill[data-tone="x402"] { color: var(--wallet-accent, var(--warn)); border-color: color-mix(in srgb, var(--wallet-accent, var(--warn)) 45%, transparent); }
+		.cn-skel { height: 118px; border-radius: var(--radius-md, 10px); border: 1px solid var(--stroke); background: linear-gradient(90deg, var(--surface-1, rgba(255,255,255,0.03)) 0%, var(--surface-2, rgba(255,255,255,0.07)) 50%, var(--surface-1, rgba(255,255,255,0.03)) 100%); background-size: 200% 100%; animation: cn-shimmer 1.4s linear infinite; }
+		@keyframes cn-shimmer { from { background-position: 200% 0; } to { background-position: -200% 0; } }
+		.cn-note { margin: 10px 0 0; font-size: 0.84rem; color: var(--ink-dim); line-height: 1.55; }
+		.cn-note[data-tone="error"] { color: var(--danger); }
+		.cn-note button { font: inherit; color: inherit; background: none; border: 0; padding: 0; text-decoration: underline; text-underline-offset: 3px; cursor: pointer; }
+		.cn-note button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 3px; }
+
+		/* ── URL box ────────────────────────────────────────────────────── */
+		.cn-url {
+			display: flex; align-items: stretch; gap: 0; margin-top: 16px;
+			border: 1px solid var(--stroke-strong); border-radius: var(--radius-md, 10px); overflow: hidden;
+			background: var(--surface-2, rgba(255,255,255,0.05));
+		}
+		.cn-url-label { flex: none; display: grid; place-items: center; padding: 0 12px; font-size: 0.72rem; font-weight: 650; text-transform: uppercase; letter-spacing: 0.06em; color: var(--ink-dim); border-right: 1px solid var(--stroke); }
+		.cn-url code { flex: 1; min-width: 0; padding: 13px 14px; font-size: 0.95rem; color: var(--ink-bright, var(--ink)); overflow-x: auto; white-space: nowrap; }
+
+		/* ── cloud-agent connector URL (keyless studio servers) ──────────── */
+		.cn-cloud {
+			margin-top: 14px; padding: 16px 16px 14px; border: 1px dashed var(--stroke-strong); border-radius: var(--radius-md, 10px);
+			background: var(--surface-1, rgba(255,255,255,0.03)); animation: cn-in var(--duration-base, 180ms) var(--ease-standard) both;
+		}
+		.cn-cloud[hidden] { display: none; }
+		.cn-cloud h3 { margin: 0 0 4px; font-size: 0.95rem; color: var(--ink-bright, var(--ink)); }
+		.cn-cloud > p { margin: 0 0 12px; font-size: 0.86rem; line-height: 1.55; color: var(--ink-dim); max-width: 72ch; }
+		.cn-cloud .cn-url { margin-top: 10px; }
+		.cn-cloud .cn-url[hidden] { display: none; }
+		.cn-cloud .cn-url-label { min-width: 92px; }
+		.cn-btn[aria-busy="true"] { opacity: 0.7; cursor: progress; }
+		.cn-btn:disabled { cursor: not-allowed; }
+
+		/* ── buttons ────────────────────────────────────────────────────── */
+		.cn-btn {
+			display: inline-flex; align-items: center; justify-content: center; gap: 8px; text-decoration: none;
+			font: inherit; font-size: 0.88rem; font-weight: 650; padding: 10px 16px; cursor: pointer;
+			color: var(--btn-secondary-fg, var(--ink)); background: var(--btn-secondary-bg, var(--surface-3));
+			border: 1px solid var(--btn-secondary-border, var(--stroke-strong)); border-radius: var(--radius-md, 10px);
+			transition: background var(--duration-fast) var(--ease-standard), transform var(--duration-instant) var(--ease-standard), border-color var(--duration-fast) var(--ease-standard);
+		}
+		.cn-btn:hover { background: var(--btn-secondary-bg-hover, rgba(255,255,255,0.12)); }
+		.cn-btn:active { transform: translateY(1px); }
+		.cn-btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+		.cn-btn[data-variant="primary"] { color: var(--btn-primary-fg, #fff); background: var(--btn-primary-bg, var(--accent)); border-color: var(--btn-primary-border, transparent); }
+		.cn-btn[data-variant="primary"]:hover { background: var(--btn-primary-bg-hover, var(--accent)); }
+		.cn-btn[data-variant="primary"]:active { background: var(--btn-primary-bg-active, var(--accent)); }
+		.cn-btn svg { width: 16px; height: 16px; flex: none; }
+		.cn-url .cn-btn { border-radius: 0; border-width: 0 0 0 1px; }
+		.cn-btn[data-copied="true"] { color: var(--success); }
+
+		/* ── client tabs ────────────────────────────────────────────────── */
+		.cn-tabs { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 14px; }
+		.cn-tab {
+			font: inherit; font-size: 0.86rem; font-weight: 600; padding: 7px 14px; cursor: pointer; color: var(--ink-dim);
+			background: transparent; border: 1px solid var(--stroke); border-radius: 999px;
+			transition: color var(--duration-fast) var(--ease-standard), border-color var(--duration-fast) var(--ease-standard), background var(--duration-fast) var(--ease-standard);
+		}
+		.cn-tab:hover { color: var(--ink); border-color: var(--stroke-strong); background: var(--surface-1, rgba(255,255,255,0.04)); }
+		.cn-tab:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+		.cn-tab[aria-selected="true"] { color: var(--ink-bright, var(--ink)); border-color: var(--accent); background: var(--accent-soft, var(--surface-3)); }
+		.cn-panel {
+			border: 1px solid var(--stroke); border-radius: var(--radius-lg, 14px); padding: 20px 20px 22px;
+			background: linear-gradient(180deg, var(--surface-2, rgba(255,255,255,0.05)), transparent 70%);
+			animation: cn-in var(--duration-base, 180ms) var(--ease-standard) both;
+		}
+		@keyframes cn-in { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: none; } }
+		.cn-panel[hidden] { display: none; }
+		.cn-panel-lede { margin: 0 0 14px; font-size: 0.92rem; line-height: 1.6; color: var(--ink-dim); max-width: 70ch; }
+		.cn-panel-lede strong { color: var(--ink-bright, var(--ink)); font-weight: 650; }
+		.cn-actions { display: flex; flex-wrap: wrap; gap: 8px; margin: 0 0 16px; }
+		.cn-list { margin: 0; padding: 0 0 0 20px; display: grid; gap: 8px; font-size: 0.9rem; line-height: 1.55; color: var(--ink); max-width: 72ch; }
+		.cn-list li::marker { color: var(--ink-dim); font-variant-numeric: tabular-nums; }
+		.cn-list kbd { font-size: 0.78rem; padding: 1px 6px; border: 1px solid var(--stroke); border-radius: 5px; background: var(--surface-1, rgba(255,255,255,0.04)); }
+		.cn-list code { font-size: 0.84rem; padding: 1px 5px; border-radius: 5px; background: var(--surface-1, rgba(255,255,255,0.05)); }
+		.cn-src { margin: 14px 0 0; font-size: 0.78rem; color: var(--ink-faint, var(--ink-dim)); }
+		.cn-src a { text-decoration: underline; text-underline-offset: 3px; }
+		.cn-src a:hover { color: var(--ink); }
+
+		.cn-snippet { position: relative; margin: 0 0 14px; }
+		.cn-snippet-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin: 0 0 6px; font-size: 0.74rem; text-transform: uppercase; letter-spacing: 0.06em; color: var(--ink-dim); }
+		.cn-snippet-head .cn-btn { font-size: 0.76rem; padding: 4px 10px; text-transform: none; letter-spacing: 0; }
+		.cn-snippet pre {
+			margin: 0; padding: 13px 14px; font-size: 0.84rem; line-height: 1.55; overflow-x: auto;
+			color: var(--ink-bright, var(--ink)); background: var(--bg-1, rgba(0,0,0,0.3));
+			border: 1px solid var(--stroke); border-radius: var(--radius-md, 10px);
+		}
+
+		.cn-cloud-actions { margin: 0 0 12px; }
+		.cn-url-second { margin-top: 8px; }
+		.cn-note a { text-decoration: underline; text-underline-offset: 3px; }
+
+		/* ── worth knowing ──────────────────────────────────────────────── */
+		.cn-facts { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 10px; }
+		.cn-fact { padding: 15px 16px; border: 1px solid var(--stroke); border-radius: var(--radius-md, 10px); background: var(--surface-1, rgba(255,255,255,0.03)); }
+		.cn-fact h3 { margin: 0 0 6px; font-size: 0.92rem; color: var(--ink-bright, var(--ink)); }
+		.cn-fact p { margin: 0; font-size: 0.84rem; line-height: 1.55; color: var(--ink-dim); }
+		.cn-fact a { text-decoration: underline; text-underline-offset: 3px; }
+		.cn-fact a:hover { color: var(--ink); }
+
+		.cn-next { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 30px; }
+
+		@media (max-width: 640px) {
+			.cn-hero { padding-top: 26px; }
+			.cn-url { flex-wrap: wrap; }
+			.cn-url-label { display: none; }
+			.cn-url code { flex-basis: 100%; }
+			.cn-url .cn-btn { flex: 1; border-width: 1px 0 0 0; }
+			.cn-cloud .cn-url-label { display: block; flex-basis: 100%; padding: 9px 14px 0; border-right: 0; }
+			.cn-cloud .cn-url code { padding-top: 6px; }
+			.cn-panel { padding: 16px 14px 18px; }
+		}
+		@media (prefers-reduced-motion: reduce) {
+			.cn-skel, .cn-panel { animation: none; }
+			.cn-server, .cn-btn, .cn-tab { transition: none; }
+		}
+	</style>
+	<script type="application/ld+json">{"@context":"https://schema.org","@type":"HowTo","name":"Connect three.ws to an AI client","description":"Add the three.ws MCP server to Claude, ChatGPT, Grok Bot, Cursor, VS Code or Claude Code with one connector URL and a single sign-in.","url":"https://three.ws/connect","step":[{"@type":"HowToStep","name":"Pick a server","text":"Choose which hosted three.ws MCP server to connect. The default three.ws server carries the core tools."},{"@type":"HowToStep","name":"Add it to your client","text":"Use the one-click link for Claude, Cursor or VS Code, or paste the connector URL into ChatGPT, Grok Bot or any MCP client. Grok Bot takes it as a custom MCP connector with Streamable HTTP transport, and connects from xAI's cloud, so the URL must be public."},{"@type":"HowToStep","name":"Sign in","text":"Your client opens three.ws sign-in. Approve the permissions and the tools appear. No API key to copy. The free 3D servers need no sign-in at all, so Grok Bot can use them with authentication set to None."}]}</script>
+
+	<meta property="og:site_name" content="three.ws">
+</head>
+<body>
+	<header class="site-header"><div id="nav-container"></div></header>
+	<script src="/nav.js"></script>
+
+	<main class="cn-wrap" id="main">
+		<section class="cn-hero">
+			<p class="cn-eyebrow" data-i18n="connect.connector">Connector</p>
+			<h1 data-i18n="connect.one_url_your_ai_gets_three_ws">One URL. Your AI gets three.ws.</h1>
+			<p data-i18n-html="connect.add_three_ws_to_claude_chatgpt_cursor">
+				Add three.ws to Claude, ChatGPT, Grok Bot, Cursor, VS Code or Claude Code and your assistant can generate 3D models and avatars,
+				run your agents, read their wallets and pay for services over x402. Sign in once in your browser: there is no API key
+				to copy. Every tool is listed in the <a href="/mcp-tools">MCP tool catalog</a>.
+			</p>
+		</section>
+
+		<section class="cn-step" aria-labelledby="cn-step1">
+			<div class="cn-step-head">
+				<span class="cn-step-num" aria-hidden="true">1</span>
+				<div>
+					<h2 id="cn-step1" data-i18n="connect.pick_a_server">Pick a server</h2>
+					<p data-i18n-html="connect.start_with_three_ws_add_others_later">Start with <strong>three.ws</strong>. Add others later; each is its own connector.</p>
+				</div>
+			</div>
+			<div class="cn-servers" id="cn-servers" role="radiogroup" aria-label="Hosted MCP servers" aria-busy="true">
+				<div class="cn-skel" aria-hidden="true"></div>
+				<div class="cn-skel" aria-hidden="true"></div>
+				<div class="cn-skel" aria-hidden="true"></div>
+			</div>
+			<p class="cn-note" id="cn-servers-note" role="status" aria-live="polite"></p>
+
+			<div class="cn-url">
+				<span class="cn-url-label" data-i18n="connect.url">URL</span>
+				<code id="cn-url">https://three.ws/api/mcp</code>
+				<button type="button" class="cn-btn" id="cn-copy-url" data-copy-target="cn-url">
+					<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg>
+					<span data-i18n="connect.copy_url">Copy URL</span>
+				</button>
+			</div>
+
+			<div class="cn-cloud" id="cn-cloud" aria-labelledby="cn-cloud-title" hidden>
+				<h3 id="cn-cloud-title" data-i18n="connect.connector_url_for_cloud_agents">Connector URL for cloud agents</h3>
+				<p data-i18n-html="connect.cloud_agents_share_one_ip">Grok Bot and other hosted agents reach three.ws from one shared IP, so every user of that agent shares one free quota. A free <strong>install token</strong> gives your connector a quota of its own. No account, no key.</p>
+				<button type="button" class="cn-btn" data-variant="primary" id="cn-cloud-make">Generate my connector URL</button>
+				<div class="cn-url" id="cn-cloud-any-row" hidden>
+					<span class="cn-url-label" data-i18n="connect.any_client">Any client</span>
+					<code id="cn-cloud-any"></code>
+					<button type="button" class="cn-btn" data-copy-target="cn-cloud-any"><span data-i18n="connect.copy">Copy</span></button>
+				</div>
+				<div class="cn-url" id="cn-cloud-grok-row" hidden>
+					<span class="cn-url-label" data-i18n="connect.grok_bot">Grok Bot</span>
+					<code id="cn-cloud-grok"></code>
+					<button type="button" class="cn-btn" data-copy-target="cn-cloud-grok"><span data-i18n="connect.copy">Copy</span></button>
+				</div>
+				<p class="cn-note" id="cn-cloud-note" role="status" aria-live="polite"></p>
+			</div>
+		</section>
+
+		<section class="cn-step" aria-labelledby="cn-step2">
+			<div class="cn-step-head">
+				<span class="cn-step-num" aria-hidden="true">2</span>
+				<div>
+					<h2 id="cn-step2" data-i18n="connect.add_it_to_your_client">Add it to your client</h2>
+					<p data-i18n="connect.links_open_your_client_with_the_server">Links open your client with the server filled in. You still review it and confirm.</p>
+				</div>
+			</div>
+
+			<div class="cn-tabs" role="tablist" aria-label="AI clients">
+				<button type="button" class="cn-tab" role="tab" id="tab-claude" aria-controls="panel-claude" data-client="claude" data-i18n="connect.claude">Claude</button>
+				<button type="button" class="cn-tab" role="tab" id="tab-chatgpt" aria-controls="panel-chatgpt" data-client="chatgpt" data-i18n="connect.chatgpt">ChatGPT</button>
+				<button type="button" class="cn-tab" role="tab" id="tab-grok" aria-controls="panel-grok" data-client="grok" data-i18n="connect.grok_bot">Grok Bot</button>
+				<button type="button" class="cn-tab" role="tab" id="tab-claude-code" aria-controls="panel-claude-code" data-client="claude-code" data-i18n="connect.claude_code">Claude Code</button>
+				<button type="button" class="cn-tab" role="tab" id="tab-cursor" aria-controls="panel-cursor" data-client="cursor" data-i18n="connect.cursor">Cursor</button>
+				<button type="button" class="cn-tab" role="tab" id="tab-vscode" aria-controls="panel-vscode" data-client="vscode" data-i18n="connect.vs_code">VS Code</button>
+				<button type="button" class="cn-tab" role="tab" id="tab-bob" aria-controls="panel-bob" data-client="bob" data-i18n="connect.ibm_bob">IBM Bob</button>
+				<button type="button" class="cn-tab" role="tab" id="tab-other" aria-controls="panel-other" data-client="other" data-i18n="connect.other_clients">Other clients</button>
+			</div>
+
+			<div class="cn-panel" role="tabpanel" id="panel-claude" aria-labelledby="tab-claude" tabindex="0">
+				<p class="cn-panel-lede" data-i18n="connect.works_on_claude_ai_and_the_claude">Works on claude.ai and the Claude desktop app, on every plan. Free accounts can add one custom connector. On Team and Enterprise, only owners can add one.</p>
+				<div class="cn-actions">
+					<a class="cn-btn" data-variant="primary" id="cn-claude-link" href="https://claude.ai/customize/connectors?modal=add-custom-connector&amp;connectorName=three.ws&amp;connectorUrl=https%3A%2F%2Fthree.ws%2Fapi%2Fmcp" target="_blank" rel="noopener" data-i18n="connect.open_claude_with_the_url_filled_in">Open Claude with the URL filled in</a>
+				</div>
+				<ol class="cn-list">
+					<li data-i18n-html="connect.click_the_button_above_check_the_name">Click the button above, check the name and URL, then click <strong>Add</strong>. Adding it by hand instead: <strong>Customize → Connectors</strong> (Settings → Connectors on some accounts), <strong>Add custom connector</strong>, paste the URL.</li>
+					<li data-i18n-html="connect.click_connect_and_sign_in_to_three">Click <strong>Connect</strong> and sign in to three.ws with Google, your wallet, or your email. The permissions screen groups what Claude asked for into Read, Manage, Trade, Spend and Launch: untick any group you do not want it to have, then approve.</li>
+					<li data-i18n-html="connect.in_a_chat_open_the_menu_then">In a chat, open the <kbd>+</kbd> menu, then <strong>Connectors</strong>, and switch three.ws on for that conversation.</li>
+				</ol>
+				<p class="cn-src" data-i18n-html="connect.steps_follow_claude_s_own_guide_its">Steps follow <a href="https://support.claude.com/en/articles/11175166-get-started-with-custom-connectors-using-remote-mcp" target="_blank" rel="noopener">Claude's own guide</a>. Its menus move: if these drift, <a href="https://github.com/nirholas/three.ws/issues" target="_blank" rel="noopener">tell us</a>.</p>
+			</div>
+
+			<div class="cn-panel" role="tabpanel" id="panel-chatgpt" aria-labelledby="tab-chatgpt" tabindex="0" hidden>
+				<p class="cn-panel-lede" data-i18n-html="connect.chatgpt_adds_custom_mcp_servers_through_deve">ChatGPT adds custom MCP servers through <strong>Developer mode</strong>, on the plans where OpenAI offers it. There is no pre-filled link, so copy the URL first.</p>
+				<div class="cn-actions">
+					<button type="button" class="cn-btn" data-variant="primary" data-copy-target="cn-url" data-i18n="connect.copy_the_connector_url">Copy the connector URL</button>
+				</div>
+				<ol class="cn-list">
+					<li data-i18n-html="connect.in_settings_apps_connectors_advanced_setting">In <strong>Settings → Apps &amp; Connectors → Advanced settings</strong>, turn on <strong>Developer mode</strong>.</li>
+					<li data-i18n-html="connect.back_in_apps_connectors_click_create_name">Back in <strong>Apps &amp; Connectors</strong>, click <strong>Create</strong>. Name it <code class="cn-name">three.ws</code>, paste the URL, choose <strong>OAuth</strong>, and create it.</li>
+					<li data-i18n="connect.sign_in_to_three_ws_when_chatgpt">Sign in to three.ws when ChatGPT asks, with Google, your wallet, or your email, and approve the permissions. If Claude is already connected it stays connected: each client has its own grant.</li>
+					<li data-i18n-html="connect.in_a_new_chat_open_the_menu">In a new chat, open the <kbd>+</kbd> menu, choose <strong>Developer mode</strong>, and tick three.ws.</li>
+				</ol>
+				<p class="cn-src" data-i18n-html="connect.steps_follow_openai_s_developer_mode_guide">Steps follow <a href="https://help.openai.com/en/articles/12584461-developer-mode-apps-and-full-mcp-connectors-in-chatgpt-beta" target="_blank" rel="noopener">OpenAI's developer mode guide</a>. Its labels change often: if these drift, <a href="https://github.com/nirholas/three.ws/issues" target="_blank" rel="noopener">tell us</a>.</p>
+			</div>
+
+			<div class="cn-panel" role="tabpanel" id="panel-grok" aria-labelledby="tab-grok" tabindex="0" hidden>
+				<div id="cn-grok-card"></div>
+			</div>
+
+			<div class="cn-panel" role="tabpanel" id="panel-claude-code" aria-labelledby="tab-claude-code" tabindex="0" hidden>
+				<p class="cn-panel-lede" data-i18n="connect.one_command_adds_the_server_the_first">One command adds the server. The first time a tool needs your account, Claude Code opens three.ws sign-in in your browser.</p>
+				<div class="cn-snippet">
+					<div class="cn-snippet-head"><span data-i18n="connect.terminal">Terminal</span><button type="button" class="cn-btn" data-copy-target="cn-cc-cmd" data-i18n="connect.copy">Copy</button></div>
+					<pre><code id="cn-cc-cmd">claude mcp add --transport http three-ws-main https://three.ws/api/mcp</code></pre>
+				</div>
+				<ol class="cn-list">
+					<li data-i18n-html="connect.run_the_command_add_to_share_it">Run the command. Add <code>--scope project</code> to share it with your team through <code>.mcp.json</code>.</li>
+					<li data-i18n-html="connect.in_claude_code_type_pick_the_server">In Claude Code, type <code>/mcp</code>, pick the server you just added and choose <strong>Authenticate</strong>.</li>
+				</ol>
+				<p class="cn-panel-lede" data-i18n-html="connect.or_let_one_script_do_all_of_it">Or let one command do all of it: it signs you in, writes the server and the three.ws skill, and keeps every key out of your config file. <a href="/docs/cli#verify-before-you-run">Read the script and check its signature first</a>.</p>
+				<div class="cn-snippet">
+					<div class="cn-snippet-head"><span data-i18n="connect.terminal">Terminal</span><button type="button" class="cn-btn" data-copy-target="cn-cc-quick" data-i18n="connect.copy">Copy</button></div>
+					<pre><code id="cn-cc-quick">npx three-ws --claude</code></pre>
+				</div>
+			</div>
+
+			<div class="cn-panel" role="tabpanel" id="panel-cursor" aria-labelledby="tab-cursor" tabindex="0" hidden>
+				<p class="cn-panel-lede" data-i18n="connect.the_button_opens_cursor_s_install_prompt">The button opens Cursor's install prompt with the server filled in. Cursor then runs the three.ws sign-in.</p>
+				<div class="cn-actions">
+					<a class="cn-btn" data-variant="primary" id="cn-cursor-link" href="cursor://anysphere.cursor-deeplink/mcp/install?name=three-ws-main&amp;config=eyJ1cmwiOiJodHRwczovL3RocmVlLndzL2FwaS9tY3AifQ%3D%3D" data-i18n="connect.add_to_cursor">Add to Cursor</a>
+				</div>
+				<div class="cn-snippet">
+					<div class="cn-snippet-head"><span data-i18n="connect.or_add_it_to_cursor_mcp_json">Or add it to ~/.cursor/mcp.json</span><button type="button" class="cn-btn" data-copy-target="cn-cursor-json" data-i18n="connect.copy_2">Copy</button></div>
+					<pre><code id="cn-cursor-json">{
+  "mcpServers": {
+    "three-ws-main": { "url": "https://three.ws/api/mcp" }
+  }
+}</code></pre>
+				</div>
+				<p class="cn-src" data-i18n-html="connect.link_format_from_cursor_s_install_link">Link format from <a href="https://cursor.com/docs/context/mcp/install-links" target="_blank" rel="noopener">Cursor's install-link docs</a>.</p>
+			</div>
+
+			<div class="cn-panel" role="tabpanel" id="panel-vscode" aria-labelledby="tab-vscode" tabindex="0" hidden>
+				<p class="cn-panel-lede" data-i18n="connect.for_github_copilot_agent_mode_in_vs">For GitHub Copilot agent mode in VS Code. The button opens VS Code's install prompt; the server signs you in on first use.</p>
+				<div class="cn-actions">
+					<a class="cn-btn" data-variant="primary" id="cn-vscode-link" href="vscode:mcp/install?%7B%22name%22%3A%22three-ws-main%22%2C%22type%22%3A%22http%22%2C%22url%22%3A%22https%3A%2F%2Fthree.ws%2Fapi%2Fmcp%22%7D" data-i18n="connect.add_to_vs_code">Add to VS Code</a>
+					<a class="cn-btn" id="cn-vscode-insiders-link" href="vscode-insiders:mcp/install?%7B%22name%22%3A%22three-ws-main%22%2C%22type%22%3A%22http%22%2C%22url%22%3A%22https%3A%2F%2Fthree.ws%2Fapi%2Fmcp%22%7D" data-i18n="connect.vs_code_insiders">VS Code Insiders</a>
+				</div>
+				<div class="cn-snippet">
+					<div class="cn-snippet-head"><span data-i18n="connect.or_add_it_to_vscode_mcp_json">Or add it to .vscode/mcp.json</span><button type="button" class="cn-btn" data-copy-target="cn-vscode-json" data-i18n="connect.copy_3">Copy</button></div>
+					<pre><code id="cn-vscode-json">{
+  "servers": {
+    "three-ws-main": { "type": "http", "url": "https://three.ws/api/mcp" }
+  }
+}</code></pre>
+				</div>
+				<p class="cn-src" data-i18n-html="connect.link_format_from_vs_code_s_mcp">Link format from <a href="https://code.visualstudio.com/api/extension-guides/ai/mcp" target="_blank" rel="noopener">VS Code's MCP developer guide</a>.</p>
+			</div>
+
+			<div class="cn-panel" role="tabpanel" id="panel-bob" aria-labelledby="tab-bob" tabindex="0" hidden>
+				<p class="cn-panel-lede" data-i18n-html="connect.ibm_bob_reads_mcp_servers_from">IBM Bob reads MCP servers from <code>.bob/mcp.json</code> in your project, or <code>~/.bob/settings/mcp.json</code> for every workspace. Pick <strong>3D Studio (free)</strong> above to connect with no sign-in; a server that needs sign-in runs Bob's built-in OAuth flow on first connect.</p>
+				<div class="cn-snippet">
+					<div class="cn-snippet-head"><span data-i18n="connect.add_it_to_bob_mcp_json">Add it to .bob/mcp.json</span><button type="button" class="cn-btn" data-copy-target="cn-bob-json" data-i18n="connect.copy_bob">Copy</button></div>
+					<pre><code id="cn-bob-json">{
+  "mcpServers": {
+    "three-ws-main": { "type": "streamable-http", "url": "https://three.ws/api/mcp" }
+  }
+}</code></pre>
+				</div>
+				<ol class="cn-list">
+					<li data-i18n-html="connect.in_the_bob_panel_open_settings">In the Bob panel, open <strong>Settings → MCP</strong> and click <strong>Edit Project MCP</strong> (or <strong>Edit Global MCP</strong>), paste the entry, and save.</li>
+					<li data-i18n-html="connect.bob_shell_reads_the_same_files">Using Bob Shell? It reads the same files but names the URL key <code>httpURL</code>, so rename <code>url</code> to <code>httpURL</code>. Or let the CLI write it: <code>npx three-ws setup --clients bob</code>.</li>
+				</ol>
+				<p class="cn-src" data-i18n-html="connect.config_format_from_ibm_bob_s_mcp">Config format from <a href="https://bob.ibm.com/docs/ide/configuration/mcp/mcp-in-bob" target="_blank" rel="noopener">IBM Bob's MCP docs</a>.</p>
+			</div>
+
+			<div class="cn-panel" role="tabpanel" id="panel-other" aria-labelledby="tab-other" tabindex="0" hidden>
+				<p class="cn-panel-lede" data-i18n-html="connect.any_client_that_speaks_streamable_http_mcp">Any client that speaks <strong>Streamable HTTP</strong> MCP can connect. Clients with OAuth support sign you in automatically from the server's <code>WWW-Authenticate</code> header. Clients without it can send an API key from <a href="/dashboard/api">Dashboard → API</a> as <code>Authorization: Bearer</code>.</p>
+				<div class="cn-snippet">
+					<div class="cn-snippet-head"><span data-i18n="connect.mcp_json">mcp.json</span><button type="button" class="cn-btn" data-copy-target="cn-other-json" data-i18n="connect.copy_4">Copy</button></div>
+					<pre><code id="cn-other-json">{
+  "mcpServers": {
+    "three-ws-main": { "type": "http", "url": "https://three.ws/api/mcp" }
+  }
+}</code></pre>
+				</div>
+				<p class="cn-src" data-i18n-html="connect.every_hosted_server_with_its_auth_and">Every hosted server, with its auth and resources, is listed machine-readably at <a href="/.well-known/mcp.json">/.well-known/mcp.json</a>.</p>
+			</div>
+		</section>
+
+		<section class="cn-step" aria-labelledby="cn-cloud">
+			<div class="cn-step-head">
+				<div>
+					<h2 id="cn-cloud">Connector URL for cloud agents</h2>
+					<p>Grok Bot, the xAI API and other hosted agents share one network address, so they share one generation allowance unless each installation has its own. Get a free, anonymous token: no account.</p>
+				</div>
+			</div>
+			<div class="cn-cloud-actions">
+				<button type="button" class="cn-btn" id="cn-cloud-mint">Generate my connector URL</button>
+			</div>
+			<div id="cn-cloud-result" hidden>
+				<div class="cn-url">
+					<span class="cn-url-label">Grok</span>
+					<code id="cn-cloud-grok"></code>
+					<button type="button" class="cn-btn" data-copy-target="cn-cloud-grok">Copy URL</button>
+				</div>
+				<div class="cn-url cn-url-second">
+					<span class="cn-url-label">Studio</span>
+					<code id="cn-cloud-studio"></code>
+					<button type="button" class="cn-btn" data-copy-target="cn-cloud-studio">Copy URL</button>
+				</div>
+			</div>
+			<p class="cn-note" id="cn-cloud-note" role="status" aria-live="polite">Keep the URL private: whoever holds it spends your installation's budget. <a href="/docs/mcp-studio">How install tokens work</a>.</p>
+		</section>
+
+		<section class="cn-step" aria-labelledby="cn-step3">
+			<div class="cn-step-head">
+				<span class="cn-step-num" aria-hidden="true">3</span>
+				<div>
+					<h2 id="cn-step3" data-i18n="connect.worth_knowing">Worth knowing</h2>
+				</div>
+			</div>
+			<div class="cn-facts">
+				<div class="cn-fact">
+					<h3 data-i18n="connect.you_never_copy_a_key">You never copy a key</h3>
+					<p data-i18n="connect.signing_in_gives_your_client_its_own">Signing in gives your client its own token for your three.ws account, with the permissions you approved on the consent screen. Tools act on the agents and wallets of the account you sign in with.</p>
+				</div>
+				<div class="cn-fact">
+					<h3 data-i18n="connect.revoke_it_any_time">Revoke it any time</h3>
+					<p data-i18n-html="connect.every_client_you_connect_appears_under_dashb">Every client you connect appears under <a href="/dashboard/settings#connected-apps">Dashboard → Settings → Connected apps</a>. Revoking one stops that client on its very next request. Your other clients, your agents and your balances are untouched.</p>
+				</div>
+				<div class="cn-fact">
+					<h3 data-i18n="connect.permissions_come_in_groups">Permissions come in groups</h3>
+					<p data-i18n-html="connect.the_consent_screen_groups_what_a_client">The consent screen groups what a client asked for into <strong>Read</strong>, <strong>Manage</strong>, <strong>Trade</strong>, <strong>Spend</strong> and <strong>Launch</strong>, says what each can do and which actions will still ask you first, and lets you untick any group but Read. A client you connect for reading can never trade or move funds. <a href="/docs/mcp#cloud-connectors-grok-bot-and-other-hosted-agents">What each group covers</a>.</p>
+				</div>
+				<div class="cn-fact">
+					<h3 data-i18n="connect.every_tool_is_labelled">Every tool is labelled</h3>
+					<p data-i18n-html="connect.each_tool_declares_whether_it_only_reads">Each tool declares whether it only reads, writes, or does something irreversible, so your client knows what to ask you about. The <a href="/mcp-tools">tool catalog</a> has a ready-made trust policy to paste in.</p>
+				</div>
+				<div class="cn-fact">
+					<h3 data-i18n="connect.try_it_without_an_account">Try it without an account</h3>
+					<p data-i18n-html="connect.the_3d_studio_free_server_needs_no">The <strong>3D Studio (free)</strong> server needs no sign-in: text to 3D, image to 3D and rigged avatars. Pick it above and connect in seconds.</p>
+				</div>
+			</div>
+		</section>
+
+		<nav class="cn-next" aria-label="Related">
+			<a class="cn-btn" href="/mcp-tools" data-i18n="connect.browse_every_tool">Browse every tool</a>
+			<a class="cn-btn" href="/docs/mcp" data-i18n="connect.mcp_docs">MCP docs</a>
+			<a class="cn-btn" href="/docs/cli" data-i18n="connect.command_line_setup">Command-line setup</a>
+		</nav>
+	</main>
+
+	<script src="/brand.js" defer></script>
+	<script type="module">
+		import { GROK_ENDPOINT, mountGrokConnector, slugForEndpoint } from '/src/grok-connector.js';
+
+		const PROD_ORIGIN = 'https://three.ws';
+		const DEFAULT_ENDPOINT = `${PROD_ORIGIN}/api/mcp`;
+		const CLIENTS = ['claude', 'chatgpt', 'grok', 'claude-code', 'cursor', 'vscode', 'bob', 'other'];
+
+		const serversEl = document.getElementById('cn-servers');
+		const noteEl = document.getElementById('cn-servers-note');
+		const urlEl = document.getElementById('cn-url');
+
+		const state = { servers: [], selected: null };
+
+		// The config key each client stores the server under: the three-ws CLI's
+		// rule, shared with the Grok Bot card (src/grok-connector.js).
+		const slugFor = (server) => slugForEndpoint(server.endpoint);
+		function displayName(server) {
+			return server.endpoint === DEFAULT_ENDPOINT ? 'three.ws' : `three.ws ${server.name}`;
+		}
+
+		function authPill(server) {
+			const auth = String(server.auth || '').toLowerCase();
+			// A server with a sign-in URL serves anonymous callers too; signing in
+			// only adds the caller's account tools (/api/mcp-grok).
+			if (server.signIn) return { text: 'Free, sign-in optional', tone: 'free' };
+			if (auth === 'none' || auth.startsWith('none ')) return { text: 'No sign-in', tone: 'free' };
+			if (auth.startsWith('x402')) return { text: 'Pay per call', tone: 'x402' };
+			return { text: 'Sign in', tone: 'oauth' };
+		}
+
+		function renderServers() {
+			serversEl.replaceChildren();
+			for (const server of state.servers) {
+				const btn = document.createElement('button');
+				btn.type = 'button';
+				btn.className = 'cn-server';
+				btn.setAttribute('role', 'radio');
+				btn.dataset.endpoint = server.endpoint;
+				const checked = server === state.selected;
+				btn.setAttribute('aria-checked', String(checked));
+				btn.tabIndex = checked ? 0 : -1;
+
+				const top = document.createElement('span');
+				top.className = 'cn-server-top';
+				const name = document.createElement('span');
+				name.className = 'cn-server-name';
+				name.textContent = server.name;
+				top.append(name);
+
+				const desc = document.createElement('span');
+				desc.className = 'cn-server-desc';
+				desc.textContent = server.description;
+
+				const meta = document.createElement('span');
+				meta.className = 'cn-server-meta';
+				const pill = authPill(server);
+				const authEl = document.createElement('span');
+				authEl.className = 'cn-pill';
+				authEl.dataset.tone = pill.tone;
+				authEl.textContent = pill.text;
+				meta.append(authEl);
+				if (Number.isFinite(server.tools)) {
+					const tools = document.createElement('span');
+					tools.className = 'cn-pill';
+					tools.textContent = `${server.tools} tool${server.tools === 1 ? '' : 's'}`;
+					meta.append(tools);
+				}
+
+				btn.append(top, desc, meta);
+				btn.addEventListener('click', () => select(server, true));
+				serversEl.append(btn);
+			}
+			serversEl.setAttribute('aria-busy', 'false');
+		}
+
+		// Arrow keys move between servers, as a radiogroup should.
+		serversEl.addEventListener('keydown', (e) => {
+			if (!['ArrowRight', 'ArrowDown', 'ArrowLeft', 'ArrowUp', 'Home', 'End'].includes(e.key)) return;
+			const i = state.servers.indexOf(state.selected);
+			if (i < 0) return;
+			e.preventDefault();
+			const n = state.servers.length;
+			const next = e.key === 'Home' ? 0 : e.key === 'End' ? n - 1
+				: (e.key === 'ArrowRight' || e.key === 'ArrowDown') ? (i + 1) % n : (i - 1 + n) % n;
+			select(state.servers[next], true);
+			serversEl.querySelectorAll('.cn-server')[next]?.focus();
+		});
+
+		function b64(str) {
+			return btoa(String.fromCharCode(...new TextEncoder().encode(str)));
+		}
+
+		function applyServer(server) {
+			const url = server.endpoint;
+			const slug = slugFor(server);
+			const name = displayName(server);
+			urlEl.textContent = url;
+
+			const claude = new URL('https://claude.ai/customize/connectors');
+			claude.searchParams.set('modal', 'add-custom-connector');
+			claude.searchParams.set('connectorName', name);
+			claude.searchParams.set('connectorUrl', url);
+			document.getElementById('cn-claude-link').href = claude.toString();
+
+			document.getElementById('cn-cursor-link').href =
+				`cursor://anysphere.cursor-deeplink/mcp/install?name=${encodeURIComponent(slug)}&config=${encodeURIComponent(b64(JSON.stringify({ url })))}`;
+
+			const vsConfig = encodeURIComponent(JSON.stringify({ name: slug, type: 'http', url }));
+			document.getElementById('cn-vscode-link').href = `vscode:mcp/install?${vsConfig}`;
+			document.getElementById('cn-vscode-insiders-link').href = `vscode-insiders:mcp/install?${vsConfig}`;
+
+			document.getElementById('cn-cc-cmd').textContent = `claude mcp add --transport http ${slug} ${url}`;
+			document.getElementById('cn-cursor-json').textContent = JSON.stringify({ mcpServers: { [slug]: { url } } }, null, 2);
+			document.getElementById('cn-vscode-json').textContent = JSON.stringify({ servers: { [slug]: { type: 'http', url } } }, null, 2);
+			document.getElementById('cn-bob-json').textContent = JSON.stringify({ mcpServers: { [slug]: { type: 'streamable-http', url } } }, null, 2);
+			document.getElementById('cn-other-json').textContent = JSON.stringify({ mcpServers: { [slug]: { type: 'http', url } } }, null, 2);
+			for (const el of document.querySelectorAll('.cn-name')) el.textContent = name;
+			grokCard.update(server, { grokAvailable: state.servers.some((s) => s.endpoint === GROK_ENDPOINT) });
+		}
+
+		// Grok Bot takes a custom MCP connector as a form, so its panel is the
+		// shared connector card, kept on whichever server is picked above.
+		const grokCard = mountGrokConnector(document.getElementById('cn-grok-card'), {
+			onUseGrok() {
+				const grokServer = state.servers.find((s) => s.endpoint === GROK_ENDPOINT);
+				if (!grokServer) return;
+				select(grokServer, true);
+				document.getElementById('gc-url').scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+			},
+		});
+		grokCard.update({ endpoint: DEFAULT_ENDPOINT, auth: 'oauth' });
+
+		// ── cloud-agent connector URL ───────────────────────────────────────
+		// Keyless studio servers accept ?install=<token>, which keys their free
+		// quota on the token instead of the caller's IP. The token comes from the
+		// real mint endpoint and is kept in this browser, so a revisit shows the
+		// same URL instead of minting another (minting is rate-limited per IP).
+		const INSTALL_PATHS = new Set(['/api/mcp-studio', '/api/mcp-grok', '/api/mcp-chatgpt']);
+		const INSTALL_STORE = 'twx_mcp_install';
+		const cloudEl = document.getElementById('cn-cloud');
+		const cloudBtn = document.getElementById('cn-cloud-make');
+		const cloudNote = document.getElementById('cn-cloud-note');
+
+		function readInstall() {
+			try {
+				const saved = JSON.parse(localStorage.getItem(INSTALL_STORE) || 'null');
+				return saved && typeof saved.token === 'string' && saved.connector_urls ? saved : null;
+			} catch {
+				return null;
+			}
+		}
+		function writeInstall(minted) {
+			try {
+				localStorage.setItem(INSTALL_STORE, JSON.stringify({ token: minted.token, created_at: minted.created_at, connector_urls: minted.connector_urls }));
+			} catch {
+				// Private mode: the URL is still shown, it just is not remembered.
+			}
+		}
+		function setCloudNote(text, tone) {
+			cloudNote.textContent = text;
+			if (tone) cloudNote.dataset.tone = tone; else delete cloudNote.dataset.tone;
+		}
+		function showInstall(minted) {
+			const urls = minted?.connector_urls;
+			document.getElementById('cn-cloud-any').textContent = urls?.studio || '';
+			document.getElementById('cn-cloud-grok').textContent = urls?.grok || '';
+			document.getElementById('cn-cloud-any-row').hidden = !urls?.studio;
+			document.getElementById('cn-cloud-grok-row').hidden = !urls?.grok;
+			cloudBtn.textContent = urls ? 'Replace with a new token' : 'Generate my connector URL';
+			if (urls) delete cloudBtn.dataset.variant; else cloudBtn.dataset.variant = 'primary';
+			if (urls) {
+				const since = minted.created_at ? new Date(minted.created_at).toLocaleDateString() : null;
+				setCloudNote(`Keep it private: anyone with this URL uses its quota.${since ? ` Token created ${since}.` : ''} The same token works on every free studio URL.`);
+			}
+		}
+		function updateCloud(server) {
+			const path = new URL(server.endpoint).pathname;
+			const keyless = INSTALL_PATHS.has(path) && authPill(server).tone === 'free';
+			cloudEl.hidden = !keyless;
+			if (keyless) showInstall(readInstall());
+		}
+		cloudBtn.addEventListener('click', async () => {
+			cloudBtn.disabled = true;
+			cloudBtn.setAttribute('aria-busy', 'true');
+			const label = cloudBtn.textContent;
+			cloudBtn.textContent = 'Generating...';
+			setCloudNote('');
+			try {
+				const res = await fetch('/api/mcp-studio/install', { method: 'POST', headers: { accept: 'application/json' } });
+				const body = await res.json().catch(() => null);
+				if (!res.ok || !body?.token) {
+					cloudBtn.textContent = label;
+					const wait = Number(res.headers.get('retry-after'));
+					const msg = res.status === 429
+						? `You've made several tokens from this network in the last hour.${wait > 0 ? ` Try again in ${Math.ceil(wait / 60)} min,` : ''} or reuse one you already have: it works on every free studio URL.`
+						: body?.error_description || `Couldn't create a token (HTTP ${res.status}). Try again in a moment.`;
+					setCloudNote(msg, 'error');
+					return;
+				}
+				writeInstall(body);
+				showInstall(body);
+			} catch {
+				cloudBtn.textContent = label;
+				setCloudNote("Couldn't reach three.ws. Check your connection and try again.", 'error');
+			} finally {
+				cloudBtn.disabled = false;
+				cloudBtn.removeAttribute('aria-busy');
+			}
+		});
+
+		function select(server, updateUrl) {
+			state.selected = server;
+			for (const btn of serversEl.querySelectorAll('.cn-server')) {
+				const on = btn.dataset.endpoint === server.endpoint;
+				btn.setAttribute('aria-checked', String(on));
+				btn.tabIndex = on ? 0 : -1;
+			}
+			applyServer(server);
+			updateCloud(server);
+			if (updateUrl) writeQuery();
+		}
+
+		// ── tabs ───────────────────────────────────────────────────────────
+		const tabs = [...document.querySelectorAll('.cn-tab')];
+		function showClient(client, updateUrl) {
+			for (const tab of tabs) {
+				const on = tab.dataset.client === client;
+				tab.setAttribute('aria-selected', String(on));
+				tab.tabIndex = on ? 0 : -1;
+				document.getElementById(tab.getAttribute('aria-controls')).hidden = !on;
+			}
+			if (updateUrl) writeQuery();
+		}
+		for (const tab of tabs) tab.addEventListener('click', () => showClient(tab.dataset.client, true));
+		document.querySelector('.cn-tabs').addEventListener('keydown', (e) => {
+			const i = tabs.findIndex((t) => t.getAttribute('aria-selected') === 'true');
+			let next = -1;
+			if (e.key === 'ArrowRight') next = (i + 1) % tabs.length;
+			else if (e.key === 'ArrowLeft') next = (i - 1 + tabs.length) % tabs.length;
+			else if (e.key === 'Home') next = 0;
+			else if (e.key === 'End') next = tabs.length - 1;
+			if (next < 0) return;
+			e.preventDefault();
+			showClient(tabs[next].dataset.client, true);
+			tabs[next].focus();
+		});
+
+		// ── connector URL for cloud agents: a real token from the real endpoint ──
+		(function cloudConnector() {
+			const mintBtn = document.getElementById('cn-cloud-mint');
+			const result = document.getElementById('cn-cloud-result');
+			const note = document.getElementById('cn-cloud-note');
+			const grokEl = document.getElementById('cn-cloud-grok');
+			const studioEl = document.getElementById('cn-cloud-studio');
+			mintBtn.addEventListener('click', async () => {
+				mintBtn.disabled = true;
+				mintBtn.textContent = 'Generating...';
+				note.dataset.tone = '';
+				try {
+					const res = await fetch('/api/mcp-studio/install', { method: 'POST' });
+					const data = await res.json().catch(() => ({}));
+					if (!res.ok || !data.connector_url) {
+						const wait = data.retry_after ? ` Try again in ${Math.ceil(data.retry_after / 60)} min.` : ' Try again in a moment.';
+						throw new Error(res.status === 429 ? `This network has minted its 10 tokens for the hour.${wait}` : `Could not create a token.${wait}`);
+					}
+					grokEl.textContent = data.grok_connector_url;
+					studioEl.textContent = data.connector_url;
+					result.hidden = false;
+					mintBtn.textContent = 'Generate another';
+					note.textContent = 'Paste the Grok URL as a custom MCP connector in Grok Bot, or the Studio URL in any other client. Keep it private: whoever holds it spends your budget.';
+				} catch (err) {
+					note.dataset.tone = 'error';
+					note.textContent = err.message;
+					mintBtn.textContent = 'Generate my connector URL';
+				} finally {
+					mintBtn.disabled = false;
+				}
+			});
+		})();
+
+		// ── shareable state: /connect?client=cursor&server=three-ws-3d-studio-free ──
+		function writeQuery() {
+			const q = new URLSearchParams(location.search);
+			const client = tabs.find((t) => t.getAttribute('aria-selected') === 'true')?.dataset.client;
+			if (client && client !== 'claude') q.set('client', client); else q.delete('client');
+			const slug = state.selected ? slugFor(state.selected) : 'three-ws-main';
+			if (slug !== 'three-ws-main') q.set('server', slug); else q.delete('server');
+			const qs = q.toString();
+			history.replaceState(null, '', `${location.pathname}${qs ? `?${qs}` : ''}${location.hash}`);
+		}
+		function detectClient() {
+			const asked = new URLSearchParams(location.search).get('client');
+			if (CLIENTS.includes(asked)) return asked;
+			return 'claude';
+		}
+
+		// ── copy buttons ───────────────────────────────────────────────────
+		document.addEventListener('click', async (e) => {
+			const btn = e.target.closest('[data-copy-target]');
+			if (!btn) return;
+			const text = document.getElementById(btn.dataset.copyTarget)?.textContent ?? '';
+			const label = btn.querySelector('span') || btn;
+			const original = label.textContent;
+			try {
+				await navigator.clipboard.writeText(text);
+				label.textContent = 'Copied';
+				btn.dataset.copied = 'true';
+			} catch {
+				label.textContent = 'Press Ctrl+C';
+				const range = document.createRange();
+				range.selectNodeContents(document.getElementById(btn.dataset.copyTarget));
+				const sel = getSelection();
+				sel.removeAllRanges();
+				sel.addRange(range);
+			}
+			setTimeout(() => { label.textContent = original; delete btn.dataset.copied; }, 1600);
+		});
+
+		// ── data ───────────────────────────────────────────────────────────
+		// The directory (/.well-known/mcp.json) names and describes each hosted
+		// server; the catalog (/mcp-catalog.json) is generated from tool source
+		// and supplies the live tool count. The directory is required, the count
+		// is a best-effort enhancement.
+		async function load() {
+			serversEl.setAttribute('aria-busy', 'true');
+			noteEl.textContent = '';
+			delete noteEl.dataset.tone;
+			try {
+				const [dirRes, catRes] = await Promise.allSettled([
+					fetch('/.well-known/mcp.json', { headers: { accept: 'application/json' } }),
+					fetch('/mcp-catalog.json', { headers: { accept: 'application/json' } }),
+				]);
+				if (dirRes.status !== 'fulfilled' || !dirRes.value.ok) throw new Error('directory');
+				const dir = await dirRes.value.json();
+				const counts = new Map();
+				if (catRes.status === 'fulfilled' && catRes.value.ok) {
+					const cat = await catRes.value.json().catch(() => null);
+					for (const s of cat?.servers ?? []) {
+						if (s.transport === 'remote') counts.set(new URL(s.endpoint, PROD_ORIGIN).toString(), s.tools);
+					}
+				}
+				state.servers = (dir.servers ?? [])
+					.filter((s) => typeof s.endpoint === 'string' && s.endpoint.startsWith('https://'))
+					.map((s) => ({
+						name: s.name,
+						endpoint: s.endpoint,
+						auth: s.auth,
+						signIn: typeof s.signIn === 'string' && s.signIn.startsWith('https://') ? s.signIn : null,
+						description: s.description,
+						signIn: typeof s.signIn === 'string' && s.signIn.startsWith('https://') ? s.signIn : null,
+						tools: counts.get(s.endpoint),
+					}));
+				if (!state.servers.length) throw new Error('empty');
+				const asked = new URLSearchParams(location.search).get('server');
+				// A Grok Bot link with no server named opens on the server built for it.
+				const preferred = !asked && detectClient() === 'grok' ? GROK_ENDPOINT : DEFAULT_ENDPOINT;
+				const initial = state.servers.find((s) => slugFor(s) === asked)
+					|| state.servers.find((s) => s.endpoint === preferred)
+					|| state.servers.find((s) => s.endpoint === DEFAULT_ENDPOINT)
+					|| state.servers[0];
+				state.selected = initial;
+				renderServers();
+				select(initial, false);
+			} catch {
+				serversEl.replaceChildren();
+				serversEl.setAttribute('aria-busy', 'false');
+				noteEl.dataset.tone = 'error';
+				noteEl.textContent = "Couldn't load the server list, so you're set up for the main three.ws server below, which works on its own. ";
+				const retry = document.createElement('button');
+				retry.type = 'button';
+				retry.textContent = 'Try loading the list again';
+				retry.addEventListener('click', load);
+				noteEl.append(retry);
+			}
+		}
+
+		showClient(detectClient(), false);
+		load();
+	</script>
+	<script type="module" src="/i18n.js"></script>
+</body>
+</html>

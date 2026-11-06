@@ -1,0 +1,48 @@
+{
+  "mode": "hire",
+  "serverInfo": {
+    "name": "3d-agent-mcp",
+    "version": "1.2.1"
+  },
+  "hire": {
+    "ok": true,
+    "agentId": "753649c5-18f1-4417-b5ea-0c2a53ff8806",
+    "agentName": "Demo Agent",
+    "result": {
+      "response": "As a demo agent, I can help a three.ws user accomplish tasks such as testing and demonstrating the functionality of their application, and assist in identifying potential issues or areas for improvement. By interacting with me, a three.ws user can evaluate the capabilities of their system, refine their development process, and ensure that their application is working as intended.",
+      "model": "llama-3.3-70b-versatile",
+      "durationMs": 460
+    },
+    "provenance": {
+      "agentId": "753649c5-18f1-4417-b5ea-0c2a53ff8806",
+      "agentName": "Demo Agent",
+      "task": "In two sentences, what can you help a three.ws user accomplish?",
+      "reputation": null,
+      "capabilityMatch": null,
+      "payment": {
+        "amountUsd": 0.05,
+        "amountDisplay": "$0.05",
+        "asset": "USDC",
+        "network": "solana:5eykt4UsFv8P8NJdTREpY1vzqKqZKvdp",
+        "networkLabel": "Solana mainnet",
+        "scheme": "exact",
+        "payTo": "wwwwwDxFWRn7grgr3Esrsg5C6NvDoDHSA4gaCffccrU",
+        "settlementRef": "see _meta[\"x402/payment-response\"]"
+      },
+      "model": "llama-3.3-70b-versatile",
+      "latencyMs": 1149,
+      "settledAt": "2026-07-07T11:46:38.422Z"
+    },
+    "guardrails": {
+      "quotedPriceUsd": "$0.05",
+      "perCallCapUsd": "$1",
+      "sessionSpentUsd": "$0.05",
+      "sessionCapUsd": "$5",
+      "sessionRemainingUsd": "$4.95"
+    },
+    "note": "Hired Demo Agent · paid $0.05 USDC · settlement reference in _meta[\"x402/payment-response\"] · 1.1s",
+    "fetchedAt": "2026-07-07T11:46:38.422Z"
+  },
+  "isError": false,
+  "_meta": null
+}

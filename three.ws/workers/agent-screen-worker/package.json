@@ -1,0 +1,20 @@
+{
+  "name": "@three-ws/agent-screen-worker",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Browser capture worker — drives Stagehand, screenshots the agent's live view, pushes frames to /api/agent-screen-push.",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js",
+    "start:local": "BROWSERBASE_API_KEY= node index.js",
+    "start:bb": "node index.js"
+  },
+  "engines": {
+    "node": ">=22"
+  },
+  "dependencies": {
+    "@browserbasehq/stagehand": "^3.6.0",
+    "zod": "^4.6.7"
+  }
+}

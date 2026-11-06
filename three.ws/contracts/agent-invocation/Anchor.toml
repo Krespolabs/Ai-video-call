@@ -1,0 +1,30 @@
+[toolchain]
+
+[features]
+resolver = "2"
+
+# Same program id on every cluster — it is the program keypair's pubkey, baked
+# into `declare_id!`. See DEPLOYMENT.md for deploy signatures + upgrade authority.
+[programs.localnet]
+agent_invocation = "AgEntJDMi1A7UadCoYcx6Fm3gusNk8SHLCi7vSUa4Zfo"
+
+[programs.devnet]
+agent_invocation = "AgEntJDMi1A7UadCoYcx6Fm3gusNk8SHLCi7vSUa4Zfo"
+
+[programs.mainnet]
+agent_invocation = "AgEntJDMi1A7UadCoYcx6Fm3gusNk8SHLCi7vSUa4Zfo"
+
+[registry]
+url = "https://api.apr.dev"
+
+[provider]
+cluster = "devnet"
+# Deploy/upgrade authority keypair — kept OUT of the repo (~/.config/solana,
+# mirrored to the secret manager as AGENT_INVOCATION_DEPLOY_AUTHORITY).
+wallet = "~/.config/solana/agent-invocation-deployer.json"
+
+[workspace]
+members = ["."]
+
+[scripts]
+smoke = "node ../../scripts/agent-invocation-smoke.mjs"

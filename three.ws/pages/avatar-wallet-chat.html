@@ -1,0 +1,987 @@
+<!doctype html>
+<html lang="en">
+	<head>
+		<style>/* three.ws hidden-guard — make the `hidden` attribute authoritative; see scripts/lib/hidden-guard.mjs */[hidden]{display:none!important}</style>
+		<script>/* three.ws theme boot — no-flash; runtime in /theme-switcher.js */(function(){try{var m=localStorage.getItem('twx_theme');var l=m==='auto'?(window.matchMedia&&window.matchMedia('(prefers-color-scheme: light)').matches):m==='light';document.documentElement.setAttribute('data-theme',l?'light':'dark');}catch(e){document.documentElement.setAttribute('data-theme','dark');}})();</script>
+		<meta charset="utf-8" />
+		<link rel="icon" href="/favicon.ico" sizes="any" />
+		<link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+		<link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png" />
+		<link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png" />
+		<link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+		<link rel="manifest" href="/manifest.webmanifest" />
+		<title data-i18n="avatar_wallet_chat.meta_title">three.ws — Avatar Wallet</title>
+		<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+		<meta name="description" content="An embeddable 3D AI avatar that holds a Solana wallet, chats, and can autonomously send SOL."  data-i18n-attr="content:avatar_wallet_chat.meta_description"/>
+		<meta name="robots" content="noindex" />
+		<style>
+			:root {
+				--accent: #7c5cff;
+				--accent-soft: rgba(124, 92, 255, 0.16);
+				--bg-0: #0b0b0b;
+				--bg-1: #121212;
+				--panel: rgba(255, 255, 255, 0.04);
+				--panel-border: rgba(255, 255, 255, 0.09);
+				--text: #f3f2fb;
+				--text-dim: #a4a2bd;
+				--text-faint: #6f6d86;
+				--ok: #3ad08a;
+				--err: #ff6b6b;
+				--radius: 16px;
+				--shadow: 0 12px 40px rgba(0, 0, 0, 0.45);
+				/* Design tokens the shared <lang-switcher> reads, mapped onto this
+				   page's palette so the picker matches the chip it sits in. */
+				--surface-2: rgba(255, 255, 255, 0.04);
+				--border: var(--panel-border);
+				--border-strong: rgba(255, 255, 255, 0.24);
+				--text-2: var(--text-dim);
+				/* Widest column the chrome is allowed to stretch to. The page is an
+				   embeddable widget, so on a desktop-width tab an uncapped chip and
+				   composer sprawl across 1400px of empty glass. */
+				--column: 720px;
+			}
+			* { box-sizing: border-box; }
+			html, body {
+				margin: 0;
+				height: 100%;
+				width: 100%;
+				overflow: hidden;
+				font-family: 'Inter', system-ui, -apple-system, sans-serif;
+				color: var(--text);
+				background:
+					radial-gradient(120% 90% at 50% -10%, rgba(124, 92, 255, 0.22), transparent 60%),
+					linear-gradient(180deg, var(--bg-1), var(--bg-0));
+				-webkit-font-smoothing: antialiased;
+			}
+			#app {
+				display: flex;
+				flex-direction: column;
+				height: 100%;
+				width: 100%;
+				position: relative;
+			}
+
+			/* ── Stage (avatar) ─────────────────────────────────────────── */
+			#stage {
+				position: relative;
+				flex: 1 1 auto;
+				min-height: 0;
+			}
+			#avatar-frame {
+				position: absolute;
+				inset: 0;
+				width: 100%;
+				height: 100%;
+				border: 0;
+				display: block;
+			}
+			#stage-fade {
+				position: absolute;
+				left: 0; right: 0; bottom: 0;
+				height: 110px;
+				background: linear-gradient(180deg, transparent, var(--bg-0));
+				pointer-events: none;
+			}
+
+			.sr-only {
+				position: absolute; width: 1px; height: 1px;
+				padding: 0; margin: -1px; overflow: hidden;
+				clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0;
+			}
+
+			/* ── Top overlay stack ──────────────────────────────────────── */
+			/* The wallet chip and the fund hint flow in one column instead of each
+			   being pinned to its own absolute offset: the chip wraps to a second
+			   line at phone widths, and a hard-coded `top` for the hint below it
+			   sat straight on top of the wrapped row. */
+			#overlay {
+				position: absolute;
+				top: 14px;
+				left: 14px;
+				right: 14px;
+				max-width: var(--column);
+				margin-inline: auto;
+				display: flex;
+				flex-direction: column;
+				gap: 10px;
+				z-index: 3;
+				pointer-events: none;
+			}
+			#overlay > * { pointer-events: auto; }
+
+			/* ── Wallet chip ────────────────────────────────────────────── */
+			#wallet {
+				display: flex;
+				align-items: center;
+				flex-wrap: wrap;
+				gap: 12px;
+				padding: 10px 12px;
+				background: rgba(12, 11, 22, 0.62);
+				backdrop-filter: blur(14px);
+				-webkit-backdrop-filter: blur(14px);
+				border: 1px solid var(--panel-border);
+				border-radius: 14px;
+				box-shadow: var(--shadow);
+			}
+			/* The language picker lives in this page's own chrome. i18n.js floats a
+			   fixed bottom-right fallback only on pages that place no
+			   <lang-switcher>, and that fallback sat directly on top of the send
+			   button, leaving the composer's primary action unclickable. */
+			#wallet lang-switcher {
+				display: inline-flex;
+				flex: 0 1 auto;
+				min-width: 0;
+				max-width: 132px;
+			}
+			#wallet .net {
+				display: inline-flex;
+				align-items: center;
+				gap: 6px;
+				font-size: 11px;
+				font-weight: 600;
+				letter-spacing: 0.04em;
+				text-transform: uppercase;
+				color: var(--text-dim);
+				padding: 4px 8px;
+				border-radius: 999px;
+				background: var(--accent-soft);
+				white-space: nowrap;
+			}
+			#wallet .net .dot {
+				width: 7px; height: 7px; border-radius: 50%;
+				background: var(--accent);
+				box-shadow: 0 0 0 3px rgba(124, 92, 255, 0.25);
+			}
+			#wallet .net.mainnet .dot { background: var(--ok); box-shadow: 0 0 0 3px rgba(58, 208, 138, 0.22); }
+			#wallet .bal { display: flex; flex-direction: column; line-height: 1.25; min-width: 0; }
+			#wallet .bal .amt { font-size: 15px; font-weight: 700; font-variant-numeric: tabular-nums; }
+			#wallet .bal .usd { font-size: 12px; color: var(--text-dim); font-variant-numeric: tabular-nums; }
+			#wallet .skel {
+				display: inline-block; height: 14px; width: 96px; border-radius: 6px;
+				background: linear-gradient(90deg, rgba(255,255,255,0.06), rgba(255,255,255,0.14), rgba(255,255,255,0.06));
+				background-size: 200% 100%;
+				animation: shimmer 1.2s linear infinite;
+			}
+			@keyframes shimmer { to { background-position: -200% 0; } }
+			#wallet .addr {
+				margin-left: auto;
+				display: inline-flex; align-items: center; gap: 6px;
+				font-size: 12px; color: var(--text-dim);
+				font-variant-numeric: tabular-nums;
+				text-decoration: none;
+			}
+			#wallet .addr:hover { color: var(--text); }
+			#wallet .copy {
+				border: 1px solid var(--panel-border);
+				background: transparent;
+				color: var(--text-dim);
+				border-radius: 8px;
+				padding: 5px 7px;
+				cursor: pointer;
+				line-height: 0;
+				transition: background 0.15s, color 0.15s, border-color 0.15s;
+			}
+			#wallet .copy:hover { background: var(--panel); color: var(--text); border-color: var(--accent); }
+			#wallet .copy:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+			#wallet .copy.done { color: var(--ok); border-color: var(--ok); }
+
+			/* ── Fund-your-wallet hint (shown when SOL balance is too low to
+			   cover an autonomous send, before the user attempts one) ──── */
+			#fund-hint {
+				display: none;
+				align-items: flex-start;
+				gap: 11px;
+				padding: 13px 14px;
+				background: rgba(12, 11, 22, 0.74);
+				backdrop-filter: blur(14px);
+				-webkit-backdrop-filter: blur(14px);
+				border: 1px solid rgba(255, 184, 92, 0.42);
+				border-radius: 14px;
+				box-shadow: var(--shadow);
+				animation: rise 0.25s ease both;
+			}
+			#fund-hint.show { display: flex; }
+			#fund-hint .fh-ic {
+				flex: none;
+				width: 30px; height: 30px;
+				display: grid; place-items: center;
+				border-radius: 9px;
+				background: rgba(255, 184, 92, 0.16);
+				color: #ffc97a;
+			}
+			#fund-hint .fh-ic svg { width: 16px; height: 16px; }
+			#fund-hint .fh-body { min-width: 0; flex: 1 1 auto; }
+			#fund-hint .fh-title { font-size: 13px; font-weight: 700; color: var(--text); }
+			#fund-hint .fh-sub { margin-top: 2px; font-size: 12px; line-height: 1.45; color: var(--text-dim); }
+			#fund-hint .fh-addr-row {
+				margin-top: 9px;
+				display: flex; align-items: center; gap: 7px;
+			}
+			#fund-hint .fh-addr {
+				flex: 1 1 auto; min-width: 0;
+				font-size: 12px;
+				font-variant-numeric: tabular-nums;
+				color: var(--text);
+				background: var(--panel);
+				border: 1px solid var(--panel-border);
+				border-radius: 8px;
+				padding: 6px 9px;
+				overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+			}
+			#fund-hint .fh-copy {
+				flex: none;
+				border: 1px solid var(--panel-border);
+				background: transparent;
+				color: var(--text-dim);
+				border-radius: 8px;
+				padding: 6px 8px;
+				cursor: pointer;
+				line-height: 0;
+				transition: background 0.15s, color 0.15s, border-color 0.15s;
+			}
+			#fund-hint .fh-copy:hover { background: var(--panel); color: var(--text); border-color: var(--accent); }
+			#fund-hint .fh-copy:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+			#fund-hint .fh-copy.done { color: var(--ok); border-color: var(--ok); }
+
+			/* ── Chat ───────────────────────────────────────────────────── */
+			#chat {
+				flex: 0 0 46%;
+				min-height: 220px;
+				display: flex;
+				flex-direction: column;
+				border-top: 1px solid var(--panel-border);
+				background: rgba(8, 8, 14, 0.72);
+				backdrop-filter: blur(8px);
+			}
+			#log {
+				flex: 1 1 auto;
+				overflow-y: auto;
+				padding: 16px;
+				width: 100%;
+				max-width: var(--column);
+				margin-inline: auto;
+				display: flex;
+				flex-direction: column;
+				gap: 12px;
+				scrollbar-width: thin;
+				scrollbar-color: rgba(255,255,255,0.16) transparent;
+			}
+			#log::-webkit-scrollbar { width: 8px; }
+			#log::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.14); border-radius: 8px; }
+			.msg {
+				max-width: 84%;
+				padding: 10px 13px;
+				border-radius: 14px;
+				font-size: 14px;
+				line-height: 1.5;
+				white-space: pre-wrap;
+				word-wrap: break-word;
+				animation: rise 0.25s ease both;
+			}
+			@keyframes rise { from { opacity: 0; transform: translateY(6px); } }
+			.msg.user {
+				align-self: flex-end;
+				background: var(--accent);
+				color: #fff;
+				border-bottom-right-radius: 4px;
+			}
+			.msg.bot {
+				align-self: flex-start;
+				background: var(--panel);
+				border: 1px solid var(--panel-border);
+				border-bottom-left-radius: 4px;
+			}
+			.msg.bot .cursor { display: inline-block; width: 7px; animation: blink 1s steps(2) infinite; }
+			@keyframes blink { 50% { opacity: 0; } }
+			/* Failed turn: say what went wrong and give the user the one control
+			   that fixes it, instead of a dead sentence they have to retype past. */
+			.msg.bot.errored { border-color: rgba(255, 107, 107, 0.38); }
+			.msg .retry {
+				display: inline-flex; align-items: center; gap: 6px;
+				margin-top: 9px;
+				border: 1px solid var(--panel-border);
+				background: transparent;
+				color: var(--text);
+				border-radius: 999px;
+				padding: 6px 12px;
+				font: inherit;
+				font-size: 13px;
+				cursor: pointer;
+				transition: background 0.15s, border-color 0.15s, transform 0.1s;
+			}
+			.msg .retry:hover { background: var(--accent-soft); border-color: var(--accent); }
+			.msg .retry:active { transform: scale(0.97); }
+			.msg .retry:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+			/* IBM Granite Guardian "Trust Layer" notice — shown when an autonomous
+			   send is held server-side before it could move funds. */
+			.gov-chip {
+				align-self: flex-start;
+				display: inline-flex; align-items: center; gap: 7px;
+				margin: -2px 0 2px;
+				padding: 6px 11px; border-radius: 99px;
+				font-size: 12px; font-weight: 600;
+				background: rgba(255, 107, 107, 0.12);
+				border: 1px solid rgba(255, 107, 107, 0.35);
+				color: #ffb3b3;
+				animation: rise 0.25s ease both;
+			}
+			.gov-chip svg { width: 13px; height: 13px; flex: none; }
+			.gov-chip a { color: inherit; text-decoration: underline; text-underline-offset: 2px; }
+
+			/* Empty state */
+			#empty {
+				margin: auto;
+				text-align: center;
+				color: var(--text-dim);
+				max-width: 320px;
+				display: flex;
+				flex-direction: column;
+				gap: 14px;
+				align-items: center;
+			}
+			#empty h2 { font-size: 16px; margin: 0; color: var(--text); font-weight: 700; }
+			#empty p { margin: 0; font-size: 13px; line-height: 1.5; }
+			.chips { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; }
+			.chip {
+				border: 1px solid var(--panel-border);
+				background: var(--panel);
+				color: var(--text);
+				border-radius: 999px;
+				padding: 8px 13px;
+				font-size: 13px;
+				cursor: pointer;
+				transition: background 0.15s, border-color 0.15s, transform 0.1s;
+			}
+			.chip:hover { background: var(--accent-soft); border-color: var(--accent); }
+			.chip:active { transform: scale(0.97); }
+			.chip:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+			/* Payment card */
+			.pay {
+				align-self: flex-start;
+				width: 84%;
+				max-width: 360px;
+				border-radius: 14px;
+				border: 1px solid var(--panel-border);
+				background: linear-gradient(160deg, rgba(124,92,255,0.14), rgba(255,255,255,0.03));
+				padding: 14px;
+				animation: rise 0.25s ease both;
+			}
+			.pay .head { display: flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 700; }
+			.pay .head .ic { font-size: 16px; }
+			.pay .amt { font-size: 26px; font-weight: 800; margin: 8px 0 2px; font-variant-numeric: tabular-nums; }
+			.pay .sub { font-size: 12px; color: var(--text-dim); }
+			.pay .status {
+				margin-top: 10px; display: flex; align-items: center; gap: 7px;
+				font-size: 12px; font-weight: 600;
+			}
+			.pay .status .pip { width: 8px; height: 8px; border-radius: 50%; background: var(--accent); }
+			.pay.pending .pip { animation: pulse 1s ease-in-out infinite; }
+			@keyframes pulse { 50% { opacity: 0.35; transform: scale(0.8); } }
+			.pay.ok .pip { background: var(--ok); animation: none; }
+			.pay.ok .status { color: var(--ok); }
+			.pay.fail .pip { background: var(--err); animation: none; }
+			.pay.fail .status { color: var(--err); }
+			.pay a.sig {
+				display: inline-flex; align-items: center; gap: 5px;
+				margin-top: 10px; font-size: 12px; color: var(--accent);
+				text-decoration: none; font-variant-numeric: tabular-nums;
+			}
+			.pay a.sig:hover { text-decoration: underline; }
+
+			/* Composer */
+			#composer-bar { border-top: 1px solid var(--panel-border); }
+			#composer {
+				display: flex;
+				gap: 8px;
+				padding: 12px;
+				width: 100%;
+				max-width: var(--column);
+				margin-inline: auto;
+			}
+			#input {
+				flex: 1 1 auto;
+				background: var(--panel);
+				border: 1px solid var(--panel-border);
+				color: var(--text);
+				padding: 11px 14px;
+				border-radius: 12px;
+				font-size: 14px;
+				font-family: inherit;
+				outline: none;
+				transition: border-color 0.15s, background 0.15s;
+			}
+			#input::placeholder { color: var(--text-faint); }
+			#input:focus { border-color: var(--accent); background: rgba(124,92,255,0.07); }
+			#send {
+				flex: 0 0 auto;
+				background: var(--accent);
+				color: #fff;
+				border: none;
+				width: 44px;
+				border-radius: 12px;
+				cursor: pointer;
+				display: grid;
+				place-items: center;
+				transition: filter 0.15s, transform 0.1s;
+			}
+			#send:hover { filter: brightness(1.12); }
+			#send:active { transform: scale(0.94); }
+			#send:disabled { opacity: 0.45; cursor: not-allowed; }
+			#send:focus-visible { outline: 2px solid #fff; outline-offset: 2px; }
+
+			/* Toast */
+			#toast {
+				position: absolute;
+				bottom: 84px;
+				left: 50%;
+				transform: translateX(-50%) translateY(12px);
+				background: var(--err);
+				color: #fff;
+				padding: 10px 16px;
+				border-radius: 12px;
+				font-size: 13px;
+				font-weight: 600;
+				box-shadow: var(--shadow);
+				opacity: 0;
+				pointer-events: none;
+				transition: opacity 0.25s, transform 0.25s;
+				z-index: 5;
+				max-width: 86%;
+				text-align: center;
+			}
+			#toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+
+			@media (max-width: 520px) {
+				#chat { flex-basis: 52%; }
+				.msg { max-width: 90%; }
+				/* Phone widths: the chip carries network, balance, address, copy and
+				   the language picker, and the picker gives up width first. */
+				#wallet { gap: 10px; }
+				#wallet lang-switcher { max-width: 104px; }
+			}
+		</style>
+	
+	<link rel="canonical" href="https://three.ws/avatar-wallet-chat">
+	<meta property="og:type" content="website">
+	<meta property="og:site_name" content="three.ws">
+	<meta property="og:title" content="Avatar Wallet · three.ws" data-i18n-attr="content:avatar_wallet_chat.meta_og_title">
+	<meta property="og:description" content="An embeddable 3D AI avatar that holds a Solana wallet, chats, and can autonomously send SOL." data-i18n-attr="content:avatar_wallet_chat.meta_og_description">
+	<meta property="og:url" content="https://three.ws/avatar-wallet-chat">
+	<meta property="og:image" content="https://three.ws/api/page-og?s=crypto&amp;t=Avatar+Wallet&amp;d=An+embeddable+3D+AI+avatar+that+holds+a+Solana+wallet%2C+chats%2C+and+can+autonomously+send+SOL.&amp;p=%2Favatar-wallet-chat">
+	<meta property="og:image:width" content="1200">
+	<meta property="og:image:height" content="630">
+	<meta name="twitter:card" content="summary_large_image">
+	<meta name="twitter:title" content="Avatar Wallet · three.ws" data-i18n-attr="content:avatar_wallet_chat.meta_twitter_title">
+	<meta name="twitter:description" content="An embeddable 3D AI avatar that holds a Solana wallet, chats, and can autonomously send SOL." data-i18n-attr="content:avatar_wallet_chat.meta_twitter_description">
+	<meta name="twitter:image" content="https://three.ws/api/page-og?s=crypto&amp;t=Avatar+Wallet&amp;d=An+embeddable+3D+AI+avatar+that+holds+a+Solana+wallet%2C+chats%2C+and+can+autonomously+send+SOL.&amp;p=%2Favatar-wallet-chat">
+	<script type="application/ld+json">{"@context":"https://schema.org","@type":"WebPage","name":"Avatar Wallet","description":"An embeddable 3D AI avatar that holds a Solana wallet, chats, and can autonomously send SOL.","url":"https://three.ws/avatar-wallet-chat","isPartOf":{"@type":"WebSite","name":"three.ws","url":"https://three.ws"}}</script>
+
+	<meta property="og:locale" content="en_US">
+	<meta property="og:image:alt" content="Avatar Wallet — three.ws">
+	<meta name="twitter:site" content="@trythreews">
+</head>
+	<body>
+		<div id="app">
+			<h1 class="sr-only" data-i18n="avatar_wallet_chat.page_h1">Avatar Wallet: a 3D agent that holds a Solana wallet, chats, and can send SOL</h1>
+			<div id="stage">
+				<iframe id="avatar-frame" title="3D avatar" allow="autoplay; microphone; camera"></iframe>
+				<div id="stage-fade"></div>
+				<div id="overlay">
+					<div id="wallet" aria-live="polite">
+						<span class="net" id="net"><span class="dot"></span><span id="net-label">…</span></span>
+						<span class="bal">
+							<span class="amt" id="bal-amt"><span class="skel"></span></span>
+							<span class="usd" id="bal-usd"></span>
+						</span>
+						<a class="addr" id="addr-link" target="_blank" rel="noopener" title="View on Solscan" data-i18n-attr="title:avatar_wallet_chat.view_on_solscan_title">
+							<span id="addr-short">…</span>
+						</a>
+						<button class="copy" id="copy-btn" title="Copy address" aria-label="Copy wallet address" data-i18n-attr="aria-label:avatar_wallet_chat.copy_wallet_address_arialabel;title:avatar_wallet_chat.copy_address_title">
+							<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+						</button>
+						<lang-switcher></lang-switcher>
+					</div>
+					<div id="fund-hint" role="status">
+						<span class="fh-ic" aria-hidden="true">
+							<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="6" width="20" height="13" rx="2"/><path d="M2 10h20"/><path d="M7 15h2"/></svg>
+						</span>
+						<div class="fh-body">
+							<div class="fh-title" id="fund-title">Fund your avatar's wallet</div>
+							<div class="fh-sub" id="fund-sub">It can't send SOL until there's a balance to send from. Send some SOL to the address below and it'll be ready.</div>
+							<div class="fh-addr-row">
+								<span class="fh-addr" id="fund-addr" title="Avatar wallet address" data-i18n-attr="title:avatar_wallet_chat.avatar_wallet_address_title">…</span>
+								<button class="fh-copy" id="fund-copy" title="Copy address" aria-label="Copy wallet address to fund" data-i18n-attr="aria-label:avatar_wallet_chat.copy_wallet_address_to_fund_arialabel;title:avatar_wallet_chat.copy_address_title_2">
+									<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+								</button>
+							</div>
+						</div>
+					</div>
+				</div>
+			</div>
+
+			<section id="chat" aria-label="Chat with the avatar">
+				<div id="log">
+					<div id="empty">
+						<h2 id="empty-title" data-i18n="avatar_wallet_chat.talk_to_your_avatar">Talk to your avatar</h2>
+						<p id="empty-sub" data-i18n="avatar_wallet_chat.it_holds_a_solana_wallet_and_can">It holds a Solana wallet and can send SOL when you ask.</p>
+						<div class="chips" id="chips"></div>
+					</div>
+				</div>
+				<div id="composer-bar">
+					<form id="composer" autocomplete="off">
+						<input id="input" type="text" placeholder="Ask me anything…" aria-label="Message" />
+						<button id="send" type="submit" aria-label="Send message" data-i18n-attr="aria-label:avatar_wallet_chat.send_message_arialabel">
+							<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 2 11 13"/><path d="M22 2 15 22l-4-9-9-4 20-7z"/></svg>
+						</button>
+					</form>
+				</div>
+			</section>
+
+			<div id="toast" role="alert"></div>
+		</div>
+
+		<script type="module">
+			const params = new URL(location.href).searchParams;
+			const accent = params.get('accent');
+			if (accent && /^#?[0-9a-fA-F]{3,8}$/.test(accent)) {
+				const hex = accent.startsWith('#') ? accent : '#' + accent;
+				document.documentElement.style.setProperty('--accent', hex);
+			}
+
+			// Optional shared-secret for the send endpoint (only needed if the
+			// deployment sets AVATAR_DEMO_TOKEN). Passed through as a header.
+			const sendToken = params.get('token') || '';
+
+			// ── Avatar iframe (reuses the embed's lipsync / idle / gestures) ──
+			const avatarFrame = document.getElementById('avatar-frame');
+			const avatarOrigin = location.origin;
+			const aq = new URLSearchParams();
+			if (params.get('id')) aq.set('id', params.get('id'));
+			else if (params.get('handle')) aq.set('handle', params.get('handle'));
+			else aq.set('model', params.get('model') || '/avatars/default.glb');
+			aq.set('bg', 'transparent');
+			aq.set('idle', 'on');
+			aq.set('name', '0');
+			aq.set('animPicker', '0');
+			aq.set('overlayMode', '1');
+			avatarFrame.src = `/avatar-embed.html?${aq.toString()}`;
+
+			let avatarReady = false;
+			let avatarFlushed = false;
+			let avatarReadyTimer = null;
+			const avatarQueue = [];
+			function toAvatar(msg) {
+				if (avatarReady) avatarFrame.contentWindow?.postMessage(msg, avatarOrigin);
+				else avatarQueue.push(msg);
+			}
+			function avatarSpeak(text) { if (text) toAvatar({ type: 'v1.avatar.speak', text: String(text).slice(0, 600) }); }
+			function avatarGesture(name) { toAvatar({ type: 'v1.avatar.animation', name }); }
+
+			// Flush the queued speech/gestures at most once — whether the real
+			// 'ready' signal arrives or the resilience timeout fires first.
+			function flushAvatarQueue() {
+				if (avatarFlushed) return;
+				avatarFlushed = true;
+				avatarReady = true;
+				clearTimeout(avatarReadyTimer);
+				while (avatarQueue.length) avatarFrame.contentWindow?.postMessage(avatarQueue.shift(), avatarOrigin);
+			}
+
+			window.addEventListener('message', (e) => {
+				if (e.source !== avatarFrame.contentWindow) return;
+				if (e.data?.type === 'v1.avatar.ready') flushAvatarQueue();
+			});
+			avatarFrame.addEventListener('load', () => {
+				avatarFrame.contentWindow?.postMessage({ type: 'v1.avatar.hello' }, avatarOrigin);
+				// Resilience: if the avatar never signals ready (e.g. a slow rig),
+				// flush queued speech/gestures best-effort after a grace period so
+				// the avatar still reacts instead of going silent forever.
+				avatarReadyTimer = setTimeout(flushAvatarQueue, 5000);
+			});
+
+			// ── Wallet chip ───────────────────────────────────────────────
+			const el = (id) => document.getElementById(id);
+			let wallet = null;
+			const fmtSol = (n) => (n >= 1 ? n.toFixed(3) : n.toFixed(5));
+			const short = (a) => (a ? `${a.slice(0, 4)}…${a.slice(-4)}` : '—');
+
+			async function refreshWallet() {
+				try {
+					const r = await fetch('/api/agent/wallet', { headers: { accept: 'application/json' } });
+					if (!r.ok) throw new Error((await r.json().catch(() => ({}))).error_description || `wallet ${r.status}`);
+					wallet = await r.json();
+					renderWallet();
+				} catch (err) {
+					el('bal-amt').innerHTML = '<span style="font-size:13px;color:var(--text-dim)">wallet offline</span>';
+					el('bal-usd').textContent = '';
+					console.warn('[wallet]', err.message);
+				}
+			}
+			function renderWallet() {
+				if (!wallet) return;
+				const net = el('net');
+				net.classList.toggle('mainnet', wallet.network === 'mainnet');
+				el('net-label').textContent = wallet.network;
+				// The API reports an unreadable balance as null rather than failing the
+				// whole response, so the address and explorer link survive an RPC blip.
+				const balanceKnown = wallet.balanceAvailable !== false && wallet.sol != null;
+				el('bal-amt').textContent = balanceKnown ? `${fmtSol(wallet.sol)} SOL` : 'balance unavailable';
+				el('bal-usd').textContent = wallet.usd != null ? `$${wallet.usd.toFixed(2)}` : '';
+				el('addr-short').textContent = short(wallet.address);
+				el('addr-link').href = wallet.explorer;
+				renderFundHint();
+			}
+
+			// First-class "fund your wallet" state — shown BEFORE a send is attempted
+			// whenever the live balance can't cover the smallest demo payout plus the
+			// network fee. Uses the real on-chain SOL balance from /api/agent/wallet.
+			const FEE_BUFFER_SOL = 0.0001; // signature fee + rent headroom
+			function renderFundHint() {
+				const hint = el('fund-hint');
+				if (!hint || !wallet) return;
+				// An unknown balance is not a zero balance: never tell someone their
+				// funded wallet is empty because the RPC was unreachable this poll.
+				if (wallet.balanceAvailable === false || wallet.sol == null) {
+					hint.classList.remove('show');
+					return;
+				}
+				const sol = Number(wallet.sol) || 0;
+				const price = Number(wallet.solPriceUsd) || 0;
+				// Smallest send the avatar offers is $1; need that in SOL + a fee buffer.
+				const minSendUsd = 1;
+				const needSol = (price > 0 ? minSendUsd / price : 0) + FEE_BUFFER_SOL;
+				const underfunded = sol <= 0 || (price > 0 && sol < needSol);
+				if (!underfunded) {
+					hint.classList.remove('show');
+					return;
+				}
+				const title = el('fund-title');
+				const sub = el('fund-sub');
+				if (sol <= 0) {
+					title.textContent = 'Fund your avatar’s wallet';
+					sub.textContent = "It can't send SOL until there's a balance to send from. Send some SOL to the address below and it'll be ready.";
+				} else {
+					title.textContent = 'Low balance';
+					sub.textContent = `Only ${fmtSol(sol)} SOL, not enough to cover a $1 send plus fees. Top it up at the address below.`;
+				}
+				el('fund-addr').textContent = wallet.address || '—';
+				hint.classList.add('show');
+			}
+
+			el('fund-copy').addEventListener('click', async () => {
+				if (!wallet?.address) return;
+				try {
+					await navigator.clipboard.writeText(wallet.address);
+					const b = el('fund-copy');
+					b.classList.add('done');
+					setTimeout(() => b.classList.remove('done'), 1200);
+				} catch { /* clipboard blocked */ }
+			});
+			el('copy-btn').addEventListener('click', async () => {
+				if (!wallet?.address) return;
+				try {
+					await navigator.clipboard.writeText(wallet.address);
+					const b = el('copy-btn');
+					b.classList.add('done');
+					setTimeout(() => b.classList.remove('done'), 1200);
+				} catch { /* clipboard blocked */ }
+			});
+
+			// ── Toast ─────────────────────────────────────────────────────
+			let toastTimer = null;
+			function toast(msg) {
+				const t = el('toast');
+				t.textContent = msg;
+				t.classList.add('show');
+				clearTimeout(toastTimer);
+				toastTimer = setTimeout(() => t.classList.remove('show'), 4200);
+			}
+
+			// ── Chat ──────────────────────────────────────────────────────
+			const log = el('log');
+			const input = el('input');
+			const sendBtn = el('send');
+			const history = [];
+			let busy = false;
+
+			function clearEmpty() { const e = el('empty'); if (e) e.remove(); }
+			function addMsg(text, who) {
+				clearEmpty();
+				const d = document.createElement('div');
+				d.className = `msg ${who}`;
+				d.textContent = text;
+				log.appendChild(d);
+				log.scrollTop = log.scrollHeight;
+				return d;
+			}
+
+			// Turn a failed turn into something the reader can act on: the reason the
+			// server actually gave (capacity, rate limit, an offline provider) plus a
+			// control that retries the same message without retyping it.
+			function botError(bubble, message, retryMessage) {
+				bubble.classList.add('errored');
+				bubble.textContent = '';
+				const line = document.createElement('span');
+				line.textContent = message;
+				bubble.appendChild(line);
+				const btn = document.createElement('button');
+				btn.type = 'button';
+				btn.className = 'retry';
+				btn.textContent = 'Try again';
+				btn.addEventListener('click', () => {
+					const prev = bubble.previousElementSibling;
+					bubble.remove();
+					if (prev?.classList.contains('user')) prev.remove();
+					if (history[history.length - 1]?.role === 'user') history.pop();
+					ask(retryMessage);
+				});
+				bubble.appendChild(btn);
+				log.scrollTop = log.scrollHeight;
+			}
+
+			function paymentCard(usd, to) {
+				clearEmpty();
+				const card = document.createElement('div');
+				card.className = 'pay pending';
+				card.innerHTML = `
+					<div class="head"><span class="ic">◎</span> Sending SOL</div>
+					<div class="amt">$${Number(usd).toFixed(2)}</div>
+					<div class="sub">to ${to ? short(to) : 'you'}</div>
+					<div class="status"><span class="pip"></span><span class="label">Signing & broadcasting…</span></div>`;
+				log.appendChild(card);
+				log.scrollTop = log.scrollHeight;
+				return {
+					ok(res) {
+						card.className = 'pay ok';
+						card.querySelector('.amt').textContent = `${fmtSol(res.sol)} SOL`;
+						card.querySelector('.sub').textContent = `≈ $${res.usd.toFixed(2)} · to ${short(res.to)}`;
+						card.querySelector('.label').textContent = 'Confirmed on-chain';
+						const a = document.createElement('a');
+						a.className = 'sig';
+						a.href = res.explorer; a.target = '_blank'; a.rel = 'noopener';
+						a.textContent = `↗ ${short(res.signature)}`;
+						card.appendChild(a);
+						log.scrollTop = log.scrollHeight;
+					},
+					fail(message) {
+						card.className = 'pay fail';
+						card.querySelector('.label').textContent = message || 'Payment failed';
+						log.scrollTop = log.scrollHeight;
+					},
+				};
+			}
+
+			async function executeSendSol(action) {
+				const card = paymentCard(action.usd, action.to);
+				try {
+					const headers = { 'content-type': 'application/json' };
+					if (sendToken) headers['x-avatar-token'] = sendToken;
+					const r = await fetch('/api/agent/send-sol', {
+						method: 'POST',
+						headers,
+						body: JSON.stringify({ usd: Number(action.usd), to: action.to || undefined }),
+					});
+					const data = await r.json().catch(() => ({}));
+					if (!r.ok || !data.ok) throw new Error(data.error_description || data.message || `send failed (${r.status})`);
+					card.ok(data);
+					avatarSpeak(`Done. I just sent ${fmtSol(data.sol)} SOL, about a dollar, to your wallet.`);
+					avatarGesture('celebrate');
+					refreshWallet();
+				} catch (err) {
+					card.fail(err.message);
+					toast(err.message);
+					avatarSpeak('Hmm, that payment didn’t go through.');
+				}
+			}
+
+			async function runActions(actions) {
+				for (const a of actions || []) {
+					if (a?.type === 'sendSol' && a.usd != null) await executeSendSol(a);
+					else if (a?.type === 'playAnimation' && a.name) avatarGesture(a.name);
+				}
+			}
+
+			// Surface the IBM Granite Guardian verdict when an autonomous send was
+			// held server-side (the action is already stripped from the stream, so
+			// this only explains the hold — it never gates anything client-side).
+			function governanceNote(gov) {
+				if (!gov || gov.decision !== 'block') return;
+				const reason = gov.reasons?.[0]?.label || 'platform policy';
+				const chip = document.createElement('div');
+				chip.className = 'gov-chip';
+				chip.innerHTML =
+					'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="M9 12l2 2 4-4"/></svg>' +
+					`<span>Send held by <a href="/ibm/x402-demo" target="_blank" rel="noopener">IBM Granite Guardian</a>: ${escapeHtml(reason)}.</span>`;
+				log.appendChild(chip);
+				log.scrollTop = log.scrollHeight;
+			}
+
+			function escapeHtml(s) {
+				return String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+			}
+
+			async function ask(message) {
+				if (busy || !message.trim()) return;
+				busy = true;
+				sendBtn.disabled = true;
+				input.value = '';
+				addMsg(message, 'user');
+				history.push({ role: 'user', content: message });
+
+				const bot = addMsg('', 'bot');
+				bot.innerHTML = '<span class="cursor">▋</span>';
+				let reply = '';
+				try {
+					const body = { message, context: {}, history: history.slice(-18) };
+					if (params.get('provider')) body.provider = params.get('provider');
+					if (params.get('model')) body.model = params.get('model');
+					if (params.get('agentId')) body.agentId = params.get('agentId');
+
+					const r = await fetch('/api/chat', {
+						method: 'POST',
+						headers: { 'content-type': 'application/json' },
+						body: JSON.stringify(body),
+					});
+					// The chat API answers a refusal with a JSON body that names the
+					// cause ("at capacity right now", a rejected model). Surface that
+					// sentence instead of a bare status code the reader can't act on.
+					if (!r.ok || !r.body) {
+						const detail = await r.json().catch(() => null);
+						throw new Error(detail?.error_description || detail?.message || `The chat service answered ${r.status}. Try again in a moment.`);
+					}
+
+					const reader = r.body.getReader();
+					const dec = new TextDecoder();
+					let buf = '';
+					let actions = [];
+					let governance = null;
+					while (true) {
+						const { value, done } = await reader.read();
+						if (done) break;
+						buf += dec.decode(value, { stream: true });
+						const lines = buf.split('\n');
+						buf = lines.pop();
+						for (const line of lines) {
+							if (!line.startsWith('data: ')) continue;
+							let evt;
+							try { evt = JSON.parse(line.slice(6)); } catch { continue; }
+							if (evt.type === 'chunk') {
+								reply += evt.text;
+								bot.textContent = reply;
+								log.scrollTop = log.scrollHeight;
+							} else if (evt.type === 'done') {
+								reply = (evt.reply || reply).trim();
+								bot.textContent = reply || '…';
+								actions = evt.actions || [];
+								governance = evt.governance || null;
+							} else if (evt.type === 'error') {
+								throw new Error(evt.message || 'chat error');
+							}
+						}
+					}
+					if (reply) {
+						history.push({ role: 'assistant', content: reply });
+						avatarSpeak(reply);
+					}
+					governanceNote(governance);
+					await runActions(actions);
+				} catch (err) {
+					// A dead fetch carries no server sentence, only "Failed to fetch",
+					// which tells the reader nothing. Name the connection instead.
+					const offline = !err.message || /failed to fetch|networkerror|load failed/i.test(err.message);
+					const reason = offline ? "I couldn't reach my brain. Check your connection and try again." : err.message;
+					botError(bot, reason, message);
+					toast(reason);
+				} finally {
+					busy = false;
+					sendBtn.disabled = false;
+					input.focus();
+				}
+			}
+
+			// ── Receive detection ─────────────────────────────────────────
+			// The avatar notices when SOL lands in its own wallet (a tip from you)
+			// and reacts in real time — the "receiving" half of the round-trip.
+			// Real on-chain data via /api/agent/activity; the first poll seeds the
+			// seen-set so only NEW arrivals trigger a reaction. Defined once at page
+			// boot with a single interval — never per message — so concurrent
+			// pollers can't accumulate.
+			const seenSigs = new Set();
+			let activitySeeded = false;
+			let activityTimer = null;
+			function receiveCard(t) {
+				clearEmpty();
+				const card = document.createElement('div');
+				card.className = 'pay ok recv';
+				const from = t.counterparty ? short(t.counterparty) : 'someone';
+				card.innerHTML =
+					'<div class="head"><span class="ic">↓</span> Received SOL</div>' +
+					'<div class="amt">' + fmtSol(t.sol) + ' SOL</div>' +
+					'<div class="sub">' + (t.usd != null ? '≈ $' + t.usd.toFixed(2) + ' · ' : '') + 'from ' + from + '</div>' +
+					'<div class="status"><span class="pip"></span><span class="label">Confirmed on-chain</span></div>';
+				const a = document.createElement('a');
+				a.className = 'sig';
+				a.href = t.explorer; a.target = '_blank'; a.rel = 'noopener';
+				a.textContent = '↗ ' + short(t.signature);
+				card.appendChild(a);
+				log.appendChild(card);
+				log.scrollTop = log.scrollHeight;
+			}
+			async function pollActivity() {
+				try {
+					const r = await fetch('/api/agent/activity?limit=12', { headers: { accept: 'application/json' } });
+					if (!r.ok) return;
+					const data = await r.json();
+					const transfers = data.transfers || [];
+					if (!activitySeeded) {
+						transfers.forEach((t) => seenSigs.add(t.signature));
+						activitySeeded = true;
+						return;
+					}
+					for (const t of [...transfers].reverse()) {
+						if (seenSigs.has(t.signature)) continue;
+						seenSigs.add(t.signature);
+						if (t.direction !== 'in') continue;
+						receiveCard(t);
+						toast('Received ' + fmtSol(t.sol) + ' SOL' + (t.usd != null ? ' ($' + t.usd.toFixed(2) + ')' : ''));
+						avatarSpeak('I just received ' + fmtSol(t.sol) + ' SOL' + (t.usd != null ? ', about $' + t.usd.toFixed(2) : '') + '. Thank you!');
+						avatarGesture('celebrate');
+						refreshWallet();
+					}
+				} catch (e) { /* transient RPC/network blip — next tick retries */ }
+			}
+			function startActivityPoller() {
+				if (activityTimer) return; // exactly one interval, ever
+				pollActivity();
+				activityTimer = setInterval(pollActivity, 9000);
+			}
+
+			el('composer').addEventListener('submit', (e) => { e.preventDefault(); ask(input.value); });
+
+			// Suggestion chips (the middle one is the autonomous-payment demo).
+			const chips = [
+				{ label: 'What can you do?', send: 'What can you do?' },
+				{ label: '💸 Send me $1 of SOL', send: 'Send me $1 of SOL' },
+				{ label: 'Wave 👋', send: 'wave at me' },
+			];
+			const chipsBox = el('chips');
+			for (const c of chips) {
+				const b = document.createElement('button');
+				b.type = 'button';
+				b.className = 'chip';
+				b.textContent = c.label;
+				b.addEventListener('click', () => ask(c.send));
+				chipsBox.appendChild(b);
+			}
+
+			// ── Boot ──────────────────────────────────────────────────────
+			refreshWallet();
+			setInterval(refreshWallet, 20000);
+			startActivityPoller();
+			input.focus();
+		</script>
+		<!-- Runtime i18n: detects locale, swaps annotated copy, mounts <lang-switcher>. -->
+	<script type="module" src="/i18n.js"></script>
+</body>
+</html>

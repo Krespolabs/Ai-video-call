@@ -1,0 +1,131 @@
+{
+	"id": "three-token-mcp",
+	"contentHash": "111e25308a115a7ccba1e68bc0ad1fe93010472f09bc8047041efbafe327cbc1",
+	"reviewedAt": "2026-09-20T04:10:03.331Z",
+	"passed": true,
+	"blockers": [],
+	"texts": [
+		"An MCP server that lets an AI burn $THREE on @solana. three_burn is flagged irreversible and by default won't sign without confirm: true. three.ws/mcp-tools?server=three-token-mcp"
+	],
+	"lint": [],
+	"verification": {
+		"ok": true,
+		"checks": [
+			{
+				"claim": "burn $THREE on @solana",
+				"kind": "evidence:page",
+				"target": "https://three.ws/mcp-tools?server=three-token-mcp&tool=three_burn",
+				"ok": true,
+				"detail": "live page shows \"Burn $THREE on-chain\""
+			},
+			{
+				"claim": "burn $THREE on @solana",
+				"kind": "evidence:page",
+				"target": "https://three.ws/mcp-tools?server=three-token-mcp&tool=three_burn",
+				"ok": true,
+				"detail": "live page shows \"signs and broadcasts on Solana mainnet\""
+			},
+			{
+				"claim": "burn $THREE on @solana",
+				"kind": "evidence:file",
+				"target": "packages/three-token-mcp/src/lib/token.js",
+				"ok": true,
+				"detail": "file supports the claim"
+			},
+			{
+				"claim": "flagged irreversible",
+				"kind": "evidence:page",
+				"target": "https://three.ws/mcp-tools?server=three-token-mcp&tool=three_burn",
+				"ok": true,
+				"detail": "live page shows \"Irreversible. Cannot be undone once it runs.\""
+			},
+			{
+				"claim": "flagged irreversible",
+				"kind": "evidence:file",
+				"target": "packages/three-token-mcp/src/tools/three-burn.js",
+				"ok": true,
+				"detail": "file supports the claim"
+			},
+			{
+				"claim": "by default won't sign without confirm: true",
+				"kind": "evidence:page",
+				"target": "https://three.ws/mcp-tools?server=three-token-mcp&tool=three_burn",
+				"ok": true,
+				"detail": "live page shows \"IRREVERSIBLE: pass confirm:true\""
+			},
+			{
+				"claim": "by default won't sign without confirm: true",
+				"kind": "evidence:file",
+				"target": "packages/three-token-mcp/src/tools/three-burn.js",
+				"ok": true,
+				"detail": "file supports the claim"
+			},
+			{
+				"claim": "by default won't sign without confirm: true",
+				"kind": "evidence:file",
+				"target": "packages/three-token-mcp/src/config.js",
+				"ok": true,
+				"detail": "file supports the claim"
+			},
+			{
+				"kind": "probe:command",
+				"target": "three_burn refuses to sign without confirm: true",
+				"ok": true,
+				"detail": "exit 0"
+			},
+			{
+				"kind": "probe:api",
+				"target": "the package is published on npm",
+				"ok": true,
+				"detail": "HTTP 200, expectations met"
+			},
+			{
+				"kind": "probe:api",
+				"target": "the live tool catalog lists three_burn",
+				"ok": true,
+				"detail": "HTTP 200, expectations met"
+			},
+			{
+				"kind": "link",
+				"target": "https://three.ws/mcp-tools?server=three-token-mcp",
+				"ok": true,
+				"detail": "HTTP 200"
+			},
+			{
+				"kind": "mention",
+				"target": "@solana",
+				"ok": true,
+				"detail": "Solana (business verified)"
+			}
+		]
+	},
+	"editor": {
+		"verdict": "publish",
+		"scores": {
+			"accuracy": 5,
+			"clarity": 5,
+			"specificity": 5,
+			"voice": 5,
+			"professionalism": 5,
+			"visual": 5
+		},
+		"issues": [],
+		"rewrite": {
+			"posts": [
+				"An MCP server that lets an AI burn $THREE on @solana. three_burn is flagged irreversible and by default won't sign without confirm: true. three.ws/mcp-tools?server=three-token-mcp"
+			],
+			"altText": [
+				"The three.ws MCP Tool Catalog filtered to the @three-ws/three-token-mcp server: 3 of 321 tools, with three_balance and three_price labelled read-only and three_burn labelled irreversible, all free"
+			]
+		},
+		"summary": "Every claim is verified against the live tool page, source files, and a passing probe, and the screenshot matches the live catalog exactly including the 3 of 321 count and badge labels. The post sits inside the 100 to 179 band, carries one tag that the mechanism justifies, and follows the voice contract with nothing to fix.",
+		"model": "nvidia:moonshotai/kimi-k3",
+		"fallbacks": [
+			"No GCP credentials found. Set GCP_SERVICE_ACCOUNT_JSON, run `gcloud auth application-default login`, or run on GCE/Cloud Run.",
+			"openrouter 402: {\"error\":{\"message\":\"Insufficient credits. Add more using https://openrouter.ai/settings/credits\",\"code\":402,\"metadata\":{\"limit_source\":\"openrouter_credits\",\"remedy_hint\":\"Add credits at https://openr",
+			"openai 429: {\n    \"error\": {\n        \"message\": \"Your account is not active, please check your billing details on our website.\",\n        \"type\": \"billing_not_active\",\n        \"param\": null,\n        \"code\": \"billi"
+		],
+		"rewriteFindings": []
+	},
+	"editorError": null
+}

@@ -1,0 +1,6069 @@
+// Consolidated pump.fun API dispatcher.
+//
+// Routes via Vercel's [action] file param. Single bundle replaces 22 separate
+// serverless functions, each of which used to import @solana/web3.js and the
+// @pump-fun/* SDKs from scratch.
+//
+// Action map:
+//   balances                 -> handleBalances
+//   buy-prep                 -> handleBuyPrep
+//   buy-confirm              -> handleBuyConfirm
+//   sell-prep                -> handleSellPrep
+//   sell-confirm             -> handleSellConfirm
+//   launch-prep              -> handleLaunchPrep
+//   launch-confirm           -> handleLaunchConfirm
+//   launch-agent             -> handleLaunchAgent (server-side signing via agent wallet)
+//   agent-wallet             -> handleAgentWallet (resolve agent + Solana wallet info)
+//   accept-payment-prep      -> handleAcceptPaymentPrep
+//   accept-payment-confirm   -> handleAcceptPaymentConfirm
+//   payments-list            -> handlePaymentsList
+//   portfolio                -> handlePortfolio
+//   by-agent                 -> handleByAgent
+//   launches                 -> handleLaunches (public cross-agent launch feed)
+//   quote                    -> handleQuote
+//   governance-prep          -> handleGovernancePrep
+//   withdraw-prep            -> handleWithdrawPrep
+//   withdraw-confirm         -> handleWithdrawConfirm
+//   strategy-backtest        -> handleStrategyBacktest
+//   strategy-close-all       -> handleStrategyCloseAll
+//   strategy-run             -> handleStrategyRun (SSE; bypasses wrap())
+//   strategy-validate        -> handleStrategyValidate
+//   live-stream              -> handleLiveStream  (SSE; bypasses wrap())
+//   collect-creator-fee-prep      -> handleCollectCreatorFeePrep
+//   distribute-creator-fees-prep  -> handleDistributeCreatorFeesPrep
+//                                    (auto-prepends transfer_creator_fees_to_pump_v2
+//                                     for graduated coins; ATA-init for non-native
+//                                     quotes is handled internally by the SDK)
+//   create-fee-sharing-prep       -> handleCreateFeeSharingPrep   (step 1)
+//   update-fee-shares-prep        -> handleUpdateFeeSharesPrep    (step 2)
+//   fee-info                      -> handleFeeInfo (read-only: claimable creator
+//                                    fees, graduation, sharing-config shareholders)
+//   resolve-github-shareholder    -> handleResolveGithubShareholder (read-only:
+//                                    GitHub @login/id -> the recipient's linked
+//                                    Solana payout wallet, or a pump.fun social-fee
+//                                    escrow PDA when they haven't joined yet)
+//   create-social-fee-pda-prep    -> handleCreateSocialFeePdaPrep (user-signed:
+//                                    initialise the pump.fun social-fee escrow that
+//                                    a fee-share update then routes a slice into)
+//   collect-creator-fee-agent     -> handleCollectCreatorFeeAgent (server-signs
+//                                    with the agent custodial wallet)
+//   distribute-creator-fees-agent -> handleDistributeCreatorFeesAgent (server-signs)
+//   fee-sharing-agent             -> handleFeeSharingAgent (server-signs create +
+//                                    update sharing config; delegated fee rewards)
+
+import { validateShareholders } from '../../src/shared/launch-fees.js';
+import { z } from 'zod';
+import { Keypair, PublicKey, LAMPORTS_PER_SOL } from '@solana/web3.js';
+import { sql } from '../_lib/db.js';
+import { resolveSocialReward } from '../_lib/github-reward.js';
+import { submitProtected } from '../_lib/execution-engine.js';
+import { getSessionUser, authenticateBearer, extractBearer, isSameSiteOrigin } from '../_lib/auth.js';
+import { assertBearerMaySpend } from '../_lib/spend-scope.js';
+import { cors, json, method, readJson, wrap, error, rateLimited, respondError } from '../_lib/http.js';
+import { putObject, publicUrl as r2PublicUrl, thumbnailUrl } from '../_lib/r2.js';
+import { env } from '../_lib/env.js';
+import { limits, clientIp } from '../_lib/rate-limit.js';
+import { resolveOrCreateAgentForAvatar as resolveLaunchAgentId } from '../_lib/agent-identity.js';
+import { parse, isUuid } from '../_lib/validate.js';
+import { queryAgentLaunches } from '../_lib/pump-agent-launches.js';
+import { markPlanLaunched } from '../_lib/agent-token-plan.js';
+import { randomToken } from '../_lib/crypto.js';
+import { publishFeedEvent } from '../_lib/feed.js';
+import { recordDailyActivity } from '../_lib/streaks.js';
+import { recordQuestTrade } from '../_lib/trading-quests.js';
+import { recordCopyPathStep } from '../_lib/copy-path.js';
+import { normalizeGatewayURL } from '../../src/ipfs.js';
+import { buildTokenMetadata } from '../_lib/three-brand.js';
+import {
+	buildPlatformFeeInstructions,
+	effectivePumpFeeBps,
+	pumpFeeRecipient,
+	pumpLaunchFeeBps,
+	txPaidPlatformFee,
+} from '../_lib/pump-platform-fee.js';
+import {
+	buildLaunchTransaction,
+	countPrefixThatFits,
+	getPumpLookupTables,
+	pumpAgentBuybackAvailable,
+	transactionV1Status,
+} from '../_lib/pump-launch-tx.js';
+import {
+	creatorExtraQuoteMints,
+	creatorFeeSweepInstructions,
+	readCreatorFeeBuckets,
+	sumByQuote,
+	unsweptCreatorFees,
+} from '../_lib/pump-creator-fees.js';
+import { pinToIPFS, ipfsPinningConfigured } from '../_lib/ipfs-pin.js';
+import { THREE_WS_VANITY, hasThreeWsMark } from '../../src/solana/vanity/brand.js';
+import { grindVanityNode, GrindExhaustedError } from '../../src/solana/vanity/grinder-node.js';
+import { logger } from '../_lib/usage.js';
+import { cacheGet, cacheSet } from '../_lib/cache.js';
+import { pumpFetchJson } from '../_lib/pump-feed-fetch.js';
+import { getCurveView } from '../_lib/pump-curve-view.js';
+import { collectFeeAgentSchema } from '../_lib/pump-fee-schemas.js';
+import { isRpcOutageError, staleEnvelope } from '../_lib/rpc-degrade.js';
+import { getLaunchEconomics, describeFeeSplit } from '../_lib/launch-economics.js';
+import {
+	GaslessError,
+	gaslessEligibility,
+	prepareGaslessCurveLaunch,
+	recordSponsorshipPrepared,
+	recordSponsorshipLaunched,
+	verifyGaslessTransaction,
+} from '../_lib/launch-sponsor.js';
+
+const log = logger('pump.launch');
+import {
+	getConnection,
+	getPumpSdk,
+	getPumpSdkV2,
+	getPumpAgent,
+	getPumpAgentOffline,
+	getAmmPoolState,
+	buildUnsignedTxBase64,
+	verifySignature,
+	txInvokesPumpProgram,
+	txInvokesAgentPaymentsProgram,
+	solanaPubkey,
+} from '../_lib/pump.js';
+
+// Wrapped SOL mint: required as the quoteMint for SOL-paired V2 instructions
+const WSOL_MINT = 'So11111111111111111111111111111111111111112';
+import { solanaConnection, loadAgentForSigning } from '../_lib/agent-pumpfun.js';
+import { connectPumpFunFeed } from '../_lib/pumpfun-ws-feed.js';
+import { makeRuntime } from '../_lib/skill-runtime.js';
+import { loadWallet } from '../_lib/solana-wallet.js';
+import { enforceSpendLimit, SpendLimitError } from '../_lib/agent-trade-guards.js';
+import { solUsdPrice } from '../_lib/avatar-wallet.js';
+import { requireRealFundsAgreement, currentSignatureFor } from '../_lib/real-funds-agreement.js';
+import {
+	createStrategySpendGuard,
+	reserveSpend,
+	finalizeSpend,
+	releaseSpend,
+} from '../_lib/agent-spend-policy.js';
+import { SOLANA_USDC_MINT, SOLANA_USDC_MINT_DEVNET, toUsdcAtomics } from '../payments/_config.js';
+import { fetchUpstream } from '../_lib/upstream-fetch.js';
+import {
+	classifyLaunchQuote,
+	usdcMintFor,
+	tradeQuoteColumns,
+	walletQuoteDeltaAtomics,
+} from '../_lib/pump-quote.js';
+import {
+	slippagePercentFromBps,
+	resolveTokenProgramForMintOwner,
+} from '../_lib/pump-trade-args.js';
+
+const TOKEN_PROGRAM_ID = new PublicKey('TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA');
+
+const RPC = {
+	mainnet: process.env.SOLANA_RPC_URL || 'https://api.mainnet-beta.solana.com',
+	devnet: process.env.SOLANA_RPC_URL_DEVNET || 'https://api.devnet.solana.com',
+};
+
+/**
+ * Read and clamp a `?limit=` query param.
+ *
+ * `Number('abc')` is NaN, and NaN survives every Math.min/Math.max clamp, so the
+ * naive `Math.min(Math.max(1, Number(param || 50)), max)` shape forwards a NaN
+ * straight into SQL `limit`, into an upstream query string, and into the feed
+ * slice. A single typo'd limit therefore answered 200 with an empty feed rather
+ * than the default page. Anything non-numeric falls back to `fallback`; a real
+ * number is floored and clamped into [1, max].
+ */
+function readLimit(url, fallback, max) {
+	const param = url.searchParams.get('limit');
+	const raw = param == null || param === '' ? NaN : Number(param);
+	const n = Number.isFinite(raw) ? Math.floor(raw) : fallback;
+	return Math.min(Math.max(1, n), max);
+}
+
+// `spend: true` marks a handler that signs with an agent's custodial key; a
+// bearer must then hold the scope for that kind of movement (spend-scope.js):
+// `kind: 'trade'` for a swap or a position, where value stays in the wallet.
+async function resolveAuth(req, { spend = false, kind = 'spend' } = {}) {
+	const session = await getSessionUser(req);
+	if (session) {
+		// CSRF defense-in-depth for the cookie path: these handlers sign real
+		// spends with platform-held custodial keys, so a cross-site POST riding
+		// the session cookie must never reach them. Reads stay open; bearer
+		// callers (agent keys, workers) are exempt since the token itself is
+		// the proof of intent.
+		const isRead = ['GET', 'HEAD', 'OPTIONS'].includes(String(req.method || '').toUpperCase());
+		if (!isRead && !isSameSiteOrigin(req)) {
+			throw Object.assign(new Error('cross-site request blocked'), { status: 403, code: 'forbidden' });
+		}
+		return { userId: session.id };
+	}
+	const bearer = await authenticateBearer(extractBearer(req));
+	if (!bearer) return null;
+	if (spend) assertBearerMaySpend(bearer, req, { kind });
+	return { userId: bearer.userId };
+}
+
+/**
+ * The account behind a non-custodial trade prep or confirm. These four
+ * handlers never touch a platform key: prep returns an unsigned transaction
+ * for the caller's own wallet and confirm only records a trade it has verified
+ * on chain. A bearer caller (an API key, or the trading tools over MCP and
+ * /api/v1/trading) is therefore as safe as the cookie session they always
+ * accepted, and the session path is unchanged.
+ * @returns {Promise<{ id: string } | null>}
+ */
+async function walletTradeUser(req) {
+	const session = await getSessionUser(req);
+	if (session) return session;
+	const bearer = await authenticateBearer(extractBearer(req));
+	return bearer ? { id: bearer.userId } : null;
+}
+
+/**
+ * Session lookup for the handlers that sign and BROADCAST with an agent's
+ * custodial keypair server-side (launch-agent, the *-agent fee cranks). Those
+ * need nothing from the caller but a cookie, so a cross-site POST alone was
+ * enough to mint a coin or sweep fees: the exact threat resolveAuth() guards
+ * against, which these paths were not routed through. Same rule as resolveAuth:
+ * the cookie path must prove same-site intent, reads stay open.
+ *
+ * Returns the session user, or null after writing the 401/403 response.
+ */
+async function requireSessionUser(req, res) {
+	const user = await getSessionUser(req);
+	if (!user) {
+		error(res, 401, 'unauthorized', 'sign in required');
+		return null;
+	}
+	const isRead = ['GET', 'HEAD', 'OPTIONS'].includes(String(req.method || '').toUpperCase());
+	if (!isRead && !isSameSiteOrigin(req)) {
+		error(res, 403, 'forbidden', 'cross-site request blocked');
+		return null;
+	}
+	return user;
+}
+
+const wrapped = wrap(async (req, res) => {
+	const action = req.query?.action;
+	switch (action) {
+		case 'balances':
+			return handleBalances(req, res);
+		case 'buy-prep':
+			return handleBuyPrep(req, res);
+		case 'buy-confirm':
+			return handleBuyConfirm(req, res);
+		case 'sell-prep':
+			return handleSellPrep(req, res);
+		case 'sell-confirm':
+			return handleSellConfirm(req, res);
+		case 'build-metadata':
+			return handleBuildMetadata(req, res);
+		case 'launch-prep':
+			return handleLaunchPrep(req, res);
+		case 'launch-confirm':
+			return handleLaunchConfirm(req, res);
+		case 'launch-agent':
+			return handleLaunchAgent(req, res);
+		case 'agent-wallet':
+			return handleAgentWallet(req, res);
+		case 'accept-payment-prep':
+			return handleAcceptPaymentPrep(req, res);
+		case 'accept-payment-confirm':
+			return handleAcceptPaymentConfirm(req, res);
+		case 'payments-list':
+			return handlePaymentsList(req, res);
+		case 'portfolio':
+			return handlePortfolio(req, res);
+		case 'by-agent':
+			return handleByAgent(req, res);
+		case 'launches':
+			return handleLaunches(req, res);
+		case 'quote':
+			return handleQuote(req, res);
+		case 'governance-prep':
+			return handleGovernancePrep(req, res);
+		case 'withdraw-prep':
+			return handleWithdrawPrep(req, res);
+		case 'withdraw-confirm':
+			return handleWithdrawConfirm(req, res);
+		case 'strategy-backtest':
+			return handleStrategyBacktest(req, res);
+		case 'strategy-close-all':
+			return handleStrategyCloseAll(req, res);
+		case 'strategy-validate':
+			return handleStrategyValidate(req, res);
+		case 'channel-feed':
+			return handleChannelFeed(req, res);
+		case 'deliver-telegram':
+			return handleDeliverTelegram(req, res);
+		case 'first-claims':
+			return handleFirstClaims(req, res);
+		case 'recent-graduations':
+			return handleRecentGraduations(req, res);
+		case 'trending':
+			return handleTrending(req, res);
+		case 'coin':
+			return handleCoin(req, res);
+		case 'coin-trades':
+			return handleCoinTrades(req, res);
+		case 'search':
+			return handleSearch(req, res);
+		case 'collect-creator-fee-prep':
+			return handleCollectCreatorFeePrep(req, res);
+		case 'launch-config':
+			return handleLaunchConfig(req, res);
+		case 'my-coins':
+			return handleMyCoins(req, res);
+		case 'distribute-creator-fees-prep':
+			return handleDistributeCreatorFeesPrep(req, res);
+		case 'create-fee-sharing-prep':
+			return handleCreateFeeSharingPrep(req, res);
+		case 'update-fee-shares-prep':
+			return handleUpdateFeeSharesPrep(req, res);
+		case 'fee-info':
+			return handleFeeInfo(req, res);
+		case 'resolve-github-shareholder':
+			return handleResolveGithubShareholder(req, res);
+		case 'create-social-fee-pda-prep':
+			return handleCreateSocialFeePdaPrep(req, res);
+		case 'github-resolve':
+			return handleGithubResolve(req, res);
+		case 'social-fee-claim-status':
+			return handleSocialFeeClaimStatus(req, res);
+		case 'collect-creator-fee-agent':
+			return handleCollectCreatorFeeAgent(req, res);
+		case 'distribute-creator-fees-agent':
+			return handleDistributeCreatorFeesAgent(req, res);
+		case 'fee-sharing-agent':
+			return handleFeeSharingAgent(req, res);
+		default:
+			return error(res, 404, 'not_found', 'unknown pump action');
+	}
+});
+
+// SSE actions bypass wrap()'s JSON-error fallback: they manage their own response writes.
+export default async function dispatcher(req, res) {
+	if (req.query?.action === 'strategy-run') return handleStrategyRun(req, res);
+	if (req.query?.action === 'vanity-keygen') return handleVanityKeygen(req, res);
+	if (req.query?.action === 'live-stream') return handleLiveStream(req, res);
+	// `trades-stream` is served by the dedicated api/pump/trades-stream.js file
+	// (static routes win over [action]); no dispatch needed here.
+	return wrapped(req, res);
+}
+
+// ── balances ───────────────────────────────────────────────────────────────
+
+async function handleBalances(req, res) {
+	if (cors(req, res, { methods: 'GET,OPTIONS', origins: '*' })) return;
+	if (!method(req, res, ['GET'])) return;
+
+	const rl = await limits.authedReadIp(clientIp(req));
+	if (!rl.success) return rateLimited(res, rl);
+
+	const url = new URL(req.url, `http://${req.headers.host}`);
+	const mintStr = url.searchParams.get('mint');
+	const network = url.searchParams.get('network') === 'devnet' ? 'devnet' : 'mainnet';
+	const currencyArg = url.searchParams.get('currency');
+
+	const mint = solanaPubkey(mintStr);
+	if (!mint) return error(res, 400, 'validation_error', 'invalid mint');
+
+	const currencyStr =
+		currencyArg || (network === 'devnet' ? SOLANA_USDC_MINT_DEVNET : SOLANA_USDC_MINT);
+	const currency = solanaPubkey(currencyStr);
+	if (!currency) return error(res, 400, 'validation_error', 'invalid currency');
+
+	try {
+		const { agent, agentPda } = await getPumpAgent({ network, mint });
+		const balances = await agent.getBalances(currency);
+		const fmt = (v) =>
+			v && {
+				address: v.address?.toString?.() ?? String(v.address),
+				balance: v.balance?.toString?.() ?? String(v.balance ?? 0),
+			};
+		return json(res, 200, {
+			mint: mintStr,
+			network,
+			currency: currencyStr,
+			agent_pda: agentPda?.toString?.() ?? null,
+			balances: {
+				payment: fmt(balances.paymentVault),
+				buyback: fmt(balances.buybackVault),
+				withdraw: fmt(balances.withdrawVault),
+			},
+		});
+	} catch (err) {
+		// Most common: agent not yet bound to mint → PDA missing. Sanitize the 5xx :
+		// web3.js network errors embed the keyed Helius RPC URL in err.message.
+		return respondError(res, 502, 'pump_agent_error', err);
+	}
+}
+
+// ── buy-prep ───────────────────────────────────────────────────────────────
+
+const buyPrepSchema = z
+	.object({
+		mint: z.string().min(32).max(44),
+		network: z.enum(['mainnet', 'devnet']).default('mainnet'),
+		// For SOL-paired coins pass `sol`; for USDC-paired coins pass `usdc_amount`.
+		// Exactly one must be provided: validation enforced below.
+		sol: z.number().positive().max(50).optional(),
+		usdc_amount: z.number().positive().max(1_000_000).optional(),
+		// Optional explicit quote mint. When omitted the server auto-detects from
+		// the on-chain bonding curve (quote_mint field added in pump.fun V2).
+		quote_mint: z.string().min(32).max(44).optional(),
+		slippage_bps: z.number().int().min(0).max(5000).default(100),
+		wallet_address: z.string().min(32).max(44),
+	})
+	.refine((v) => v.sol != null || v.usdc_amount != null, {
+		message: 'sol or usdc_amount required',
+		path: ['sol'],
+	});
+
+async function handleBuyPrep(req, res) {
+	if (cors(req, res, { methods: 'POST,OPTIONS', credentials: true })) return;
+	if (!method(req, res, ['POST'])) return;
+
+	const user = await walletTradeUser(req);
+	if (!user) return error(res, 401, 'unauthorized', 'sign in required');
+
+	const rl = await limits.authIp(clientIp(req));
+	if (!rl.success) return rateLimited(res, rl);
+
+	const body = parse(buyPrepSchema, await readJson(req));
+	const userPk = solanaPubkey(body.wallet_address);
+	const mintPk = solanaPubkey(body.mint);
+	if (!userPk || !mintPk) return error(res, 400, 'validation_error', 'invalid pubkeys');
+
+	try {
+		const { sdk, BN, web3, connection } = await getPumpSdk({ network: body.network });
+		const { isLegacyQuoteMint, getBuyTokenAmountFromSolAmount } =
+			await import('@pump-fun/pump-sdk');
+		// @pump-fun SDK builders take slippage as a PERCENT (1 = 1%), not a
+		// fraction: see api/_lib/pump-trade-args.js for the unit derivation.
+		const slippagePct = slippagePercentFromBps(body.slippage_bps);
+
+		// The base mint's owner decides base_token_program: create_v2 coins are
+		// Token-2022, legacy coins are SPL Token (docs/instructions/BUY.md #4).
+		const mintInfo = await connection.getAccountInfo(mintPk);
+		if (!mintInfo)
+			return error(
+				res,
+				404,
+				'mint_not_found',
+				`mint ${body.mint} not found on ${body.network}`,
+			);
+		const baseTokenProgram = resolveTokenProgramForMintOwner(mintInfo.owner);
+
+		// Fetch bonding curve state: also gives us the on-chain quote_mint.
+		// Pass the real token program so the user-ATA existence check resolves
+		// the correct (possibly Token-2022) associated account.
+		let buyState = null;
+		try {
+			if (sdk.fetchBuyState)
+				buyState = await sdk.fetchBuyState(mintPk, userPk, baseTokenProgram);
+		} catch {
+			buyState = null;
+		}
+
+		// Resolve quoteMint: explicit override > on-chain curve > WSOL fallback.
+		let quoteMintPk = body.quote_mint
+			? solanaPubkey(body.quote_mint)
+			: (buyState?.bondingCurve?.quoteMint ?? solanaPubkey(WSOL_MINT));
+		if (!quoteMintPk) quoteMintPk = solanaPubkey(WSOL_MINT);
+
+		const isUsdcQuote = !isLegacyQuoteMint(quoteMintPk);
+		// On-chain SOL curves store quoteMint as PublicKey.default (all-zeros).
+		// Surface wrapped SOL in the API response instead of the zero pubkey so
+		// clients see a real, usable mint for every coin type.
+		const quoteMintDisplay = isUsdcQuote ? quoteMintPk.toString() : WSOL_MINT;
+
+		// quote_token_program must match the quote mint's owner (wSOL/USDC are
+		// SPL Token today; read it from chain so a future quote can't break us).
+		let quoteTokenProgram = TOKEN_PROGRAM_ID;
+		if (isUsdcQuote) {
+			const quoteInfo = await connection.getAccountInfo(quoteMintPk);
+			if (!quoteInfo)
+				return error(
+					res,
+					404,
+					'quote_mint_not_found',
+					`quote mint ${quoteMintPk.toBase58()} not found`,
+				);
+			quoteTokenProgram = resolveTokenProgramForMintOwner(quoteInfo.owner);
+		}
+
+		// Validate the quote-asset amount up front for both routes.
+		if (isUsdcQuote && body.usdc_amount == null)
+			return error(res, 400, 'validation_error', 'usdc_amount required for USDC-paired coin');
+		if (!isUsdcQuote && body.sol == null)
+			return error(res, 400, 'validation_error', 'sol required for SOL-paired coin');
+		const quoteAtomics = isUsdcQuote
+			? new BN(Math.round(body.usdc_amount * 1_000_000))
+			: new BN(Math.floor(body.sol * web3.LAMPORTS_PER_SOL));
+
+		if (buyState && buyState.bondingCurve && !buyState.bondingCurve.complete) {
+			// Unified v2 interface for every coin type (SOL- and USDC-paired,
+			// SPL and Token-2022 base mints) per the upstream migration guidance :
+			// docs/pumpfun-program/UPSTREAM-buy-sell-v2-announcement.md.
+			const [global, feeConfig] = await Promise.all([
+				sdk.fetchGlobal(),
+				sdk.fetchFeeConfig().catch(() => null),
+			]);
+			// buy_v2's `amount` arg is the base-token quantity to buy and must be
+			// > 0 (docs/instructions/BUY.md): derive it from the quote input.
+			const tokenAmount = getBuyTokenAmountFromSolAmount({
+				global,
+				feeConfig,
+				mintSupply: buyState.bondingCurve.tokenTotalSupply,
+				bondingCurve: buyState.bondingCurve,
+				amount: quoteAtomics,
+				quoteMint: quoteMintPk,
+			});
+			if (!tokenAmount.gt(new BN(0)))
+				return error(
+					res,
+					400,
+					'amount_too_small',
+					'quote amount too small to buy any tokens',
+				);
+			const ixs = await sdk.buyV2Instructions({
+				global,
+				bondingCurveAccountInfo: buyState.bondingCurveAccountInfo,
+				bondingCurve: buyState.bondingCurve,
+				associatedUserAccountInfo: buyState.associatedUserAccountInfo,
+				mint: mintPk,
+				user: userPk,
+				amount: tokenAmount,
+				quoteAmount: quoteAtomics,
+				slippage: slippagePct,
+				tokenProgram: baseTokenProgram,
+				quoteTokenProgram,
+			});
+			const __platformFee = await buildPlatformFeeInstructions({
+				network: body.network, payer: userPk, isUsdc: isUsdcQuote,
+				quoteMintPk, quoteTokenProgram, grossAtomics: BigInt(quoteAtomics.toString()), basis: 'buy',
+			});
+			if (__platformFee) ixs.push(...__platformFee.instructions);
+			const tx_base64 = await buildUnsignedTxBase64({
+				network: body.network,
+				payer: userPk,
+				instructions: ixs,
+			});
+			return json(res, 201, {
+				route: 'bonding_curve',
+				mint: body.mint,
+				network: body.network,
+				quote_mint: quoteMintDisplay,
+				...(isUsdcQuote ? { usdc_in: body.usdc_amount } : { sol_in: body.sol }),
+				expected_tokens_out: tokenAmount.toString(),
+				slippage_bps: body.slippage_bps,
+				platform_fee: __platformFee ? __platformFee.disclosure : null,
+				tx_base64,
+			});
+		}
+
+		// AMM (post-graduation)
+		const amm = await getAmmPoolState({
+			network: body.network,
+			mint: mintPk,
+			quoteMint: isUsdcQuote ? quoteMintPk : null,
+		});
+		const ammMod = await import('@pump-fun/pump-swap-sdk');
+		const offline = new ammMod.PumpAmmSdk();
+		const onlineAmm = new ammMod.OnlinePumpAmmSdk(getConnection({ network: body.network }));
+		const swapState = await onlineAmm.swapSolanaState(amm.poolKey, userPk);
+
+		const ixs = await offline.buyQuoteInput(swapState, quoteAtomics, slippagePct);
+		const __platformFee = await buildPlatformFeeInstructions({
+			network: body.network, payer: userPk, isUsdc: isUsdcQuote,
+			quoteMintPk, quoteTokenProgram, grossAtomics: BigInt(quoteAtomics.toString()), basis: 'buy',
+		});
+		if (__platformFee) ixs.push(...__platformFee.instructions);
+		const tx_base64 = await buildUnsignedTxBase64({
+			network: body.network,
+			payer: userPk,
+			instructions: ixs,
+		});
+		return json(res, 201, {
+			route: 'amm',
+			pool: amm.poolKey.toString(),
+			mint: body.mint,
+			network: body.network,
+			quote_mint: quoteMintDisplay,
+			...(isUsdcQuote ? { usdc_in: body.usdc_amount } : { sol_in: body.sol }),
+			slippage_bps: body.slippage_bps,
+			platform_fee: __platformFee ? __platformFee.disclosure : null,
+			tx_base64,
+		});
+	} catch (e) {
+		return respondError(res, e.status || 502, e.code || 'pump_sdk_error', e);
+	}
+}
+
+// ── buy-confirm ────────────────────────────────────────────────────────────
+
+const buyConfirmSchema = z
+	.object({
+		mint: z.string().min(32).max(44),
+		network: z.enum(['mainnet', 'devnet']).default('mainnet'),
+		tx_signature: z.string().min(80).max(100),
+		wallet_address: z.string().min(32).max(44),
+		// SOL-paired coins record `sol`; USDC-paired (v2) coins record `usdc_amount`.
+		// Both optional so either quote asset can confirm; the tx itself is the
+		// source of truth (verified on-chain below), these only label the trade row.
+		sol: z.number().nonnegative().max(50).optional(),
+		usdc_amount: z.number().nonnegative().max(1_000_000).optional(),
+		route: z.enum(['bonding_curve', 'amm']),
+		slippage_bps: z.number().int().min(0).max(5000).optional(),
+		// 'fork' when the trade panel was opened by a Fork (src/fork-trade.js). Only
+		// labels the verified trade for the daily fork quest; it gates nothing.
+		origin: z.enum(['fork']).optional(),
+	})
+	.refine((v) => (v.sol ?? 0) > 0 || (v.usdc_amount ?? 0) > 0, {
+		message: 'sol or usdc_amount required',
+		path: ['sol'],
+	});
+
+async function handleBuyConfirm(req, res) {
+	if (cors(req, res, { methods: 'POST,OPTIONS', credentials: true })) return;
+	if (!method(req, res, ['POST'])) return;
+
+	const user = await walletTradeUser(req);
+	if (!user) return error(res, 401, 'unauthorized', 'sign in required');
+
+	const rl = await limits.authIp(clientIp(req));
+	if (!rl.success) return rateLimited(res, rl);
+
+	const body = parse(buyConfirmSchema, await readJson(req));
+
+	const [mintRow] = await sql`
+		select id, quote_mint from pump_agent_mints where mint=${body.mint} and network=${body.network} limit 1
+	`;
+	const mintId = mintRow?.id ?? null;
+
+	let tx;
+	try {
+		tx = await verifySignature({ network: body.network, signature: body.tx_signature });
+	} catch (e) {
+		return error(res, e.status || 422, e.code || 'tx_failed', e.message);
+	}
+	const accountKeys = tx.transaction.message.accountKeys.map((k) => (k.pubkey || k).toString());
+	if (!accountKeys.includes(body.mint))
+		return error(res, 422, 'mint_not_in_tx', 'mint not in tx');
+	if (!accountKeys.includes(body.wallet_address))
+		return error(res, 422, 'wallet_not_in_tx', 'wallet not in tx');
+
+	if (mintId) {
+		// Resolve the quote asset authoritatively from the coin's recorded pairing
+		// mint (NULL = SOL-paired), so a USDC buy never lands in the lamports
+		// column. `sol_amount` stays a SOL-only lamports field for legacy readers;
+		// `quote_amount` carries the spend in whichever quote's atomic units.
+		const { quote_mint, quote_symbol } = tradeQuoteColumns({
+			quoteMint: mintRow?.quote_mint,
+			network: body.network,
+		});
+		const lamports =
+			quote_symbol === 'SOL' && body.sol > 0
+				? BigInt(Math.floor(body.sol * 1_000_000_000)).toString()
+				: null;
+		const quoteAmount =
+			quote_symbol === 'SOL'
+				? lamports
+				: body.usdc_amount > 0
+					? String(Math.round(body.usdc_amount * 1_000_000))
+					: walletQuoteDeltaAtomics({
+							tx,
+							wallet: body.wallet_address,
+							quoteSymbol: quote_symbol,
+							quoteMint: quote_mint,
+						});
+		await sql`
+			insert into pump_agent_trades
+				(mint_id, user_id, wallet, direction, route, sol_amount,
+				 quote_mint, quote_symbol, quote_amount, slippage_bps, tx_signature, network)
+			values
+				(${mintId}, ${user.id}, ${body.wallet_address}, 'buy', ${body.route},
+				 ${lamports}, ${quote_mint}, ${quote_symbol}, ${quoteAmount},
+				 ${body.slippage_bps ?? null}, ${body.tx_signature}, ${body.network})
+			on conflict (tx_signature, network) do nothing
+		`;
+		// A confirmed on-chain trade is the most real thing a user does here, and
+		// the cross-surface streak counted logins, forges, worlds and walks but not
+		// this. Fire-and-forget and idempotent per UTC day, exactly like every other
+		// call site: it can never delay or fail the buy that earned it.
+		recordDailyActivity(user.id).catch(() => {});
+	} else {
+		// A coin launched elsewhere has no pump_agent_trades row, so this verified
+		// buy is the proof of step 3 of the first-copy path (api/_lib/copy-path.js).
+		recordCopyPathStep(user.id, 'trade', { signature: body.tx_signature }).catch(() => {});
+	}
+
+	// Daily trading quests (api/_lib/trading-quests.js) count every verified trade,
+	// on any coin. Fire-and-forget: a quest record can never delay or fail the buy.
+	recordQuestTrade({
+		userId: user.id,
+		signature: body.tx_signature,
+		network: body.network,
+		wallet: body.wallet_address,
+		origin: body.origin ?? null,
+		direction: 'buy',
+		mint: body.mint,
+	}).catch(() => {});
+
+	// Surface the buy on the site-wide live activity ticker. The tx is already
+	// verified on-chain above, so this is a real, confirmed purchase. Fire-and-
+	// forget: never let the delight layer delay or fail the buy response.
+	publishFeedEvent({
+		type: 'coin-buy',
+		ts: Date.now(),
+		actor: shortAddr(body.wallet_address),
+		mint: body.mint,
+		...(body.sol && body.sol > 0 ? { sol: body.sol } : {}),
+		...(body.usdc_amount && body.usdc_amount > 0 ? { usdc: body.usdc_amount } : {}),
+		network: body.network,
+	}).catch(() => {});
+
+	return json(res, 200, {
+		ok: true,
+		tracked: !!mintId,
+		mint: body.mint,
+		network: body.network,
+		tx_signature: body.tx_signature,
+	});
+}
+
+// Truncate a base58 address for public display: "AbCd…WxYz". The feed is world-
+// readable, so we only ever surface the head/tail, never the full key.
+function shortAddr(addr) {
+	const s = String(addr || '');
+	return s.length > 10 ? `${s.slice(0, 4)}…${s.slice(-4)}` : s;
+}
+
+// ── sell-prep ──────────────────────────────────────────────────────────────
+
+const sellPrepSchema = z.object({
+	mint: z.string().min(32).max(44),
+	network: z.enum(['mainnet', 'devnet']).default('mainnet'),
+	tokens: z.string().regex(/^\d+$/, 'tokens must be a base-units integer string'),
+	slippage_bps: z.number().int().min(0).max(5000).default(100),
+	wallet_address: z.string().min(32).max(44),
+	// Optional: auto-detected from on-chain bonding curve when omitted.
+	quote_mint: z.string().min(32).max(44).optional(),
+});
+
+async function handleSellPrep(req, res) {
+	if (cors(req, res, { methods: 'POST,OPTIONS', credentials: true })) return;
+	if (!method(req, res, ['POST'])) return;
+
+	const user = await walletTradeUser(req);
+	if (!user) return error(res, 401, 'unauthorized', 'sign in required');
+
+	const rl = await limits.authIp(clientIp(req));
+	if (!rl.success) return rateLimited(res, rl);
+
+	const body = parse(sellPrepSchema, await readJson(req));
+	const userPk = solanaPubkey(body.wallet_address);
+	const mintPk = solanaPubkey(body.mint);
+	if (!userPk || !mintPk) return error(res, 400, 'validation_error', 'invalid pubkeys');
+
+	try {
+		const { sdk, BN, connection } = await getPumpSdk({ network: body.network });
+		const { isLegacyQuoteMint, getSellSolAmountFromTokenAmount } =
+			await import('@pump-fun/pump-sdk');
+		const tokens = new BN(body.tokens);
+		// SDK builders take slippage as a PERCENT: see api/_lib/pump-trade-args.js.
+		const slippagePct = slippagePercentFromBps(body.slippage_bps);
+
+		// base_token_program must match the mint owner (Token-2022 for create_v2
+		// coins, SPL for legacy): docs/instructions/SELL.md #4.
+		const mintInfo = await connection.getAccountInfo(mintPk);
+		if (!mintInfo)
+			return error(
+				res,
+				404,
+				'mint_not_found',
+				`mint ${body.mint} not found on ${body.network}`,
+			);
+		const baseTokenProgram = resolveTokenProgramForMintOwner(mintInfo.owner);
+
+		let sellState = null;
+		try {
+			if (sdk.fetchSellState)
+				sellState = await sdk.fetchSellState(mintPk, userPk, baseTokenProgram);
+		} catch {
+			sellState = null;
+		}
+
+		// Resolve quoteMint from explicit override > on-chain curve > WSOL fallback.
+		let quoteMintPk = body.quote_mint
+			? solanaPubkey(body.quote_mint)
+			: (sellState?.bondingCurve?.quoteMint ?? solanaPubkey(WSOL_MINT));
+		if (!quoteMintPk) quoteMintPk = solanaPubkey(WSOL_MINT);
+
+		const isUsdcQuote = !isLegacyQuoteMint(quoteMintPk);
+		// SOL curves store quoteMint as PublicKey.default: surface wrapped SOL.
+		const quoteMintDisplay = isUsdcQuote ? quoteMintPk.toString() : WSOL_MINT;
+
+		// quote_token_program must match the quote mint's owner.
+		let quoteTokenProgram = TOKEN_PROGRAM_ID;
+		if (isUsdcQuote) {
+			const quoteInfo = await connection.getAccountInfo(quoteMintPk);
+			if (!quoteInfo)
+				return error(
+					res,
+					404,
+					'quote_mint_not_found',
+					`quote mint ${quoteMintPk.toBase58()} not found`,
+				);
+			quoteTokenProgram = resolveTokenProgramForMintOwner(quoteInfo.owner);
+		}
+
+		if (sellState && sellState.bondingCurve && !sellState.bondingCurve.complete) {
+			// Unified v2 sell for every coin type. sell_v2 reads the fee-recipient
+			// pool from the curve's mayhem flag inside the SDK builder, and the
+			// expected quote output below gives the program a real min_sol_output
+			// floor (expected minus slippage) instead of 0.
+			const [global, feeConfig] = await Promise.all([
+				sdk.fetchGlobal(),
+				sdk.fetchFeeConfig().catch(() => null),
+			]);
+			const expectedQuoteOut = getSellSolAmountFromTokenAmount({
+				global,
+				feeConfig,
+				mintSupply: sellState.bondingCurve.tokenTotalSupply,
+				bondingCurve: sellState.bondingCurve,
+				amount: tokens,
+			});
+			const ixs = [];
+			if (isUsdcQuote) {
+				// sell_v2 pays proceeds into the seller's quote ATA, which the
+				// program does NOT init (SELL.md #16): create it idempotently.
+				const spl = await import('@solana/spl-token');
+				const userQuoteAta = spl.getAssociatedTokenAddressSync(
+					quoteMintPk,
+					userPk,
+					true,
+					quoteTokenProgram,
+				);
+				ixs.push(
+					spl.createAssociatedTokenAccountIdempotentInstruction(
+						userPk,
+						userQuoteAta,
+						userPk,
+						quoteMintPk,
+						quoteTokenProgram,
+					),
+				);
+			}
+			ixs.push(
+				...(await sdk.sellV2Instructions({
+					global,
+					bondingCurveAccountInfo: sellState.bondingCurveAccountInfo,
+					bondingCurve: sellState.bondingCurve,
+					mint: mintPk,
+					user: userPk,
+					amount: tokens,
+					quoteAmount: expectedQuoteOut,
+					slippage: slippagePct,
+					tokenProgram: baseTokenProgram,
+					quoteTokenProgram,
+				})),
+			);
+			const __platformFee = await buildPlatformFeeInstructions({
+				network: body.network, payer: userPk, isUsdc: isUsdcQuote,
+				quoteMintPk, quoteTokenProgram, grossAtomics: BigInt(expectedQuoteOut.toString()), basis: 'sell',
+			});
+			if (__platformFee) ixs.push(...__platformFee.instructions);
+			const tx_base64 = await buildUnsignedTxBase64({
+				network: body.network,
+				payer: userPk,
+				instructions: ixs,
+			});
+			return json(res, 201, {
+				route: 'bonding_curve',
+				mint: body.mint,
+				network: body.network,
+				quote_mint: quoteMintDisplay,
+				tokens_in: body.tokens,
+				...(isUsdcQuote
+					? { expected_usdc_out: Number(expectedQuoteOut.toString()) / 1_000_000 }
+					: { expected_sol_out: Number(expectedQuoteOut.toString()) / 1_000_000_000 }),
+				slippage_bps: body.slippage_bps,
+				platform_fee: __platformFee ? __platformFee.disclosure : null,
+				tx_base64,
+			});
+		}
+
+		const amm = await getAmmPoolState({
+			network: body.network,
+			mint: mintPk,
+			quoteMint: isUsdcQuote ? quoteMintPk : null,
+		});
+		const ammMod = await import('@pump-fun/pump-swap-sdk');
+		const offline = new ammMod.PumpAmmSdk();
+		const onlineAmm = new ammMod.OnlinePumpAmmSdk(getConnection({ network: body.network }));
+		const swapState = await onlineAmm.swapSolanaState(amm.poolKey, userPk);
+		const ixs = await offline.sellBaseInput(swapState, tokens, slippagePct);
+		// Expected proceeds (uiQuote) is the fee basis for an AMM sell. Best-effort:
+		// if the low-level quote can't be derived we skip the fee, never the sell.
+		let __ammSellGross = 0n;
+		try {
+			const { uiQuote } = ammMod.sellBaseInput({
+				base: tokens, slippage: slippagePct,
+				baseReserve: swapState.poolBaseAmount, quoteReserve: swapState.poolQuoteAmount,
+				virtualQuoteReserves: swapState.pool.virtualQuoteReserves,
+				baseMintAccount: swapState.baseMintAccount, baseMint: swapState.baseMint,
+				quoteMint: swapState.pool.quoteMint, isMayhemMode: swapState.pool.isMayhemMode,
+				creatorFeeBps: swapState.pool.creatorFeeBps,
+				coinCreator: swapState.pool.coinCreator, creator: swapState.pool.creator,
+				feeConfig: swapState.feeConfig, globalConfig: swapState.globalConfig,
+			});
+			__ammSellGross = BigInt(uiQuote.toString());
+		} catch { /* fee basis unavailable */ }
+		const __platformFee = await buildPlatformFeeInstructions({
+			network: body.network, payer: userPk, isUsdc: isUsdcQuote,
+			quoteMintPk, quoteTokenProgram, grossAtomics: __ammSellGross, basis: 'sell',
+		});
+		if (__platformFee) ixs.push(...__platformFee.instructions);
+		const tx_base64 = await buildUnsignedTxBase64({
+			network: body.network,
+			payer: userPk,
+			instructions: ixs,
+		});
+		return json(res, 201, {
+			route: 'amm',
+			pool: amm.poolKey.toString(),
+			mint: body.mint,
+			network: body.network,
+			quote_mint: quoteMintDisplay,
+			tokens_in: body.tokens,
+			slippage_bps: body.slippage_bps,
+			platform_fee: __platformFee ? __platformFee.disclosure : null,
+			tx_base64,
+		});
+	} catch (e) {
+		return respondError(res, e.status || 502, e.code || 'pump_sdk_error', e);
+	}
+}
+
+// ── sell-confirm ───────────────────────────────────────────────────────────
+
+const sellConfirmSchema = z.object({
+	mint: z.string().min(32).max(44),
+	network: z.enum(['mainnet', 'devnet']).default('mainnet'),
+	tx_signature: z.string().min(80).max(100),
+	wallet_address: z.string().min(32).max(44),
+	tokens: z.string().regex(/^\d+$/),
+	route: z.enum(['bonding_curve', 'amm']),
+	slippage_bps: z.number().int().min(0).max(5000).optional(),
+});
+
+async function handleSellConfirm(req, res) {
+	if (cors(req, res, { methods: 'POST,OPTIONS', credentials: true })) return;
+	if (!method(req, res, ['POST'])) return;
+
+	const user = await walletTradeUser(req);
+	if (!user) return error(res, 401, 'unauthorized', 'sign in required');
+
+	const rl = await limits.authIp(clientIp(req));
+	if (!rl.success) return rateLimited(res, rl);
+
+	const body = parse(sellConfirmSchema, await readJson(req));
+
+	const [mintRow] = await sql`
+		select id, quote_mint from pump_agent_mints where mint=${body.mint} and network=${body.network} limit 1
+	`;
+	const mintId = mintRow?.id ?? null;
+
+	let tx;
+	try {
+		tx = await verifySignature({ network: body.network, signature: body.tx_signature });
+	} catch (e) {
+		return error(res, e.status || 422, e.code || 'tx_failed', e.message);
+	}
+	const accountKeys = tx.transaction.message.accountKeys.map((k) => (k.pubkey || k).toString());
+	if (!accountKeys.includes(body.mint))
+		return error(res, 422, 'mint_not_in_tx', 'mint not in tx');
+	if (!accountKeys.includes(body.wallet_address))
+		return error(res, 422, 'wallet_not_in_tx', 'wallet not in tx');
+
+	if (mintId) {
+		// The sell-confirm payload only carries the token quantity, so derive the
+		// proceeds (quote received) from the verified tx's on-chain balance delta
+		// rather than trusting client input: real settled amount, not an estimate.
+		const { quote_mint, quote_symbol } = tradeQuoteColumns({
+			quoteMint: mintRow?.quote_mint,
+			network: body.network,
+		});
+		const quoteAmount = walletQuoteDeltaAtomics({
+			tx,
+			wallet: body.wallet_address,
+			quoteSymbol: quote_symbol,
+			quoteMint: quote_mint,
+		});
+		// Keep sol_amount in sync for SOL sells so legacy readers see proceeds too.
+		const lamports = quote_symbol === 'SOL' ? quoteAmount : null;
+		await sql`
+			insert into pump_agent_trades
+				(mint_id, user_id, wallet, direction, route, sol_amount, token_amount,
+				 quote_mint, quote_symbol, quote_amount, slippage_bps, tx_signature, network)
+			values
+				(${mintId}, ${user.id}, ${body.wallet_address}, 'sell', ${body.route},
+				 ${lamports}, ${body.tokens}, ${quote_mint}, ${quote_symbol}, ${quoteAmount},
+				 ${body.slippage_bps ?? null}, ${body.tx_signature}, ${body.network})
+			on conflict (tx_signature, network) do nothing
+		`;
+		recordDailyActivity(user.id).catch(() => {});
+	}
+
+	recordQuestTrade({
+		userId: user.id,
+		signature: body.tx_signature,
+		network: body.network,
+		wallet: body.wallet_address,
+		direction: 'sell',
+		mint: body.mint,
+	}).catch(() => {});
+
+	return json(res, 200, {
+		ok: true,
+		tracked: !!mintId,
+		mint: body.mint,
+		network: body.network,
+		tx_signature: body.tx_signature,
+	});
+}
+
+// ── build-metadata ─────────────────────────────────────────────────────────
+// Builds a pump.fun-compatible metadata JSON and uploads it (+ optional token
+// image) to R2. Returns a stable public URL the wizard can use as the URI.
+
+const buildMetadataSchema = z.object({
+	name: z.string().trim().min(1).max(32),
+	symbol: z.string().trim().min(1).max(10),
+	description: z.string().trim().max(500).default(''),
+	avatar_id: z.string().uuid().optional(),
+	agent_id: z.string().uuid().optional(),
+	// Social links surfaced on the coin page (pump.fun reads twitter/telegram/
+	// website; explorers read external_url). Omit any to fall back to the agent
+	// profile page (website) and the three.ws X/Telegram.
+	twitter: z.string().trim().max(200).optional(),
+	website: z.string().trim().max(200).optional(),
+	telegram: z.string().trim().max(200).optional(),
+	// Base64 data URL: "data:image/png;base64,...": max 4 MB raw.
+	// Cap the string at 6 MB chars to safely cover 4 MB raw (base64 inflates ~4/3 → ~5.59 M)
+	// plus the data URL header. Raw-byte ceiling is re-checked after decode.
+	image_data_url: z.string().max(6_000_000).optional(),
+});
+
+async function handleBuildMetadata(req, res) {
+	if (cors(req, res, { methods: 'POST,OPTIONS', credentials: true })) return;
+	if (!method(req, res, ['POST'])) return;
+
+	const user = await getSessionUser(req);
+	if (!user) return error(res, 401, 'unauthorized', 'sign in required');
+
+	const rl = await limits.pumpMetaIp(clientIp(req));
+	if (!rl.success) return rateLimited(res, rl);
+
+	let body;
+	try {
+		body = parse(buildMetadataSchema, await readJson(req));
+	} catch (err) {
+		if (err.code === 'validation_error') {
+			console.warn('[pump/build-metadata] validation_error', {
+				userId: user.id,
+				issues: err.issues,
+			});
+		}
+		throw err;
+	}
+	const uid = user.id;
+	const ts = Date.now().toString(36);
+	const prefix = `pump/meta/${uid}/${ts}`;
+
+	// ── Resolve image bytes ─────────────────────────────────────────────────
+	// We want raw bytes (not just an HTTPS URL) so the image can be pinned to
+	// IPFS alongside the metadata: matching pump.fun's native upload flow.
+	let imageBuf = null;
+	let imageContentType = 'image/png';
+	let imageExt = 'png';
+	let imageUrl = null; // set directly only when we can't get bytes to pin
+
+	if (body.image_data_url) {
+		const commaIdx = body.image_data_url.indexOf(',');
+		if (commaIdx === -1) return error(res, 400, 'validation_error', 'invalid image_data_url');
+		const meta = body.image_data_url.slice(0, commaIdx);
+		const payload = body.image_data_url.slice(commaIdx + 1);
+		imageBuf = meta.includes('base64')
+			? Buffer.from(payload, 'base64')
+			: Buffer.from(decodeURIComponent(payload));
+		if (imageBuf.byteLength > 4 * 1024 * 1024) {
+			return error(res, 413, 'payload_too_large', 'image must be under 4 MB');
+		}
+		imageContentType = meta.match(/data:([^;,]+)/)?.[1] || 'image/png';
+		imageExt =
+			imageContentType.includes('jpeg') || imageContentType.includes('jpg') ? 'jpg' : 'png';
+	} else if (body.avatar_id) {
+		const [av] = await sql`
+			select thumbnail_key from avatars
+			where id=${body.avatar_id} and owner_id=${uid} and deleted_at is null limit 1
+		`;
+		// thumbnailUrl() returns null for a legacy origin-pointing `*_og.png` key,
+		// whose object does not exist: fetching it would 404 and then the launch
+		// would reference that dead URL from its permanent token metadata.
+		const thumbUrl = thumbnailUrl(av?.thumbnail_key);
+		if (thumbUrl) {
+			// Fetch the stored thumbnail so it too lands on IPFS; if that fails,
+			// fall back to referencing the R2 URL directly (still a valid image).
+			try {
+				// Bounded: a launch waits on this download, and an unbounded read of a
+				// stalled object held the whole mint request open instead of falling
+				// through to the R2 URL below, which is a perfectly good answer.
+				const resp = await fetchUpstream(thumbUrl, {}, {
+					name: 'r2:thumbnail',
+					timeoutMs: 15_000,
+					attempts: 2,
+					okWhen: () => true,
+				});
+				if (resp.ok) {
+					imageBuf = Buffer.from(await resp.arrayBuffer());
+					imageContentType = resp.headers.get('content-type') || 'image/png';
+					imageExt =
+						imageContentType.includes('jpeg') || imageContentType.includes('jpg')
+							? 'jpg'
+							: 'png';
+				}
+			} catch {
+				/* fall through to direct URL */
+			}
+			if (!imageBuf) imageUrl = thumbUrl;
+		}
+	}
+
+	// Pin the image (IPFS preferred, R2 fallback) so the metadata references a
+	// stable, gateway-resolvable URL.
+	if (imageBuf && !imageUrl) {
+		const pinnedImage = await pinToIPFS(imageBuf, `image.${imageExt}`).catch(() => null);
+		if (pinnedImage) {
+			imageUrl = pinnedImage.uri;
+		} else {
+			const imgKey = `${prefix}/image.${imageExt}`;
+			await putObject({ key: imgKey, body: imageBuf, contentType: imageContentType });
+			imageUrl = r2PublicUrl(imgKey);
+		}
+	}
+
+	// ── Build metadata JSON via the canonical three.ws brand builder ─────────
+	// This stamps createdOn=https://three.ws plus the Platform/Launchpad
+	// attributes that explorers and launchpad aggregators read for attribution.
+	// Link the coin to its 3D agent. An avatar that has no agent identity yet gets
+	// one here (launch-prep would create it moments later anyway), so the page
+	// the coin points at is the agent that launched it, not the three.ws homepage.
+	let linkedAgentId = body.agent_id || null;
+	let agentModelUrl;
+	if (body.avatar_id) {
+		if (!linkedAgentId) {
+			const resolved = await resolveLaunchAgentId({ userId: uid, avatarId: body.avatar_id }).catch(() => null);
+			linkedAgentId = resolved?.id || null;
+		}
+		const [avRow] = await sql`
+			select storage_key, visibility from avatars
+			where id=${body.avatar_id} and owner_id=${uid} and deleted_at is null limit 1
+		`;
+		// Token metadata is permanent and public: only a model its owner already
+		// shares (public or unlisted) is written into it.
+		if (avRow?.storage_key && (avRow.visibility === 'public' || avRow.visibility === 'unlisted')) {
+			agentModelUrl = r2PublicUrl(avRow.storage_key);
+		}
+	}
+	const agentHomeUrl = linkedAgentId ? `${env.APP_ORIGIN}/agents/${linkedAgentId}` : undefined;
+	const metadata = buildTokenMetadata({
+		name: body.name,
+		symbol: body.symbol,
+		description: body.description,
+		image: imageUrl || '',
+		...(agentHomeUrl ? { agentUrl: agentHomeUrl } : {}),
+		...(agentModelUrl ? { agentModelUrl } : {}),
+		...(body.twitter ? { twitter: body.twitter } : {}),
+		...(body.website ? { website: body.website } : {}),
+		...(body.telegram ? { telegram: body.telegram } : {}),
+		createdAt: new Date().toISOString(),
+	});
+
+	// Pin the metadata JSON (IPFS preferred, R2 fallback).
+	const jsonBuf = Buffer.from(JSON.stringify(metadata, null, 2));
+	const pinnedJson = await pinToIPFS(jsonBuf, 'metadata.json').catch(() => null);
+	let metadataUrl;
+	if (pinnedJson) {
+		metadataUrl = pinnedJson.uri;
+	} else {
+		const jsonKey = `${prefix}/metadata.json`;
+		await putObject({ key: jsonKey, body: jsonBuf, contentType: 'application/json' });
+		metadataUrl = r2PublicUrl(jsonKey);
+	}
+
+	return json(res, 200, {
+		metadata_url: metadataUrl,
+		image_url: imageUrl,
+		agent_id: linkedAgentId,
+		agent_url: agentHomeUrl || null,
+		agent_model_url: agentModelUrl || null,
+		on_ipfs: Boolean(pinnedJson),
+		provider: pinnedJson?.provider ?? (ipfsPinningConfigured() ? 'r2-fallback' : 'r2'),
+	});
+}
+
+// ── shared launch helpers ──────────────────────────────────────────────────
+
+// Build the pump.fun launch instructions for the requested coin variant.
+// All variants now go through createV2* (token-2022). Pump.fun no longer
+// accepts V1 (SPL Token) launches: calling the deprecated createInstruction /
+// createAndBuyInstructions paths returned tokens the pump.fun program rejected.
+// mayhemMode toggles the high-volatility curve; agent binding is appended by
+// the caller when applicable.
+//
+// creator is the on-chain "creator" (recipient of creator rewards / royalties).
+// signer is the wallet that signs the tx, pays fees, and (if solBuyIn>0) funds
+// the initial buy. When the caller omits signer it defaults to creator :
+// preserving the legacy single-wallet semantics: but split mode is supported
+// so a treasury / DAO wallet can be the creator while a contributor wallet
+// signs and pays.
+async function buildLaunchInstructions({
+	sdk,
+	BN,
+	mint,
+	creator,
+	signer,
+	name,
+	symbol,
+	uri,
+	solBuyIn,
+	usdcBuyIn,
+	quoteMint,
+	isMayhem,
+	holderReward = false,
+}) {
+	const LAMPORTS = 1_000_000_000;
+	const user = signer || creator;
+	const { isLegacyQuoteMint } = await import('@pump-fun/pump-sdk');
+	const isUsdcQuote = quoteMint && !isLegacyQuoteMint(quoteMint);
+
+	if (isUsdcQuote) {
+		// USDC-paired: use V2 buy path regardless of whether there's an initial buy.
+		const hasBuy = usdcBuyIn > 0;
+		const global = await sdk.fetchGlobal();
+		const pumpSdk = await import('@pump-fun/pump-sdk');
+		if (hasBuy) {
+			const quoteAmount = new BN(Math.round(usdcBuyIn * 1_000_000));
+			// Pass `quoteMint` so the SDK seeds a fresh curve from
+			// `initial_virtual_quote_reserves` (USDC) rather than the SOL reserves :
+			// otherwise the base-token estimate is priced against the wrong pool and
+			// the create+buy can over/under-spend or revert on max_quote_cost.
+			const tokenAmount = pumpSdk.getBuyTokenAmountFromSolAmount({
+				global,
+				feeConfig: null,
+				mintSupply: null,
+				bondingCurve: null,
+				amount: quoteAmount,
+				quoteMint,
+			});
+			const ixs = await sdk.createV2AndBuyV2Instructions({
+				global,
+				mint,
+				name,
+				symbol,
+				uri,
+				creator,
+				user,
+				quoteAmount,
+				amount: tokenAmount,
+				mayhemMode: !!isMayhem,
+				quoteMint,
+				holderReward,
+			});
+			return Array.isArray(ixs) ? [...ixs] : [ixs];
+		}
+		const ix = await sdk.createV2Instruction({
+			mint,
+			name,
+			symbol,
+			uri,
+			creator,
+			user,
+			mayhemMode: !!isMayhem,
+			quoteMint,
+			holderReward,
+		});
+		return [ix];
+	}
+
+	// SOL-paired (original behaviour)
+	const hasBuy = solBuyIn > 0;
+	if (hasBuy) {
+		const global = await sdk.fetchGlobal();
+		const solAmount = new BN(Math.floor(solBuyIn * LAMPORTS));
+		const pumpSdk = await import('@pump-fun/pump-sdk');
+		const tokenAmount = pumpSdk.getBuyTokenAmountFromSolAmount({
+			global,
+			feeConfig: null,
+			mintSupply: null,
+			bondingCurve: null,
+			amount: solAmount,
+		});
+		const ixs = await sdk.createV2AndBuyInstructions({
+			global,
+			mint,
+			name,
+			symbol,
+			uri,
+			creator,
+			user,
+			solAmount,
+			amount: tokenAmount,
+			mayhemMode: !!isMayhem,
+			holderReward,
+		});
+		return Array.isArray(ixs) ? [...ixs] : [ixs];
+	}
+
+	const ix = await sdk.createV2Instruction({
+		mint,
+		name,
+		symbol,
+		uri,
+		creator,
+		user,
+		mayhemMode: !!isMayhem,
+		holderReward,
+	});
+	return [ix];
+}
+
+// ── launch-prep ────────────────────────────────────────────────────────────
+
+const launchPrepSchema = z
+	.object({
+		agent_id: z.string().uuid().optional(),
+		avatar_id: z.string().uuid().optional(),
+		wallet_address: z.string().min(32).max(44), // the SIGNER — signs the tx, pays fees, funds initial buy
+		// Optional on-chain creator address (the recipient of pump.fun creator
+		// rewards / royalties). When omitted, defaults to wallet_address :
+		// preserving the legacy single-wallet flow. When provided and different,
+		// it must be another Solana wallet linked to the same user account
+		// (validated at /api/pump/launch-prep). Enables team/DAO launches where
+		// a treasury wallet is the creator and a contributor wallet pays gas.
+		creator_address: z.string().min(32).max(44).optional(),
+		name: z.string().trim().min(1).max(32),
+		symbol: z.string().trim().min(1).max(10),
+		// Bound the metadata URI so name(32)+symbol(10)+uri always fit inside
+		// Solana's 1232-byte transaction packet: an unbounded URI is what pushed
+		// the create message past the limit and threw "encoding overruns
+		// Uint8Array" at sign time. 200 matches pump.fun's own URI ceiling; the
+		// 413 guard at sign time remains as a defence-in-depth backstop.
+		uri: z.string().url().max(200),
+		network: z.enum(['mainnet', 'devnet']).default('mainnet'),
+		buyback_bps: z.number().int().min(0).max(10_000).default(0),
+		sol_buy_in: z.number().nonnegative().max(50).default(0), // SOL-paired initial buy, capped 50 SOL
+		usdc_buy_in: z.number().nonnegative().max(1_000_000).default(0), // USDC-paired initial buy
+		// Quote currency for the coin. `quote_currency: 'usdc'` is the friendly
+		// form: the server resolves the network-correct USDC mint. `quote_mint`
+		// is the explicit form (any non-WSOL mint → stable-paired v2 coin via
+		// createV2AndBuyV2Instructions). When neither is set, the coin is
+		// SOL-paired (existing behaviour). quote_currency wins when both appear.
+		quote_currency: z.enum(['sol', 'usdc']).optional(),
+		quote_mint: z.string().min(32).max(44).optional(),
+		// Optional client-ground vanity mint address. When provided, the client
+		// already holds the secret key locally and will co-sign in the wallet :
+		// the server never sees the secret. When omitted, the server falls back
+		// to a fresh Keypair.generate() and returns the secret key for co-sign.
+		mint_address: z.string().min(32).max(44).optional(),
+		// Coin variant:
+		//   'agent'  : pump.fun coin + on-chain agent (buyback-bound)
+		//   'regular': plain pump.fun coin, no agent binding
+		//   'mayhem' : pump.fun mayhem-mode coin (V2 instruction set, token-2022)
+		coin_type: z.enum(['regular', 'mayhem', 'agent']).default('agent'),
+		// Platform-sponsored launch for a creator wallet with no SOL.
+		gasless: z.boolean().default(false),
+		// Pump SDK 2.0 holder-reward launch. Creator fees accrue to the
+		// protocol-derived holder rewards PDA instead of a creator wallet.
+		holder_reward: z.boolean().default(false),
+		// Transaction format. 'auto' compiles v0 against pump.fun's lookup table and
+		// only moves to the 4,096-byte v1 envelope when v0 overflows AND the wallet
+		// advertised v1 signing (`v1_capable`). 0 or 1 pins the format.
+		transaction_version: z.union([z.literal('auto'), z.literal(0), z.literal(1)]).default('auto'),
+		v1_capable: z.boolean().default(false),
+		// Optional Launch Copilot attach: a market-maker policy to arm on this coin
+		// the moment it's confirmed (the success screen can also attach one after).
+		// Validated + safety-gated by api/_lib/market-maker.js at confirm time.
+		mm: z
+			.object({
+				preset: z.enum(['gentle', 'balanced', 'aggressive', 'custom']).optional(),
+				mode: z.enum(['simulate', 'live']).optional(),
+				enabled: z.boolean().optional(),
+				floor_price_sol: z.number().nonnegative().optional(),
+				floor_band_pct: z.number().optional(),
+				take_profit_band_pct: z.number().optional(),
+				recycle_pct: z.number().optional(),
+				max_inventory_tokens: z.number().optional(),
+				dip_buy_budget_sol: z.number().optional(),
+				daily_budget_sol: z.number().optional(),
+				seed_sol: z.number().optional(),
+				graduation_action: z.enum(['provide_lp', 'hold', 'distribute']).optional(),
+				slippage_bps: z.number().optional(),
+				max_price_impact_pct: z.number().optional(),
+				min_action_interval_seconds: z.number().optional(),
+				max_volume_pct: z.number().optional(),
+			})
+			.optional(),
+	})
+	.refine((v) => v.agent_id || v.avatar_id, {
+		message: 'agent_id or avatar_id required',
+		path: ['agent_id'],
+	})
+	.refine((v) => !v.holder_reward || v.coin_type === 'regular', {
+		message: 'holder_reward requires coin_type=regular',
+		path: ['holder_reward'],
+	})
+	// Gasless: the launch sponsor pays rent + fees, and the coin's creator fees are
+	// split on-chain with the platform (api/_lib/launch-sponsor.js). A dev buy
+	// needs the creator's own funds, and the fee split needs a SOL-paired coin
+	// whose creator fees reach a real wallet, so those options are excluded.
+	.refine(
+		(v) =>
+			!v.gasless ||
+			(!v.sol_buy_in && !v.usdc_buy_in && v.quote_currency !== 'usdc' && !v.quote_mint && v.coin_type !== 'mayhem' && !v.holder_reward),
+		{
+			message: 'a gasless launch has no dev buy, is SOL-paired, and is not a mayhem or holder-reward coin',
+			path: ['gasless'],
+		},
+	);
+
+
+async function handleLaunchPrep(req, res) {
+	if (cors(req, res, { methods: 'POST,OPTIONS', credentials: true })) return;
+	if (!method(req, res, ['POST'])) return;
+
+	const user = await getSessionUser(req);
+	if (!user) return error(res, 401, 'unauthorized', 'sign in required');
+
+	const rl = await limits.authIp(clientIp(req));
+	if (!rl.success) return rateLimited(res, rl);
+
+	const body = parse(launchPrepSchema, await readJson(req));
+	const signer = solanaPubkey(body.wallet_address);
+	if (!signer) return error(res, 400, 'validation_error', 'invalid wallet_address');
+
+	// Verify signer wallet linked to user.
+	const [walletRow] = await sql`
+		select id from user_wallets
+		where user_id=${user.id} and address=${body.wallet_address} and chain_type='solana'
+		limit 1
+	`;
+	if (!walletRow) return error(res, 403, 'forbidden', 'wallet not linked to your account');
+
+	// Resolve the on-chain creator (creator-reward recipient). When omitted,
+	// the signer IS the creator (legacy single-wallet flow). When provided,
+	// validate it's a valid Solana pubkey AND linked to the same user
+	// account so callers can't launch tokens "as" arbitrary wallets.
+	let creator = signer;
+	if (body.creator_address && body.creator_address !== body.wallet_address) {
+		const creatorPk = solanaPubkey(body.creator_address);
+		if (!creatorPk) return error(res, 400, 'validation_error', 'invalid creator_address');
+		const [creatorWallet] = await sql`
+			select id from user_wallets
+			where user_id=${user.id} and address=${body.creator_address} and chain_type='solana'
+			limit 1
+		`;
+		if (!creatorWallet) {
+			return error(
+				res,
+				403,
+				'forbidden',
+				'creator_address must be a solana wallet linked to your account',
+			);
+		}
+		creator = creatorPk;
+	}
+
+	// Resolve agent_identities.id from either agent_id or avatar_id.
+	// /studio sends avatar_id; the dashboard/vanity flows send agent_id.
+	const agent = await resolveLaunchAgentId({
+		userId: user.id,
+		agentId: body.agent_id,
+		avatarId: body.avatar_id,
+	});
+	if (!agent) return error(res, 404, 'not_found', 'agent not found');
+	const resolvedAgentId = agent.id;
+
+	// Mint pubkey: client-supplied (vanity-ground) or server-ground with the three.ws mark.
+	const enforceMark = env.THREE_WS_MARK_ENFORCE !== '0' && env.THREE_WS_MARK_ENFORCE !== 'false';
+	let mintKeypair = null;
+	let mint;
+
+	if (body.mint_address) {
+		const supplied = solanaPubkey(body.mint_address);
+		if (!supplied) return error(res, 400, 'validation_error', 'invalid mint_address');
+		if (enforceMark && !hasThreeWsMark(supplied.toBase58())) {
+			return error(
+				res,
+				400,
+				'unbranded_mint',
+				'three.ws launches must use a mint address carrying the "3ws" mark — grind one client-side or omit mint_address to let the server stamp it',
+			);
+		}
+		mint = supplied;
+	} else if (enforceMark) {
+		try {
+			const ground = await grindVanityNode({ ...THREE_WS_VANITY }); // ~49k attempts, sub-second
+			mintKeypair = Keypair.fromSecretKey(ground.secretKey);
+			mint = mintKeypair.publicKey;
+			log.info('mint_mark_stamped', {
+				publicKey: ground.publicKey,
+				attempts: ground.attempts,
+				durationMs: Math.round(ground.durationMs),
+			});
+		} catch (err) {
+			if (err instanceof GrindExhaustedError) {
+				return error(
+					res,
+					503,
+					'mark_grind_failed',
+					'could not stamp the three.ws mark — retry',
+				);
+			}
+			throw err;
+		}
+	} else {
+		mintKeypair = Keypair.generate();
+		mint = mintKeypair.publicKey;
+	}
+
+	if (body.gasless) {
+		return prepGaslessLaunch(res, { user, body, creator, signer, mint, mintKeypair, agentId: resolvedAgentId });
+	}
+
+	const { sdk, BN } = await getPumpSdk({ network: body.network });
+	const LAMPORTS_PER_SOL_LAUNCH = 1_000_000_000;
+
+	// Coin-variant flags:
+	//   mayhem → use createV2* (token-2022, mayhemMode=true), drop buyback binding
+	//   agent  → V1 path + on-chain agent (PumpAgent.create with buyback_bps)
+	//   regular→ V1 path, no agent binding
+	const isMayhem = body.coin_type === 'mayhem';
+	const isAgent = body.coin_type === 'agent';
+	// The PumpAgent program currently refuses new agents (see
+	// pumpAgentBuybackAvailable), so an 'agent' coin launches without the
+	// on-chain buyback binding instead of reverting the whole launch.
+	const buybackAvailable = pumpAgentBuybackAvailable();
+	const effBuyback = isAgent && buybackAvailable ? body.buyback_bps : 0;
+
+	// Resolve the quote pairing: null → SOL-paired; an explicit mint (e.g. USDC)
+	// → stable-paired so the agent's USDC buyback can swap+burn natively. The
+	// friendly `quote_currency` ('sol'|'usdc') wins and resolves the
+	// network-correct USDC mint; otherwise an explicit `quote_mint` is used.
+	const requestedQuoteMint =
+		body.quote_currency === 'usdc'
+			? usdcMintFor(body.network)
+			: body.quote_currency === 'sol'
+				? null
+				: body.quote_mint;
+	const quote = classifyLaunchQuote({ quoteMint: requestedQuoteMint, network: body.network });
+	const launchQuoteMint = quote.quoteMint ? solanaPubkey(quote.quoteMint) : null;
+	const instructions = await buildLaunchInstructions({
+		sdk,
+		BN,
+		mint,
+		creator,
+		signer,
+		name: body.name,
+		symbol: body.symbol,
+		uri: body.uri,
+		solBuyIn: body.sol_buy_in,
+		usdcBuyIn: body.usdc_buy_in,
+		quoteMint: launchQuoteMint,
+		isMayhem,
+		holderReward: body.holder_reward,
+	});
+	const onchainCreator = body.holder_reward
+		? (await import('@pump-fun/pump-sdk')).holderRewardsPda(mint)
+		: creator;
+
+	if (isAgent && effBuyback > 0) {
+		const { offline } = await getPumpAgentOffline({ network: body.network, mint });
+		const createIx = await offline.create({
+			authority: creator,
+			mint,
+			agentAuthority: creator,
+			buybackBps: effBuyback,
+		});
+		instructions.push(createIx);
+	}
+
+	// three.ws launch fee: a disclosed share of the dev buy, paid by the signer in
+	// the same transaction as the create. No dev buy, no fee.
+	const launchFee = await buildPlatformFeeInstructions({
+		network: body.network,
+		payer: signer,
+		isUsdc: quote.isUsdc,
+		quoteMintPk: launchQuoteMint,
+		grossAtomics: quote.isUsdc
+			? BigInt(Math.round((body.usdc_buy_in || 0) * 1_000_000))
+			: BigInt(Math.floor((body.sol_buy_in || 0) * LAMPORTS_PER_SOL_LAUNCH)),
+		basis: 'launch_dev_buy',
+		bps: pumpLaunchFeeBps(),
+	});
+	if (launchFee) instructions.push(...launchFee.instructions);
+
+	// Signer pays gas + funds the initial buy. Creator stays on-chain as the
+	// reward recipient regardless of who paid. A server-ground mint co-signs
+	// here so the browser only adds the wallet signature.
+	const built = await buildLaunchTransaction({
+		network: body.network,
+		payer: signer,
+		instructions,
+		transactionVersion: body.transaction_version,
+		v1Capable: body.v1_capable,
+		signers: mintKeypair ? [mintKeypair] : [],
+	});
+	const txBase64 = built.tx_base64;
+
+	const prepId = await randomToken(24);
+	const expiresAt = new Date(Date.now() + 30 * 60 * 1000);
+
+	await sql`
+		insert into agent_registrations_pending (user_id, cid, metadata_uri, payload, expires_at)
+		values (
+			${user.id},
+			${mint.toBase58()},
+			${body.uri},
+			${JSON.stringify({
+				kind: 'pump_launch',
+				agent_id: resolvedAgentId,
+				wallet_address: body.wallet_address, // signer (pays gas, funds initial buy)
+				creator_address: onchainCreator.toBase58(), // actual on-chain fee recipient
+				mint: mint.toBase58(),
+				name: body.name,
+				symbol: body.symbol,
+				network: body.network,
+				buyback_bps: effBuyback,
+				coin_type: body.coin_type,
+				holder_reward: body.holder_reward,
+				quote_mint: quote.quoteMint, // null = SOL-paired; else the stable quote mint
+				platform_fee: launchFee ? launchFee.disclosure : null,
+				transaction_version: built.transaction_version,
+				prep_id: prepId,
+				mm: body.mm || null, // optional Launch Copilot policy to arm on confirm
+			})}::jsonb,
+			${expiresAt}
+		)
+	`;
+
+	return json(res, 201, {
+		prep_id: prepId,
+		agent_id: resolvedAgentId,
+		mint: mint.toBase58(),
+		// Mint keypair must co-sign the tx. When server-generated, we hand
+		// the secret to the frontend; when client-supplied (vanity), the
+		// client already holds it and the server never sees it.
+		mint_secret_key_b64: mintKeypair
+			? Buffer.from(mintKeypair.secretKey).toString('base64')
+			: null,
+		client_supplied_mint: !mintKeypair,
+		mint_presigned: !!mintKeypair,
+		tx_base64: txBase64,
+		transaction_version: built.transaction_version,
+		tx_bytes: built.bytes,
+		tx_limit_bytes: built.limit_bytes,
+		platform_fee: launchFee ? launchFee.disclosure : null,
+		buyback_available: buybackAvailable,
+		network: body.network,
+		buyback_bps: effBuyback,
+		coin_type: body.coin_type,
+		holder_reward: body.holder_reward,
+		quote_mint: quote.quoteMint,
+		quote_currency: quote.label,
+		expires_at: expiresAt.toISOString(),
+		instructions: mintKeypair
+			? 'The mint keypair has already co-signed tx_base64. Have the user wallet sign it (a Wallet Standard signTransaction for transaction_version 1), submit, then POST /api/pump/launch-confirm with the tx_signature.'
+			: 'Decode tx_base64 as VersionedTransaction. Sign with your locally-held vanity mint keypair AND the user wallet, submit, then POST /api/pump/launch-confirm with the tx_signature.',
+	});
+}
+
+// ── launch-prep (gasless) ──────────────────────────────────────────────────
+//
+// The launch sponsor pays rent + network fees; the creator (the signer) only
+// signs. Eligibility is checked against the live caps and the sponsor's floor
+// before anything is built, and the transaction is measured by simulation so
+// the sponsored cost shown to the user is the cost the chain will charge.
+
+async function prepGaslessLaunch(res, { user, body, creator, signer, mint, mintKeypair, agentId }) {
+	if (!creator.equals(signer)) {
+		return error(res, 400, 'validation_error', 'a gasless launch is signed by its creator: omit creator_address or set it to wallet_address');
+	}
+	const econ = await getLaunchEconomics();
+	const eligibility = await gaslessEligibility({ userId: user.id, network: body.network, econ });
+	if (!eligibility.eligible) {
+		const first = eligibility.reasons[0];
+		const status = /cap$/.test(first.code) ? 429 : first.code === 'gasless_disabled' ? 403 : 503;
+		return error(res, status, first.code, first.message, { gasless: eligibility });
+	}
+	let built;
+	try {
+		built = await prepareGaslessCurveLaunch({
+			network: body.network,
+			mint,
+			mintKeypair,
+			creator,
+			name: body.name,
+			symbol: body.symbol,
+			uri: body.uri,
+			econ,
+		});
+	} catch (err) {
+		if (err instanceof GaslessError) return error(res, err.status, err.code, err.message);
+		if (isRpcOutageError(err)) return error(res, 503, 'rpc_unavailable', 'Solana RPC is temporarily unavailable. Try again in a moment.');
+		throw err;
+	}
+
+	const prepId = await randomToken(24);
+	const expiresAt = new Date(Date.now() + 30 * 60 * 1000);
+	const gasless = {
+		sponsor: built.sponsor,
+		sponsored_lamports: built.sponsored_lamports,
+		sponsored_sol: built.sponsored_lamports / LAMPORTS_PER_SOL,
+		rent_forwarded_lamports: built.rent_forwarded_lamports,
+		platform_recipient: built.platform_recipient,
+		creator_share_bps: built.creator_share_bps,
+		platform_share_bps: built.platform_share_bps,
+		buyback_share_of_platform_bps: econ.buyback.share_of_platform_revenue_bps,
+		explanation: describeFeeSplit(econ, { gasless: true }),
+	};
+	await sql`
+		insert into agent_registrations_pending (user_id, cid, metadata_uri, payload, expires_at)
+		values (
+			${user.id},
+			${mint.toBase58()},
+			${body.uri},
+			${JSON.stringify({
+				kind: 'pump_launch',
+				gasless: true,
+				agent_id: agentId,
+				wallet_address: body.wallet_address,
+				creator_address: creator.toBase58(),
+				mint: mint.toBase58(),
+				name: body.name,
+				symbol: body.symbol,
+				network: body.network,
+				buyback_bps: 0,
+				coin_type: body.coin_type,
+				holder_reward: false,
+				quote_mint: null,
+				platform_fee: null,
+				transaction_version: 0,
+				prep_id: prepId,
+				sponsor: built.sponsor,
+				sponsored_lamports: built.sponsored_lamports,
+				platform_share_bps: built.platform_share_bps,
+			})}::jsonb,
+			${expiresAt}
+		)
+	`;
+	await recordSponsorshipPrepared({
+		userId: user.id,
+		agentId,
+		network: body.network,
+		mint: mint.toBase58(),
+		creator: creator.toBase58(),
+		sponsor: built.sponsor,
+		prepId,
+		sponsoredLamports: built.sponsored_lamports,
+		platformShareBps: built.platform_share_bps,
+	});
+
+	return json(res, 201, {
+		prep_id: prepId,
+		agent_id: agentId,
+		mint: mint.toBase58(),
+		mint_secret_key_b64: null,
+		client_supplied_mint: !mintKeypair,
+		mint_presigned: !!mintKeypair,
+		tx_base64: built.tx_base64,
+		transaction_version: 0,
+		tx_bytes: built.bytes,
+		fee_payer: built.sponsor,
+		platform_fee: null,
+		network: body.network,
+		coin_type: body.coin_type,
+		quote_currency: 'SOL',
+		gasless,
+		expires_at: expiresAt.toISOString(),
+		instructions: mintKeypair
+			? 'The launch sponsor and the mint have signed tx_base64 and the sponsor pays every fee. Have the creator wallet sign it (signTransaction, not signAndSend), then POST /api/pump/launch-confirm with prep_id and signed_tx_base64. The server submits it.'
+			: 'The launch sponsor has signed tx_base64 and pays every fee. Sign with your vanity mint keypair and the creator wallet, then POST /api/pump/launch-confirm with prep_id and signed_tx_base64.',
+	});
+}
+
+// ── launch-confirm ─────────────────────────────────────────────────────────
+
+const launchConfirmSchema = z
+	.object({
+		prep_id: z.string().min(8),
+		tx_signature: z.string().min(80).max(100).optional(),
+		// Gasless launches: the fully signed transaction, submitted by the server so
+		// the creator's wallet never has to broadcast a transaction it did not pay for.
+		signed_tx_base64: z.string().min(100).max(8000).optional(),
+	})
+	.refine((v) => v.tx_signature || v.signed_tx_base64, {
+		message: 'tx_signature or signed_tx_base64 required',
+		path: ['tx_signature'],
+	});
+
+async function handleLaunchConfirm(req, res) {
+	if (cors(req, res, { methods: 'POST,OPTIONS', credentials: true })) return;
+	if (!method(req, res, ['POST'])) return;
+
+	const user = await getSessionUser(req);
+	if (!user) return error(res, 401, 'unauthorized', 'sign in required');
+
+	const rl = await limits.authIp(clientIp(req));
+	if (!rl.success) return rateLimited(res, rl);
+
+	const body = parse(launchConfirmSchema, await readJson(req));
+
+	const [pending] = await sql`
+		select id, payload, metadata_uri from agent_registrations_pending
+		where user_id=${user.id} and payload->>'prep_id'=${body.prep_id}
+		  and expires_at > now()
+		order by created_at desc limit 1
+	`;
+	if (!pending) return error(res, 404, 'not_found', 'prep not found or expired');
+	const p = pending.payload;
+	if (p.kind !== 'pump_launch') return error(res, 400, 'wrong_kind', 'prep is not a pump launch');
+	// metadata_uri lives as a top-level column on the pending row (= launch-prep
+	// `uri`), not inside the payload JSON. Thread it through so client-signed
+	// launches persist their metadata like the launch-agent path does.
+	const metadataUri = pending.metadata_uri || p.metadata_uri || null;
+
+	let txSignature = body.tx_signature;
+	if (body.signed_tx_base64) {
+		try {
+			txSignature = await submitSignedLaunch({ network: p.network, signedTxBase64: body.signed_tx_base64, mint: p.mint, gasless: p.gasless ? p.sponsor : null });
+		} catch (e) {
+			return error(res, e.status || 422, e.code || 'submit_failed', e.message);
+		}
+	}
+
+	let tx;
+	try {
+		tx = await verifySignature({ network: p.network, signature: txSignature });
+	} catch (e) {
+		return error(res, e.status || 422, e.code || 'tx_failed', e.message);
+	}
+	if (p.gasless) {
+		try {
+			verifyGaslessTransaction(tx, { sponsor: p.sponsor, mint: p.mint });
+		} catch (e) {
+			return error(res, e.status || 422, e.code || 'not_sponsored', e.message);
+		}
+	}
+	const accountKeys = tx.transaction.message.accountKeys.map((k) => (k.pubkey || k).toString());
+	if (!accountKeys.includes(p.mint)) {
+		return error(res, 422, 'mint_not_in_tx', 'mint pubkey not present in tx');
+	}
+	// Prove the confirmed tx actually ran the pump.fun program: not just a tx
+	// that happens to reference the mint pubkey. Without this, a confirmed memo
+	// or transfer touching the new mint account could be recorded as a launch.
+	if (!txInvokesPumpProgram(tx)) {
+		return error(res, 422, 'not_a_pump_launch', 'transaction did not invoke the pump.fun program');
+	}
+	// The launch fee rode inside the transaction launch-prep built. A signature
+	// for some other transaction (the same mint, minus the fee) is not a
+	// three.ws launch and is not listed as one.
+	if (!txPaidPlatformFee(tx, p.platform_fee, p.quote_mint || undefined)) {
+		return error(res, 422, 'platform_fee_missing', 'transaction did not include the disclosed three.ws launch fee');
+	}
+
+	const [existing] = await sql`
+		select id from pump_agent_mints where mint=${p.mint} and network=${p.network} limit 1
+	`;
+	if (existing) return error(res, 409, 'conflict', 'mint already registered');
+
+	// agent_authority is the on-chain creator (royalty recipient + governance
+	// authority), not the signer. p.creator_address is set by launch-prep;
+	// fall back to wallet_address for prep rows written before the split landed.
+	const agentAuthority = p.creator_address || p.wallet_address;
+	const [row] = await sql`
+		insert into pump_agent_mints
+			(agent_id, user_id, network, mint, name, symbol, metadata_uri, agent_authority, buyback_bps, quote_mint)
+		values
+			(${p.agent_id}, ${user.id}, ${p.network}, ${p.mint},
+			 ${p.name}, ${p.symbol}, ${metadataUri}, ${agentAuthority}, ${p.buyback_bps}, ${p.quote_mint ?? null})
+		returning id, mint, network, buyback_bps, quote_mint, created_at
+	`;
+
+	await sql`delete from agent_registrations_pending where id=${pending.id}`;
+
+	// Launch Copilot: if the launcher armed a market-maker policy at prep time,
+	// attach it now from the launch's own agent wallet. Best-effort: a bad policy
+	// (e.g. an anti-manipulation cap breach) must never fail the confirmed launch;
+	// the owner can fix + arm it from the success screen. The MM trades only
+	// through the shared firewall/spend-guard/custody path.
+	if (p.mm && p.agent_id) {
+		try {
+			const { normalizePolicyPatch, upsertPolicy } = await import('../_lib/market-maker.js');
+			const patch = normalizePolicyPatch(p.mm, { isCreate: true });
+			// The launch itself is already on-chain, so an unsigned real-funds
+			// agreement must not fail this confirm. Attach the maker disarmed instead;
+			// arming it later goes through /api/launch/mm, which enforces the agreement.
+			if (p.network !== 'devnet' && patch.enabled === true && patch.kill_switch !== true && patch.mode === 'live') {
+				const signed = await currentSignatureFor(user.id).catch(() => null);
+				if (!signed) patch.enabled = false;
+			}
+			await upsertPolicy({ mint: p.mint, network: p.network, agentId: p.agent_id, userId: user.id, patch });
+		} catch (e) {
+			console.warn('[pump/launch-confirm] market-maker attach skipped:', e?.code || e?.message);
+		}
+	}
+
+	// Surface the confirmed launch on the site-wide live activity ticker.
+	publishFeedEvent({
+		type: 'coin-buy',
+		ts: Date.now(),
+		actor: shortAddr(p.wallet_address),
+		mint: p.mint,
+		sol: 0,
+		network: p.network,
+		branded: hasThreeWsMark(p.mint),
+	}).catch(() => {});
+
+	if (p.gasless) {
+		await recordSponsorshipLaunched({ mint: p.mint, network: p.network, signature: txSignature });
+	}
+
+	return json(res, 201, {
+		ok: true,
+		mint: p.mint,
+		pump_agent_mint: row,
+		tx_signature: txSignature,
+		signature: txSignature,
+		gasless: !!p.gasless,
+		launch_url: `${env.APP_ORIGIN}/launch/${p.mint}`,
+		explorer: `https://solscan.io/tx/${txSignature}${p.network === 'devnet' ? '?cluster=devnet' : ''}`,
+	});
+}
+
+/**
+ * Broadcast a wallet-signed launch transaction and wait for confirmation.
+ * For a gasless launch, the fee payer must be the sponsor that prepared it.
+ */
+async function submitSignedLaunch({ network, signedTxBase64, mint, gasless }) {
+	const { VersionedTransaction } = await import('@solana/web3.js');
+	let vtx;
+	try {
+		vtx = VersionedTransaction.deserialize(Buffer.from(signedTxBase64, 'base64'));
+	} catch {
+		throw Object.assign(new Error('signed_tx_base64 is not a serialized versioned transaction'), { status: 400, code: 'validation_error' });
+	}
+	const keys = vtx.message.staticAccountKeys.map((k) => k.toBase58());
+	if (!keys.includes(mint)) throw Object.assign(new Error('the signed transaction does not create the prepared mint'), { status: 422, code: 'mint_not_in_tx' });
+	if (gasless && keys[0] !== gasless) {
+		throw Object.assign(new Error('the signed transaction is not fee-paid by the launch sponsor'), { status: 422, code: 'not_sponsored' });
+	}
+	const connection = getConnection({ network });
+	const raw = vtx.serialize();
+	const signature = await connection.sendRawTransaction(raw, { skipPreflight: false, preflightCommitment: 'confirmed', maxRetries: 3 });
+	const { confirmOrThrow } = await import('../_lib/solana/confirm.js');
+	await confirmOrThrow(connection, signature, 'confirmed');
+	return signature;
+}
+
+// ── agent-wallet ───────────────────────────────────────────────────────────
+//
+// Resolves the agent_identity backing the avatar (creating it if needed) and
+// the agent's custodial Solana wallet (provisioning if needed). Returns the
+// wallet's address and live SOL balance so the /studio UI can display it,
+// fund it, and check whether it can cover a launch.
+
+const agentWalletSchema = z
+	.object({
+		agent_id: z.string().uuid().optional(),
+		avatar_id: z.string().uuid().optional(),
+		network: z.enum(['mainnet', 'devnet']).default('mainnet'),
+	})
+	.refine((v) => v.agent_id || v.avatar_id, {
+		message: 'agent_id or avatar_id required',
+		path: ['agent_id'],
+	});
+
+async function handleAgentWallet(req, res) {
+	if (cors(req, res, { methods: 'POST,OPTIONS', credentials: true })) return;
+	if (!method(req, res, ['POST'])) return;
+
+	const user = await getSessionUser(req);
+	if (!user) return error(res, 401, 'unauthorized', 'sign in required');
+
+	const rl = await limits.authIp(clientIp(req));
+	if (!rl.success) return rateLimited(res, rl);
+
+	const body = parse(agentWalletSchema, await readJson(req));
+
+	const agent = await resolveLaunchAgentId({
+		userId: user.id,
+		agentId: body.agent_id,
+		avatarId: body.avatar_id,
+	});
+	if (!agent) return error(res, 404, 'not_found', 'agent not found');
+
+	const loaded = await loadAgentForSigning(agent.id, user.id, {
+		reason: 'studio_launch_prepare',
+	});
+	if (loaded.error) return error(res, loaded.error.status, loaded.error.code, loaded.error.msg);
+
+	const address = loaded.keypair.publicKey.toBase58();
+	let lamports = null;
+	try {
+		const conn = solanaConnection(body.network);
+		lamports = await conn.getBalance(loaded.keypair.publicKey);
+	} catch (err) {
+		console.error('[pump/agent-wallet] balance fetch failed', err?.message);
+	}
+
+	return json(res, 200, {
+		agent_id: agent.id,
+		address,
+		network: body.network,
+		lamports,
+		sol: lamports == null ? null : lamports / 1e9,
+	});
+}
+
+// ── launch-agent ───────────────────────────────────────────────────────────
+//
+// Server-side mirror of launch-prep + launch-confirm: builds, signs, and
+// submits a pump.fun launch transaction using the agent's custodial Solana
+// keypair. The user's connected wallet is not involved: the agent wallet
+// pays for rent, fees, and any initial buy. PumpAgent.create is bound when
+// buyback_bps > 0.
+
+const launchAgentSchema = z
+	.object({
+		agent_id: z.string().uuid().optional(),
+		avatar_id: z.string().uuid().optional(),
+		name: z.string().trim().min(1).max(32),
+		symbol: z.string().trim().min(1).max(10),
+		// Bound the metadata URI so name(32)+symbol(10)+uri always fit inside
+		// Solana's 1232-byte transaction packet: an unbounded URI is what pushed
+		// the create message past the limit and threw "encoding overruns
+		// Uint8Array" at sign time. 200 matches pump.fun's own URI ceiling; the
+		// 413 guard at sign time remains as a defence-in-depth backstop.
+		uri: z.string().url().max(200),
+		network: z.enum(['mainnet', 'devnet']).default('mainnet'),
+		buyback_bps: z.number().int().min(0).max(10_000).default(0),
+		sol_buy_in: z.number().nonnegative().max(50).default(0),
+		// USDC-paired agent coins: pass `quote_mint` (the USDC mint) to create a
+		// stable-paired curve, and `usdc_buy_in` for an optional USDC dev buy. The
+		// agent custodial wallet must hold that USDC (checked in the preflight).
+		usdc_buy_in: z.number().nonnegative().max(1_000_000).default(0),
+		quote_currency: z.enum(['sol', 'usdc']).optional(),
+		quote_mint: z.string().min(32).max(44).optional(),
+		mint_address: z.string().min(32).max(44).optional(),
+		mint_secret_key_b64: z.string().min(20).optional(),
+		coin_type: z.enum(['regular', 'mayhem', 'agent']).default('agent'),
+		holder_reward: z.boolean().default(false),
+	})
+	.refine((v) => v.agent_id || v.avatar_id, {
+		message: 'agent_id or avatar_id required',
+		path: ['agent_id'],
+	})
+	.refine((v) => !v.mint_address || v.mint_secret_key_b64, {
+		message: 'mint_secret_key_b64 required when mint_address is supplied',
+		path: ['mint_secret_key_b64'],
+	})
+	.refine((v) => !v.holder_reward || v.coin_type === 'regular', {
+		message: 'holder_reward requires coin_type=regular',
+		path: ['holder_reward'],
+	});
+
+async function handleLaunchAgent(req, res) {
+	if (cors(req, res, { methods: 'POST,OPTIONS', credentials: true })) return;
+	if (!method(req, res, ['POST'])) return;
+
+	const user = await requireSessionUser(req, res);
+	if (!user) return;
+
+	const rl = await limits.authIp(clientIp(req));
+	if (!rl.success) return rateLimited(res, rl);
+
+	const body = parse(launchAgentSchema, await readJson(req));
+
+	const agent = await resolveLaunchAgentId({
+		userId: user.id,
+		agentId: body.agent_id,
+		avatarId: body.avatar_id,
+	});
+	if (!agent) return error(res, 404, 'not_found', 'agent not found');
+	const resolvedAgentId = agent.id;
+	if (!(await requireRealFundsAgreement(req, res, { userId: user.id, network: body.network, context: 'pump-launch-agent' }))) return;
+
+	const loaded = await loadAgentForSigning(resolvedAgentId, user.id, {
+		reason: 'studio_pump_launch',
+		meta: { network: body.network, buyback_bps: body.buyback_bps, coin_type: body.coin_type },
+	});
+	if (loaded.error) return error(res, loaded.error.status, loaded.error.code, loaded.error.msg);
+	const agentKeypair = loaded.keypair;
+	const creator = agentKeypair.publicKey;
+
+	// Mint keypair: client-supplied (vanity) or server-ground with the three.ws mark.
+	// This path signs server-side with the agent custodial wallet, so the server
+	// always holds the mint secret: supplied or ground.
+	const enforceMark = env.THREE_WS_MARK_ENFORCE !== '0' && env.THREE_WS_MARK_ENFORCE !== 'false';
+	let mintKeypair;
+	if (body.mint_address && body.mint_secret_key_b64) {
+		try {
+			mintKeypair = Keypair.fromSecretKey(
+				Uint8Array.from(Buffer.from(body.mint_secret_key_b64, 'base64')),
+			);
+		} catch {
+			return error(res, 400, 'validation_error', 'mint_secret_key_b64 did not parse');
+		}
+		if (mintKeypair.publicKey.toBase58() !== body.mint_address) {
+			return error(res, 400, 'validation_error', 'mint_address does not match secret key');
+		}
+		if (enforceMark && !hasThreeWsMark(mintKeypair.publicKey.toBase58())) {
+			return error(
+				res,
+				400,
+				'unbranded_mint',
+				'three.ws launches must use a mint carrying the "3ws" mark — omit mint_address to let the server stamp it',
+			);
+		}
+	} else if (enforceMark) {
+		try {
+			const ground = await grindVanityNode({ ...THREE_WS_VANITY }); // ~49k attempts, sub-second
+			mintKeypair = Keypair.fromSecretKey(ground.secretKey);
+			log.info('mint_mark_stamped', {
+				publicKey: ground.publicKey,
+				attempts: ground.attempts,
+				durationMs: Math.round(ground.durationMs),
+			});
+		} catch (err) {
+			if (err instanceof GrindExhaustedError) {
+				return error(
+					res,
+					503,
+					'mark_grind_failed',
+					'could not stamp the three.ws mark — retry',
+				);
+			}
+			throw err;
+		}
+	} else {
+		mintKeypair = Keypair.generate();
+	}
+	const mint = mintKeypair.publicKey;
+
+	// Conflict check before doing on-chain work.
+	const [existing] = await sql`
+		select id from pump_agent_mints where mint=${mint.toBase58()} and network=${body.network} limit 1
+	`;
+	if (existing) return error(res, 409, 'conflict', 'mint already registered');
+
+	// Resolve the quote pairing. Agent coins are SOL-paired by default; pass
+	// `quote_currency: 'usdc'` (or an explicit `quote_mint`) to launch a
+	// stable-paired coin whose USDC buyback swaps natively.
+	const requestedQuoteMint =
+		body.quote_currency === 'usdc'
+			? usdcMintFor(body.network)
+			: body.quote_currency === 'sol'
+				? null
+				: body.quote_mint;
+	const quote = classifyLaunchQuote({ quoteMint: requestedQuoteMint, network: body.network });
+	const launchQuoteMint = quote.quoteMint ? solanaPubkey(quote.quoteMint) : null;
+
+	// three.ws launch fee on the dev buy, paid by the agent wallet in the launch
+	// transaction itself. Built before the preflight so the balance check covers it.
+	const launchFee = await buildPlatformFeeInstructions({
+		network: body.network,
+		payer: creator,
+		isUsdc: quote.isUsdc,
+		quoteMintPk: launchQuoteMint,
+		grossAtomics: quote.isUsdc
+			? BigInt(Math.round((body.usdc_buy_in || 0) * 1_000_000))
+			: BigInt(Math.floor((body.sol_buy_in || 0) * LAMPORTS_PER_SOL)),
+		basis: 'launch_dev_buy',
+		bps: pumpLaunchFeeBps(),
+	});
+	const feeLamports = launchFee && launchFee.disclosure.asset === 'SOL' ? Number(launchFee.disclosure.amount) : 0;
+	const feeUsdcAtomics = launchFee && launchFee.disclosure.asset === 'USDC' ? BigInt(launchFee.disclosure.amount) : 0n;
+
+	// Pre-flight: make sure the agent wallet can afford the launch.
+	const conn = solanaConnection(body.network);
+	const PUMP_BASE_LAMPORTS = Math.floor(0.022 * LAMPORTS_PER_SOL);
+	// SOL always covers rent + fees. A SOL dev buy adds to the requirement; a USDC
+	// dev buy is funded from the wallet's USDC balance (checked separately), so it
+	// does not add to the SOL requirement.
+	const initialBuyLamports = quote.isUsdc
+		? 0
+		: Math.floor((body.sol_buy_in || 0) * LAMPORTS_PER_SOL);
+	const requiredLamports = PUMP_BASE_LAMPORTS + initialBuyLamports + feeLamports;
+	let balanceLamports = 0;
+	try {
+		balanceLamports = await conn.getBalance(creator);
+	} catch (err) {
+		console.error('[pump/launch-agent] balance check failed', err?.message);
+	}
+	if (balanceLamports < requiredLamports) {
+		return error(
+			res,
+			402,
+			'insufficient_funds',
+			`agent wallet has ${(balanceLamports / LAMPORTS_PER_SOL).toFixed(4)} SOL, needs ~${(requiredLamports / LAMPORTS_PER_SOL).toFixed(4)} SOL — deposit to ${creator.toBase58()}`,
+		);
+	}
+
+	// USDC dev buy: the custodial wallet must hold the USDC it will spend, or the
+	// create+buy reverts on-chain. Verify up front so it fails cleanly here.
+	if (quote.isUsdc && body.usdc_buy_in > 0) {
+		const needAtomics = BigInt(Math.round(body.usdc_buy_in * 1_000_000)) + feeUsdcAtomics;
+		let haveAtomics = 0n;
+		try {
+			const { getAssociatedTokenAddressSync } = await import('@solana/spl-token');
+			const usdcAta = getAssociatedTokenAddressSync(launchQuoteMint, creator, true);
+			const bal = await conn.getTokenAccountBalance(usdcAta);
+			haveAtomics = BigInt(bal?.value?.amount ?? 0);
+		} catch {
+			haveAtomics = 0n; // missing/closed ATA → treat as zero balance
+		}
+		if (haveAtomics < needAtomics) {
+			return error(
+				res,
+				402,
+				'insufficient_usdc',
+				`agent wallet holds ${(Number(haveAtomics) / 1e6).toFixed(2)} USDC, needs ${body.usdc_buy_in.toFixed(2)} USDC for the dev buy — deposit USDC to ${creator.toBase58()} or set usdc_buy_in to 0`,
+			);
+		}
+	}
+
+	const { sdk, BN } = await getPumpSdk({ network: body.network });
+
+	const isMayhem = body.coin_type === 'mayhem';
+	const isAgent = body.coin_type === 'agent';
+	const buybackAvailable = pumpAgentBuybackAvailable();
+	const effBuyback = isAgent && buybackAvailable ? body.buyback_bps : 0;
+
+	const instructions = await buildLaunchInstructions({
+		sdk,
+		BN,
+		mint,
+		creator,
+		name: body.name,
+		symbol: body.symbol,
+		uri: body.uri,
+		solBuyIn: body.sol_buy_in,
+		usdcBuyIn: body.usdc_buy_in,
+		quoteMint: launchQuoteMint,
+		isMayhem,
+		holderReward: body.holder_reward,
+	});
+
+	if (isAgent && effBuyback > 0) {
+		const { offline } = await getPumpAgentOffline({ network: body.network, mint });
+		const createIx = await offline.create({
+			authority: creator,
+			mint,
+			agentAuthority: creator,
+			buybackBps: effBuyback,
+		});
+		instructions.push(createIx);
+	}
+
+	// Spend-policy gate: this path signs server-side with the agent's custodial
+	// wallet, so a stolen session could otherwise drive an arbitrarily large SOL
+	// dev-buy (up to the schema max) to drain the wallet. Reserve the SOL outflow
+	// against the agent's per-tx + rolling-24h caps BEFORE broadcasting: atomic,
+	// so concurrent launches can't both pass, and the launch is recorded toward
+	// the daily cap. A USDC-paired dev buy moves no SOL (amount 0). Released on
+	// send failure, finalized with the signature on success.
+	const launchSolOutflow = (quote.isUsdc ? 0 : body.sol_buy_in || 0) + feeLamports / LAMPORTS_PER_SOL;
+	// The owner's full spend policy (frozen switch, burner tier, USD caps, English
+	// rules) applies before the SOL reservation, same as every other signing path.
+	try {
+		const price = await solUsdPrice().catch(() => null);
+		await enforceSpendLimit({
+			agentId: resolvedAgentId,
+			meta: loaded.meta,
+			category: 'trade',
+			usdValue: Number.isFinite(price) && price > 0 ? launchSolOutflow * price : null,
+			asset: 'SOL',
+			userId: user.id,
+			network: body.network,
+		});
+	} catch (err) {
+		if (err instanceof SpendLimitError) return error(res, err.status, err.code, err.message, err.detail);
+		throw err;
+	}
+	const reservation = await reserveSpend({
+		agentId: resolvedAgentId,
+		meta: loaded.meta,
+		mint: mint.toBase58(),
+		solAmount: launchSolOutflow,
+		type: 'pumpfun.launch',
+		payload: {
+			name: body.name,
+			symbol: body.symbol,
+			network: body.network,
+			source: 'studio_agent_wallet',
+		},
+	});
+	if (!reservation.ok) return error(res, reservation.status, reservation.code, reservation.msg);
+
+	let signature;
+	// Set when the fee could not ride in the launch transaction and settles in its
+	// own transaction after the launch lands: 'separate' on success, 'failed' if
+	// that follow-up transfer did not land.
+	let feeSettlement = launchFee ? 'bundled' : null;
+	const lookupTables = await getPumpLookupTables({ network: body.network });
+	const sendLaunch = (ixs) =>
+		submitProtected({
+			network: body.network,
+			connection: conn,
+			payer: agentKeypair,
+			instructions: ixs,
+			opts: { extraSigners: [mintKeypair], addressLookupTables: lookupTables },
+		});
+	try {
+		// Protected send: the agent custodial wallet pays + signs, the new mint
+		// co-signs. Priority fee + CU estimate, rebroadcast with blockhash refresh,
+		// hard throw on an on-chain revert. The launch fee rides along when it
+		// fits; a USDC-quoted launch plus the engine's compute-budget instructions
+		// can exceed the v0 packet, and then the coin launches first and the fee
+		// follows in its own transaction.
+		try {
+			({ signature } = await sendLaunch(launchFee ? [...instructions, ...launchFee.instructions] : instructions));
+		} catch (err) {
+			if (!launchFee || !/too large|overruns|RangeError/i.test(`${err?.name} ${err?.message}`)) throw err;
+			({ signature } = await sendLaunch(instructions));
+			feeSettlement = 'separate';
+			try {
+				await submitProtected({
+					network: body.network,
+					connection: conn,
+					payer: agentKeypair,
+					instructions: launchFee.instructions,
+				});
+			} catch (feeErr) {
+				feeSettlement = 'failed';
+				console.error('[pump/launch-agent] separate launch-fee transfer failed', mint.toBase58(), feeErr?.message);
+			}
+		}
+	} catch (err) {
+		await releaseSpend(reservation.reservationId);
+		// A message too large for Solana's packet limit now surfaces here (compile
+		// happens inside submitProtected): keep the actionable 413 rather than 502.
+		if (/too large|overruns/i.test(err?.message || '')) {
+			return error(res, 413, 'launch_payload_too_large', 'token launch transaction exceeds Solana size limits — shorten the token name or metadata URI');
+		}
+		console.error('[pump/launch-agent] send failed', err);
+		return respondError(res, 502, 'rpc_error', err);
+	}
+
+	const mintAddr = mint.toBase58();
+	const onchainCreator = body.holder_reward
+		? (await import('@pump-fun/pump-sdk')).holderRewardsPda(mint)
+		: creator;
+	const [row] = await sql`
+		insert into pump_agent_mints
+			(agent_id, user_id, network, mint, name, symbol, metadata_uri, agent_authority, buyback_bps, quote_mint)
+		values
+			(${resolvedAgentId}, ${user.id}, ${body.network}, ${mintAddr},
+			 ${body.name}, ${body.symbol}, ${body.uri}, ${onchainCreator.toBase58()}, ${effBuyback}, ${quote.quoteMint ?? null})
+		on conflict (mint, network) do nothing
+		returning id, mint, network, buyback_bps, quote_mint, created_at
+	`;
+
+	// Finalize the spend reservation in place: merge the launch metadata + tx
+	// signature into the reserved row and mark it confirmed. This replaces the
+	// previous standalone insert: the reserved row already carries `solAmount`
+	// (so the launch counts toward the daily cap, which the old `sol_buy_in`-keyed
+	// row never did), and reusing it avoids double-recording the launch.
+	await finalizeSpend(reservation.reservationId, {
+		mint: mintAddr,
+		name: body.name,
+		symbol: body.symbol,
+		uri: body.uri,
+		signature,
+		network: body.network,
+		sol_buy_in: body.sol_buy_in || 0,
+		usdc_buy_in: body.usdc_buy_in || 0,
+		quote_mint: quote.quoteMint,
+		quote_currency: quote.label,
+		buyback_bps: effBuyback,
+		coin_type: body.coin_type,
+		holder_reward: body.holder_reward,
+		platform_fee: launchFee ? { ...launchFee.disclosure, settlement: feeSettlement } : null,
+		source: 'studio_agent_wallet',
+	});
+
+	// Bind the launch back to the agent's saved token plan, if it launched from
+	// one: the plan flips to 'launched' and records the mint, so the profile stops
+	// advertising a coin that now exists and starts rendering its market instead.
+	// A launch configured inline (no saved plan) writes nothing and is unaffected.
+	await markPlanLaunched({ agentId: resolvedAgentId, network: body.network, mint: mintAddr });
+
+	// Surface the confirmed agent-wallet launch on the site-wide live activity ticker.
+	publishFeedEvent({
+		type: 'coin-buy',
+		ts: Date.now(),
+		actor: shortAddr(creator.toBase58()),
+		mint: mintAddr,
+		sol: body.sol_buy_in || 0,
+		network: body.network,
+		branded: hasThreeWsMark(mintAddr),
+	}).catch(() => {});
+
+	return json(res, 201, {
+		ok: true,
+		agent_id: resolvedAgentId,
+		mint: mintAddr,
+		signature,
+		network: body.network,
+		buyback_bps: effBuyback,
+		coin_type: body.coin_type,
+		holder_reward: body.holder_reward,
+		quote_mint: quote.quoteMint,
+		quote_currency: quote.label,
+		pump_agent_mint: row || null,
+		platform_fee: launchFee ? { ...launchFee.disclosure, settlement: feeSettlement } : null,
+		buyback_available: buybackAvailable,
+		explorer: `https://solscan.io/tx/${signature}${body.network === 'devnet' ? '?cluster=devnet' : ''}`,
+		pumpfun_url: `https://pump.fun/coin/${mintAddr}`,
+	});
+}
+
+// ── accept-payment-prep ────────────────────────────────────────────────────
+
+const acceptPaymentPrepSchema = z.object({
+	mint: z.string().min(32).max(44), // pump.fun token mint = agent token
+	payer_wallet: z.string().min(32).max(44),
+	amount_usdc: z.number().positive().max(100_000),
+	currency_mint: z.string().min(32).max(44).optional(), // defaults to USDC
+	currency_token_program: z.string().min(32).max(44).optional(),
+	user_token_account: z.string().min(32).max(44), // payer ATA
+	skill_id: z.string().max(100).optional(),
+	tool_name: z.string().max(100).optional(),
+	duration_seconds: z
+		.number()
+		.int()
+		.positive()
+		.max(60 * 60 * 24 * 365)
+		.default(60),
+	network: z.enum(['mainnet', 'devnet']).default('mainnet'),
+});
+
+function bnFromBigint(BN, v) {
+	return new BN(v.toString());
+}
+
+async function handleAcceptPaymentPrep(req, res) {
+	if (cors(req, res, { methods: 'POST,OPTIONS', credentials: true })) return;
+	if (!method(req, res, ['POST'])) return;
+
+	// Session users (browser) and bearer (MCP / agent) callers both allowed.
+	// Routed through resolveAuth() rather than a bare getSessionUser() so the
+	// cookie path has to prove same-site intent: this POST writes a pending
+	// invoice row under the caller's identity, which is exactly the cookie-borne
+	// write the same-site rule exists for. Bearer callers stay exempt.
+	const auth = await resolveAuth(req);
+	if (!auth) return error(res, 401, 'unauthorized', 'sign in or supply a bearer token');
+	const userId = auth.userId;
+
+	const rl = await limits.authIp(clientIp(req));
+	if (!rl.success) return rateLimited(res, rl);
+
+	const body = parse(acceptPaymentPrepSchema, await readJson(req));
+	const payer = solanaPubkey(body.payer_wallet);
+	const userAta = solanaPubkey(body.user_token_account);
+	if (!payer) return error(res, 400, 'validation_error', 'invalid payer_wallet');
+	if (!userAta) return error(res, 400, 'validation_error', 'invalid user_token_account');
+
+	const [agent] = await sql`
+		select id, mint, network, buyback_bps from pump_agent_mints
+		where mint=${body.mint} and network=${body.network} limit 1
+	`;
+	if (!agent) return error(res, 404, 'not_found', 'agent mint not registered');
+
+	const currencyStr =
+		body.currency_mint ||
+		(body.network === 'devnet' ? SOLANA_USDC_MINT_DEVNET : SOLANA_USDC_MINT);
+	const currency = solanaPubkey(currencyStr);
+	if (!currency) return error(res, 400, 'validation_error', 'invalid currency_mint');
+
+	const { offline, BN } = await getPumpAgentOffline({
+		network: body.network,
+		mint: body.mint,
+	});
+
+	// Invoice ID = random 64-bit unsigned (memo BN). Used as the PDA seed and
+	// as the X402 receipt identifier downstream.
+	const invoiceIdHex = (await randomToken(8)).slice(0, 16);
+	const invoiceId = new BN(invoiceIdHex, 16);
+
+	const startTime = Math.floor(Date.now() / 1000);
+	const endTime = startTime + body.duration_seconds;
+
+	const amountAtomics = toUsdcAtomics(body.amount_usdc); // bigint, USDC = 6 dp
+
+	const tokenProgram = body.currency_token_program
+		? solanaPubkey(body.currency_token_program)
+		: undefined;
+
+	const ix = await offline.acceptPayment({
+		user: payer,
+		userTokenAccount: userAta,
+		currencyMint: currency,
+		amount: bnFromBigint(BN, amountAtomics),
+		memo: invoiceId,
+		startTime: new BN(startTime),
+		endTime: new BN(endTime),
+		...(tokenProgram ? { tokenProgram } : {}),
+	});
+
+	const txBase64 = await buildUnsignedTxBase64({
+		network: body.network,
+		payer,
+		instructions: [ix],
+	});
+
+	const [row] = await sql`
+		insert into pump_agent_payments
+			(mint_id, user_id, payer_wallet, currency_mint, amount_atomics,
+			 invoice_id, start_time, end_time, status, skill_id, tool_name)
+		values
+			(${agent.id}, ${userId}, ${body.payer_wallet}, ${currencyStr},
+			 ${amountAtomics.toString()}, ${invoiceId.toString()},
+			 to_timestamp(${startTime}), to_timestamp(${endTime}),
+			 'pending', ${body.skill_id || null}, ${body.tool_name || null})
+		returning id, invoice_id, start_time, end_time, status
+	`;
+
+	return json(res, 201, {
+		payment_id: row.id,
+		mint: body.mint,
+		invoice_id: invoiceId.toString(),
+		amount_usdc: body.amount_usdc,
+		amount_atomics: amountAtomics.toString(),
+		currency_mint: currencyStr,
+		start_time: row.start_time,
+		end_time: row.end_time,
+		network: body.network,
+		tx_base64: txBase64,
+		instructions:
+			'Decode tx_base64, sign with payer wallet, submit, then call /api/pump/accept-payment-confirm with the tx_signature and payment_id.',
+	});
+}
+
+// ── accept-payment-confirm ─────────────────────────────────────────────────
+
+const acceptPaymentConfirmSchema = z.object({
+	payment_id: z.string().uuid(),
+	tx_signature: z.string().min(80).max(100),
+});
+
+async function handleAcceptPaymentConfirm(req, res) {
+	if (cors(req, res, { methods: 'POST,OPTIONS', credentials: true })) return;
+	if (!method(req, res, ['POST'])) return;
+
+	// Same same-site rule as accept-payment-prep: this POST settles an invoice
+	// and can flip a payment row to 'failed', so the cookie path must prove
+	// intent. Bearer callers stay exempt.
+	const auth = await resolveAuth(req);
+	if (!auth) return error(res, 401, 'unauthorized', 'auth required');
+
+	const rl = await limits.authIp(clientIp(req));
+	if (!rl.success) return rateLimited(res, rl);
+
+	const body = parse(acceptPaymentConfirmSchema, await readJson(req));
+	const [payment] = await sql`
+		select p.*, m.mint, m.network from pump_agent_payments p
+		join pump_agent_mints m on m.id = p.mint_id
+		where p.id=${body.payment_id} limit 1
+	`;
+	if (!payment) return error(res, 404, 'not_found', 'payment not found');
+	if (payment.status === 'confirmed')
+		return error(res, 409, 'already_confirmed', 'payment already confirmed');
+
+	// One signature confirms one invoice. Reject a signature already consumed by
+	// another payment before doing any on-chain work (the partial unique index
+	// pump_agent_payments_tx_signature_unique is the hard backstop).
+	const [sigDupe] = await sql`
+		select id from pump_agent_payments
+		where tx_signature=${body.tx_signature} and status='confirmed' and id != ${payment.id} limit 1
+	`;
+	if (sigDupe)
+		return error(
+			res,
+			409,
+			'tx_already_used',
+			'this transaction already confirmed another payment',
+		);
+
+	let tx;
+	try {
+		tx = await verifySignature({ network: payment.network, signature: body.tx_signature });
+	} catch (e) {
+		await sql`update pump_agent_payments set status='failed' where id=${payment.id}`;
+		return error(res, e.status || 422, e.code || 'tx_failed', e.message);
+	}
+
+	const accountKeys = tx.transaction.message.accountKeys.map((k) => (k.pubkey || k).toString());
+	if (!accountKeys.includes(payment.mint)) {
+		return error(res, 422, 'mint_not_in_tx', 'agent mint not in tx accounts');
+	}
+
+	// The declared payer must have signed the tx: a signature that didn't
+	// involve this payer can't satisfy this invoice.
+	const signed = tx.transaction.message.accountKeys.some(
+		(k) => (k.pubkey || k).toString() === payment.payer_wallet && k.signer === true,
+	);
+	if (!signed)
+		return error(res, 422, 'payer_not_signer', 'declared payer did not sign the transaction');
+
+	// Verify the agent's payment vault was actually credited the invoiced amount
+	// of the invoiced currency. Without this, "the mint pubkey appears in the tx"
+	// is not proof of payment: any cheap unrelated tx referencing the mint would
+	// pass. The vault is the ATA owned by the TokenAgentPayments PDA for this mint.
+	const { agentPda } = await getPumpAgentOffline({
+		network: payment.network,
+		mint: payment.mint,
+	});
+	if (!agentPda) {
+		return error(
+			res,
+			503,
+			'verification_unavailable',
+			'unable to derive agent payment vault for verification',
+		);
+	}
+	const vaultOwner = agentPda.toString();
+	const expectedAtomics = BigInt(payment.amount_atomics);
+	const post = tx.meta?.postTokenBalances || [];
+	const pre = tx.meta?.preTokenBalances || [];
+	let credited = 0n;
+	for (const p of post) {
+		if (p.mint !== payment.currency_mint) continue;
+		if (p.owner !== vaultOwner) continue;
+		const before = pre.find((b) => b.accountIndex === p.accountIndex);
+		const delta =
+			BigInt(p.uiTokenAmount?.amount ?? '0') - BigInt(before?.uiTokenAmount?.amount ?? '0');
+		if (delta > credited) credited = delta;
+	}
+	if (credited < expectedAtomics) {
+		await sql`update pump_agent_payments set status='failed' where id=${payment.id}`;
+		return error(
+			res,
+			422,
+			'amount_not_credited',
+			'transaction did not credit the invoiced amount to the agent payment vault',
+		);
+	}
+
+	try {
+		await sql`
+			update pump_agent_payments
+			set status='confirmed', tx_signature=${body.tx_signature}, confirmed_at=now()
+			where id=${payment.id} and status != 'confirmed'
+		`;
+	} catch (e) {
+		if (e?.code === '23505')
+			return error(
+				res,
+				409,
+				'tx_already_used',
+				'this transaction already confirmed another payment',
+			);
+		throw e;
+	}
+
+	return json(res, 200, {
+		ok: true,
+		payment_id: payment.id,
+		invoice_id: payment.invoice_id,
+		tx_signature: body.tx_signature,
+	});
+}
+
+// ── payments-list ──────────────────────────────────────────────────────────
+
+async function handlePaymentsList(req, res) {
+	if (cors(req, res, { methods: 'GET,OPTIONS', credentials: true })) return;
+	if (!method(req, res, ['GET'])) return;
+
+	const rl = await limits.authedReadIp(clientIp(req));
+	if (!rl.success) return rateLimited(res, rl);
+
+	const url = new URL(req.url, `http://${req.headers.host}`);
+	const mint = url.searchParams.get('mint');
+	const network = url.searchParams.get('network') === 'devnet' ? 'devnet' : 'mainnet';
+	const limit = readLimit(url, 50, 500);
+	const wantsPending = url.searchParams.get('include_pending') === '1';
+
+	// Pending payments expose unconfirmed invoices: require auth.
+	if (wantsPending) {
+		const auth = await resolveAuth(req);
+		if (!auth) return error(res, 401, 'unauthorized', 'sign in required to view pending payments');
+	}
+	const includePending = wantsPending;
+
+	if (!mint) return error(res, 400, 'validation_error', 'mint required');
+
+	const [agent] = await sql`
+		select id, mint, network, buyback_bps from pump_agent_mints
+		where mint=${mint} and network=${network} limit 1
+	`;
+	if (!agent) return error(res, 404, 'not_found', 'agent mint not registered');
+
+	const rows = includePending
+		? await sql`
+			select id, payer_wallet, currency_mint, amount_atomics, invoice_id,
+			       start_time, end_time, status, skill_id, tool_name,
+			       invoice_pda, tx_signature, created_at, confirmed_at
+			from pump_agent_payments
+			where mint_id=${agent.id}
+			order by created_at desc limit ${limit}
+		`
+		: await sql`
+			select id, payer_wallet, currency_mint, amount_atomics, invoice_id,
+			       start_time, end_time, status, skill_id, tool_name,
+			       invoice_pda, tx_signature, created_at, confirmed_at
+			from pump_agent_payments
+			where mint_id=${agent.id} and status='confirmed'
+			order by confirmed_at desc nulls last limit ${limit}
+		`;
+
+	// Derive invoice PDAs for any rows that lack one (older rows pre-PDA backfill).
+	// We do it lazily here so the widget can deep-link without a backfill cron.
+	let pdaErrored = false;
+	const needsPda = rows.filter((r) => !r.invoice_pda && r.invoice_id);
+	if (needsPda.length > 0) {
+		try {
+			const [{ getInvoiceIdPDA }, { PublicKey }] = await Promise.all([
+				import('@three-ws/agent-payments'),
+				import('@solana/web3.js'),
+			]);
+			const BN = (await import('bn.js')).default || (await import('bn.js'));
+			const mintPk = new PublicKey(mint);
+			for (const r of needsPda) {
+				try {
+					const [pda] = getInvoiceIdPDA(mintPk, new BN(r.invoice_id));
+					r.invoice_pda = pda.toBase58();
+				} catch {
+					/* skip individual failures */
+				}
+			}
+		} catch {
+			pdaErrored = true;
+		}
+	}
+
+	const [agg] = await sql`
+		select
+			count(*)::int                                                      as total,
+			count(*) filter (where status='confirmed')::int                    as confirmed,
+			count(distinct payer_wallet) filter (where status='confirmed')::int as unique_payers,
+			coalesce(sum(amount_atomics) filter (where status='confirmed'), 0)::text as total_atomics
+		from pump_agent_payments where mint_id=${agent.id}
+	`;
+
+	return json(res, 200, {
+		mint,
+		network,
+		buyback_bps: agent.buyback_bps,
+		summary: agg,
+		data: rows,
+	});
+}
+
+// ── portfolio ──────────────────────────────────────────────────────────────
+
+async function handlePortfolio(req, res) {
+	if (cors(req, res, { methods: 'GET,OPTIONS', credentials: true })) return;
+	if (!method(req, res, ['GET'])) return;
+
+	const auth = await resolveAuth(req);
+	if (!auth) return error(res, 401, 'unauthorized', 'sign in required');
+
+	const rl = await limits.authedReadIp(clientIp(req));
+	if (!rl.success) return rateLimited(res, rl);
+
+	const url = new URL(req.url, `http://${req.headers.host}`);
+	const agentId = url.searchParams.get('agentId');
+	const network = url.searchParams.get('network') === 'devnet' ? 'devnet' : 'mainnet';
+	if (!agentId) return error(res, 400, 'validation_error', 'agentId required');
+	if (!isUuid(agentId)) return error(res, 404, 'not_found', 'agent not found');
+
+	const [agent] = await sql`
+		SELECT user_id, meta FROM agent_identities
+		WHERE id = ${agentId} AND deleted_at IS NULL
+	`;
+	if (!agent) return error(res, 404, 'not_found', 'agent not found');
+	if (agent.user_id !== auth.userId) return error(res, 403, 'forbidden', 'not your agent');
+	const address = agent.meta?.solana_address;
+	if (!address) return error(res, 409, 'conflict', 'agent has no solana wallet');
+
+	const conn = solanaConnection(network);
+	const owner = new PublicKey(address);
+
+	// Each chain leg settles on its own: a throttled getBalance must not throw
+	// away a successful token-account read (or vice versa). A failed leg is
+	// named in `degraded` and the response carries `partial: true`; only when
+	// BOTH chain legs fail is there nothing honest to render.
+	const [lamportsRead, tokenRead, tradeRows, recentBuys] = await Promise.allSettled([
+		conn.getBalance(owner),
+		conn.getParsedTokenAccountsByOwner(owner, { programId: TOKEN_PROGRAM_ID }),
+		// Quote-aware cost basis from the trade ledger: net quote spent (buys −
+		// sells) per mint, in the quote asset's own atomic units, grouped by quote
+		// so SOL and USDC are never summed together.
+		sql`
+			SELECT pam.mint, t.quote_symbol,
+			       COALESCE(SUM(CASE WHEN t.direction='buy'  THEN t.quote_amount ELSE 0 END), 0)::text AS buy_quote,
+			       COALESCE(SUM(CASE WHEN t.direction='sell' THEN t.quote_amount ELSE 0 END), 0)::text AS sell_quote
+			FROM pump_agent_trades t
+			JOIN pump_agent_mints pam ON pam.id = t.mint_id
+			WHERE t.wallet = ${address} AND t.network = ${network}
+			GROUP BY pam.mint, t.quote_symbol
+		`.catch(() => []),
+		// Legacy fallback for SOL coins whose buys predate the trade ledger.
+		sql`
+			SELECT payload FROM agent_actions
+			WHERE agent_id = ${agentId}
+			  AND type IN ('pumpfun.buy', 'buy')
+			ORDER BY created_at DESC
+			LIMIT 500
+		`.catch(() => []),
+	]).then((settled) => settled.map((r) => (r.status === 'fulfilled' ? r.value : r)));
+
+	const degraded = [];
+	if (lamportsRead?.status === 'rejected') degraded.push('balance');
+	if (tokenRead?.status === 'rejected') degraded.push('token_accounts');
+	if (degraded.length === 2) {
+		console.warn(`[pump/portfolio] both chain legs failed agentId=${agentId}: ${lamportsRead.reason?.message || lamportsRead.reason}`);
+		res.setHeader('Retry-After', '15');
+		return error(res, 503, 'rpc_unavailable', 'Solana RPC is temporarily unavailable, retry shortly', { retry_after: 15 });
+	}
+	const lamports = lamportsRead?.status === 'rejected' ? null : lamportsRead;
+	const tokenResp = tokenRead?.status === 'rejected' ? { value: [] } : tokenRead;
+
+	const holdings = tokenResp.value
+		.map((acc) => {
+			const info = acc.account.data.parsed.info;
+			return {
+				mint: info.mint,
+				amount: info.tokenAmount.uiAmount ?? 0,
+				decimals: info.tokenAmount.decimals,
+			};
+		})
+		.filter((h) => h.amount > 0);
+
+	// Atomic→UI divisor per quote asset (lamports for SOL, 6-dec for USDC).
+	const QUOTE_ATOMS = { SOL: 1e9, USDC: 1e6 };
+
+	// Cost basis + quote asset per mint from the quote-aware trade ledger.
+	const basisByMint = new Map(); // mint -> { quoteSymbol, costBasis }
+	for (const r of tradeRows) {
+		const quoteSymbol = r.quote_symbol || 'SOL';
+		const net = BigInt(r.buy_quote || '0') - BigInt(r.sell_quote || '0');
+		const div = QUOTE_ATOMS[quoteSymbol] ?? null;
+		basisByMint.set(r.mint, {
+			quoteSymbol,
+			costBasis: div != null ? Number(net) / div : null,
+		});
+	}
+	// Supplement SOL basis from legacy agent_actions only for mints with no ledger
+	// rows: keeps historical portfolios intact without double-counting.
+	for (const row of recentBuys) {
+		const p = row.payload || {};
+		if (!p.mint || basisByMint.has(p.mint)) continue;
+		const prev = basisByMint.get(p.mint) ?? { quoteSymbol: 'SOL', costBasis: 0 };
+		prev.costBasis = (prev.costBasis ?? 0) + (Number(p.amountSol) || 0);
+		basisByMint.set(p.mint, prev);
+	}
+
+	// Authoritative quote asset for held agent coins not seen in the ledger.
+	const unknownMints = holdings.map((h) => h.mint).filter((m) => !basisByMint.has(m));
+	const quoteByMint = new Map();
+	if (unknownMints.length) {
+		const mintRows = await sql`
+			SELECT mint, quote_mint FROM pump_agent_mints
+			WHERE network = ${network} AND mint = ANY(${unknownMints})
+		`.catch(() => []);
+		for (const r of mintRows) {
+			quoteByMint.set(r.mint, tradeQuoteColumns({ quoteMint: r.quote_mint, network }).quote_symbol);
+		}
+	}
+
+	// Live price per holding via the read-only pump-fun MCP (parallelized).
+	const rt = makeRuntime();
+	const priced = await Promise.all(
+		holdings.map(async (h) => {
+			const curve = await rt
+				.invoke('pump-fun.getBondingCurve', { mint: h.mint })
+				.catch(() => ({ ok: false }));
+			const basis = basisByMint.get(h.mint);
+			const quoteSymbol = basis?.quoteSymbol ?? quoteByMint.get(h.mint) ?? 'SOL';
+			// A bonding-curve price is quote-per-token in the coin's OWN quote unit
+			// (SOL/token for SOL-paired, USDC/token for USDC-paired), so value and
+			// cost basis are always expressed in the same currency.
+			const priceQuote = curve?.ok ? (curve.data?.priceSol ?? curve.data?.price ?? null) : null;
+			const valueQuote = priceQuote != null ? priceQuote * h.amount : null;
+			const costBasis = basis?.costBasis ?? null;
+			const unrealized =
+				valueQuote != null && costBasis != null ? valueQuote - costBasis : null;
+			const isSol = quoteSymbol === 'SOL';
+			return {
+				...h,
+				quoteSymbol,
+				priceQuote,
+				valueQuote,
+				costBasis,
+				unrealizedPnl: unrealized,
+				unrealizedPnlPct:
+					unrealized != null && costBasis > 0 ? (unrealized / costBasis) * 100 : null,
+				// Backward-compat SOL-named fields, populated only for SOL-paired
+				// coins so existing consumers never read a USDC figure as SOL.
+				priceSol: isSol ? priceQuote : null,
+				valueSol: isSol ? valueQuote : null,
+				costBasisSol: isSol ? costBasis : null,
+				unrealizedPnlSol: isSol ? unrealized : null,
+			};
+		}),
+	);
+
+	// Per-quote subtotals: the fix for summing mismatched units. Each quote
+	// asset (SOL, USDC, …) gets its own value / cost-basis / PnL totals.
+	const subtotals = {};
+	for (const p of priced) {
+		const s = (subtotals[p.quoteSymbol] ??= {
+			quoteSymbol: p.quoteSymbol,
+			positions: 0,
+			value: 0,
+			costBasis: 0,
+			unrealizedPnl: 0,
+			unrealizedPnlPct: null,
+		});
+		s.positions += 1;
+		s.value += p.valueQuote ?? 0;
+		s.costBasis += p.costBasis ?? 0;
+	}
+	for (const s of Object.values(subtotals)) {
+		s.unrealizedPnl = s.value - s.costBasis;
+		s.unrealizedPnlPct = s.costBasis > 0 ? (s.unrealizedPnl / s.costBasis) * 100 : null;
+	}
+
+	// Top-level SOL totals stay backward-compatible: now scoped to SOL-paired
+	// holdings only (no cross-unit summing).
+	const solSub = subtotals.SOL ?? { value: 0, costBasis: 0 };
+	const totalValueSol = solSub.value;
+	const totalCostBasisSol = solSub.costBasis;
+	const unrealizedPnlSol = totalValueSol - totalCostBasisSol;
+
+	return json(res, 200, {
+		data: {
+			address,
+			network,
+			lamports,
+			sol: lamports == null ? null : lamports / LAMPORTS_PER_SOL,
+			holdings: priced,
+			subtotals,
+			...(degraded.length ? { partial: true, degraded } : {}),
+			totalValueSol,
+			totalCostBasisSol,
+			unrealizedPnlSol,
+			unrealizedPnlPct:
+				totalCostBasisSol > 0 ? (unrealizedPnlSol / totalCostBasisSol) * 100 : null,
+		},
+	});
+}
+
+// ── launches ─────────────────────────────────────────────────────────────────
+// Public, paginated feed of every coin launched through three.ws, joined with
+// the agent that launched it. Powers the /launches page and the agent-detail
+// "launched coins" card. Anonymous-readable; avatar thumbnails respect the
+// same public/unlisted visibility gate as api/agents.js.
+
+const LAUNCHES_CACHE = new Map(); // cacheKey → { at, body }
+const LAUNCHES_TTL_MS = 15_000;
+
+async function handleLaunches(req, res) {
+	if (cors(req, res, { methods: 'GET,OPTIONS', origins: '*' })) return;
+	if (!method(req, res, ['GET'])) return;
+
+	const rl = await limits.mcpIp(clientIp(req));
+	if (!rl.success) return rateLimited(res, rl);
+
+	const url = new URL(req.url, `http://${req.headers.host}`);
+	const limit = Math.min(Math.max(1, Number(url.searchParams.get('limit')) || 24), 100);
+	const offset = Math.max(0, Number(url.searchParams.get('offset')) || 0);
+	const network = url.searchParams.get('network') === 'devnet' ? 'devnet' : 'mainnet';
+	const agentId = url.searchParams.get('agent_id');
+	if (agentId && !isUuid(agentId))
+		return error(res, 400, 'validation_error', 'agent_id must be a uuid');
+
+	const minTierParam = url.searchParams.get('min_tier') || '';
+
+	const cacheKey = `${network}:${agentId || ''}:${minTierParam}:${offset}:${limit}`;
+	const now = Date.now();
+	const hit = LAUNCHES_CACHE.get(cacheKey);
+	if (hit && now - hit.at < LAUNCHES_TTL_MS) {
+		res.setHeader('cache-control', 'public, max-age=15');
+		return json(res, 200, hit.body);
+	}
+
+	// Query + row-shaping lives in api/_lib/pump-agent-launches.js, shared with
+	// the free GET /api/v1/pump/launches endpoint: one query, two doors.
+	const { launches, has_more: hasMore } = await queryAgentLaunches({
+		network,
+		agentId,
+		minTierParam,
+		offset,
+		limit,
+	});
+
+	const body = { data: { launches, has_more: hasMore, offset, limit, network, min_tier: minTierParam || null } };
+	LAUNCHES_CACHE.set(cacheKey, { at: now, body });
+	// Keep the per-instance cache bounded: feed pages only ever walk forward.
+	if (LAUNCHES_CACHE.size > 200) {
+		const oldest = LAUNCHES_CACHE.keys().next().value;
+		LAUNCHES_CACHE.delete(oldest);
+	}
+	res.setHeader('cache-control', 'public, max-age=15');
+	return json(res, 200, body);
+}
+
+// ── by-agent ───────────────────────────────────────────────────────────────
+
+async function handleByAgent(req, res) {
+	if (cors(req, res, { methods: 'GET,OPTIONS', origins: '*' })) return;
+	if (!method(req, res, ['GET'])) return;
+
+	const rl = await limits.authedReadIp(clientIp(req));
+	if (!rl.success) return rateLimited(res, rl);
+
+	const url = new URL(req.url, `http://${req.headers.host}`);
+	const agentId = url.searchParams.get('agent_id');
+	const avatarId = url.searchParams.get('avatar_id');
+	if (!agentId && !avatarId)
+		return error(res, 400, 'validation_error', 'agent_id or avatar_id required');
+	if (agentId && !isUuid(agentId)) return error(res, 404, 'not_found', 'agent not found');
+	if (avatarId && !isUuid(avatarId)) return error(res, 404, 'not_found', 'agent not found');
+
+	// All coins this agent has launched, newest first. The newest one stays the
+	// canonical `data` payload (stats, burns) for existing consumers; the full
+	// list ships alongside as `coins` for the agent-page launch history.
+	let rows;
+	if (agentId) {
+		rows = await sql`
+			select pam.id, pam.mint, pam.network, pam.name, pam.symbol,
+			       pam.buyback_bps, pam.agent_authority, pam.metadata_uri,
+			       pam.sharing_config, pam.created_at
+			from pump_agent_mints pam
+			where pam.agent_id=${agentId}
+			order by pam.created_at desc limit 50
+		`;
+	} else {
+		rows = await sql`
+			select pam.id, pam.mint, pam.network, pam.name, pam.symbol,
+			       pam.buyback_bps, pam.agent_authority, pam.metadata_uri,
+			       pam.sharing_config, pam.created_at
+			from pump_agent_mints pam
+			join agent_identities ai
+			  on ai.id = pam.agent_id and ai.deleted_at is null
+			where ai.avatar_id=${avatarId}
+			order by pam.created_at desc limit 50
+		`;
+	}
+	// Coins the agent launched on an EVM chain (Robinhood Chain through Pons)
+	// live in fixed_supply_launches. They join the history list, never `data`,
+	// whose payment and burn stats are pump.fun-mint specific.
+	const evmRows = await sql`
+		select f.mint, f.network, f.name, f.symbol, f.chain, f.venue, f.venue_url, f.image_url, f.created_at
+		from fixed_supply_launches f
+		${agentId ? sql`where f.agent_id = ${agentId}` : sql`join agent_identities ai on ai.id = f.agent_id and ai.deleted_at is null where ai.avatar_id = ${avatarId}`}
+		  and f.chain <> 'solana'
+		order by f.created_at desc limit 50
+	`;
+	const evmCoins = evmRows.map((r) => ({
+		mint: r.mint,
+		network: r.network,
+		name: r.name,
+		symbol: r.symbol,
+		buyback_bps: 0,
+		created_at: r.created_at,
+		chain: r.chain,
+		venue: r.venue,
+		venue_url: r.venue_url || null,
+		image_url: r.image_url || null,
+	}));
+	const [row] = rows;
+	if (!row) return json(res, 200, { data: null, coins: evmCoins });
+	const coins = rows
+		.map((r) => ({
+			mint: r.mint,
+			network: r.network,
+			name: r.name,
+			symbol: r.symbol,
+			buyback_bps: r.buyback_bps,
+			created_at: r.created_at,
+			chain: 'solana',
+		}))
+		.concat(evmCoins)
+		.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+
+	const [stats] = await sql`
+		select
+			count(*) filter (where status='confirmed')::int                      as confirmed_payments,
+			count(distinct payer_wallet) filter (where status='confirmed')::int  as unique_payers,
+			coalesce(sum(amount_atomics) filter (where status='confirmed'),0)::text as total_atomics,
+			max(confirmed_at) filter (where status='confirmed')                  as last_payment_at
+		from pump_agent_payments where mint_id=${row.id}
+	`;
+
+	// Every column here counts CONFIRMED runs only. `last_burn_at` used to take a
+	// bare max(created_at), so it reported the last time the buyback cron merely
+	// looked: an agent with 12k `skipped` rows and zero burns answered
+	// {runs: 0, total_burned: '0', last_burn_at: <minutes ago>}, and the dashboard
+	// and passport rendered "last burn" for a burn that never happened.
+	const [burnRow] = await sql`
+		select
+			count(*) filter (where status='confirmed')::int                       as runs,
+			coalesce(sum(burn_amount) filter (where status='confirmed'),0)::text  as total_burned,
+			max(created_at) filter (where status='confirmed')                     as last_burn_at
+		from pump_buyback_runs where mint_id=${row.id}
+	`;
+
+	// Burns feed (separate from payments feed): recent confirmed buyback runs
+	// for the dashboard / passport "🔥 burns" stream.
+	const burnsFeed = await sql`
+		select id, currency_mint, tx_signature, burn_amount, created_at
+		from pump_buyback_runs
+		where mint_id=${row.id} and status='confirmed'
+		order by created_at desc
+		limit 10
+	`;
+
+	return json(res, 200, {
+		data: {
+			...row,
+			stats: stats || { confirmed_payments: 0, unique_payers: 0, total_atomics: '0' },
+			burns: burnRow || { runs: 0, total_burned: '0' },
+			burns_feed: burnsFeed,
+		},
+		coins,
+	});
+}
+
+// ── quote ──────────────────────────────────────────────────────────────────
+
+async function handleQuote(req, res) {
+	if (cors(req, res, { methods: 'GET,OPTIONS', origins: '*' })) return;
+	if (!method(req, res, ['GET'])) return;
+
+	const rl = await limits.authedReadIp(clientIp(req));
+	if (!rl.success) return rateLimited(res, rl);
+
+	const url = new URL(req.url, `http://${req.headers.host}`);
+	const mintStr = url.searchParams.get('mint');
+	const network = url.searchParams.get('network') === 'devnet' ? 'devnet' : 'mainnet';
+	const direction = url.searchParams.get('direction') === 'sell' ? 'sell' : 'buy';
+	const solRaw = url.searchParams.get('sol');
+	const usdcRaw = url.searchParams.get('usdc');
+	const tokenRaw = url.searchParams.get('token');
+	const quoteMintRaw = url.searchParams.get('quote_mint');
+	const slippageRaw = url.searchParams.get('slippage_bps');
+	const slippageBps = Number.isFinite(Number(slippageRaw))
+		? Math.max(0, Math.min(5000, Number(slippageRaw)))
+		: 100;
+	// AMM SDK pricing takes slippage as a PERCENT (1 = 1%): pump-trade-args.js.
+	const slippagePct = slippagePercentFromBps(slippageBps);
+
+	const mint = solanaPubkey(mintStr);
+	if (!mint) return error(res, 400, 'validation_error', 'invalid mint');
+
+	try {
+		const { sdk, BN, web3 } = await getPumpSdk({ network });
+		const {
+			isLegacyQuoteMint,
+			getBuyTokenAmountFromSolAmount,
+			getSellSolAmountFromTokenAmount,
+		} = await import('@pump-fun/pump-sdk');
+		const LAMPORTS_PER_SOL_Q = web3.LAMPORTS_PER_SOL || 1_000_000_000;
+
+		// Fetch bonding curve: exposes on-chain quote_mint for V2 coins.
+		let curve = null;
+		try {
+			if (sdk.fetchBuyState) {
+				const state = await sdk.fetchBuyState(mint, mint);
+				curve = state.bondingCurve;
+			} else if (sdk.fetchBondingCurve) {
+				curve = await sdk.fetchBondingCurve(mint);
+			}
+		} catch {
+			curve = null;
+		}
+
+		// Resolve quoteMint: explicit param > on-chain curve field > WSOL fallback.
+		let quoteMintPk = quoteMintRaw
+			? solanaPubkey(quoteMintRaw)
+			: (curve?.quoteMint ?? solanaPubkey(WSOL_MINT));
+		if (!quoteMintPk) quoteMintPk = solanaPubkey(WSOL_MINT);
+		const isUsdcQuote = !isLegacyQuoteMint(quoteMintPk);
+		const USDC_DECIMALS = 1_000_000;
+
+		if (curve && !curve.complete) {
+			const global = typeof sdk.fetchGlobal === 'function' ? await sdk.fetchGlobal() : null;
+			const feeConfig =
+				typeof sdk.fetchFeeConfig === 'function'
+					? await sdk.fetchFeeConfig().catch(() => null)
+					: null;
+			let quote = null;
+
+			if (direction === 'buy') {
+				const quoteAmountRaw = isUsdcQuote ? usdcRaw : solRaw;
+				if (quoteAmountRaw) {
+					const quoteNum = Number(quoteAmountRaw);
+					if (!(quoteNum > 0))
+						return error(
+							res,
+							400,
+							'validation_error',
+							`${isUsdcQuote ? 'usdc' : 'sol'} must be > 0`,
+						);
+					const atomics = new BN(
+						isUsdcQuote
+							? Math.round(quoteNum * USDC_DECIMALS)
+							: Math.floor(quoteNum * LAMPORTS_PER_SOL_Q),
+					);
+					const tokens = getBuyTokenAmountFromSolAmount({
+						global,
+						feeConfig,
+						mintSupply: curve.tokenTotalSupply,
+						bondingCurve: curve,
+						amount: atomics,
+					});
+					quote = isUsdcQuote
+						? {
+								usdc_in: quoteNum,
+								tokens_out: tokens.toString(),
+								source: 'bonding_curve',
+							}
+						: {
+								sol_in: quoteNum,
+								tokens_out: tokens.toString(),
+								source: 'bonding_curve',
+							};
+				}
+			} else if (direction === 'sell' && tokenRaw) {
+				const tokens = new BN(tokenRaw);
+				const atomicsOut = getSellSolAmountFromTokenAmount({
+					global,
+					feeConfig,
+					mintSupply: curve.tokenTotalSupply,
+					bondingCurve: curve,
+					amount: tokens,
+				});
+				quote = isUsdcQuote
+					? {
+							tokens_in: tokenRaw,
+							usdc_out: Number(atomicsOut.toString()) / USDC_DECIMALS,
+							source: 'bonding_curve',
+						}
+					: {
+							tokens_in: tokenRaw,
+							sol_out: Number(atomicsOut.toString()) / LAMPORTS_PER_SOL_Q,
+							source: 'bonding_curve',
+						};
+			}
+
+			return json(res, 200, {
+				mint: mintStr,
+				network,
+				graduated: false,
+				// SOL curves store quoteMint as PublicKey.default: surface wSOL.
+				quote_mint: isUsdcQuote ? quoteMintPk.toString() : WSOL_MINT,
+				bonding_curve: {
+					real_quote_reserves:
+						curve.realQuoteReserves?.toString?.() ??
+						curve.realSolReserves?.toString?.() ??
+						null,
+					real_token_reserves: curve.realTokenReserves?.toString?.() ?? null,
+					virtual_quote_reserves:
+						curve.virtualQuoteReserves?.toString?.() ??
+						curve.virtualSolReserves?.toString?.() ??
+						null,
+					virtual_token_reserves: curve.virtualTokenReserves?.toString?.() ?? null,
+					complete: curve.complete ?? false,
+				},
+				platform_fee_bps: await effectivePumpFeeBps(),
+				quote,
+			});
+		}
+
+		// Post-graduation: canonical AMM pool. For USDC pairs use the quote-keyed PDA.
+		let amm;
+		try {
+			amm = await getAmmPoolState({
+				network,
+				mint,
+				quoteMint: isUsdcQuote ? quoteMintPk : null,
+			});
+		} catch (e) {
+			if (e.code === 'pool_not_found') {
+				return json(res, 200, {
+					mint: mintStr,
+					network,
+					graduated: true,
+					pool: null,
+					quote: null,
+					note: 'No bonding curve and no canonical AMM pool — token may not be a pump.fun mint or has not graduated yet',
+				});
+			}
+			throw e;
+		}
+
+		const {
+			pool,
+			poolKey,
+			baseReserve,
+			quoteReserve,
+			virtualQuoteReserves,
+			effectiveQuoteReserve,
+			baseMintAccount,
+			globalConfig,
+			feeConfig,
+		} = amm;
+		const ammSdk = await import('@pump-fun/pump-swap-sdk');
+		// Resolved pool quoteMint tells us the definitive quote currency.
+		const resolvedQuoteMintStr = pool.quoteMint?.toString?.() ?? quoteMintPk.toString();
+		const resolvedIsUsdc = resolvedQuoteMintStr !== WSOL_MINT;
+		const QUOTE_UNIT = resolvedIsUsdc ? USDC_DECIMALS : 1_000_000_000;
+		let quote = null;
+
+		if (direction === 'buy') {
+			const quoteRaw = resolvedIsUsdc ? usdcRaw : solRaw;
+			if (quoteRaw) {
+				const quoteNum = Number(quoteRaw);
+				if (!(quoteNum > 0))
+					return error(
+						res,
+						400,
+						'validation_error',
+						`${resolvedIsUsdc ? 'usdc' : 'sol'} must be > 0`,
+					);
+				const atomics = new BN(Math.round(quoteNum * QUOTE_UNIT));
+				const r = ammSdk.buyQuoteInput({
+					quote: atomics,
+					slippage: slippagePct,
+					baseReserve,
+					quoteReserve,
+					virtualQuoteReserves,
+					globalConfig,
+					baseMintAccount,
+					baseMint: pool.baseMint,
+					quoteMint: pool.quoteMint,
+					isMayhemMode: pool.isMayhemMode,
+					creatorFeeBps: pool.creatorFeeBps,
+					coinCreator: pool.coinCreator,
+					creator: pool.creator,
+					feeConfig,
+				});
+				// buyQuoteInput is a quote-input swap: slippage widens the max quote
+				// spend (maxQuote), not a token floor: surface that real bound.
+				const maxQuoteIn =
+					r.maxQuote != null ? Number(r.maxQuote.toString()) / QUOTE_UNIT : null;
+				quote = {
+					...(resolvedIsUsdc ? { usdc_in: quoteNum } : { sol_in: quoteNum }),
+					tokens_out: r.base?.toString?.() ?? null,
+					...(resolvedIsUsdc ? { max_usdc_in: maxQuoteIn } : { max_sol_in: maxQuoteIn }),
+					slippage_bps: slippageBps,
+					source: 'amm',
+				};
+			}
+		} else if (direction === 'sell' && tokenRaw) {
+			const tokens = new BN(tokenRaw);
+			const r = ammSdk.sellBaseInput({
+				base: tokens,
+				slippage: slippagePct,
+				baseReserve,
+				quoteReserve,
+				virtualQuoteReserves,
+				globalConfig,
+				baseMintAccount,
+				baseMint: pool.baseMint,
+				quoteMint: pool.quoteMint,
+				isMayhemMode: pool.isMayhemMode,
+				creatorFeeBps: pool.creatorFeeBps,
+				coinCreator: pool.coinCreator,
+				creator: pool.creator,
+				feeConfig,
+			});
+			const atomicsOut = r.uiQuote ?? r.minQuote;
+			const minAtomicsOut = r.minQuote ?? r.uiQuote;
+			const toUnit = (v) => (v != null ? Number(v.toString()) / QUOTE_UNIT : null);
+			quote = {
+				tokens_in: tokenRaw,
+				...(resolvedIsUsdc
+					? { usdc_out: toUnit(atomicsOut), min_usdc_out: toUnit(minAtomicsOut) }
+					: { sol_out: toUnit(atomicsOut), min_sol_out: toUnit(minAtomicsOut) }),
+				slippage_bps: slippageBps,
+				source: 'amm',
+			};
+		}
+
+		return json(res, 200, {
+			mint: mintStr,
+			network,
+			graduated: true,
+			quote_mint: resolvedQuoteMintStr,
+			pool: {
+				address: poolKey.toString(),
+				base: pool.baseMint.toString(),
+				quote: resolvedQuoteMintStr,
+				base_reserve: baseReserve.toString(),
+				quote_reserve: quoteReserve.toString(),
+				// Price against `effective_quote_reserve`, not `quote_reserve`:
+				// PumpSwap adds the pool's virtual quote reserves to the vault
+				// balance when quoting (non-zero on launchpad coins since
+				// 2026-07-20). The raw vault balance alone under-prices buys.
+				virtual_quote_reserves: virtualQuoteReserves.toString(),
+				effective_quote_reserve: effectiveQuoteReserve.toString(),
+				lp_supply: pool.lpSupply?.toString?.() ?? null,
+			},
+			platform_fee_bps: await effectivePumpFeeBps(),
+			quote,
+		});
+	} catch (err) {
+		return respondError(res, err.status || 502, err.code || 'pump_sdk_error', err);
+	}
+}
+
+// ── governance-prep ────────────────────────────────────────────────────────
+
+const governancePrepSchema = z.object({
+	mint: z.string().min(32).max(44),
+	authority_wallet: z.string().min(32).max(44),
+	new_buyback_bps: z.number().int().min(0).max(10_000),
+	network: z.enum(['mainnet', 'devnet']).default('mainnet'),
+});
+
+async function handleGovernancePrep(req, res) {
+	if (cors(req, res, { methods: 'POST,OPTIONS', credentials: true })) return;
+	if (!method(req, res, ['POST'])) return;
+
+	const user = await getSessionUser(req);
+	if (!user) return error(res, 401, 'unauthorized', 'sign in required');
+
+	const rl = await limits.authIp(clientIp(req));
+	if (!rl.success) return rateLimited(res, rl);
+
+	const body = parse(governancePrepSchema, await readJson(req));
+	const authority = solanaPubkey(body.authority_wallet);
+	if (!authority) return error(res, 400, 'validation_error', 'invalid authority_wallet');
+
+	const [row] = await sql`
+		select id, user_id, agent_authority from pump_agent_mints
+		where mint=${body.mint} and network=${body.network} limit 1
+	`;
+	if (!row) return error(res, 404, 'not_found', 'agent mint not registered');
+	if (row.user_id !== user.id) return error(res, 403, 'forbidden', 'not your agent');
+	if (row.agent_authority && row.agent_authority !== body.authority_wallet) {
+		return error(res, 403, 'forbidden', 'authority does not match');
+	}
+
+	const { offline } = await getPumpAgentOffline({ network: body.network, mint: body.mint });
+	const ix = await offline.updateBuybackBps(
+		{ authority, buybackBps: body.new_buyback_bps },
+		{}, // UpdateBuybackBpsOptions — empty default
+	);
+
+	const txBase64 = await buildUnsignedTxBase64({
+		network: body.network,
+		payer: authority,
+		instructions: [ix],
+	});
+
+	return json(res, 201, {
+		mint: body.mint,
+		network: body.network,
+		new_buyback_bps: body.new_buyback_bps,
+		tx_base64: txBase64,
+		instructions:
+			'Sign with the agent authority wallet, submit, then optionally PATCH the local row via /api/agents/:id to refresh display.',
+	});
+}
+
+// ── withdraw-prep ──────────────────────────────────────────────────────────
+
+const withdrawPrepSchema = z.object({
+	mint: z.string().min(32).max(44),
+	authority_wallet: z.string().min(32).max(44),
+	receiver_ata: z.string().min(32).max(44),
+	currency_mint: z.string().min(32).max(44).optional(),
+	currency_token_program: z.string().min(32).max(44).optional(),
+	network: z.enum(['mainnet', 'devnet']).default('mainnet'),
+});
+
+async function handleWithdrawPrep(req, res) {
+	if (cors(req, res, { methods: 'POST,OPTIONS', credentials: true })) return;
+	if (!method(req, res, ['POST'])) return;
+
+	const auth = await resolveAuth(req);
+	if (!auth) return error(res, 401, 'unauthorized', 'sign in required');
+
+	const rl = await limits.authIp(clientIp(req));
+	if (!rl.success) return rateLimited(res, rl);
+
+	const body = parse(withdrawPrepSchema, await readJson(req));
+	const authority = solanaPubkey(body.authority_wallet);
+	const receiverAta = solanaPubkey(body.receiver_ata);
+	if (!authority || !receiverAta) return error(res, 400, 'validation_error', 'invalid pubkeys');
+
+	const [row] = await sql`
+		select m.id, m.mint, m.user_id, m.agent_authority, m.network from pump_agent_mints m
+		where m.mint=${body.mint} and m.network=${body.network} limit 1
+	`;
+	if (!row) return error(res, 404, 'not_found', 'agent mint not registered');
+	if (row.user_id !== auth.userId) return error(res, 403, 'forbidden', 'not your agent');
+	if (row.agent_authority && row.agent_authority !== body.authority_wallet) {
+		return error(res, 403, 'forbidden', 'authority does not match');
+	}
+
+	const currencyStr =
+		body.currency_mint ||
+		(body.network === 'devnet' ? SOLANA_USDC_MINT_DEVNET : SOLANA_USDC_MINT);
+	const currency = solanaPubkey(currencyStr);
+	if (!currency) return error(res, 400, 'validation_error', 'invalid currency_mint');
+
+	// An unparseable token program used to be dropped silently, which built a tx
+	// against the default SPL program and only failed once the user had signed it.
+	// Reject it here instead, where the caller can still fix the request.
+	let tokenProgram;
+	if (body.currency_token_program) {
+		tokenProgram = solanaPubkey(body.currency_token_program);
+		if (!tokenProgram) {
+			return error(res, 400, 'validation_error', 'invalid currency_token_program');
+		}
+	}
+
+	const { offline } = await getPumpAgentOffline({
+		network: body.network,
+		mint: body.mint,
+	});
+
+	const ix = await offline.withdraw({
+		authority,
+		currencyMint: currency,
+		receiverAta,
+		...(tokenProgram ? { tokenProgram } : {}),
+	});
+
+	const txBase64 = await buildUnsignedTxBase64({
+		network: body.network,
+		payer: authority,
+		instructions: [ix],
+	});
+
+	return json(res, 201, {
+		mint: body.mint,
+		network: body.network,
+		currency_mint: currencyStr,
+		tx_base64: txBase64,
+	});
+}
+
+// ── withdraw-confirm ───────────────────────────────────────────────────────
+
+const withdrawConfirmSchema = z.object({
+	mint: z.string().min(32).max(44),
+	network: z.enum(['mainnet', 'devnet']).default('mainnet'),
+	tx_signature: z.string().min(80).max(100),
+});
+
+async function handleWithdrawConfirm(req, res) {
+	if (cors(req, res, { methods: 'POST,OPTIONS', credentials: true })) return;
+	if (!method(req, res, ['POST'])) return;
+
+	const auth = await resolveAuth(req);
+	if (!auth) return error(res, 401, 'unauthorized', 'sign in required');
+
+	const rl = await limits.authIp(clientIp(req));
+	if (!rl.success) return rateLimited(res, rl);
+
+	const body = parse(withdrawConfirmSchema, await readJson(req));
+
+	const [row] = await sql`
+		select id, mint, user_id, agent_authority, network from pump_agent_mints
+		where mint=${body.mint} and network=${body.network} limit 1
+	`;
+	if (!row) return error(res, 404, 'not_found', 'agent mint not registered');
+	if (row.user_id !== auth.userId) return error(res, 403, 'forbidden', 'not your agent');
+
+	let tx;
+	try {
+		tx = await verifySignature({ network: body.network, signature: body.tx_signature });
+	} catch (e) {
+		return error(res, e.status || 422, e.code || 'tx_failed', e.message);
+	}
+
+	// A versioned tx resolved through an address-lookup table can come back with
+	// its account list under a different shape; treat a missing list as "no match"
+	// rather than letting `.map` throw the whole confirm into a 500.
+	const accountKeys = (tx.transaction?.message?.accountKeys || []).map((k) =>
+		(k.pubkey || k).toString(),
+	);
+	if (!accountKeys.includes(body.mint)) {
+		return error(res, 422, 'mint_not_in_tx', 'mint not present in tx accounts');
+	}
+	if (row.agent_authority && !accountKeys.includes(row.agent_authority)) {
+		return error(res, 422, 'authority_not_in_tx', 'agent authority not present in tx');
+	}
+	// Account presence alone is not a payout: any succeeded transfer or memo that
+	// touches the mint and the authority satisfies it. Require that the
+	// agent-payments program actually ran before reporting a confirmed withdrawal.
+	if (!txInvokesAgentPaymentsProgram(tx)) {
+		return error(
+			res,
+			422,
+			'not_a_withdrawal',
+			'tx did not invoke the agent-payments program',
+		);
+	}
+
+	return json(res, 200, {
+		ok: true,
+		mint: body.mint,
+		network: body.network,
+		tx_signature: body.tx_signature,
+		slot: tx.slot ?? null,
+		block_time: tx.blockTime ?? null,
+	});
+}
+
+// ── strategy-backtest ──────────────────────────────────────────────────────
+
+async function resolveStrategyMints(invoke, strategy, explicit, limit) {
+	if (Array.isArray(explicit) && explicit.length) return explicit;
+	const scan = strategy?.scan ?? {};
+	if (scan.kind === 'mintList' && Array.isArray(scan.mints)) return scan.mints;
+	const tool = scan.kind === 'trending' ? 'pump-fun.getTrendingTokens' : 'pump-fun.getNewTokens';
+	const r = await invoke(tool, { limit: limit ?? scan.limit ?? 20 });
+	if (!r.ok) throw new Error(`scan failed: ${r.error}`);
+	const items = r.data?.tokens ?? r.data ?? [];
+	return items.map((t) => t.mint ?? t.address).filter(Boolean);
+}
+
+async function handleStrategyBacktest(req, res) {
+	if (cors(req, res, { methods: 'POST,OPTIONS', credentials: true })) return;
+	if (!method(req, res, ['POST'])) return;
+
+	const auth = await resolveAuth(req);
+	if (!auth) return error(res, 401, 'unauthorized', 'sign in required');
+
+	const rl = await limits.authedReadIp(clientIp(req));
+	if (!rl.success) return rateLimited(res, rl);
+
+	const body = await readJson(req);
+	if (!body?.strategy) return error(res, 400, 'validation_error', 'strategy required');
+	const network = body.network === 'devnet' ? 'devnet' : 'mainnet';
+
+	const rt = makeRuntime();
+
+	// Reject a semantically-broken spec up front with field-level issues, before
+	// sourcing mints or replaying: same validator the validate endpoint uses.
+	const vr = await rt.invoke('pump-fun-strategy.validateStrategy', {
+		strategy: body.strategy,
+		network,
+		mintInfo: await resolveStrategyMintInfo(body.strategy?.scan?.mints, network),
+	});
+	if (vr.data && !vr.data.valid) {
+		return error(res, 400, 'validation_error', vr.error || 'strategy is invalid', {
+			issues: vr.data.issues,
+			report: vr.data,
+		});
+	}
+
+	let mints;
+	try {
+		mints = await resolveStrategyMints(rt.invoke, body.strategy, body.mints, body.limit);
+	} catch (e) {
+		return respondError(res, 502, 'upstream_error', e);
+	}
+	if (!mints.length) return error(res, 422, 'no_candidates', 'no mints to backtest');
+
+	const { backtestStrategy } =
+		await import('../../examples/skills/pump-fun-strategy/handlers.js');
+	const result = await backtestStrategy(
+		{ strategy: body.strategy, mints, sinceMs: body.sinceMs ?? 0 },
+		{ skills: { invoke: rt.invoke }, memory: { note: () => {} } },
+	);
+	if (!result.ok) return error(res, 400, 'validation_error', result.error);
+	return json(res, 200, { data: { ...result.data, mintsUsed: mints } });
+}
+
+// ── strategy-close-all ─────────────────────────────────────────────────────
+
+async function handleStrategyCloseAll(req, res) {
+	if (cors(req, res, { methods: 'POST,OPTIONS', credentials: true })) return;
+	if (!method(req, res, ['POST'])) return;
+
+	const auth = await resolveAuth(req, { spend: true, kind: 'trade' });
+	if (!auth) return error(res, 401, 'unauthorized', 'sign in required');
+
+	const rl = await limits.authIp(clientIp(req));
+	if (!rl.success) return rateLimited(res, rl);
+
+	const body = await readJson(req);
+	if (!body?.agentId) return error(res, 400, 'validation_error', 'agentId required');
+	const network = body.network === 'devnet' ? 'devnet' : 'mainnet';
+
+	const [row] = await sql`
+		SELECT user_id, meta FROM agent_identities
+		WHERE id = ${body.agentId} AND deleted_at IS NULL
+	`;
+	if (!row) return error(res, 404, 'not_found', 'agent not found');
+	if (row.user_id !== auth.userId) return error(res, 403, 'forbidden', 'not your agent');
+	const enc = row.meta?.encrypted_solana_secret;
+	if (!enc) return error(res, 409, 'conflict', 'agent has no solana wallet');
+
+	const wallet = await loadWallet(enc, {
+		agentId: body.agentId,
+		userId: auth.userId,
+		reason: 'pump_close_all',
+	});
+	const rt = makeRuntime({
+		wallet,
+		agentId: body.agentId,
+		signerAddress: wallet.publicKey.toBase58(),
+		configOverrides: {
+			'pump-fun-trade': { rpc: RPC[network] },
+			'solana-wallet': { rpc: RPC[network] },
+		},
+	});
+
+	const { closeAllPositions } =
+		await import('../../examples/skills/pump-fun-strategy/handlers.js');
+	const result = await closeAllPositions(
+		{ mints: body.mints, simulate: !!body.simulate },
+		{ skills: { invoke: rt.invoke }, wallet, memory: { note: () => {} } },
+	);
+	if (!result.ok) return error(res, 400, 'sell_failed', result.error);
+	return json(res, 200, { data: result.data });
+}
+
+// ── strategy-run ───────────────────────────────────────────────────────────
+// SSE: manages its own response writes; routed before wrap() above.
+
+async function loadAgentWalletForStrategy(agentId, userId) {
+	const [row] = await sql`
+		SELECT user_id, meta FROM agent_identities
+		WHERE id = ${agentId} AND deleted_at IS NULL
+	`;
+	if (!row) throw Object.assign(new Error('agent not found'), { status: 404 });
+	if (row.user_id !== userId) throw Object.assign(new Error('not your agent'), { status: 403 });
+	const enc = row.meta?.encrypted_solana_secret;
+	if (!enc)
+		throw Object.assign(
+			new Error('agent has no solana wallet — provision via /api/agents/:id/solana'),
+			{ status: 409 },
+		);
+	const wallet = await loadWallet(enc, { agentId, userId, reason: 'pump_strategy' });
+	return { wallet, address: wallet.publicKey.toBase58(), meta: row.meta };
+}
+
+async function handleStrategyRun(req, res) {
+	if (cors(req, res, { methods: 'POST,OPTIONS', credentials: true })) return;
+	if (!method(req, res, ['POST'])) return;
+
+	const rl = await limits.authIp(clientIp(req));
+	if (!rl.success) return rateLimited(res, rl);
+
+	let body;
+	try {
+		body = await readJson(req);
+	} catch (e) {
+		return error(res, 400, 'validation_error', e.message);
+	}
+
+	if (!body?.strategy) return error(res, 400, 'validation_error', 'strategy required');
+	const durationSec = Math.max(5, Math.min(600, Number(body.durationSec) || 30));
+	const mode = body.mode === 'live' ? 'live' : 'simulate';
+	const network = body.network === 'devnet' ? 'devnet' : 'mainnet';
+
+	// Pre-flight semantic validation BEFORE switching to SSE, so a broken spec
+	// (or a quote-asset mismatch on a listed coin) is rejected with a clean JSON
+	// error rather than streaming a doomed run. Same validator the validate
+	// endpoint and the runner use: they cannot disagree.
+	{
+		const mintInfo = await resolveStrategyMintInfo(body.strategy?.scan?.mints, network);
+		const vr = await makeRuntime().invoke('pump-fun-strategy.validateStrategy', {
+			strategy: body.strategy,
+			network,
+			mintInfo,
+		});
+		if (vr.data && !vr.data.valid) {
+			return error(res, 400, 'validation_error', vr.error || 'strategy is invalid', {
+				issues: vr.data.issues,
+				report: vr.data,
+			});
+		}
+	}
+
+	let wallet = null,
+		walletAddress = null,
+		agentMeta = null,
+		agentOwnerId = null;
+	if (mode === 'live') {
+		// This handler is not behind wrap(), so a refusal thrown by resolveAuth
+		// (cross-site cookie, bearer without wallet:write) is answered here.
+		let auth;
+		try {
+			auth = await resolveAuth(req, { spend: true, kind: 'trade' });
+		} catch (e) {
+			return error(res, e.status || 403, e.code || 'forbidden', e.message);
+		}
+		if (!auth) return error(res, 401, 'unauthorized', 'sign in required for live mode');
+		if (!body.agentId)
+			return error(res, 400, 'validation_error', 'agentId required for live mode');
+		if (!(await requireRealFundsAgreement(req, res, { userId: auth.userId, network, context: 'pump-strategy-run' }))) return;
+		try {
+			const r = await loadAgentWalletForStrategy(body.agentId, auth.userId);
+			wallet = r.wallet;
+			walletAddress = r.address;
+			agentMeta = r.meta;
+			agentOwnerId = auth.userId;
+		} catch (e) {
+			return error(
+				res,
+				e.status ?? 500,
+				e.status === 409 ? 'conflict' : 'unauthorized',
+				e.message,
+			);
+		}
+	}
+
+	res.statusCode = 200;
+	res.setHeader('content-type', 'text/event-stream');
+	res.setHeader('cache-control', 'no-cache, no-transform');
+	res.setHeader('connection', 'keep-alive');
+	res.setHeader('access-control-allow-origin', '*');
+	const send = (event, data) => {
+		res.write(`event: ${event}\n`);
+		res.write(`data: ${JSON.stringify(data)}\n\n`);
+	};
+
+	let aborted = false;
+	req.on('close', () => {
+		aborted = true;
+	});
+
+	const spendGuard =
+		mode === 'live' ? createStrategySpendGuard({ agentId: body.agentId, meta: agentMeta, userId: agentOwnerId }) : null;
+	const rt = makeRuntime({
+		wallet,
+		agentId: mode === 'live' ? body.agentId : undefined,
+		signerAddress: walletAddress,
+		// Live buys are recorded by the spend reservation (finalizeSpend), so the
+		// runtime must not persist a second pumpfun.buy row for the same trade.
+		shouldPersist: (skillName, tag) => !(spendGuard && skillName === 'pump-fun-trade' && tag === 'pump-fun-trade:buy'),
+		configOverrides: {
+			'pump-fun-trade': { rpc: RPC[network] },
+			'solana-wallet': { rpc: RPC[network] },
+		},
+		onEvent: (e) => send('memory', e),
+	});
+
+	send('start', { durationSec, mode, network, walletAddress });
+
+	const { runStrategy } = await import('../../examples/skills/pump-fun-strategy/handlers.js');
+	const ctx = {
+		skills: { invoke: rt.invoke },
+		skillConfig: { defaultPollMs: Math.max(1500, Number(body.pollMs) || 3000) },
+		memory: { note: (tag, value) => send('memory', { tag, value }) },
+		wallet,
+	};
+
+	const policyGuard = spendGuard ? spendGuard.guard : null;
+	const policySettle = spendGuard ? spendGuard.settle : null;
+
+	const abortController = new AbortController();
+	req.on('close', () => abortController.abort());
+
+	try {
+		const result = await runStrategy(
+			{
+				strategy: body.strategy,
+				durationSec,
+				simulate: mode === 'simulate',
+				onLog: (entry) => {
+					if (!aborted) send('log', entry);
+				},
+				policyGuard,
+				policySettle,
+				abortSignal: abortController.signal,
+			},
+			ctx,
+		);
+		send('done', result.data);
+	} catch (e) {
+		send('error', { message: e.message });
+	}
+	res.end();
+}
+
+// ── live-stream ────────────────────────────────────────────────────────────
+// SSE: fans out the PumpPortal WebSocket feed to browser clients.
+// Routed before wrap() above. No auth; rate-limited by IP.
+
+const liveStreamKindSchema = z.enum(['all', 'mint', 'graduation']).default('all');
+
+async function handleLiveStream(req, res) {
+	if (cors(req, res, { methods: 'GET,OPTIONS', origins: '*' })) return;
+	if (!method(req, res, ['GET'])) return;
+
+	const rl = await limits.mcpIp(clientIp(req));
+	if (!rl.success) return rateLimited(res, rl);
+
+	const url = new URL(req.url, `http://${req.headers.host}`);
+	let kind;
+	try {
+		kind = liveStreamKindSchema.parse(url.searchParams.get('kind') ?? undefined);
+	} catch {
+		return error(res, 400, 'validation_error', 'kind must be all, mint, or graduation');
+	}
+
+	res.statusCode = 200;
+	res.setHeader('content-type', 'text/event-stream; charset=utf-8');
+	res.setHeader('cache-control', 'no-cache, no-transform');
+	res.setHeader('connection', 'keep-alive');
+	res.setHeader('x-accel-buffering', 'no');
+
+	// EventSource auto-reconnects when the stream ends; hint a 1s backoff so the
+	// rotation below is near-seamless rather than the browser's ~3s default.
+	res.write('retry: 1000\n\n');
+
+	const ping = setInterval(() => {
+		if (!res.writableEnded) res.write(': ping\n\n');
+	}, 15_000);
+
+	// Rotate the stream a few seconds BEFORE the Vercel function maxDuration
+	// (60s: see vercel.json → functions["api/pump/[action].js"]). Ending the
+	// response ourselves emits a clean `end` event and lets EventSource
+	// reconnect; letting Vercel hit the hard limit instead kills the function
+	// and logs a "Task timed out" error on every long-lived client connection.
+	const STREAM_BUDGET_MS = 55_000;
+	const maxDuration = setTimeout(() => {
+		clearInterval(ping);
+		stop?.();
+		if (!res.writableEnded) {
+			res.write(`event: end\ndata: ${JSON.stringify({ reason: 'rotate' })}\n\n`);
+			res.end();
+		}
+	}, STREAM_BUDGET_MS);
+
+	const stop = connectPumpFunFeed({
+		kind,
+		onEvent({ kind: evtKind, data }) {
+			if (!res.writableEnded) {
+				res.write(`event: ${evtKind}\ndata: ${JSON.stringify(data)}\n\n`);
+			}
+		},
+	});
+
+	req.on('close', () => {
+		clearInterval(ping);
+		clearTimeout(maxDuration);
+		stop();
+		if (!res.writableEnded) res.end();
+	});
+}
+
+// ── strategy-validate ──────────────────────────────────────────────────────
+
+// Resolve authoritative agent-coin facts (existence + quote pairing) for the
+// mints a strategy explicitly lists. pump_agent_mints is the only place a
+// three.ws coin's quote asset is reliably known (the on-chain bonding curve
+// read does not surface it). Returns a map keyed by mint, or null on DB error
+// (the handler then falls back to an on-chain existence probe).
+async function resolveStrategyMintInfo(mints, network) {
+	const listed = Array.isArray(mints)
+		? [...new Set(mints.filter((m) => typeof m === 'string' && m.trim()).map((m) => m.trim()))]
+		: [];
+	if (!listed.length) return null;
+	try {
+		const rows = await sql`
+			SELECT mint, quote_mint FROM pump_agent_mints
+			WHERE mint = ANY(${listed}) AND network = ${network}
+		`;
+		const info = {};
+		for (const row of rows) {
+			const q = classifyLaunchQuote({ quoteMint: row.quote_mint, network });
+			info[row.mint] = { isAgentCoin: true, quoteIsUsdc: q.isUsdc, quoteSymbol: q.label };
+		}
+		return info;
+	} catch (e) {
+		console.error('[strategy-validate] mint info lookup failed', e?.message);
+		return null;
+	}
+}
+
+async function handleStrategyValidate(req, res) {
+	if (cors(req, res, { methods: 'POST,OPTIONS', origins: '*' })) return;
+	if (!method(req, res, ['POST'])) return;
+
+	const rl = await limits.authedReadIp(clientIp(req));
+	if (!rl.success) return rateLimited(res, rl);
+
+	const body = await readJson(req);
+	if (!body?.strategy || typeof body.strategy !== 'object') {
+		return error(res, 400, 'validation_error', 'strategy required');
+	}
+	const network = body.network === 'devnet' ? 'devnet' : 'mainnet';
+
+	const mintInfo = await resolveStrategyMintInfo(body.strategy?.scan?.mints, network);
+
+	const rt = makeRuntime();
+	const r = await rt.invoke('pump-fun-strategy.validateStrategy', {
+		strategy: body.strategy,
+		network,
+		mintInfo,
+	});
+	const report = r.data ?? {
+		valid: false,
+		issues: [{ level: 'error', field: 'strategy', code: 'validate_failed', message: r.error || 'validation failed' }],
+		errorCount: 1,
+		warningCount: 0,
+	};
+	if (!report.valid) {
+		return error(res, 400, 'validation_error', r.error || 'strategy is invalid', {
+			issues: report.issues,
+			report,
+		});
+	}
+	return json(res, 200, { data: report });
+}
+
+// ── channel-feed ──────────────────────────────────────────────────────────────
+
+async function handleChannelFeed(req, res) {
+	if (cors(req, res, { methods: 'GET,OPTIONS', origins: '*' })) return;
+	if (!method(req, res, ['GET'])) return;
+	const rl = await limits.mcpIp(clientIp(req));
+	if (!rl.success) return rateLimited(res, rl);
+	const url = new URL(req.url, `http://${req.headers.host}`);
+	const limit = readLimit(url, 50, 200);
+	const kinds = url.searchParams.get('kinds') || null;
+	// `signal` is one of the four kinds buildFeed knows and the only one that
+	// carries agent attribution (which agent earned the reputation event, and how
+	// much it weighed). Leaving it out of the fan-out published a feed that could
+	// never answer ?kinds=signal, so the whole agent-attributed lane was invisible.
+	const { getMints, getWhales, getClaims, getSignals } = await import(
+		'../_lib/channel-feed-sources.js'
+	);
+	const { buildFeed } = await import('../../src/pump/channel-feed.js');
+	// buildFeed filters by kind after the fact; skipping the unrequested reads
+	// here keeps ?kinds=mint to one query instead of four. It ignores a `kinds`
+	// naming nothing valid and serves everything, so this must too, or the two
+	// halves disagree and a typo'd filter returns an empty feed.
+	const ALL_KINDS = ['mint', 'whale', 'claim', 'signal'];
+	const named = kinds
+		? kinds.split(',').map((k) => k.trim()).filter((k) => ALL_KINDS.includes(k))
+		: [];
+	const requested = named.length ? new Set(named) : null;
+	const wants = (kind) => !requested || requested.has(kind);
+	const [mints, whales, claims, signals] = await Promise.all([
+		wants('mint') ? getMints(limit) : [],
+		wants('whale') ? getWhales(limit) : [],
+		wants('claim') ? getClaims(limit) : [],
+		wants('signal') ? getSignals(limit) : [],
+	]);
+	const items = buildFeed(
+		[
+			{ kind: 'mint', items: mints },
+			{ kind: 'whale', items: whales },
+			{ kind: 'claim', items: claims },
+			{ kind: 'signal', items: signals },
+		],
+		{ limit, kinds },
+	);
+	return json(res, 200, { items });
+}
+
+// ── trending / search (proxies for the CORS-protected pump.fun frontend API) ──
+
+const PUMP_FRONTEND_BASE = 'https://frontend-api-v3.pump.fun';
+const TRENDING_CACHE = { at: 0, body: null };
+const TRENDING_TTL_MS = 15_000;
+
+// pump.fun hands back image URLs on the retired cf-ipfs.com gateway, which no
+// longer resolves in the browser. Repair the image fields onto a working
+// gateway before the feed reaches any client (play lobby, home card, etc.).
+function repairCoinImages(coins) {
+	if (!Array.isArray(coins)) return coins;
+	for (const c of coins) {
+		if (!c || typeof c !== 'object') continue;
+		if (c.image_uri) c.image_uri = normalizeGatewayURL(c.image_uri);
+		if (c.image) c.image = normalizeGatewayURL(c.image);
+		if (c.metadata_uri) c.metadata_uri = normalizeGatewayURL(c.metadata_uri);
+	}
+	return coins;
+}
+
+async function handleTrending(req, res) {
+	if (cors(req, res, { methods: 'GET,OPTIONS', origins: '*' })) return;
+	if (!method(req, res, ['GET'])) return;
+	const rl = await limits.mcpIp(clientIp(req));
+	if (!rl.success) return rateLimited(res, rl);
+	const now = Date.now();
+	if (TRENDING_CACHE.body && now - TRENDING_CACHE.at < TRENDING_TTL_MS) {
+		res.setHeader('cache-control', 'public, max-age=15');
+		return json(res, 200, TRENDING_CACHE.body);
+	}
+	const url = new URL(req.url, `http://${req.headers.host}`);
+	const limit = readLimit(url, 50, 100);
+	const upstream = new URL('/coins', PUMP_FRONTEND_BASE);
+	upstream.searchParams.set('offset', '0');
+	upstream.searchParams.set('limit', String(limit));
+	upstream.searchParams.set('sort', 'market_cap');
+	upstream.searchParams.set('order', 'DESC');
+	upstream.searchParams.set('includeNsfw', 'false');
+	let resp;
+	try {
+		resp = await fetch(upstream, {
+			headers: { accept: 'application/json' },
+			signal: AbortSignal.timeout(8000),
+		});
+	} catch {
+		// Upstream timeout/network blip: serve the last good list if we have one
+		// rather than 500-ing the trending feed.
+		if (TRENDING_CACHE.body) {
+			res.setHeader('cache-control', 'public, max-age=15');
+			return json(res, 200, TRENDING_CACHE.body);
+		}
+		return error(res, 504, 'upstream_timeout', 'pump.fun did not respond');
+	}
+	if (!resp.ok) return error(res, 502, 'upstream_failed', `pump.fun returned ${resp.status}`);
+	// pump.fun can answer 200 with an empty/truncated body; resp.json() then throws
+	// "Unexpected end of JSON input" → an unhandled 500. Fall back to the last good
+	// list (or an empty feed) instead of crashing.
+	let body;
+	try {
+		body = await resp.json();
+	} catch {
+		if (TRENDING_CACHE.body) {
+			res.setHeader('cache-control', 'public, max-age=15');
+			return json(res, 200, TRENDING_CACHE.body);
+		}
+		body = [];
+	}
+	const arr = repairCoinImages(
+		Array.isArray(body) ? body : Array.isArray(body?.coins) ? body.coins : [],
+	);
+	TRENDING_CACHE.at = now;
+	TRENDING_CACHE.body = arr;
+	res.setHeader('cache-control', 'public, max-age=15');
+	return json(res, 200, arr);
+}
+
+// ── coin ─────────────────────────────────────────────────────────────────────
+// Live metadata for a single mint, proxied from pump.fun's frontend API
+// (CORS-protected from the browser). Powers the /play lobby's pinned flagship
+// town so its name/symbol/art/market-cap are always real and current, even when
+// the coin isn't in the trending 30. Short-cached per mint to spare the upstream.
+
+const COIN_CACHE = new Map(); // mint → { at, body }
+const COIN_TTL_MS = 30_000;
+// Shared last-good tier: a cold instance holds no COIN_CACHE, and pump.fun's
+// frontend API rate-limits in windows longer than a request budget. The last
+// body a healthy fetch produced is served marked stale until pump.fun answers.
+const COIN_LKG_TTL_S = 24 * 3600;
+const coinLkgKey = (mint) => `pump:coin:lkg:${mint}`;
+
+// Third degrade tier for handleCoin, reached once both the in-memory cache and
+// the 24h last-known-good copy are empty: pump.fun's own metadata is gone, but
+// two real, first-party sources can still answer. Numeric/curve fields come
+// from the on-chain bonding-curve reader already proven live behind
+// /api/pump/curve (order 423); identity fields (name, symbol, creator) come
+// from pump_agent_mints, the platform's own launch registry, for any mint
+// three.ws itself launched. Neither source carries a stored image URL for a
+// curve launch, so `image`/`image_uri` stay null rather than guessing.
+// Returns null when neither source has anything, so the caller falls through
+// to the honest 502.
+async function fetchOnchainCoinDegrade(mint) {
+	let curveBody = null;
+	try {
+		const view = await getCurveView({ mint, network: 'mainnet' });
+		if (view?.httpStatus === 200 && view.body) curveBody = view.body;
+	} catch (err) {
+		console.warn('[pump/coin] on-chain curve fallback failed: %s', String(err?.message || err).slice(0, 160));
+	}
+
+	let dbRow = null;
+	try {
+		const rows = await sql`
+			select name, symbol, agent_authority from pump_agent_mints
+			where mint = ${mint} and network = 'mainnet'
+			limit 1
+		`;
+		dbRow = rows[0] || null;
+	} catch (err) {
+		console.warn('[pump/coin] pump_agent_mints lookup failed: %s', String(err?.message || err).slice(0, 160));
+	}
+
+	if (!curveBody && !dbRow) return null;
+
+	const curve = curveBody?.curve || null;
+	return {
+		mint,
+		name: dbRow?.name ?? null,
+		symbol: dbRow?.symbol ?? null,
+		image: null,
+		image_uri: null,
+		description: null,
+		creator: curve?.creator ?? dbRow?.agent_authority ?? null,
+		complete: curve ? Boolean(curve.complete) : curveBody?.graduated === true ? true : null,
+		usd_market_cap: curveBody?.graduatedPrice?.marketCapUsd ?? null,
+		virtual_token_reserves: curve?.virtualTokenReserves ?? null,
+		virtual_sol_reserves: curve?.virtualSolReserves ?? null,
+		real_token_reserves: curve?.realTokenReserves ?? null,
+		real_sol_reserves: curve?.realSolReserves ?? null,
+		total_supply: curve?.tokenTotalSupply ?? null,
+		metadataSource: dbRow ? 'platform' : 'onchain',
+	};
+}
+
+async function serveStaleCoin(res, mint, status, code, message) {
+	const hit = COIN_CACHE.get(mint) || (await cacheGet(coinLkgKey(mint)));
+	if (hit && hit.body && typeof hit.at === 'number') {
+		res.setHeader('cache-control', 'public, max-age=10');
+		res.setHeader('x-pump-stale', '1');
+		return json(res, 200, staleEnvelope(hit.body, hit.at));
+	}
+	const degraded = await fetchOnchainCoinDegrade(mint);
+	if (degraded) {
+		res.setHeader('cache-control', 'public, max-age=10');
+		res.setHeader('x-pump-degraded', 'onchain');
+		return json(res, 200, { ...degraded, stale: true, as_of: new Date().toISOString() });
+	}
+	res.setHeader('Retry-After', '15');
+	return error(res, status, code, message, { retry_after: 15 });
+}
+
+export async function handleCoin(req, res) {
+	if (cors(req, res, { methods: 'GET,OPTIONS', origins: '*' })) return;
+	if (!method(req, res, ['GET'])) return;
+	const rl = await limits.mcpIp(clientIp(req));
+	if (!rl.success) return rateLimited(res, rl);
+	const url = new URL(req.url, `http://${req.headers.host}`);
+	const mint = (url.searchParams.get('mint') || '').trim();
+	if (!MINT_RE.test(mint))
+		return error(res, 400, 'invalid_mint', 'mint must be a base58 address');
+	// `?miss=empty` is for callers with their own fallback (the coin-status
+	// widget reads the bonding curve next): an unindexed coin is an expected
+	// answer there, not an error, so it gets a 204 instead of a 404 that every
+	// browser prints to the console once per card on every refresh.
+	const softMiss = url.searchParams.get('miss') === 'empty';
+	const notFound = () => {
+		if (!softMiss) return error(res, 404, 'coin_not_found', 'no pump.fun coin for that mint');
+		res.setHeader('cache-control', 'public, max-age=60');
+		res.statusCode = 204;
+		return res.end();
+	};
+
+	const now = Date.now();
+	const hit = COIN_CACHE.get(mint);
+	if (hit && now - hit.at < COIN_TTL_MS) {
+		res.setHeader('cache-control', 'public, max-age=15');
+		return json(res, 200, hit.body);
+	}
+
+	// Bounded retry on 429/5xx with Retry-After honoured; never throws.
+	const r = await pumpFetchJson(new URL(`/coins/${mint}`, PUMP_FRONTEND_BASE).toString(), { timeoutMs: 8000 });
+	if (!r.ok) {
+		// pump.fun returns 200 with an empty body for an unknown/unmigrated mint;
+		// pumpFetchJson reports that as ok:false with the 200 status. That is a
+		// real "coin not found", not an outage, so it never falls to last-good.
+		if (r.status >= 200 && r.status < 300) return notFound();
+		if (r.status === 0) return serveStaleCoin(res, mint, 504, 'upstream_timeout', 'pump.fun did not respond');
+		if (r.status === 404) return notFound();
+		return serveStaleCoin(res, mint, 502, 'upstream_failed', `pump.fun returned ${r.status}`);
+	}
+	const parsed = r.body;
+	if (!parsed || typeof parsed !== 'object') return notFound();
+	const [body] = repairCoinImages([parsed]);
+	COIN_CACHE.set(mint, { at: now, body });
+	cacheSet(coinLkgKey(mint), { at: now, body }, COIN_LKG_TTL_S).catch(() => {});
+	res.setHeader('cache-control', 'public, max-age=15');
+	return json(res, 200, body);
+}
+
+// ── coin-trades ────────────────────────────────────────────────────────────
+// Recent buy/sell trades for a single mint, proxied from pump.fun's swap API
+// (CORS-protected from the browser). Powers the homepage live token card's
+// green/red flow. Covers both bonding-curve and migrated (AMM) trades.
+
+const PUMP_SWAP_BASE = 'https://swap-api.pump.fun';
+const MINT_RE = /^[1-9A-HJ-NP-Za-km-z]{32,44}$/;
+
+async function handleCoinTrades(req, res) {
+	if (cors(req, res, { methods: 'GET,OPTIONS', origins: '*' })) return;
+	if (!method(req, res, ['GET'])) return;
+	const rl = await limits.mcpIp(clientIp(req));
+	if (!rl.success) return rateLimited(res, rl);
+	const url = new URL(req.url, `http://${req.headers.host}`);
+	const mint = (url.searchParams.get('mint') || '').trim();
+	if (!MINT_RE.test(mint))
+		return error(res, 400, 'invalid_mint', 'mint must be a base58 address');
+	const limit = readLimit(url, 30, 100);
+	const upstream = `${PUMP_SWAP_BASE}/v2/coins/${mint}/trades?limit=${limit}`;
+	// "Recent trades" is a soft, continuously-polled feed (the homepage live card
+	// re-fetches every ~4s). A transient pump.fun swap-API blip means "no new data
+	// right now", not a hard error: so degrade to an empty 200 with `no-store`
+	// rather than a 5xx the browser console logs on every poll. The next poll
+	// retries immediately and the card recovers the moment upstream is back.
+	const stale = (extra = {}) => {
+		res.setHeader('cache-control', 'no-store');
+		return json(res, 200, { mint, trades: [], stale: true, ...extra });
+	};
+	let resp;
+	try {
+		resp = await fetch(upstream, {
+			headers: { accept: 'application/json' },
+			signal: AbortSignal.timeout(8000),
+		});
+	} catch {
+		return stale({ reason: 'upstream_timeout' });
+	}
+	if (!resp.ok) return stale({ reason: `upstream_${resp.status}` });
+	let body;
+	try {
+		body = await resp.json();
+	} catch {
+		return stale({ reason: 'upstream_unparseable' });
+	}
+	const raw = Array.isArray(body) ? body : Array.isArray(body?.trades) ? body.trades : [];
+	const trades = raw
+		.map((t) => {
+			const solAmount = Number(t.amountSol);
+			const usdAmount = t.amountUsd != null ? Number(t.amountUsd) : null;
+			// pump.fun v2 USDC-paired coins report the quote spend on amountQuote/
+			// amountUsdc rather than amountSol. Surface whichever quote the upstream
+			// used (with a stable symbol) so USDC trades are no longer silently
+			// dropped by a SOL-only filter or shown as a misleading 0 SOL.
+			const usdcRaw = t.amountQuote ?? t.amountUsdc ?? null;
+			const isUsdcQuote = usdcRaw != null && (!isFinite(solAmount) || solAmount === 0);
+			const quoteSymbol = isUsdcQuote ? 'USDC' : 'SOL';
+			const quoteAmount = isUsdcQuote
+				? Number(usdcRaw)
+				: isFinite(solAmount)
+					? solAmount
+					: null;
+			return {
+				tx: t.tx,
+				timestamp: t.timestamp,
+				user: t.userAddress || t.user || null,
+				is_buy: String(t.type).toLowerCase() === 'buy',
+				sol_amount: isFinite(solAmount) ? solAmount : null,
+				quote_symbol: quoteSymbol,
+				quote_amount: quoteAmount,
+				usd_amount: usdAmount,
+				price_usd: t.priceUsd != null ? Number(t.priceUsd) : null,
+			};
+		})
+		.filter(
+			(t) =>
+				t.tx &&
+				((t.quote_amount != null && t.quote_amount > 0) ||
+					(t.usd_amount != null && t.usd_amount > 0)),
+		);
+	res.setHeader('cache-control', 'public, max-age=3');
+	return json(res, 200, { mint, trades });
+}
+
+async function handleSearch(req, res) {
+	if (cors(req, res, { methods: 'GET,OPTIONS', origins: '*' })) return;
+	if (!method(req, res, ['GET'])) return;
+	const rl = await limits.mcpIp(clientIp(req));
+	if (!rl.success) return rateLimited(res, rl);
+	const url = new URL(req.url, `http://${req.headers.host}`);
+	const q = (url.searchParams.get('q') || '').trim();
+	if (!q) return json(res, 200, []);
+	const upstream = new URL('/coins', PUMP_FRONTEND_BASE);
+	upstream.searchParams.set('searchTerm', q);
+	upstream.searchParams.set('offset', '0');
+	upstream.searchParams.set('limit', '30');
+	upstream.searchParams.set('sort', 'market_cap');
+	upstream.searchParams.set('order', 'DESC');
+	upstream.searchParams.set('includeNsfw', 'false');
+	const searchLkgKey = `pump:search:lkg:${q.toLowerCase()}`;
+	// Bounded retry on 429/5xx with Retry-After honoured; never throws. A 200
+	// with an empty/truncated body reports ok:false with a 2xx status, which is
+	// "no results", not an outage.
+	const r = await pumpFetchJson(upstream.toString(), { timeoutMs: 8000 });
+	if (!r.ok) {
+		if (r.status >= 200 && r.status < 300) return json(res, 200, []);
+		// Outage or rate-limit window: the last result set this query produced
+		// beats both a 502 and a misleading empty list.
+		const lkg = await cacheGet(searchLkgKey);
+		if (lkg && Array.isArray(lkg.rows) && typeof lkg.at === 'number') {
+			res.setHeader('x-pump-stale', '1');
+			return json(res, 200, lkg.rows, { 'x-pump-as-of': new Date(lkg.at).toISOString() });
+		}
+		if (r.status === 0) return json(res, 200, []);
+		res.setHeader('Retry-After', '15');
+		return error(res, 502, 'upstream_failed', `pump.fun returned ${r.status}`, { retry_after: 15 });
+	}
+	const body = r.body;
+	const arr = repairCoinImages(
+		Array.isArray(body) ? body : Array.isArray(body?.coins) ? body.coins : [],
+	);
+	if (arr.length) cacheSet(searchLkgKey, { rows: arr, at: Date.now() }, 3600).catch(() => {});
+	return json(res, 200, arr);
+}
+
+// ── deliver-telegram ──────────────────────────────────────────────────────────
+
+const _deliverSchema = z.object({
+	chatId: z.union([z.string(), z.number()]),
+	signal: z.object({
+		kind: z.enum(['mint', 'whale', 'claim', 'graduation']),
+		mint: z.string(),
+		summary: z.string(),
+		refs: z.array(z.string()).optional(),
+		ts: z.number().optional(),
+	}),
+});
+
+async function handleDeliverTelegram(req, res) {
+	if (cors(req, res, { methods: 'POST,OPTIONS', credentials: true })) return;
+	if (!method(req, res, ['POST'])) return;
+	const auth = await resolveAuth(req);
+	if (!auth) return error(res, 401, 'unauthorized', 'sign in required');
+	// This speaks under the platform's verified bot identity, so an authenticated
+	// caller still gets a per-IP ceiling: without one, a single account turns the
+	// bot into a spam/phishing relay one POST at a time.
+	const rl = await limits.authIp(clientIp(req));
+	if (!rl.success) return rateLimited(res, rl, 'too many delivery requests');
+	const botToken = process.env.TELEGRAM_BOT_TOKEN;
+	// An absent bot token is a deployment gap, not a server fault: 503 +
+	// not_configured is what every sibling handler answers, and it tells a client
+	// to stop retrying rather than to report a bug.
+	if (!botToken)
+		return error(res, 503, 'not_configured', 'Telegram delivery is not configured');
+	const raw = await readJson(req);
+	const { chatId, signal } = parse(_deliverSchema, raw);
+	const { sendTelegramSignal } = await import('../../src/pump/telegram-delivery.js');
+	const result = await sendTelegramSignal({ botToken, chatId, signal });
+	return json(res, 200, result);
+}
+
+// ── first-claims ──────────────────────────────────────────────────────────────
+
+import { scanFirstClaims } from '../_lib/pump-claims.js';
+
+// ── recent-graduations ───────────────────────────────────────────────────────
+//
+// Returns the most-recent enriched graduation events as a single JSON payload.
+// The page calls this once on load to backfill the feed before it opens an
+// SSE connection. Reads from Postgres if available, falls back to the WS
+// feed's in-process ring buffer (covers cold starts before the first migration
+// arrives, plus dev environments without a DB).
+
+async function handleRecentGraduations(req, res) {
+	if (cors(req, res, { methods: 'GET,OPTIONS', origins: '*' })) return;
+	if (!method(req, res, ['GET'])) return;
+	const rl = await limits.mcpIp(clientIp(req));
+	if (!rl.success) return rateLimited(res, rl);
+	const url = new URL(req.url, 'http://x');
+	const limit = Math.max(1, Math.min(100, Number(url.searchParams.get('limit')) || 20));
+	try {
+		const { recentGraduations } = await import('../_lib/pumpfun-ws-feed.js');
+		const items = await recentGraduations({ limit });
+		return json(res, 200, { items }, { 'cache-control': 'public, max-age=5' });
+	} catch (err) {
+		console.warn('[recent-graduations] failed:', err?.message);
+		return json(res, 200, { items: [] });
+	}
+}
+
+async function handleFirstClaims(req, res) {
+	if (cors(req, res, { methods: 'GET,OPTIONS', origins: '*' })) return;
+	if (!method(req, res, ['GET'])) return;
+	const rl = await limits.mcpIp(clientIp(req));
+	if (!rl.success) return rateLimited(res, rl);
+	const url = new URL(req.url, 'http://x');
+	const limit = Math.max(1, Math.min(50, Number(url.searchParams.get('limit')) || 50));
+	let sinceTs;
+	if (url.searchParams.has('sinceTs')) {
+		sinceTs = Number(url.searchParams.get('sinceTs'));
+	} else {
+		const sinceMinutes = Math.max(
+			1,
+			Math.min(1440, Number(url.searchParams.get('sinceMinutes')) || 60),
+		);
+		sinceTs = Math.floor(Date.now() / 1000) - sinceMinutes * 60;
+	}
+	if (!Number.isFinite(sinceTs) || sinceTs <= 0)
+		return error(res, 400, 'validation_error', 'invalid sinceTs');
+	const items = await scanFirstClaims({ sinceTs, limit });
+	return json(res, 200, { items });
+}
+
+
+// ── vanity-keygen (SSE) ───────────────────────────────────────────────────────
+
+async function handleVanityKeygen(req, res) {
+	if (cors(req, res, { methods: 'POST,OPTIONS', credentials: true })) return;
+	if (req.method !== 'POST') {
+		res.setHeader('allow', 'POST');
+		return error(res, 405, 'method_not_allowed', 'method POST required');
+	}
+	const auth = await resolveAuth(req);
+	if (!auth) return error(res, 401, 'unauthorized', 'sign in required');
+	const rl = await limits.mcpIp(clientIp(req));
+	if (!rl.success) return rateLimited(res, rl);
+	let body;
+	try {
+		body = await readJson(req);
+	} catch (e) {
+		return error(res, e.status || 400, 'bad_request', e.message);
+	}
+	const { suffix = '', prefix = '', caseSensitive = false, maxAttempts = 5_000_000 } = body || {};
+	if (!suffix && !prefix)
+		return error(res, 400, 'validation_error', 'at least one of suffix or prefix is required');
+	res.statusCode = 200;
+	res.setHeader('content-type', 'text/event-stream; charset=utf-8');
+	res.setHeader('cache-control', 'no-store');
+	res.setHeader('connection', 'keep-alive');
+	res.setHeader('x-accel-buffering', 'no');
+	const ac = new AbortController();
+	const timeout = setTimeout(() => {
+		ac.abort();
+		_sse(res, 'error', {
+			error: 'request_timeout',
+			error_description: 'vanity search exceeded 60 s limit',
+		});
+		res.statusCode = 408;
+		res.end();
+	}, 60_000);
+	req.on('close', () => ac.abort());
+	const progressInterval = setInterval(() => {
+		if (ac.signal.aborted) return clearInterval(progressInterval);
+		_sse(res, 'progress', { elapsed: Date.now() });
+	}, 2_000);
+	try {
+		const { generateVanityKey } = await import('../../src/pump/vanity-keygen.js');
+		const _bs58 = (await import('bs58')).default;
+		const result = await generateVanityKey({
+			suffix,
+			prefix,
+			caseSensitive,
+			maxAttempts,
+			signal: ac.signal,
+		});
+		clearTimeout(timeout);
+		clearInterval(progressInterval);
+		if (!result)
+			_sse(res, 'error', {
+				error: 'max_attempts_reached',
+				error_description: `no match found in ${maxAttempts} attempts`,
+			});
+		else
+			_sse(res, 'result', {
+				publicKey: result.publicKey,
+				secretKey: _bs58.encode(result.secretKey),
+				attempts: result.attempts,
+				ms: result.ms,
+			});
+	} catch (err) {
+		clearTimeout(timeout);
+		clearInterval(progressInterval);
+		if (!res.writableEnded)
+			_sse(res, 'error', {
+				error: 'internal_error',
+				error_description: err.message || 'unexpected error',
+			});
+	} finally {
+		if (!res.writableEnded) res.end();
+	}
+}
+
+// ── launch-config ──────────────────────────────────────────────────────────
+// What a launch will cost and which transaction formats it can use, read live
+// so the /launch preview never quotes a fee the transaction will not take.
+
+async function handleLaunchConfig(req, res) {
+	if (cors(req, res, { methods: 'GET,OPTIONS', origins: '*' })) return;
+	if (!method(req, res, ['GET'])) return;
+
+	const rl = await limits.authedReadIp(clientIp(req));
+	if (!rl.success) return rateLimited(res, rl);
+
+	const url = new URL(req.url, `http://${req.headers.host}`);
+	const network = url.searchParams.get('network') === 'devnet' ? 'devnet' : 'mainnet';
+	const [recipient, txV1, tradeFeeBps, econ] = await Promise.all([
+		pumpFeeRecipient(),
+		transactionV1Status({ network }),
+		effectivePumpFeeBps(),
+		getLaunchEconomics(),
+	]);
+	// Gasless availability for the caller when signed in; the platform-level
+	// blockers (paused, sponsor floor, platform cap) for everyone else.
+	const session = await getSessionUser(req).catch(() => null);
+	const gasless = await gaslessEligibility({ userId: session?.id || null, network, econ }).catch((err) => ({
+		eligible: false,
+		reasons: [{ code: 'unavailable', message: err?.message || 'gasless eligibility could not be read' }],
+	}));
+
+	res.setHeader('cache-control', session ? 'private, no-store' : 'public, max-age=60');
+	return json(res, 200, {
+		data: {
+			network,
+			launch_fee_bps: recipient ? pumpLaunchFeeBps() : 0,
+			launch_fee_basis: 'dev_buy',
+			fee_recipient: recipient ? recipient.toBase58() : null,
+			trade_fee_bps: tradeFeeBps,
+			create_cost_sol_estimate: 0.022,
+			max_sol_buy_in: 50,
+			buyback_available: pumpAgentBuybackAvailable(),
+			tx_v1: txV1,
+			economics: {
+				...econ,
+				standard_explanation: describeFeeSplit(econ, { gasless: false }),
+				gasless_explanation: describeFeeSplit(econ, { gasless: true }),
+			},
+			gasless,
+		},
+	});
+}
+
+// ── my-coins ───────────────────────────────────────────────────────────────
+// Every coin the signed-in user launched through three.ws, grouped by the
+// on-chain creator that earns its rewards, with the live unclaimed balance per
+// creator. pump.fun pools creator fees per creator wallet (not per coin), so a
+// claim is per wallet and sweeps every coin that wallet created.
+
+const PUMP_QUOTE_LABELS = {
+	So11111111111111111111111111111111111111112: { symbol: 'SOL', decimals: 9 },
+	EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v: { symbol: 'USDC', decimals: 6 },
+	'4zMMC9srt5Ri5X14GAgXhaHii3GnPAEERYPJgZJDncDU': { symbol: 'USDC', decimals: 6 },
+};
+
+// ── unswept creator fees ───────────────────────────────────────────────────
+// v3 bonding-curve and v2 PumpSwap trades (pump-sdk 4.0) leave the creator fee
+// on the curve or in the pool until a permissionless sweep moves it into the
+// creator vault. Every claim below sweeps first, so it collects those fees in
+// the same transaction, and every balance counts what is still waiting there.
+
+const SOL_QUOTE_MINT = 'So11111111111111111111111111111111111111112';
+// Room for the compute-budget instructions submitProtected adds to a send.
+const PROTECTED_SEND_RESERVE_BYTES = 120;
+
+// Coins a creator wallet launched through three.ws, plus any the caller named.
+async function creatorCoinMints(creator, network, extra = []) {
+	const rows = await sql`
+		select mint from pump_agent_mints
+		where agent_authority = ${creator} and network = ${network}
+		order by created_at desc
+		limit 500
+	`;
+	return [...new Set([...rows.map((r) => r.mint), ...extra])];
+}
+
+// Sweeps (largest first) and the extra quote mints for one creator's collect.
+// A failed chain read degrades to a vault-only claim instead of no claim.
+async function prepareCreatorSweeps(connection, { creator, mints, payer, solOnly }) {
+	const empty = { sweeps: [], swept: [], legs: [], extraQuoteMints: [] };
+	if (!mints.length) return empty;
+	try {
+		const buckets = await readCreatorFeeBuckets(connection, mints);
+		const legs = unsweptCreatorFees(buckets.values(), creator).filter(
+			(l) => !solOnly || l.quoteMint === SOL_QUOTE_MINT,
+		);
+		const { instructions, swept } = await creatorFeeSweepInstructions(connection, { legs, payer });
+		return { sweeps: instructions, swept, legs, extraQuoteMints: creatorExtraQuoteMints(buckets.values(), creator) };
+	} catch (e) {
+		console.warn('[pump] creator-fee bucket read failed, collecting the vault only', creator, e?.message);
+		return empty;
+	}
+}
+
+// The first `count` swept legs, as the claim responses report them.
+function sweptReport(swept, count) {
+	return swept.slice(0, count).map((l) => ({
+		mint: l.mint,
+		source: l.source,
+		quote_mint: l.quoteMint,
+		amount: l.amount.toString(),
+	}));
+}
+
+// Every nonzero creator-fee bucket on one coin, swept to whoever it belongs to:
+// the programs refuse a distribution, CTO or fee-sharing change while one is
+// nonzero (CreatorFeesNotSwept), so these go first in the same transaction.
+async function coinSweepInstructions(connection, mintPk, payer) {
+	const buckets = await readCreatorFeeBuckets(connection, [mintPk.toBase58()]);
+	const { instructions } = await creatorFeeSweepInstructions(connection, {
+		legs: unsweptCreatorFees(buckets.values()),
+		payer,
+	});
+	return instructions;
+}
+
+// The quote mint and payer buildDistributeCreatorFeesInstructions needs: with
+// the payer it also sweeps the pool bucket, with the quote mint it finds a
+// token-quoted coin's pool and vaults instead of treating it as SOL.
+async function distributeOptions(onlineSdk, mintPk, payer) {
+	const { normalizeQuoteMint } = await import('@pump-fun/pump-sdk');
+	const curve = await onlineSdk.fetchBondingCurve(mintPk).catch(() => null);
+	return curve ? { payer, quoteMint: normalizeQuoteMint(curve.quoteMint) } : { payer };
+}
+
+// One creator's waiting rewards per quote mint: the vaults plus the fees still
+// on that creator's curves and pools, which the claim sweeps in first.
+async function creatorRewardBalances(connection, creator, buckets) {
+	const { OnlinePumpSdk } = await import('@pump-fun/pump-sdk');
+	const list = [...buckets.values()];
+	const pending = sumByQuote(unsweptCreatorFees(list, creator));
+	const rows = await new OnlinePumpSdk(connection).getCreatorVaultQuoteBalances(
+		new PublicKey(creator),
+		creatorExtraQuoteMints(list, creator),
+	);
+	const byMint = new Map(rows.map((r) => [r.mint.toBase58(), BigInt(r.total.toString())]));
+	for (const mint of pending.keys()) if (!byMint.has(mint)) byMint.set(mint, 0n);
+	return [...byMint.entries()]
+		.map(([mint, vault]) => {
+			const label = PUMP_QUOTE_LABELS[mint] || { symbol: `${mint.slice(0, 4)}…`, decimals: null };
+			const unswept = pending.get(mint) || 0n;
+			const total = vault + unswept;
+			return {
+				mint,
+				symbol: label.symbol,
+				amount: total.toString(),
+				amount_ui: label.decimals == null ? null : Number(total) / 10 ** label.decimals,
+				unswept: unswept.toString(),
+			};
+		})
+		.filter((r) => r.amount !== '0');
+}
+
+async function handleMyCoins(req, res) {
+	if (cors(req, res, { methods: 'GET,OPTIONS', credentials: true })) return;
+	if (!method(req, res, ['GET'])) return;
+
+	const user = await getSessionUser(req);
+	if (!user) return error(res, 401, 'unauthorized', 'sign in required');
+
+	const rl = await limits.authedReadIp(clientIp(req));
+	if (!rl.success) return rateLimited(res, rl);
+
+	const url = new URL(req.url, `http://${req.headers.host}`);
+	const network = url.searchParams.get('network') === 'devnet' ? 'devnet' : 'mainnet';
+
+	const [rows, linked] = await Promise.all([
+		sql`
+			select pam.mint, pam.name, pam.symbol, pam.created_at, pam.agent_authority,
+			       pam.sharing_config, pam.quote_mint,
+			       ai.id as agent_id, ai.name as agent_name, ai.avatar_id,
+			       ai.meta->>'solana_address' as agent_wallet,
+			       a.thumbnail_key
+			from pump_agent_mints pam
+			left join agent_identities ai on ai.id = pam.agent_id and ai.deleted_at is null
+			left join avatars a on a.id = ai.avatar_id and a.deleted_at is null
+			where pam.user_id = ${user.id} and pam.network = ${network}
+			order by pam.created_at desc
+			limit 200
+		`,
+		sql`select address from user_wallets where user_id = ${user.id} and chain_type = 'solana'`,
+	]);
+	const linkedSet = new Set(linked.map((w) => w.address));
+	const { holderRewardsPda } = await import('@pump-fun/pump-sdk');
+
+	const coins = [];
+	const creators = new Map(); // address -> wallet group
+	for (const r of rows) {
+		const creator = r.agent_authority;
+		let route;
+		const shared = r.sharing_config && Array.isArray(r.sharing_config.shareholders) && r.sharing_config.shareholders.length > 0;
+		if (shared) route = 'shared';
+		else if (!creator) route = 'unknown';
+		else if (holderRewardsPda(new PublicKey(r.mint)).toBase58() === creator) route = 'holders';
+		else if (r.agent_wallet && r.agent_wallet === creator) route = 'agent';
+		else if (linkedSet.has(creator)) route = 'wallet';
+		else route = 'external';
+
+		coins.push({
+			mint: r.mint,
+			name: r.name,
+			symbol: r.symbol,
+			created_at: r.created_at,
+			quote_mint: r.quote_mint,
+			creator,
+			reward_route: route,
+			agent: r.agent_id
+				? {
+						id: r.agent_id,
+						name: r.agent_name,
+						avatar_id: r.avatar_id,
+						thumbnail_url: thumbnailUrl(r.thumbnail_key),
+					}
+				: null,
+		});
+
+		if (route !== 'agent' && route !== 'wallet') continue;
+		if (!creators.has(creator)) {
+			creators.set(creator, {
+				address: creator,
+				kind: route,
+				agent: route === 'agent' ? { id: r.agent_id, name: r.agent_name } : null,
+				// The agent claim endpoint authorizes through one of the agent's coins.
+				claim_mint: r.mint,
+				coins: [],
+				rewards: [],
+				balance_error: null,
+			});
+		}
+		creators.get(creator).coins.push(r.mint);
+	}
+
+	const connection = getConnection({ network });
+	const claimMints = [...creators.values()].flatMap((g) => g.coins);
+	const buckets = claimMints.length
+		? await readCreatorFeeBuckets(connection, claimMints).catch((e) => {
+				console.warn('[pump/my-coins] fee bucket read failed', e?.message);
+				return new Map();
+			})
+		: new Map();
+	await Promise.all(
+		[...creators.values()].map(async (group) => {
+			try {
+				group.rewards = await creatorRewardBalances(connection, group.address, buckets);
+			} catch (e) {
+				group.balance_error = isRpcOutageError(e) ? 'rpc_unavailable' : 'balance_read_failed';
+				console.warn('[pump/my-coins] vault read failed', group.address, e?.message);
+			}
+		}),
+	);
+
+	return json(res, 200, {
+		data: { network, coins, wallets: [...creators.values()] },
+	});
+}
+
+// ── collect-creator-fee-prep ───────────────────────────────────────────────
+// Builds the tx for the coin creator to collect accrued creator fees from the
+// pump.fun fee vault into their own wallet.
+// Docs: https://github.com/pump-fun/pump-public-docs/blob/main/docs/instructions/COLLECT_CREATOR_FEE.md
+
+const collectCreatorFeePrepSchema = z.object({
+	// The on-chain creator address registered for the coin.
+	creator_address: z.string().min(32).max(44),
+	// The wallet that will sign (and receive fees). Must match creator_address.
+	wallet_address: z.string().min(32).max(44),
+	network: z.enum(['mainnet', 'devnet']).default('mainnet'),
+	// Sweep every quote mint (SOL plus USDC and any other listed quote) instead
+	// of SOL alone, so a USDC-paired coin's rewards are claimable too.
+	all_quotes: z.boolean().default(false),
+	// Coins this creator made outside three.ws whose curve or pool fees should be
+	// swept in too. Coins launched here are found from the launch records.
+	mints: z.array(z.string().min(32).max(44)).max(50).default([]),
+	transaction_version: z.union([z.literal('auto'), z.literal(0), z.literal(1)]).default('auto'),
+	v1_capable: z.boolean().default(false),
+});
+
+async function handleCollectCreatorFeePrep(req, res) {
+	if (cors(req, res, { methods: 'POST,OPTIONS', credentials: true })) return;
+	if (!method(req, res, ['POST'])) return;
+
+	const user = await getSessionUser(req);
+	if (!user) return error(res, 401, 'unauthorized', 'sign in required');
+
+	const rl = await limits.authIp(clientIp(req));
+	if (!rl.success) return rateLimited(res, rl);
+
+	const body = parse(collectCreatorFeePrepSchema, await readJson(req));
+	const creatorPk = solanaPubkey(body.creator_address);
+	const feePayer = solanaPubkey(body.wallet_address);
+	if (!creatorPk || !feePayer) return error(res, 400, 'validation_error', 'invalid pubkeys');
+
+	try {
+		const { connection } = await getPumpSdk({ network: body.network });
+		const { OnlinePumpSdk } = await import('@pump-fun/pump-sdk');
+		const onlineSdk = new OnlinePumpSdk(connection);
+		const extraMints = body.mints.filter((m) => solanaPubkey(m));
+		const prep = await prepareCreatorSweeps(connection, {
+			creator: creatorPk.toBase58(),
+			mints: await creatorCoinMints(creatorPk.toBase58(), body.network, extraMints),
+			payer: feePayer,
+			solOnly: !body.all_quotes,
+		});
+		const ixs = body.all_quotes
+			? await onlineSdk.collectCoinCreatorFeeAllQuotesInstructions(creatorPk, feePayer, prep.extraQuoteMints)
+			: await onlineSdk.collectCoinCreatorFeeInstructions(creatorPk, feePayer);
+		const collectIxs = Array.isArray(ixs) ? ixs : [ixs];
+		const sweepCount = countPrefixThatFits({
+			payer: feePayer,
+			prefix: prep.sweeps,
+			rest: collectIxs,
+			tables: await getPumpLookupTables({ network: body.network }),
+		});
+		const built = await buildLaunchTransaction({
+			network: body.network,
+			payer: feePayer,
+			instructions: [...prep.sweeps.slice(0, sweepCount), ...collectIxs],
+			transactionVersion: body.transaction_version,
+			v1Capable: body.v1_capable,
+		});
+		return json(res, 201, {
+			creator: body.creator_address,
+			network: body.network,
+			tx_base64: built.tx_base64,
+			transaction_version: built.transaction_version,
+			swept: sweptReport(prep.swept, sweepCount),
+			// Fee legs left on curves or pools after this claim (too many for one
+			// transaction); claiming again sweeps the next largest.
+			sweeps_remaining: prep.legs.length - sweepCount,
+		});
+	} catch (e) {
+		return error(
+			res,
+			e.status || 502,
+			e.code || 'pump_sdk_error',
+			e.message || 'failed to build collect-creator-fee tx',
+		);
+	}
+}
+
+// ── distribute-creator-fees-prep ──────────────────────────────────────────
+// Builds the tx that distributes accumulated creator fees to shareholders
+// defined in the coin's fee-sharing config. For graduated coins the SDK
+// automatically prepends a `transfer_creator_fees_to_pump_v2` instruction so
+// AMM-side fees are consolidated into the bonding-curve vault first: no
+// separate transfer call is needed at this layer.
+//
+// ATA initialization for non-native quotes (e.g. USDC) is handled internally
+// by `buildDistributeCreatorFeesInstructions`: the SDK reads the coin's
+// quote_mint and emits `initialize_ata: true` for the underlying
+// `distribute_creator_fees_v2` instruction so each shareholder's USDC ATA is
+// idempotently created before the program transfers their share.
+//
+// Docs: https://github.com/pump-fun/pump-public-docs/blob/main/docs/instructions/CREATOR_FEE_SHARING.md
+
+const distributeCreatorFeesPrepSchema = z.object({
+	mint: z.string().min(32).max(44),
+	wallet_address: z.string().min(32).max(44), // fee payer / signer (permissionless)
+	network: z.enum(['mainnet', 'devnet']).default('mainnet'),
+});
+
+async function handleDistributeCreatorFeesPrep(req, res) {
+	if (cors(req, res, { methods: 'POST,OPTIONS', credentials: true })) return;
+	if (!method(req, res, ['POST'])) return;
+
+	const user = await getSessionUser(req);
+	if (!user) return error(res, 401, 'unauthorized', 'sign in required');
+
+	const rl = await limits.authIp(clientIp(req));
+	if (!rl.success) return rateLimited(res, rl);
+
+	const body = parse(distributeCreatorFeesPrepSchema, await readJson(req));
+	const mintPk = solanaPubkey(body.mint);
+	const payerPk = solanaPubkey(body.wallet_address);
+	if (!mintPk || !payerPk) return error(res, 400, 'validation_error', 'invalid pubkeys');
+
+	try {
+		const { connection } = await getPumpSdk({ network: body.network });
+		const { OnlinePumpSdk } = await import('@pump-fun/pump-sdk');
+		const onlineSdk = new OnlinePumpSdk(connection);
+		const { instructions, isGraduated } = await onlineSdk.buildDistributeCreatorFeesInstructions(
+			mintPk,
+			await distributeOptions(onlineSdk, mintPk, payerPk),
+		);
+		const tx_base64 = await buildUnsignedTxBase64({
+			network: body.network,
+			payer: payerPk,
+			instructions,
+		});
+		return json(res, 201, {
+			mint: body.mint,
+			network: body.network,
+			is_graduated: !!isGraduated,
+			tx_base64,
+		});
+	} catch (e) {
+		return error(
+			res,
+			e.status || 502,
+			e.code || 'pump_sdk_error',
+			e.message || 'failed to build distribute-creator-fees tx',
+		);
+	}
+}
+
+// ── update-fee-shares-prep ────────────────────────────────────────────────
+// Step 2 of the fee-sharing lifecycle. The current sharing_config admin
+// finalises the shareholder list (1-10 entries, share_bps must sum to 10_000).
+// This sweeps any pending AMM + bonding-curve fees, applies the new
+// distribution, and (in version-1 configs) permanently revokes further
+// updates: so for v1 callers should call it exactly once after
+// create-fee-sharing-prep.
+// Docs: https://github.com/pump-fun/pump-public-docs/blob/main/docs/instructions/CREATOR_FEE_SHARING.md
+
+const updateFeeSharesSchema = z.object({
+	mint: z.string().min(32).max(44),
+	wallet_address: z.string().min(32).max(44), // sharing_config admin (signer + fee payer)
+	network: z.enum(['mainnet', 'devnet']).default('mainnet'),
+	// The set of shareholder addresses currently encoded in the on-chain
+	// sharing_config. Right after create-fee-sharing-prep this is `[creator]`
+	// at 10_000 bps; after a prior update it's whatever was last set. The SDK
+	// uses these to derive the existing PDA accounts that must be passed in.
+	// Optional: when omitted the handler decodes the current set from the
+	// on-chain sharing_config so the client never has to track it.
+	current_shareholders: z.array(z.string().min(32).max(44)).min(1).max(10).optional(),
+	new_shareholders: z
+		.array(
+			z.object({
+				address: z.string().min(32).max(44),
+				share_bps: z.number().int().min(1).max(10_000),
+			}),
+		)
+		.min(1)
+		.max(10)
+		.superRefine((arr, ctx) => {
+			// One rule set for the server and the launch UI: src/shared/launch-fees.js.
+			for (const message of validateShareholders(arr).errors) ctx.addIssue({ code: 'custom', message });
+		}),
+});
+
+async function handleUpdateFeeSharesPrep(req, res) {
+	if (cors(req, res, { methods: 'POST,OPTIONS', credentials: true })) return;
+	if (!method(req, res, ['POST'])) return;
+
+	const user = await getSessionUser(req);
+	if (!user) return error(res, 401, 'unauthorized', 'sign in required');
+
+	const rl = await limits.authIp(clientIp(req));
+	if (!rl.success) return rateLimited(res, rl);
+
+	const body = parse(updateFeeSharesSchema, await readJson(req));
+	const mintPk = solanaPubkey(body.mint);
+	const payerPk = solanaPubkey(body.wallet_address);
+	if (!mintPk || !payerPk) return error(res, 400, 'validation_error', 'invalid pubkeys');
+
+	const guard = await assertCoinNotOwnedByOther({
+		userId: user.id,
+		mint: body.mint,
+		network: body.network,
+		res,
+	});
+	if (guard.blocked) return;
+
+	const newShareholders = body.new_shareholders.map((s) => {
+		const addr = solanaPubkey(s.address);
+		if (!addr)
+			throw Object.assign(new Error(`invalid shareholder ${s.address}`), {
+				status: 400,
+				code: 'validation_error',
+			});
+		return { address: addr, shareBps: s.share_bps };
+	});
+
+	try {
+		const { sdk, connection } = await getPumpSdk({ network: body.network });
+
+		// Current shareholders: trust the client list when supplied, otherwise
+		// decode them from the on-chain sharing_config so callers don't have to
+		// track on-chain state themselves.
+		let currentShareholders;
+		if (body.current_shareholders?.length) {
+			currentShareholders = body.current_shareholders.map((s) => {
+				const pk = solanaPubkey(s);
+				if (!pk)
+					throw Object.assign(new Error(`invalid current shareholder ${s}`), {
+						status: 400,
+						code: 'validation_error',
+					});
+				return pk;
+			});
+		} else {
+			const { feeSharingConfigPda } = await import('@pump-fun/pump-sdk');
+			const cfgInfo = await connection.getAccountInfo(feeSharingConfigPda(mintPk));
+			if (!cfgInfo) {
+				return error(
+					res,
+					409,
+					'no_sharing_config',
+					'no fee-sharing config for this coin — create one first via create-fee-sharing-prep',
+				);
+			}
+			const cfg = sdk.decodeSharingConfig(cfgInfo);
+			currentShareholders = cfg.shareholders.map((s) => new PublicKey(s.address));
+		}
+
+		const ix = await sdk.updateFeeShares({
+			authority: payerPk,
+			mint: mintPk,
+			currentShareholders,
+			newShareholders,
+		});
+		const tx_base64 = await buildUnsignedTxBase64({
+			network: body.network,
+			payer: payerPk,
+			instructions: [...(await coinSweepInstructions(connection, mintPk, payerPk)), ix],
+		});
+		return json(res, 201, {
+			mint: body.mint,
+			network: body.network,
+			shareholder_count: newShareholders.length,
+			tx_base64,
+		});
+	} catch (e) {
+		return error(
+			res,
+			e.status || 502,
+			e.code || 'pump_sdk_error',
+			e.message || 'failed to build update-fee-shares tx',
+		);
+	}
+}
+
+// ── create-fee-sharing-prep ────────────────────────────────────────────────
+// Builds the tx to create a fee-sharing config for a graduated coin, enabling
+// the coin creator to split AMM creator fees among multiple shareholders.
+// Docs: https://github.com/pump-fun/pump-public-docs/blob/main/docs/instructions/CREATOR_FEE_SHARING.md
+
+const createFeeSharingPrepSchema = z.object({
+	mint: z.string().min(32).max(44),
+	creator_address: z.string().min(32).max(44),
+	wallet_address: z.string().min(32).max(44), // signer / fee payer
+	network: z.enum(['mainnet', 'devnet']).default('mainnet'),
+});
+
+async function handleCreateFeeSharingPrep(req, res) {
+	if (cors(req, res, { methods: 'POST,OPTIONS', credentials: true })) return;
+	if (!method(req, res, ['POST'])) return;
+
+	const user = await getSessionUser(req);
+	if (!user) return error(res, 401, 'unauthorized', 'sign in required');
+
+	const rl = await limits.authIp(clientIp(req));
+	if (!rl.success) return rateLimited(res, rl);
+
+	const body = parse(createFeeSharingPrepSchema, await readJson(req));
+	const mintPk = solanaPubkey(body.mint);
+	const creatorPk = solanaPubkey(body.creator_address);
+	const payerPk = solanaPubkey(body.wallet_address);
+	if (!mintPk || !creatorPk || !payerPk)
+		return error(res, 400, 'validation_error', 'invalid pubkeys');
+
+	const guard = await assertCoinNotOwnedByOther({
+		userId: user.id,
+		mint: body.mint,
+		network: body.network,
+		res,
+	});
+	if (guard.blocked) return;
+
+	try {
+		const { canonicalPumpPoolPda } = await import('@pump-fun/pump-swap-sdk');
+		const { bondingCurvePda } = await import('@pump-fun/pump-sdk');
+		const { isLegacyQuoteMint } = await getPumpSdkV2({ network: body.network });
+		const { sdk, connection } = await getPumpSdk({ network: body.network });
+
+		const bcPda = bondingCurvePda(mintPk);
+		const bcInfo = await connection.getAccountInfo(bcPda);
+		const bc = bcInfo ? sdk.decodeBondingCurve(bcInfo) : null;
+
+		let poolPk;
+		if (bc && bc.quoteMint && !isLegacyQuoteMint(bc.quoteMint)) {
+			poolPk = canonicalPumpPoolPda(mintPk, bc.quoteMint);
+		} else {
+			poolPk = canonicalPumpPoolPda(mintPk);
+		}
+
+		const ix = await sdk.createFeeSharingConfig({
+			creator: creatorPk,
+			mint: mintPk,
+			pool: poolPk,
+		});
+		const tx_base64 = await buildUnsignedTxBase64({
+			network: body.network,
+			payer: payerPk,
+			instructions: [...(await coinSweepInstructions(connection, mintPk, payerPk)), ix],
+		});
+		return json(res, 201, {
+			mint: body.mint,
+			creator: body.creator_address,
+			pool: poolPk.toString(),
+			network: body.network,
+			tx_base64,
+		});
+	} catch (e) {
+		return error(
+			res,
+			e.status || 502,
+			e.code || 'pump_sdk_error',
+			e.message || 'failed to build create-fee-sharing tx',
+		);
+	}
+}
+
+// Soft ownership guard for connected-wallet fee/delegation actions. If this mint
+// was launched through three.ws (a pump_agent_mints row exists), it must belong
+// to the session user: this stops one account building fee txs against another
+// account's coin. Coins launched outside three.ws have no row and are allowed
+// (the on-chain sharing-config admin signature is the real gate either way).
+async function assertCoinNotOwnedByOther({ userId, mint, network, res }) {
+	const [row] = await sql`
+		select id, user_id from pump_agent_mints
+		where mint=${mint} and network=${network}
+		limit 1
+	`;
+	if (row && row.user_id !== userId) {
+		error(res, 403, 'forbidden', 'this coin belongs to another account');
+		return { blocked: true };
+	}
+	return { blocked: false, row: row || null };
+}
+
+// pump.fun social platform ids (matches the SDK's Platform enum):
+//   Pump = 0, X = 1, GitHub = 2
+const SOCIAL_PLATFORM_ID = { pump: 0, x: 1, github: 2 };
+
+// ── resolve-github-shareholder ─────────────────────────────────────────────
+// Turns a GitHub identity into a concrete fee-share recipient address so the
+// delegation UI never has to know the mapping. If the GitHub user is on
+// three.ws (linked via the existing GitHub OAuth) and has a linked Solana
+// wallet, we return that wallet: a fully-claimable shareholder paid by the
+// permissionless distribute crank. Otherwise we return the pump.fun social-fee
+// escrow PDA for their numeric id; fees can be routed into it, but the final
+// claim is brokered by pump.fun's own app (we don't hold the social-claim
+// authority), so we flag claimable_now:false and explain.
+
+const resolveGithubShareholderSchema = z
+	.object({
+		// Platform is now general: 'github' (default) or 'x' (Twitter). The
+		// github_* fields are kept for back-compat; `username`/`user_id` are the
+		// platform-agnostic inputs the fees panel and Launch Studio use.
+		platform: z.enum(['github', 'x']).default('github'),
+		username: z.string().trim().min(1).max(40).optional(),
+		user_id: z.string().trim().regex(/^\d{1,20}$/).optional(),
+		github_username: z.string().trim().min(1).max(40).optional(),
+		github_user_id: z.string().trim().regex(/^\d{1,20}$/).optional(),
+		network: z.enum(['mainnet', 'devnet']).default('mainnet'),
+	})
+	.refine((b) => b.username || b.user_id || b.github_username || b.github_user_id, {
+		message: 'a username or numeric user id is required',
+	});
+
+async function handleResolveGithubShareholder(req, res) {
+	if (cors(req, res, { methods: 'POST,OPTIONS', credentials: true })) return;
+	if (!method(req, res, ['POST'])) return;
+
+	const user = await getSessionUser(req);
+	if (!user) return error(res, 401, 'unauthorized', 'sign in required');
+
+	const rl = await limits.authedReadIp(clientIp(req));
+	if (!rl.success) return rateLimited(res, rl);
+
+	const body = parse(resolveGithubShareholderSchema, await readJson(req));
+
+	// One source of truth for social → reward resolution (github + x), shared with
+	// the launch use-case engine and the fees panel.
+	const r = await resolveSocialReward({
+		platform: body.platform,
+		username: body.username || body.github_username,
+		userId: body.user_id || body.github_user_id,
+		network: body.network,
+	});
+	return json(res, 200, {
+		platform: r.platform,
+		mode: r.mode,
+		address: r.address,
+		username: r.username,
+		user_id: r.user_id,
+		// Back-compat aliases for existing github callers.
+		github_username: r.platform === 'github' ? r.username : undefined,
+		github_user_id: r.platform === 'github' ? r.user_id : undefined,
+		claimable_now: r.claimable_now,
+		note: r.note,
+	});
+}
+
+
+// ── create-social-fee-pda-prep ─────────────────────────────────────────────
+// Initialises the pump.fun social-fee escrow PDA for a (social_user_id,
+// platform) pair so a subsequent update-fee-shares-prep can name it as a
+// shareholder address. Idempotent on-chain (no-op if it already exists). The
+// returned tx is signed by the connected wallet (the coin admin/payer).
+
+const createSocialFeePdaPrepSchema = z.object({
+	wallet_address: z.string().min(32).max(44), // payer / signer
+	social_user_id: z.string().trim().min(1).max(20), // numeric social id (SDK caps at 20 chars)
+	platform: z.enum(['github', 'x', 'pump']).default('github'),
+	mint: z.string().min(32).max(44).optional(), // when set, enforces coin ownership
+	network: z.enum(['mainnet', 'devnet']).default('mainnet'),
+});
+
+async function handleCreateSocialFeePdaPrep(req, res) {
+	if (cors(req, res, { methods: 'POST,OPTIONS', credentials: true })) return;
+	if (!method(req, res, ['POST'])) return;
+
+	const user = await getSessionUser(req);
+	if (!user) return error(res, 401, 'unauthorized', 'sign in required');
+
+	const rl = await limits.authIp(clientIp(req));
+	if (!rl.success) return rateLimited(res, rl);
+
+	const body = parse(createSocialFeePdaPrepSchema, await readJson(req));
+	const payerPk = solanaPubkey(body.wallet_address);
+	if (!payerPk) return error(res, 400, 'validation_error', 'invalid wallet_address');
+
+	if (body.mint) {
+		const guard = await assertCoinNotOwnedByOther({
+			userId: user.id,
+			mint: body.mint,
+			network: body.network,
+			res,
+		});
+		if (guard.blocked) return;
+	}
+
+	const platform = SOCIAL_PLATFORM_ID[body.platform];
+
+	try {
+		const { sdk } = await getPumpSdk({ network: body.network });
+		const { socialFeePda } = await import('@pump-fun/pump-sdk');
+		const ix = await sdk.createSocialFeePda({
+			payer: payerPk,
+			userId: body.social_user_id,
+			platform,
+		});
+		const tx_base64 = await buildUnsignedTxBase64({
+			network: body.network,
+			payer: payerPk,
+			instructions: Array.isArray(ix) ? ix : [ix],
+		});
+		return json(res, 201, {
+			social_fee_pda: socialFeePda(body.social_user_id, platform).toBase58(),
+			platform: body.platform,
+			social_user_id: body.social_user_id,
+			network: body.network,
+			tx_base64,
+		});
+	} catch (e) {
+		return error(
+			res,
+			e.status || 502,
+			e.code || 'pump_sdk_error',
+			e.message || 'failed to build create-social-fee-pda tx',
+		);
+	}
+}
+// ── fee-info ───────────────────────────────────────────────────────────────
+// Read-only resolver: given a mint, report where creator fees go (cashback,
+// sharing-config shareholders, or direct creator), the claimable vault balance
+// (pump native vault + AMM WSOL vault), graduation status, and the on-chain
+// sharing-config shareholders if one exists. Mirrors the coin-fees skill's
+// fetch-fee-info.mjs so the studio shows real, on-chain numbers: no estimates.
+// Public read (rate-limited) so anyone can inspect a coin's fee posture before
+// claiming a delegated share.
+
+const MIN_RENT_EXEMPTION_LAMPORTS = 890_880n;
+
+/**
+ * Pure fee-routing read for `mintPk`: returns the same object handleFeeInfo
+ * serves, or null when the mint has no bonding curve. Exported so other
+ * composed read surfaces (the launch receipt) can reuse this without an
+ * internal HTTP round trip. Throws on an on-chain read failure; the caller
+ * decides how to surface that.
+ */
+export async function computeFeeInfo(mintPk, network) {
+	const connection = getConnection({ network });
+	const [
+		{ PumpSdk, OnlinePumpSdk, canonicalPumpPoolPdaWithQuote, normalizeQuoteMint, creatorVaultPda, feeSharingConfigPda },
+		{ OnlinePumpAmmSdk, coinCreatorVaultAuthorityPda, coinCreatorVaultAtaPda },
+		{ AccountLayout, NATIVE_MINT, TOKEN_PROGRAM_ID },
+	] = await Promise.all([
+		import('@pump-fun/pump-sdk'),
+		import('@pump-fun/pump-swap-sdk'),
+		import('@solana/spl-token'),
+	]);
+
+	const onlineSdk = new OnlinePumpSdk(connection);
+	const offlineSdk = new PumpSdk();
+	const bondingCurve = await onlineSdk.fetchBondingCurve(mintPk).catch(() => null);
+	if (!bondingCurve) return null;
+	const isHolderReward = bondingCurve.isHolderReward === true;
+
+	const poolPda = canonicalPumpPoolPdaWithQuote(mintPk, normalizeQuoteMint(bondingCurve.quoteMint));
+	const poolInfo = await connection.getAccountInfo(poolPda);
+	let isGraduated = false;
+	let poolCoinCreator = null;
+	let isCashbackCoin = false;
+
+	if (poolInfo) {
+		isGraduated = true;
+		try {
+			const pool = await new OnlinePumpAmmSdk(connection).fetchPool(poolPda);
+			poolCoinCreator = pool.coinCreator;
+			isCashbackCoin =
+				pool.isCashbackCoin === true ||
+				(Array.isArray(pool.is_cashback_coin) && pool.is_cashback_coin[0] === true);
+		} catch {
+			/* pool not fully initialized */
+		}
+	} else {
+		isCashbackCoin =
+			bondingCurve.isCashbackCoin === true ||
+			(Array.isArray(bondingCurve.is_cashback_coin) &&
+				bondingCurve.is_cashback_coin[0] === true);
+	}
+
+	const effectiveCreator = poolCoinCreator ?? new PublicKey(bondingCurve.creator);
+
+	let hasSharingConfig = false;
+	let sharingConfig = null;
+	if (!isCashbackCoin && !isHolderReward) {
+		// When a creator migrates to a fee-sharing config, the on-chain creator
+		// field (pool.coinCreator / bondingCurve.creator) becomes the config PDA.
+		const cfgPda = feeSharingConfigPda(mintPk);
+		hasSharingConfig = effectiveCreator.equals(cfgPda);
+		if (hasSharingConfig) {
+			const cfgInfo = await connection.getAccountInfo(cfgPda);
+			if (cfgInfo) {
+				const cfg = offlineSdk.decodeSharingConfig(cfgInfo);
+				sharingConfig = {
+					address: cfgPda.toBase58(),
+					admin: cfg.admin.toBase58(),
+					admin_revoked: cfg.adminRevoked ?? false,
+					shareholders: cfg.shareholders.map((s) => ({
+						address: s.address.toBase58(),
+						bps: Number(s.shareBps),
+					})),
+				};
+			} else {
+				hasSharingConfig = false;
+			}
+		}
+	}
+
+	// Vault balance = pump native creator vault (minus rent) + AMM WSOL vault,
+	// plus the SOL creator fees v3 / PumpSwap v2 trades left on this coin's
+	// curve and pool, which a claim sweeps into the vault first.
+	// When a sharing config exists, fees accrue under the config PDA.
+	let claimableLamports = 0n;
+	let unsweptLamports = 0n;
+	if (!isCashbackCoin) {
+		const vaultCreator = hasSharingConfig ? feeSharingConfigPda(mintPk) : effectiveCreator;
+		const buckets = await readCreatorFeeBuckets(connection, [mintPk.toBase58()]);
+		for (const leg of unsweptCreatorFees(buckets.values(), vaultCreator.toBase58())) {
+			if (leg.quoteMint === SOL_QUOTE_MINT) unsweptLamports += leg.amount;
+		}
+		claimableLamports += unsweptLamports;
+		const nativeVault = creatorVaultPda(vaultCreator);
+		const nativeInfo = await connection.getAccountInfo(nativeVault);
+		if (nativeInfo) {
+			const adjusted = BigInt(nativeInfo.lamports) - MIN_RENT_EXEMPTION_LAMPORTS;
+			if (adjusted > 0n) claimableLamports += adjusted;
+		}
+		try {
+			const ammAuthority = coinCreatorVaultAuthorityPda(vaultCreator);
+			const ammAta = coinCreatorVaultAtaPda(ammAuthority, NATIVE_MINT, TOKEN_PROGRAM_ID);
+			const ammInfo = await connection.getAccountInfo(ammAta);
+			if (ammInfo) {
+				const parsed = AccountLayout.decode(
+					new Uint8Array(
+						ammInfo.data.buffer,
+						ammInfo.data.byteOffset,
+						ammInfo.data.byteLength,
+					),
+				);
+				claimableLamports += BigInt(parsed.amount.toString());
+			}
+		} catch {
+			/* no AMM vault yet */
+		}
+	}
+
+	const feeDestination = isHolderReward
+		? 'holder_rewards'
+		: isCashbackCoin
+		? 'cashback'
+		: hasSharingConfig
+			? 'sharing_config'
+			: 'creator';
+
+	return {
+		mint: mintPk.toBase58(),
+		network,
+		is_graduated: isGraduated,
+		is_cashback_coin: isCashbackCoin,
+		is_holder_reward: isHolderReward,
+		has_sharing_config: hasSharingConfig,
+		creator: effectiveCreator.toBase58(),
+		claimable_lamports: claimableLamports.toString(),
+		claimable_sol: Number(claimableLamports) / LAMPORTS_PER_SOL,
+		// The part of claimable still on the curve or pool (swept by the claim).
+		unswept_lamports: unsweptLamports.toString(),
+		fee_destination: feeDestination,
+		sharing_config: sharingConfig,
+	};
+}
+
+async function handleFeeInfo(req, res) {
+	if (cors(req, res, { methods: 'GET,OPTIONS', origins: '*' })) return;
+	if (!method(req, res, ['GET'])) return;
+
+	const rl = await limits.authedReadIp(clientIp(req));
+	if (!rl.success) return rateLimited(res, rl);
+
+	const url = new URL(req.url, `http://${req.headers.host}`);
+	const mintStr = url.searchParams.get('mint');
+	const network = url.searchParams.get('network') === 'devnet' ? 'devnet' : 'mainnet';
+	const mintPk = solanaPubkey(mintStr);
+	if (!mintPk) return error(res, 400, 'validation_error', 'valid mint required');
+
+	try {
+		const info = await computeFeeInfo(mintPk, network);
+		if (!info) return error(res, 404, 'not_found', 'no bonding curve for this mint');
+		return json(res, 200, info);
+	} catch (e) {
+		return error(
+			res,
+			e.status || 502,
+			e.code || 'pump_sdk_error',
+			e.message || 'failed to read fee info',
+		);
+	}
+}
+
+// Build a v0 transaction from `instructions`, sign with the agent keypair (and
+// any extra signers), send, and confirm. Mirrors the launch-agent send path so
+// every server-signed pump action uses the same RPC handling.
+async function signSendWithAgent({ network, agentKeypair, instructions, extraSigners = [], lookupTables = [] }) {
+	const conn = solanaConnection(network);
+	// Protected send: priority fee + CU estimate, rebroadcast with blockhash
+	// refresh, hard throw on an on-chain revert.
+	const { signature } = await submitProtected({
+		network,
+		connection: conn,
+		payer: agentKeypair,
+		instructions,
+		opts: { extraSigners, addressLookupTables: lookupTables },
+	});
+	return signature;
+}
+
+// Resolve the agent + mint the caller controls, and assert the agent's custodial
+// wallet is the on-chain creator (agent_authority) of the coin. Returns
+// { agent, mintRow, loaded, creator } or sends an error and returns null.
+async function resolveAgentFeeContext(req, res, body, { agreementContext = null } = {}) {
+	const user = await requireSessionUser(req, res);
+	if (!user) return null;
+
+	const agent = await resolveLaunchAgentId({
+		userId: user.id,
+		agentId: body.agent_id,
+		avatarId: body.avatar_id,
+	});
+	if (!agent) {
+		error(res, 404, 'not_found', 'agent not found');
+		return null;
+	}
+
+	const [mintRow] = await sql`
+		select id, mint, network, agent_authority, sharing_config
+		from pump_agent_mints
+		where agent_id=${agent.id} and mint=${body.mint} and network=${body.network}
+		limit 1
+	`;
+	if (!mintRow) {
+		error(res, 404, 'not_found', 'coin not found for this agent');
+		return null;
+	}
+	if (agreementContext && !(await requireRealFundsAgreement(req, res, { userId: user.id, network: body.network, context: agreementContext }))) {
+		return null;
+	}
+
+	const loaded = await loadAgentForSigning(agent.id, user.id, {
+		reason: 'studio_fee_action',
+		meta: { mint: body.mint, network: body.network },
+	});
+	if (loaded.error) {
+		error(res, loaded.error.status, loaded.error.code, loaded.error.msg);
+		return null;
+	}
+
+	const creator = loaded.keypair.publicKey.toBase58();
+	if (mintRow.agent_authority && mintRow.agent_authority !== creator) {
+		error(
+			res,
+			409,
+			'creator_mismatch',
+			'this coin was launched from a connected wallet — claim with that wallet instead of the agent wallet',
+		);
+		return null;
+	}
+	return { user, agent, mintRow, loaded, creator };
+}
+
+// ── collect-creator-fee-agent ──────────────────────────────────────────────
+// Server-signs the creator-fee collection with the agent custodial wallet. Use
+// for coins launched from the agent wallet (agent_authority == agent wallet).
+// The body contract (collectFeeAgentSchema) lives in api/_lib/pump-fee-schemas.js.
+
+async function handleCollectCreatorFeeAgent(req, res) {
+	if (cors(req, res, { methods: 'POST,OPTIONS', credentials: true })) return;
+	if (!method(req, res, ['POST'])) return;
+
+	const rl = await limits.authIp(clientIp(req));
+	if (!rl.success) return rateLimited(res, rl);
+
+	const body = parse(collectFeeAgentSchema, await readJson(req));
+	const ctx = await resolveAgentFeeContext(req, res, body);
+	if (!ctx) return;
+
+	try {
+		const { connection } = await getPumpSdk({ network: body.network });
+		const { OnlinePumpSdk } = await import('@pump-fun/pump-sdk');
+		const onlineSdk = new OnlinePumpSdk(connection);
+		const creatorPk = ctx.loaded.keypair.publicKey;
+		// Snapshot the creator's SOL before the sweep so we can report the exact
+		// lamports the claim delivered (net of tx fee): callers (the launcher
+		// claimer, the studio) need the real figure, not a boolean.
+		const balanceBefore = await connection.getBalance(creatorPk).catch(() => null);
+		// Fees v3 / PumpSwap v2 trades left on the creator's curves and pools are
+		// swept into the vault first, so this one claim collects them too.
+		const prep = await prepareCreatorSweeps(connection, {
+			creator: ctx.creator,
+			mints: await creatorCoinMints(ctx.creator, body.network, [body.mint]),
+			payer: creatorPk,
+			solOnly: !body.all_quotes,
+		});
+		const ixs = body.all_quotes
+			? await onlineSdk.collectCoinCreatorFeeAllQuotesInstructions(creatorPk, creatorPk, prep.extraQuoteMints)
+			: await onlineSdk.collectCoinCreatorFeeInstructions(creatorPk, creatorPk);
+		const collectIxs = Array.isArray(ixs) ? ixs : [ixs];
+		const lookupTables = await getPumpLookupTables({ network: body.network });
+		const sweepCount = countPrefixThatFits({
+			payer: creatorPk,
+			prefix: prep.sweeps,
+			rest: collectIxs,
+			tables: lookupTables,
+			reserveBytes: PROTECTED_SEND_RESERVE_BYTES,
+		});
+		const signature = await signSendWithAgent({
+			network: body.network,
+			agentKeypair: ctx.loaded.keypair,
+			instructions: [...prep.sweeps.slice(0, sweepCount), ...collectIxs],
+			lookupTables,
+		});
+		const swept = sweptReport(prep.swept, sweepCount);
+		const balanceAfter = balanceBefore == null ? null : await connection.getBalance(creatorPk).catch(() => null);
+		const lamports = balanceBefore != null && balanceAfter != null ? Math.max(0, balanceAfter - balanceBefore) : null;
+		await sql`
+			insert into agent_actions (agent_id, type, payload, source_skill)
+			values (${ctx.agent.id}, ${'pumpfun.collect_creator_fee'},
+				${JSON.stringify({ mint: body.mint, network: body.network, signature, lamports, swept, source: 'studio_agent_wallet' })}::jsonb,
+				${'pumpfun'})
+		`.catch((e) => console.error('[pump/collect-creator-fee-agent] log failed', e?.message));
+		return json(res, 201, {
+			ok: true,
+			mint: body.mint,
+			network: body.network,
+			signature,
+			lamports,
+			sol: lamports == null ? null : lamports / LAMPORTS_PER_SOL,
+			swept,
+			sweeps_remaining: prep.legs.length - sweepCount,
+			explorer: `https://solscan.io/tx/${signature}${body.network === 'devnet' ? '?cluster=devnet' : ''}`,
+		});
+	} catch (e) {
+		return respondError(res, e.status || 502, e.code || 'rpc_error', e);
+	}
+}
+
+// ── distribute-creator-fees-agent ──────────────────────────────────────────
+// Server-signs distribution of shared fees to the sharing-config shareholders,
+// paid by the agent custodial wallet. Distribution is permissionless on-chain;
+// this lets the agent wallet crank it without a connected wallet.
+
+async function handleDistributeCreatorFeesAgent(req, res) {
+	if (cors(req, res, { methods: 'POST,OPTIONS', credentials: true })) return;
+	if (!method(req, res, ['POST'])) return;
+
+	const rl = await limits.authIp(clientIp(req));
+	if (!rl.success) return rateLimited(res, rl);
+
+	const body = parse(collectFeeAgentSchema, await readJson(req));
+	const ctx = await resolveAgentFeeContext(req, res, body);
+	if (!ctx) return;
+
+	try {
+		const { connection } = await getPumpSdk({ network: body.network });
+		const { OnlinePumpSdk } = await import('@pump-fun/pump-sdk');
+		const onlineSdk = new OnlinePumpSdk(connection);
+		const mintPk = new PublicKey(body.mint);
+		const { instructions } = await onlineSdk.buildDistributeCreatorFeesInstructions(
+			mintPk,
+			await distributeOptions(onlineSdk, mintPk, ctx.loaded.keypair.publicKey),
+		);
+		const signature = await signSendWithAgent({
+			network: body.network,
+			agentKeypair: ctx.loaded.keypair,
+			instructions,
+		});
+		await sql`
+			insert into agent_actions (agent_id, type, payload, source_skill)
+			values (${ctx.agent.id}, ${'pumpfun.distribute_creator_fees'},
+				${JSON.stringify({ mint: body.mint, network: body.network, signature, source: 'studio_agent_wallet' })}::jsonb,
+				${'pumpfun'})
+		`.catch((e) => console.error('[pump/distribute-creator-fees-agent] log failed', e?.message));
+		return json(res, 201, {
+			ok: true,
+			mint: body.mint,
+			network: body.network,
+			signature,
+			explorer: `https://solscan.io/tx/${signature}${body.network === 'devnet' ? '?cluster=devnet' : ''}`,
+		});
+	} catch (e) {
+		return respondError(res, e.status || 502, e.code || 'rpc_error', e);
+	}
+}
+
+// ── fee-sharing-agent ──────────────────────────────────────────────────────
+// Server-signs the full delegation lifecycle with the agent custodial wallet:
+// creates the sharing config if absent, then sets the shareholder split. This
+// is the on-chain mechanism behind "reward" coins: creator fees are split to a
+// list of delegated wallets (e.g. GitHub contributors) who can each claim their
+// share via distribute. Shares are basis points and must sum to 10000.
+
+const feeSharingAgentSchema = z
+	.object({
+		agent_id: z.string().uuid().optional(),
+		avatar_id: z.string().uuid().optional(),
+		mint: z.string().min(32).max(44),
+		network: z.enum(['mainnet', 'devnet']).default('mainnet'),
+		shareholders: z
+			.array(
+				z.object({
+					address: z.string().min(32).max(44),
+					share_bps: z.number().int().min(1).max(10_000),
+				}),
+			)
+			.min(1)
+			.max(10)
+			.refine((arr) => arr.reduce((s, x) => s + x.share_bps, 0) === 10_000, {
+				message: 'share_bps must sum to 10000',
+			})
+			.refine((arr) => new Set(arr.map((x) => x.address)).size === arr.length, {
+				message: 'duplicate shareholder addresses',
+			}),
+	})
+	.refine((b) => b.agent_id || b.avatar_id, { message: 'agent_id or avatar_id required' });
+
+async function handleFeeSharingAgent(req, res) {
+	if (cors(req, res, { methods: 'POST,OPTIONS', credentials: true })) return;
+	if (!method(req, res, ['POST'])) return;
+
+	const rl = await limits.authIp(clientIp(req));
+	if (!rl.success) return rateLimited(res, rl);
+
+	const body = parse(feeSharingAgentSchema, await readJson(req));
+	// Redirects the coin's creator-fee revenue and pays config rent from the agent wallet.
+	const ctx = await resolveAgentFeeContext(req, res, body, { agreementContext: 'pump-fee-sharing' });
+	if (!ctx) return;
+
+	const newShareholders = body.shareholders.map((s) => {
+		const pk = solanaPubkey(s.address);
+		if (!pk)
+			throw Object.assign(new Error(`invalid shareholder ${s.address}`), {
+				status: 400,
+				code: 'validation_error',
+			});
+		return { address: pk, shareBps: s.share_bps };
+	});
+
+	try {
+		const { sdk, connection } = await getPumpSdk({ network: body.network });
+		const [
+			{ feeSharingConfigPda, bondingCurvePda },
+			{ canonicalPumpPoolPda },
+			{ isLegacyQuoteMint },
+		] = await Promise.all([
+			import('@pump-fun/pump-sdk'),
+			import('@pump-fun/pump-swap-sdk'),
+			getPumpSdkV2({ network: body.network }),
+		]);
+
+		const mintPk = new PublicKey(body.mint);
+		const creator = ctx.loaded.keypair.publicKey;
+
+		// The sharing-config account existing on-chain means the split has already
+		// been initialized: skip creation and go straight to updating shares.
+		const cfgPda = feeSharingConfigPda(mintPk);
+		const cfgInfo = await connection.getAccountInfo(cfgPda);
+		const configExists = !!cfgInfo;
+
+		const signatures = [];
+
+		// Step 1: create the config if it doesn't exist yet. A fresh config seeds
+		// the creator as the sole shareholder at 10000 bps.
+		if (!configExists) {
+			const bcInfo = await connection.getAccountInfo(bondingCurvePda(mintPk));
+			const bc = bcInfo ? sdk.decodeBondingCurve(bcInfo) : null;
+			const poolPk =
+				bc && bc.quoteMint && !isLegacyQuoteMint(bc.quoteMint)
+					? canonicalPumpPoolPda(mintPk, bc.quoteMint)
+					: canonicalPumpPoolPda(mintPk);
+			const createIx = await sdk.createFeeSharingConfig({
+				creator,
+				mint: mintPk,
+				pool: poolPk,
+			});
+			signatures.push(
+				await signSendWithAgent({
+					network: body.network,
+					agentKeypair: ctx.loaded.keypair,
+					instructions: [...(await coinSweepInstructions(connection, mintPk, creator)), createIx],
+				}),
+			);
+		}
+
+		// Step 2: set the shareholder split. Right after creation the current set
+		// is [creator] at 10000 bps; otherwise it's whatever the cached config holds.
+		const cached = Array.isArray(ctx.mintRow.sharing_config?.shareholders)
+			? ctx.mintRow.sharing_config.shareholders
+			: null;
+		const currentShareholders =
+			configExists && cached?.length
+				? cached.map((s) => new PublicKey(s.address))
+				: [creator];
+		const updateIx = await sdk.updateFeeShares({
+			authority: creator,
+			mint: mintPk,
+			currentShareholders,
+			newShareholders,
+		});
+		signatures.push(
+			await signSendWithAgent({
+				network: body.network,
+				agentKeypair: ctx.loaded.keypair,
+				instructions: [...(await coinSweepInstructions(connection, mintPk, creator)), updateIx],
+			}),
+		);
+
+		// Cache the split so the next update knows the current shareholder set and
+		// the UI reflects delegation immediately. On-chain fee-info remains the
+		// source of truth.
+		const sharingConfig = {
+			address: cfgPda.toBase58(),
+			admin: creator,
+			shareholders: body.shareholders.map((s) => ({ address: s.address, bps: s.share_bps })),
+			updated_at: new Date().toISOString(),
+		};
+		await sql`
+			update pump_agent_mints set sharing_config=${JSON.stringify(sharingConfig)}::jsonb
+			where id=${ctx.mintRow.id}
+		`;
+		await sql`
+			insert into agent_actions (agent_id, type, payload, source_skill)
+			values (${ctx.agent.id}, ${'pumpfun.set_fee_sharing'},
+				${JSON.stringify({ mint: body.mint, network: body.network, shareholders: sharingConfig.shareholders, signatures, source: 'studio_agent_wallet' })}::jsonb,
+				${'pumpfun'})
+		`.catch((e) => console.error('[pump/fee-sharing-agent] log failed', e?.message));
+
+		return json(res, 201, {
+			ok: true,
+			mint: body.mint,
+			network: body.network,
+			created: !configExists,
+			signatures,
+			sharing_config: sharingConfig,
+			explorer: `https://solscan.io/tx/${signatures[signatures.length - 1]}${body.network === 'devnet' ? '?cluster=devnet' : ''}`,
+		});
+	} catch (e) {
+		return error(
+			res,
+			e.status || 502,
+			e.code || 'rpc_error',
+			e.message || 'fee sharing failed',
+		);
+	}
+}
+
+// ── github-resolve ─────────────────────────────────────────────────────────
+// Validate a GitHub handle and return its public profile + numeric id. The
+// numeric id is what pump.fun's social-fee program keys on (platform=2), and
+// the avatar/profile let the launch UI confirm "rewards → @handle" before the
+// user delegates fees. Read-only; best-effort (GitHub rate-limits unauthed IPs
+// at 60/hr: set GITHUB_TOKEN to raise that).
+
+async function handleGithubResolve(req, res) {
+	if (cors(req, res, { methods: 'GET,OPTIONS', origins: '*' })) return;
+	if (!method(req, res, ['GET'])) return;
+
+	const rl = await limits.authedReadIp(clientIp(req));
+	if (!rl.success) return rateLimited(res, rl);
+
+	const url = new URL(req.url, `http://${req.headers.host}`);
+	const handle = (url.searchParams.get('handle') || '').replace(/^@/, '').trim();
+	if (!/^[A-Za-z0-9](?:[A-Za-z0-9-]{0,38})$/.test(handle)) {
+		return error(res, 400, 'validation_error', 'invalid github handle');
+	}
+
+	// A GitHub login maps to one numeric id for the account's whole life, so a
+	// resolved profile is safe to hold for days: a 60/hr unauthenticated rate
+	// limit window must not turn "rewards to @handle" into a 502.
+	const lkgKey = `github:user:lkg:${handle.toLowerCase()}`;
+	const GITHUB_LKG_TTL_S = 7 * 24 * 3600;
+	const serveLastGood = async (status, code, message) => {
+		const lkg = await cacheGet(lkgKey);
+		if (lkg && lkg.body && typeof lkg.at === 'number') {
+			res.setHeader('x-github-stale', '1');
+			return json(res, 200, staleEnvelope(lkg.body, lkg.at));
+		}
+		if (status === 429 || status === 502) res.setHeader('Retry-After', '15');
+		return error(res, status, code, message, ...(status === 429 || status === 502 ? [{ retry_after: 15 }] : []));
+	};
+
+	try {
+		const headers = { 'user-agent': 'three.ws', accept: 'application/vnd.github+json' };
+		if (process.env.GITHUB_TOKEN) headers.authorization = `Bearer ${process.env.GITHUB_TOKEN}`;
+		const gh = await fetch(`https://api.github.com/users/${encodeURIComponent(handle)}`, {
+			headers,
+			signal: AbortSignal.timeout(8000),
+		});
+		if (gh.status === 404)
+			return error(res, 404, 'github_user_not_found', `@${handle} not found on GitHub`);
+		if (gh.status === 403 || gh.status === 429)
+			return serveLastGood(429, 'github_rate_limited', 'GitHub rate limit, try again shortly');
+		if (!gh.ok) return serveLastGood(502, 'github_error', `github responded ${gh.status}`);
+		const j = await gh.json();
+		if (!j?.id) return serveLastGood(502, 'github_error', 'github id missing');
+		const body = {
+			ok: true,
+			login: j.login,
+			id: String(j.id), // social-fee user_id (≤20 chars, fits u64)
+			name: j.name || null,
+			avatar_url: j.avatar_url || null,
+			html_url: j.html_url || `https://github.com/${j.login}`,
+			type: j.type || 'User',
+		};
+		cacheSet(lkgKey, { body, at: Date.now() }, GITHUB_LKG_TTL_S).catch(() => {});
+		return json(res, 200, body);
+	} catch (e) {
+		const lkg = await cacheGet(lkgKey);
+		if (lkg && lkg.body && typeof lkg.at === 'number') {
+			res.setHeader('x-github-stale', '1');
+			return json(res, 200, staleEnvelope(lkg.body, lkg.at));
+		}
+		res.setHeader('Retry-After', '15');
+		return respondError(res, 502, 'github_error', e, { retry_after: 15 });
+	}
+}
+
+// Read pump.fun's global FeeProgramGlobal account and decode the single field we
+// need: `social_claim_authority`: the only signer allowed to release social
+// (GitHub/X) fee claims. We surface it so the UI can be honest that claiming
+// native social rewards is gated by pump.fun, not self-custodial. No exported
+// decoder exists for FeeProgramGlobal, so we slice the known layout:
+//   [8 disc][1 bump][32 authority][1 disable_flags][32 social_claim_authority]…
+async function readSocialClaimAuthority(connection) {
+	try {
+		const { FEE_PROGRAM_GLOBAL_PDA } = await import('@pump-fun/pump-sdk');
+		const info = await connection.getAccountInfo(FEE_PROGRAM_GLOBAL_PDA);
+		if (!info?.data || info.data.length < 8 + 1 + 32 + 1 + 32) return null;
+		const off = 8 + 1 + 32 + 1;
+		return new PublicKey(info.data.subarray(off, off + 32)).toBase58();
+	} catch {
+		return null;
+	}
+}
+
+// ── social-fee-claim-status ────────────────────────────────────────────────
+// Read-only view of a GitHub/X identity's pump.fun social-fee PDA: how much has
+// accrued and been claimed, and the gated deep-link to claim it. We CANNOT build
+// a claim tx ourselves: claim_social_fee_pda requires pump.fun's global
+// `social_claim_authority` to co-sign: so this endpoint is read + deep-link.
+// Self-custodial "reward" delegation is the fee-sharing split (see
+// fee-sharing-agent / update-fee-shares-prep), which IS claimable directly.
+
+async function handleSocialFeeClaimStatus(req, res) {
+	if (cors(req, res, { methods: 'GET,OPTIONS', origins: '*' })) return;
+	if (!method(req, res, ['GET'])) return;
+
+	const rl = await limits.authedReadIp(clientIp(req));
+	if (!rl.success) return rateLimited(res, rl);
+
+	const url = new URL(req.url, `http://${req.headers.host}`);
+	const userId = (url.searchParams.get('user_id') || '').trim();
+	const platform = Number(url.searchParams.get('platform') ?? '2'); // 0=pump 1=X 2=GitHub
+	const network = url.searchParams.get('network') === 'devnet' ? 'devnet' : 'mainnet';
+	if (!/^\d{1,20}$/.test(userId))
+		return error(res, 400, 'validation_error', 'numeric user_id required');
+	if (![0, 1, 2].includes(platform))
+		return error(res, 400, 'validation_error', 'platform must be 0,1,2');
+
+	try {
+		const connection = getConnection({ network });
+		const { socialFeePda, PUMP_SDK } = await import('@pump-fun/pump-sdk');
+		const pda = socialFeePda(userId, platform);
+		const info = await connection.getAccountInfo(pda);
+
+		let decoded = null;
+		let claimableLamports = 0n;
+		if (info) {
+			claimableLamports = BigInt(info.lamports) - MIN_RENT_EXEMPTION_LAMPORTS;
+			if (claimableLamports < 0n) claimableLamports = 0n;
+			try {
+				const d = PUMP_SDK.decodeSocialFeePda(info);
+				decoded = {
+					user_id: d.userId,
+					platform: Number(d.platform),
+					total_claimed_lamports: d.totalClaimed?.toString?.() ?? '0',
+					last_claimed: d.lastClaimed?.toString?.() ?? '0',
+				};
+			} catch {
+				/* layout drift: still return the balance */
+			}
+		}
+
+		const social_claim_authority = await readSocialClaimAuthority(connection);
+		return json(res, 200, {
+			user_id: userId,
+			platform,
+			network,
+			social_fee_pda: pda.toBase58(),
+			exists: !!info,
+			claimable_lamports: claimableLamports.toString(),
+			claimable_sol: Number(claimableLamports) / LAMPORTS_PER_SOL,
+			decoded,
+			// Claiming is gated: only pump.fun's social_claim_authority can sign.
+			gated: true,
+			social_claim_authority,
+			claim_url: 'https://pump.fun/profile',
+		});
+	} catch (e) {
+		return error(
+			res,
+			e.status || 502,
+			e.code || 'pump_sdk_error',
+			e.message || 'failed to read social fee status',
+		);
+	}
+}
+
+function _sse(res, event, data) {
+	res.write(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`);
+}

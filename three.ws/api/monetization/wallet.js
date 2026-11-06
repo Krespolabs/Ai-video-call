@@ -1,0 +1,230 @@
+// GET /api/monetization/wallet?agent_id=X  reads the payout wallet config
+// PUT /api/monetization/wallet              sets/updates payout addresses
+//
+// Body (PUT): { agent_id, evm_address?, solana_address?, preferred_network? }
+
+import { z } from 'zod';
+import { sql } from '../_lib/db.js';
+import { logAudit } from '../_lib/audit.js';
+import { ExternalWalletError, payoutChangePolicy, stepUpProven } from '../_lib/account-link/external-wallets.js';
+import { getSessionUser, authenticateBearer, extractBearer } from '../_lib/auth.js';
+import { assertBearerMaySpend } from '../_lib/spend-scope.js';
+import { cors, json, method, wrap, error, readJson, rateLimited } from '../_lib/http.js';
+import { parse, isValidSolanaAddress, isValidEvmAddress, isUuid } from '../_lib/validate.js';
+import { limits, clientIp } from '../_lib/rate-limit.js';
+import { requireCsrf } from '../_lib/csrf.js';
+
+const putBody = z.object({
+	agent_id: z.string().uuid(),
+	evm_address: z.string().trim().max(100).nullable().optional(),
+	solana_address: z.string().trim().max(100).nullable().optional(),
+	preferred_network: z.enum(['solana', 'base', 'evm']).default('solana'),
+});
+
+async function resolveUserId(req) {
+	const session = await getSessionUser(req);
+	if (session) return session.id;
+	const bearer = assertBearerMaySpend(await authenticateBearer(extractBearer(req)), req);
+	if (bearer) return bearer.userId;
+	return null;
+}
+
+export default wrap(async (req, res) => {
+	if (cors(req, res, { methods: 'GET,PUT,OPTIONS', credentials: true })) return;
+	if (!method(req, res, ['GET', 'PUT'])) return;
+
+	const userId = await resolveUserId(req);
+	if (!userId) return error(res, 401, 'unauthorized', 'Sign in required');
+
+	const rl = await limits.authIp(clientIp(req));
+	if (!rl.success) return rateLimited(res, rl);
+
+	if (req.method === 'GET') {
+		const params = new URL(req.url, 'http://x').searchParams;
+		const agentId = params.get('agent_id');
+
+		if (agentId && !isUuid(agentId)) {
+			return error(res, 400, 'validation_error', 'agent_id must be a UUID');
+		}
+
+		// Verify ownership if agent_id specified
+		if (agentId) {
+			const [agent] = await sql`
+				SELECT id, user_id FROM agent_identities
+				WHERE id = ${agentId} AND deleted_at IS NULL
+			`;
+			if (!agent) return error(res, 404, 'not_found', 'Agent not found');
+			if (agent.user_id !== userId)
+				return error(res, 403, 'forbidden', "You don't own this agent");
+		}
+
+		// Fetch all wallets for the user, optionally filtered by agent_id
+		const wallets = agentId
+			? await sql`
+				SELECT id, agent_id, address, chain, is_default, preferred_network, created_at, approved_at, effective_at, set_by
+				FROM agent_payout_wallets
+				WHERE user_id = ${userId} AND (agent_id = ${agentId} OR agent_id IS NULL)
+				ORDER BY agent_id NULLS LAST, is_default DESC, created_at DESC
+			`
+			: await sql`
+				SELECT id, agent_id, address, chain, is_default, preferred_network, created_at, approved_at, effective_at, set_by
+				FROM agent_payout_wallets
+				WHERE user_id = ${userId}
+				ORDER BY agent_id NULLS LAST, is_default DESC, created_at DESC
+			`;
+
+		// Summary view: which address a payout would actually land on per chain.
+		// This must mirror the payout-wallet resolution in withdrawals.js, where an
+		// agent-specific row wins and a user-level row (agent_id IS NULL) is the
+		// fallback. The ORDER BY above already puts agent rows ahead of user-level
+		// ones, so the first match per chain is the row that would be paid; matching
+		// on agent_id alone would report "no wallet" for an agent that inherits one.
+		// Only an approved row past its cooldown is paid; a pending replacement
+		// is listed with its effective_at so the page can say when it lands.
+		const live = (w) => Boolean(w.approved_at) && new Date(w.effective_at).getTime() <= Date.now();
+		const resolveWallet = (chains) => wallets.find((w) => chains.includes(w.chain) && live(w));
+		const evmWallet = resolveWallet(['base', 'evm']);
+		const solanaWallet = resolveWallet(['solana']);
+
+		return json(res, 200, {
+			wallets,
+			resolved: {
+				evm_address: evmWallet?.address ?? null,
+				solana_address: solanaWallet?.address ?? null,
+				preferred_network: wallets[0]?.preferred_network ?? 'solana',
+			},
+		});
+	}
+
+	// PUT: set/update payout addresses
+	// CSRF on state-changing session-cookie requests; bearer tokens are exempt
+	// (the token itself proves intent and isn't auto-attached by browsers).
+	if (!(await requireCsrf(req, res, userId))) return;
+
+	const body = parse(putBody, await readJson(req));
+	const { agent_id, evm_address, solana_address, preferred_network } = body;
+
+	// Verify agent ownership
+	const [agent] = await sql`
+		SELECT id, user_id FROM agent_identities
+		WHERE id = ${agent_id} AND deleted_at IS NULL
+	`;
+	if (!agent) return error(res, 404, 'not_found', 'Agent not found');
+	if (agent.user_id !== userId) return error(res, 403, 'forbidden', "You don't own this agent");
+
+	// Validate addresses if provided
+	if (evm_address && !isValidEvmAddress(evm_address)) {
+		return error(
+			res,
+			400,
+			'validation_error',
+			'Invalid EVM address (must start with 0x, 42 characters)',
+		);
+	}
+	if (solana_address && !isValidSolanaAddress(solana_address)) {
+		return error(
+			res,
+			400,
+			'validation_error',
+			'Invalid Solana address (must be base58, 32-44 characters)',
+		);
+	}
+
+	if (!evm_address && !solana_address) {
+		return error(
+			res,
+			400,
+			'validation_error',
+			'At least one address (evm_address or solana_address) is required',
+		);
+	}
+
+	// Replacing a live payout address is slow on purpose (step-up, then a
+	// cooldown before withdrawals use it): api/_lib/account-link/external-wallets.js.
+	let policy;
+	try {
+		const stepUp = await stepUpProven(req, userId, body);
+		policy = {
+			solana: solana_address ? await payoutChangePolicy({ userId, agentId: agent_id, chain: 'solana', address: solana_address, stepUp }) : null,
+			evm: evm_address ? await payoutChangePolicy({ userId, agentId: agent_id, chain: 'base', address: evm_address, stepUp }) : null,
+		};
+	} catch (e) {
+		if (e instanceof ExternalWalletError) return error(res, e.status, e.code, e.message, e.extra);
+		throw e;
+	}
+
+	const results = [];
+
+	// Upsert Solana wallet
+	if (solana_address) {
+		// Clear existing default for this (user, agent, solana)
+		await sql`
+			UPDATE agent_payout_wallets
+			SET is_default = false
+			WHERE user_id = ${userId} AND chain = 'solana' AND agent_id = ${agent_id}
+		`;
+
+		const [wallet] = await sql`
+			INSERT INTO agent_payout_wallets
+				(user_id, agent_id, address, chain, is_default, preferred_network, approved_at, effective_at, set_by)
+			VALUES
+				(${userId}, ${agent_id}, ${solana_address}, 'solana', true, ${preferred_network}, ${policy.solana.approvedAt}, ${policy.solana.effectiveAt}, 'owner')
+			ON CONFLICT (user_id, agent_id, chain) DO UPDATE SET
+				address = EXCLUDED.address,
+				is_default = true,
+				preferred_network = EXCLUDED.preferred_network,
+				approved_at = EXCLUDED.approved_at,
+				effective_at = EXCLUDED.effective_at,
+				set_by = EXCLUDED.set_by,
+				approval_request_id = null
+			RETURNING id, agent_id, address, chain, is_default, preferred_network, created_at, approved_at, effective_at
+		`;
+		if (policy.solana.replacing) logAudit({ userId, action: 'link_payout_wallet', resourceId: wallet.id, meta: { chain: 'solana', address: solana_address, previous: policy.solana.previous, agent_id, actor: 'owner', effective_at: policy.solana.effectiveAt, step_up: true }, req });
+		results.push(wallet);
+	}
+
+	// Upsert EVM wallet.
+	// 'base' and 'evm' are one rail with two historical chain labels, and the
+	// unique key is (user_id, agent_id, chain), so a user can hold a row under
+	// each: /api/billing/payout-wallets accepts chain 'evm', this endpoint always
+	// writes 'base'. Clearing the default on 'base' alone left the sibling 'evm'
+	// row flagged default too, and both resolvers here and in withdrawals.js order
+	// by `is_default DESC, created_at DESC` before picking the first EVM-rail row.
+	// The newly saved address does not move created_at (the table has no
+	// updated_at), so the older row won the tie and the withdrawal paid out to the
+	// address the owner had just replaced. Clear the whole rail instead.
+	if (evm_address) {
+		await sql`
+			UPDATE agent_payout_wallets
+			SET is_default = false
+			WHERE user_id = ${userId} AND chain IN ('base', 'evm') AND agent_id = ${agent_id}
+		`;
+
+		const [wallet] = await sql`
+			INSERT INTO agent_payout_wallets
+				(user_id, agent_id, address, chain, is_default, preferred_network, approved_at, effective_at, set_by)
+			VALUES
+				(${userId}, ${agent_id}, ${evm_address}, 'base', true, ${preferred_network}, ${policy.evm.approvedAt}, ${policy.evm.effectiveAt}, 'owner')
+			ON CONFLICT (user_id, agent_id, chain) DO UPDATE SET
+				address = EXCLUDED.address,
+				is_default = true,
+				preferred_network = EXCLUDED.preferred_network,
+				approved_at = EXCLUDED.approved_at,
+				effective_at = EXCLUDED.effective_at,
+				set_by = EXCLUDED.set_by,
+				approval_request_id = null
+			RETURNING id, agent_id, address, chain, is_default, preferred_network, created_at, approved_at, effective_at
+		`;
+		if (policy.evm.replacing) logAudit({ userId, action: 'link_payout_wallet', resourceId: wallet.id, meta: { chain: 'base', address: evm_address, previous: policy.evm.previous, agent_id, actor: 'owner', effective_at: policy.evm.effectiveAt, step_up: true }, req });
+		results.push(wallet);
+	}
+
+	return json(res, 200, {
+		wallets: results,
+		resolved: {
+			evm_address: evm_address ?? null,
+			solana_address: solana_address ?? null,
+			preferred_network,
+		},
+	});
+});

@@ -1,0 +1,506 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>hood-mcp: a real Robinhood Chain agent session</title>
+<meta name="description" content="A verbatim MCP session transcript: a real client spawns hood-mcp over stdio, initializes, lists 9 tools, and asks what AAPL is trading at on-chain and what the premium is. Live chain-4663 numbers, captured, not written." />
+<link rel="canonical" href="https://nirholas.github.io/hood-mcp/" />
+<meta name="theme-color" content="#0a0d10" />
+<meta property="og:type" content="website" />
+<meta property="og:title" content="hood-mcp: a real Robinhood Chain agent session" />
+<meta property="og:description" content="Verbatim MCP wire transcript against Robinhood Chain 4663: AAPL oracle vs DEX price, the premium, trending coins, token search. Every number captured from a live run." />
+<meta property="og:url" content="https://nirholas.github.io/hood-mcp/" />
+<meta name="twitter:card" content="summary_large_image" />
+<meta name="twitter:title" content="hood-mcp: a real Robinhood Chain agent session" />
+<meta name="twitter:description" content="A real MCP client, the real server, live chain 4663 data. The transcript is the documentation." />
+<meta name="twitter:creator" content="@nichxbt" />
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='7' fill='%230a0d10'/><path d='M7 22V10m0 6h8m0-6v12' fill='none' stroke='%2300c805' stroke-width='2.6' stroke-linecap='round'/><circle cx='24' cy='12' r='2.6' fill='%2335e0c0'/></svg>" />
+<link rel="stylesheet" href="site.css" />
+<script type="application/ld+json">
+{"@context":"https://schema.org","@type":"SoftwareApplication","name":"hood-mcp","applicationCategory":"DeveloperApplication","operatingSystem":"Node.js >= 20","offers":{"@type":"Offer","price":"0","priceCurrency":"USD"},"description":"Model Context Protocol servers for Robinhood Chain (chain ID 4663): a zero-config read-only data server and an explicitly opt-in trading server with hard spend caps and a confirm gate.","softwareVersion":"0.1.0","author":{"@type":"Person","name":"nirholas","url":"https://x.com/nichxbt"},"downloadUrl":"https://www.npmjs.com/package/hood-mcp","codeRepository":"https://github.com/nirholas/hood-mcp"}
+</script>
+</head>
+<body>
+
+<nav class="top">
+  <div class="wrap">
+    <div class="brand"><span class="tick">hood</span>-mcp</div>
+    <div class="links">
+      <a href="index.html" aria-current="page">Session</a>
+      <a href="install.html">Install</a>
+      <a href="tools.html">Tools</a>
+      <a href="safety.html">Safety model</a>
+      <a href="https://github.com/nirholas/hood-mcp">GitHub</a>
+    </div>
+  </div>
+</nav>
+
+<main class="wrap">
+
+  <section style="border-top:none; padding-top:56px;">
+    <p class="eyebrow">Captured session · 2026-07-29 05:54:55 UTC</p>
+    <h1>“What is AAPL trading at on-chain,<br />and what is the premium?”</h1>
+    <p class="section-lede">
+      Below is the answer, and then the entire wire transcript that produced it: a real
+      <a href="https://modelcontextprotocol.io">Model Context Protocol</a> client spawning
+      <code>hood-mcp</code> over stdio, initializing, listing its 9 tools, and
+      calling 4 of them against live Robinhood Chain mainnet (4663). Nothing on this page
+      is written by hand. It is generated from
+      <a href="session.json">session.json</a>, the recorded frames of one run.
+    </p>
+
+    <dl class="figures">
+      <div>
+        <dt>AAPL · Chainlink oracle</dt>
+        <dd>$341.26<small>feed answer, 1,809s old</small></dd>
+      </div>
+      <div>
+        <dt>AAPL · Uniswap DEX</dt>
+        <dd>$340.4<small>on-chain v3 mid price</small></dd>
+      </div>
+      <div>
+        <dt>Premium</dt>
+        <dd class="neg">-0.2522%<small>DEX vs oracle</small></dd>
+      </div>
+      <div>
+        <dt>Chain 4663</dt>
+        <dd>#22,218,404<small>101 ms blocks · $338,136,167.56 TVL</small></dd>
+      </div>
+    </dl>
+
+    <p class="section-lede">
+      That premium is the whole trade: a Stock Token can drift from its oracle, and an agent that can
+      read both sides in one tool call can act on the gap. <code>get_stock_quote</code> returns the
+      oracle price, the DEX price, the spread, and the ERC-8056 <code>uiMultiplier</code> so the
+      underlying share price is never misstated after a split.
+    </p>
+
+    <p class="note">
+      <strong>Reproduce it.</strong> <code>npm install &amp;&amp; npm run build &amp;&amp; npm run docs</code> re-runs the
+      capture against the chain as it is right now and re-renders this page. The numbers above will
+      differ from yours, because they are real.
+    </p>
+  </section>
+
+  <section id="transcript">
+    <h2>The transcript</h2>
+    <p class="section-lede">
+      Every frame below was recorded off the stdio transport in both directions during a single run
+      of <code>scripts/capture-session.mjs</code>. Request frames are the client speaking; result
+      frames are the server's, verbatim.
+    </p>
+
+    <div class="transcript">
+      <div class="transcript-head">
+        <span class="dots" aria-hidden="true"><i></i><i></i><i></i></span>
+        <span>node dist/data-server.js &nbsp;·&nbsp; stdio &nbsp;·&nbsp; HOOD_MCP_NETWORK=mainnet</span>
+        <span style="margin-left:auto">13 frames · 11225 ms total</span>
+      </div>
+
+      <div class="turn req">
+      <div class="turn-label">→ initialize<span class="ms">handshake</span></div>
+      <pre><code>{
+  &quot;method&quot;: &quot;initialize&quot;,
+  &quot;params&quot;: {
+    &quot;protocolVersion&quot;: &quot;<span class="j-num">2025</span><span class="j-num">-11</span><span class="j-num">-25</span>&quot;,
+    &quot;capabilities&quot;: {},
+    &quot;clientInfo&quot;: {
+      &quot;name&quot;: &quot;hood-mcp-session-capture&quot;,
+      &quot;version&quot;: &quot;<span class="j-num">1.0</span>.<span class="j-num">0</span>&quot;
+    }
+  },
+  &quot;jsonrpc&quot;: &quot;<span class="j-num">2.0</span>&quot;,
+  &quot;id&quot;: <span class="j-num">0</span>
+}</code></pre>
+    </div>
+      <div class="turn res">
+      <div class="turn-label">← initialize result<span class="ms">server capabilities</span></div>
+      <pre><code>{
+  &quot;jsonrpc&quot;: &quot;<span class="j-num">2.0</span>&quot;,
+  &quot;id&quot;: <span class="j-num">0</span>,
+  &quot;result&quot;: {
+    &quot;protocolVersion&quot;: &quot;<span class="j-num">2025</span><span class="j-num">-11</span><span class="j-num">-25</span>&quot;,
+    &quot;capabilities&quot;: {
+      &quot;tools&quot;: {
+        &quot;listChanged&quot;: <span class="j-bool">true</span>
+      }
+    },
+    &quot;serverInfo&quot;: {
+      &quot;name&quot;: &quot;hood-mcp&quot;,
+      &quot;version&quot;: &quot;<span class="j-num">0.1</span>.<span class="j-num">0</span>&quot;
+    },
+    &quot;instructions&quot;: &quot;Read-only market data for Robinhood Chain (chain ID <span class="j-num">4663</span>), the permissionless\nArbitrum Orbit L<span class="j-num">2</span> with tokenized-equity \&quot;Stock Tokens\&quot;, the USDG stablecoin, and the NOXA / The\nOdyssey memecoin launchpads. Use get_stock_quote for a ticker&#<span class="j-num">39</span>;s oracle+DEX price and premium,\nget_portfolio for a wallet&#<span class="j-num">39</span>;s holdings, list_trending_coins / get_coin for memecoins,\nget_recent_launches / watch_launches for launchpad activity, and get_chain_stats for the chain.\nAll data is public and read-only. To place trades, use the separate hood-mcp-trading server.&quot;
+  }
+}</code></pre>
+    </div>
+      <div class="turn req">
+      <div class="turn-label">→ tools/list</div>
+      <pre><code>{
+  &quot;method&quot;: &quot;tools/list&quot;,
+  &quot;jsonrpc&quot;: &quot;<span class="j-num">2.0</span>&quot;,
+  &quot;id&quot;: <span class="j-num">1</span>
+}</code></pre>
+    </div>
+      <div class="turn res">
+        <div class="turn-label">← 9 tools<span class="ms">schemas in <a href="tools.html">the reference</a></span></div>
+        <div class="table-scroll"><table>
+          <thead><tr><th>Tool</th><th>Description the model routes on</th></tr></thead>
+          <tbody>
+          <tr><td><code>get_chain_stats</code></td><td>Live Robinhood Chain overview: latest block, gas price, TVL, and network totals (blocks, addresses, transactions, block time). No inputs.</td></tr>
+          <tr><td><code>list_stock_tokens</code></td><td>The registry of tokenized-equity Stock Tokens on Robinhood Chain (ticker, name, contract, Chainlink feed). Set pricedOnly to return only tokens with a live feed.</td></tr>
+          <tr><td><code>get_stock_quote</code></td><td>Price a Stock Token by ticker: the Chainlink oracle price, the on-chain Uniswap DEX mid price, the premium/discount between them, and the ERC-8056 multiplier (so you also get the underlying share price).</td></tr>
+          <tr><td><code>get_portfolio</code></td><td>Multiplier-correct Stock Token portfolio for any address: per-position token balance, ERC-8056 share-equivalent, USD value, plus the USDG cash balance. Read-only.</td></tr>
+          <tr><td><code>get_coin</code></td><td>Detail for any Robinhood Chain token by contract address: price, 24h volume, liquidity, FDV, holder count, and whether it is a registered Stock Token.</td></tr>
+          <tr><td><code>list_trending_coins</code></td><td>The trending pools on Robinhood Chain right now (memecoins and stocks) with price, 24h volume, price change, and liquidity — the pulse of the chain.</td></tr>
+          <tr><td><code>get_recent_launches</code></td><td>Recently launched tokens on Robinhood Chain launchpads (NOXA and The Odyssey), newest first, scanned from on-chain logs.</td></tr>
+          <tr><td><code>watch_launches</code></td><td>Watch NOXA + The Odyssey live for new token launches, blocking up to waitSeconds (or until limit launches are seen), then returns what appeared. Falls back to the most recent launch if none fire in the window.</td></tr>
+          <tr><td><code>search_token</code></td><td>Find tokens on Robinhood Chain by ticker, name, or contract address — searches the Stock Token registry and the Blockscout index together.</td></tr>
+          </tbody>
+        </table></div>
+      </div>
+      <div class="turn req">
+      <div class="turn-label">→ tools/call  get_chain_stats</div>
+      <pre><code>{
+  &quot;jsonrpc&quot;: &quot;<span class="j-num">2.0</span>&quot;,
+  &quot;id&quot;: &quot;get_chain_stats&quot;,
+  &quot;method&quot;: &quot;tools/call&quot;,
+  &quot;params&quot;: {
+    &quot;name&quot;: &quot;get_chain_stats&quot;,
+    &quot;arguments&quot;: {}
+  }
+}</code></pre>
+    </div>
+    <div class="turn res">
+      <div class="turn-label">← result<span class="ms">799 ms · live</span></div>
+      <pre><code>{
+  &quot;network&quot;: &quot;mainnet&quot;,
+  &quot;chainId&quot;: <span class="j-num">4663</span>,
+  &quot;latestBlock&quot;: &quot;<span class="j-num">22218404</span>&quot;,
+  &quot;gasPriceWei&quot;: &quot;<span class="j-num">25952000</span>&quot;,
+  &quot;gasPriceGwei&quot;: <span class="j-num">0.026</span>,
+  &quot;tvlUsd&quot;: <span class="j-num">338136167.5648021</span>,
+  &quot;blockscout&quot;: {
+    &quot;averageBlockTimeMs&quot;: <span class="j-num">101</span>,
+    &quot;totalBlocks&quot;: &quot;<span class="j-num">22217047</span>&quot;,
+    &quot;totalAddresses&quot;: &quot;<span class="j-num">4797848</span>&quot;,
+    &quot;totalTransactions&quot;: &quot;<span class="j-num">187224382</span>&quot;,
+    &quot;transactionsToday&quot;: &quot;<span class="j-num">9205189</span>&quot;,
+    &quot;gasPrices&quot;: {
+      &quot;slow&quot;: <span class="j-num">0.03</span>,
+      &quot;average&quot;: <span class="j-num">0.08</span>,
+      &quot;fast&quot;: <span class="j-num">0.15</span>
+    },
+    &quot;ethPriceUsd&quot;: <span class="j-num">1910.1</span>
+  },
+  &quot;sources&quot;: [
+    &quot;robinhood-chain-rpc&quot;,
+    &quot;defillama&quot;,
+    &quot;blockscout&quot;
+  ],
+  &quot;asOf&quot;: &quot;<span class="j-num">2026</span><span class="j-num">-07</span><span class="j-num">-29</span>T<span class="j-num">05</span>:<span class="j-num">54</span>:<span class="j-num">53.465</span>Z&quot;
+}</code></pre>
+    </div>
+    <div class="turn req">
+      <div class="turn-label">→ tools/call  get_stock_quote</div>
+      <pre><code>{
+  &quot;jsonrpc&quot;: &quot;<span class="j-num">2.0</span>&quot;,
+  &quot;id&quot;: &quot;get_stock_quote&quot;,
+  &quot;method&quot;: &quot;tools/call&quot;,
+  &quot;params&quot;: {
+    &quot;name&quot;: &quot;get_stock_quote&quot;,
+    &quot;arguments&quot;: {
+      &quot;symbol&quot;: &quot;AAPL&quot;
+    }
+  }
+}</code></pre>
+    </div>
+    <div class="turn res">
+      <div class="turn-label">← result<span class="ms">838 ms · live</span></div>
+      <pre><code>{
+  &quot;symbol&quot;: &quot;AAPL&quot;,
+  &quot;name&quot;: &quot;Apple • Robinhood Token&quot;,
+  &quot;address&quot;: &quot;<span class="j-num">0</span>xaF<span class="j-num">3</span>D<span class="j-num">76</span>f<span class="j-num">1834</span>A<span class="j-num">1</span>d<span class="j-num">425780943</span>C<span class="j-num">99</span>Ea<span class="j-num">8</span>A<span class="j-num">608</span>f<span class="j-num">8</span>a<span class="j-num">93</span>f<span class="j-num">9</span>&quot;,
+  &quot;network&quot;: &quot;mainnet&quot;,
+  &quot;chainlink&quot;: {
+    &quot;priceUsd&quot;: <span class="j-num">341.26</span>,
+    &quot;feed&quot;: &quot;<span class="j-num">0</span>x<span class="j-num">6</span>B<span class="j-num">22</span>A<span class="j-num">786</span>bAa<span class="j-num">607</span>d<span class="j-num">76728168703</span>a<span class="j-num">39</span>Ea<span class="j-num">9</span>C<span class="j-num">99</span>f<span class="j-num">2</span>cD<span class="j-num">0</span>&quot;,
+    &quot;roundId&quot;: &quot;<span class="j-num">18446744073709551925</span>&quot;,
+    &quot;updatedAt&quot;: <span class="j-num">1785302684</span>,
+    &quot;ageSeconds&quot;: <span class="j-num">1809</span>
+  },
+  &quot;chainlinkError&quot;: <span class="j-null">null</span>,
+  &quot;dexPriceUsd&quot;: <span class="j-num">340.399395</span>,
+  &quot;dexError&quot;: <span class="j-null">null</span>,
+  &quot;premiumPct&quot;: <span class="j-num">-0.2522</span>,
+  &quot;premiumNote&quot;: &quot;positive = DEX trades above oracle&quot;,
+  &quot;uiMultiplier&quot;: &quot;<span class="j-num">1000000000000000000</span>&quot;,
+  &quot;underlyingSharePriceUsd&quot;: <span class="j-num">341.26</span>,
+  &quot;explorer&quot;: &quot;https://robinhoodchain.blockscout.com/address/<span class="j-num">0</span>xaF<span class="j-num">3</span>D<span class="j-num">76</span>f<span class="j-num">1834</span>A<span class="j-num">1</span>d<span class="j-num">425780943</span>C<span class="j-num">99</span>Ea<span class="j-num">8</span>A<span class="j-num">608</span>f<span class="j-num">8</span>a<span class="j-num">93</span>f<span class="j-num">9</span>&quot;,
+  &quot;sources&quot;: [
+    &quot;chainlink&quot;,
+    &quot;uniswap-v<span class="j-num">3</span>&quot;,
+    &quot;robinhood-chain-rpc&quot;
+  ],
+  &quot;asOf&quot;: &quot;<span class="j-num">2026</span><span class="j-num">-07</span><span class="j-num">-29</span>T<span class="j-num">05</span>:<span class="j-num">54</span>:<span class="j-num">54.324</span>Z&quot;,
+  &quot;disclosure&quot;: &quot;Stock Tokens are tokenized debt securities (Robinhood Assets (Jersey) Ltd) and may not be offered, sold, or delivered to US persons. This tool is read-only data.&quot;
+}</code></pre>
+    </div>
+    <div class="turn req">
+      <div class="turn-label">→ tools/call  list_trending_coins</div>
+      <pre><code>{
+  &quot;jsonrpc&quot;: &quot;<span class="j-num">2.0</span>&quot;,
+  &quot;id&quot;: &quot;list_trending_coins&quot;,
+  &quot;method&quot;: &quot;tools/call&quot;,
+  &quot;params&quot;: {
+    &quot;name&quot;: &quot;list_trending_coins&quot;,
+    &quot;arguments&quot;: {
+      &quot;limit&quot;: <span class="j-num">5</span>
+    }
+  }
+}</code></pre>
+    </div>
+    <div class="turn res">
+      <div class="turn-label">← result<span class="ms">301 ms · live</span></div>
+      <pre><code>{
+  &quot;network&quot;: &quot;mainnet&quot;,
+  &quot;count&quot;: <span class="j-num">5</span>,
+  &quot;coins&quot;: [
+    {
+      &quot;poolName&quot;: &quot;ASTEROID / WETH&quot;,
+      &quot;poolAddress&quot;: &quot;<span class="j-num">0</span>x<span class="j-num">5</span>d<span class="j-num">0808</span>de<span class="j-num">5</span>c<span class="j-num">01</span>fef<span class="j-num">74</span>b<span class="j-num">1</span>c<span class="j-num">81</span>ecb<span class="j-num">4</span>f<span class="j-num">1</span>baa<span class="j-num">3974</span>f<span class="j-num">28</span>f<span class="j-num">1</span>&quot;,
+      &quot;baseTokenAddress&quot;: &quot;<span class="j-num">0</span>x<span class="j-num">38</span>aaf<span class="j-num">33082</span>b<span class="j-num">20</span>aff<span class="j-num">2e33433138</span>de<span class="j-num">920</span>f<span class="j-num">131</span>b<span class="j-num">7777</span>&quot;,
+      &quot;quoteTokenAddress&quot;: &quot;<span class="j-num">0</span>x<span class="j-num">0</span>bd<span class="j-num">7</span>d<span class="j-num">308</span>f<span class="j-num">8e1639</span>fab<span class="j-num">988</span>df<span class="j-num">18</span>a<span class="j-num">8011</span>f<span class="j-num">41</span>eacad<span class="j-num">73</span>&quot;,
+      &quot;priceUsd&quot;: <span class="j-num">0.000546565206650149</span>,
+      &quot;priceChange<span class="j-num">24</span>hPct&quot;: <span class="j-num">142.964</span>,
+      &quot;volume<span class="j-num">24</span>hUsd&quot;: <span class="j-num">1063951.86724201</span>,
+      &quot;liquidityUsd&quot;: <span class="j-num">80518.5464</span>,
+      &quot;fdvUsd&quot;: <span class="j-num">546565.2067</span>,
+      &quot;buys<span class="j-num">24</span>h&quot;: <span class="j-num">3621</span>,
+      &quot;sells<span class="j-num">24</span>h&quot;: <span class="j-num">2754</span>,
+      &quot;createdAt&quot;: &quot;<span class="j-num">2026</span><span class="j-num">-07</span><span class="j-num">-21</span>T<span class="j-num">09</span>:<span class="j-num">49</span>:<span class="j-num">58</span>Z&quot;
+    },
+    {
+      &quot;poolName&quot;: &quot;FROGE / WETH <span class="j-num">1</span>%&quot;,
+      &quot;poolAddress&quot;: &quot;<span class="j-num">0</span>x<span class="j-num">8236</span>b<span class="j-num">1</span>bc<span class="j-num">2e58411</span>bd<span class="j-num">7</span>be<span class="j-num">1</span>fe<span class="j-num">62</span>b<span class="j-num">512</span>a<span class="j-num">2</span>f<span class="j-num">47</span>f<span class="j-num">7</span>b<span class="j-num">8</span>f<span class="j-num">6</span>&quot;,
+      &quot;baseTokenAddress&quot;: &quot;<span class="j-num">0</span>x<span class="j-num">530237</span>d<span class="j-num">8347e0</span>dc<span class="j-num">4137</span>d<span class="j-num">5</span>f<span class="j-num">04</span>ab<span class="j-num">7</span>a<span class="j-num">952</span>ff<span class="j-num">71</span>df<span class="j-num">20</span>d&quot;,
+      &quot;quoteTokenAddress&quot;: &quot;<span class="j-num">0</span>x<span class="j-num">0</span>bd<span class="j-num">7</span>d<span class="j-num">308</span>f<span class="j-num">8e1639</span>fab<span class="j-num">988</span>df<span class="j-num">18</span>a<span class="j-num">8011</span>f<span class="j-num">41</span>eacad<span class="j-num">73</span>&quot;,
+      &quot;priceUsd&quot;: <span class="j-num">0.0000035167325314918</span>,
+      &quot;priceChange<span class="j-num">24</span>hPct&quot;: <span class="j-num">28.723</span>,
+      &quot;volume<span class="j-num">24</span>hUsd&quot;: <span class="j-num">55744.8178726283</span>,
+      &quot;liquidityUsd&quot;: <span class="j-num">3545.8034</span>,
+      &quot;fdvUsd&quot;: <span class="j-num">3516.732531</span>,
+      &quot;buys<span class="j-num">24</span>h&quot;: <span class="j-num">1612</span>,
+      &quot;sells<span class="j-num">24</span>h&quot;: <span class="j-num">1015</span>,
+      &quot;createdAt&quot;: &quot;<span class="j-num">2026</span><span class="j-num">-07</span><span class="j-num">-28</span>T<span class="j-num">17</span>:<span class="j-num">33</span>:<span class="j-num">37</span>Z&quot;
+    },
+    {
+      &quot;poolName&quot;: &quot;PLTS / WETH&quot;,
+      &quot;poolAddress&quot;: &quot;<span class="j-num">0</span>xdbbe<span class="j-num">5</span>af<span class="j-num">0e5563</span>fa<span class="j-num">3</span>a<span class="j-num">67</span>c<span class="j-num">7</span>fac<span class="j-num">601</span>a<span class="j-num">57</span>dce<span class="j-num">6e450</span>ff&quot;,
+      &quot;baseTokenAddress&quot;: &quot;<span class="j-num">0</span>xbcca<span class="j-num">8</span>c<span class="j-num">2</span>dd<span class="j-num">0</span>ffb<span class="j-num">6</span>ca<span class="j-num">5210</span>dba<span class="j-num">327e027756</span>c<span class="j-num">047777</span>&quot;,
+      &quot;quoteTokenAddress&quot;: &quot;<span class="j-num">0</span>x<span class="j-num">0</span>bd<span class="j-num">7</span>d<span class="j-num">308</span>f<span class="j-num">8e1639</span>fab<span class="j-num">988</span>df<span class="j-num">18</span>a<span class="j-num">8011</span>f<span class="j-num">41</span>eacad<span class="j-num">73</span>&quot;,
+      &quot;priceUsd&quot;: <span class="j-num">1.94102655402234e-9</span>,
+      &quot;priceChange<span class="j-num">24</span>hPct&quot;: <span class="j-num">-99.901</span>,
+      &quot;volume<span class="j-num">24</span>hUsd&quot;: <span class="j-num">15902225.2135792</span>,
+      &quot;liquidityUsd&quot;: <span class="j-num">0.191</span>,
+      &quot;fdvUsd&quot;: <span class="j-num">1.941026554</span>,
+      &quot;buys<span class="j-num">24</span>h&quot;: <span class="j-num">6872</span>,
+      &quot;sells<span class="j-num">24</span>h&quot;: <span class="j-num">1056</span>,
+      &quot;createdAt&quot;: &quot;<span class="j-num">2026</span><span class="j-num">-07</span><span class="j-num">-28</span>T<span class="j-num">17</span>:<span class="j-num">24</span>:<span class="j-num">09</span>Z&quot;
+    },
+    {
+      &quot;poolName&quot;: &quot;PIPEDOG / WETH <span class="j-num">1</span>%&quot;,
+      &quot;poolAddress&quot;: &quot;<span class="j-num">0</span>xb<span class="j-num">7</span>f<span class="j-num">10</span>f<span class="j-num">74</span>b<span class="j-num">39291</span>b<span class="j-num">9290</span>b<span class="j-num">779978e19</span>a<span class="j-num">7637</span>c<span class="j-num">742</span>d<span class="j-num">6</span>&quot;,
+      &quot;baseTokenAddress&quot;: &quot;<span class="j-num">0</span>x<span class="j-num">5</span>cb<span class="j-num">6</span>f<span class="j-num">181081301</span>b<span class="j-num">44905</span>f<span class="j-num">3</span>ae<span class="j-num">15419112</span>ecabd<span class="j-num">8</span>a<span class="j-num">6</span>&quot;,
+      &quot;quoteTokenAddress&quot;: &quot;<span class="j-num">0</span>x<span class="j-num">0</span>bd<span class="j-num">7</span>d<span class="j-num">308</span>f<span class="j-num">8e1639</span>fab<span class="j-num">988</span>df<span class="j-num">18</span>a<span class="j-num">8011</span>f<span class="j-num">41</span>eacad<span class="j-num">73</span>&quot;,
+      &quot;priceUsd&quot;: <span class="j-num">0.00330896516329277</span>,
+      &quot;priceChange<span class="j-num">24</span>hPct&quot;: <span class="j-num">7793.242</span>,
+      &quot;volume<span class="j-num">24</span>hUsd&quot;: <span class="j-num">60274246.5498963</span>,
+      &quot;liquidityUsd&quot;: <span class="j-num">10090826.0318</span>,
+      &quot;fdvUsd&quot;: <span class="j-num">40234140.4877809</span>,
+      &quot;buys<span class="j-num">24</span>h&quot;: <span class="j-num">27262</span>,
+      &quot;sells<span class="j-num">24</span>h&quot;: <span class="j-num">17355</span>,
+      &quot;createdAt&quot;: &quot;<span class="j-num">2026</span><span class="j-num">-07</span><span class="j-num">-28</span>T<span class="j-num">20</span>:<span class="j-num">31</span>:<span class="j-num">52</span>Z&quot;
+    },
+    {
+      &quot;poolName&quot;: &quot;CASHCAT / WETH <span class="j-num">1</span>%&quot;,
+      &quot;poolAddress&quot;: &quot;<span class="j-num">0</span>xa<span class="j-num">70</span>fc<span class="j-num">67</span>c<span class="j-num">9</span>f<span class="j-num">69</span>da<span class="j-num">90</span>b<span class="j-num">63</span>a<span class="j-num">0e4</span>c<span class="j-num">05</span>d<span class="j-num">229954574e313</span>&quot;,
+      &quot;baseTokenAddress&quot;: &quot;<span class="j-num">0</span>x<span class="j-num">020</span>bfc<span class="j-num">650</span>a<span class="j-num">365</span>f<span class="j-num">8</span>bb<span class="j-num">26819</span>deaabf<span class="j-num">3e21291018</span>b<span class="j-num">4</span>&quot;,
+      &quot;quoteTokenAddress&quot;: &quot;<span class="j-num">0</span>x<span class="j-num">0</span>bd<span class="j-num">7</span>d<span class="j-num">308</span>f<span class="j-num">8e1639</span>fab<span class="j-num">988</span>df<span class="j-num">18</span>a<span class="j-num">8011</span>f<span class="j-num">41</span>eacad<span class="j-num">73</span>&quot;,
+      &quot;priceUsd&quot;: <span class="j-num">0.040571997442232</span>,
+      &quot;priceChange<span class="j-num">24</span>hPct&quot;: <span class="j-num">0.57</span>,
+      &quot;volume<span class="j-num">24</span>hUsd&quot;: <span class="j-num">7870242.51179214</span>,
+      &quot;liquidityUsd&quot;: <span class="j-num">2923977.0396</span>,
+      &quot;fdvUsd&quot;: <span class="j-num">40156036.1427855</span>,
+      &quot;buys<span class="j-num">24</span>h&quot;: <span class="j-num">5203</span>,
+      &quot;sells<span class="j-num">24</span>h&quot;: <span class="j-num">4125</span>,
+      &quot;createdAt&quot;: &quot;<span class="j-num">2026</span><span class="j-num">-06</span><span class="j-num">-29</span>T<span class="j-num">07</span>:<span class="j-num">00</span>:<span class="j-num">49</span>Z&quot;
+    }
+  ],
+  &quot;source&quot;: &quot;geckoterminal&quot;,
+  &quot;asOf&quot;: &quot;<span class="j-num">2026</span><span class="j-num">-07</span><span class="j-num">-29</span>T<span class="j-num">05</span>:<span class="j-num">54</span>:<span class="j-num">54.633</span>Z&quot;
+}</code></pre>
+    </div>
+    <div class="turn req">
+      <div class="turn-label">→ tools/call  search_token</div>
+      <pre><code>{
+  &quot;jsonrpc&quot;: &quot;<span class="j-num">2.0</span>&quot;,
+  &quot;id&quot;: &quot;search_token&quot;,
+  &quot;method&quot;: &quot;tools/call&quot;,
+  &quot;params&quot;: {
+    &quot;name&quot;: &quot;search_token&quot;,
+    &quot;arguments&quot;: {
+      &quot;query&quot;: &quot;NVDA&quot;,
+      &quot;limit&quot;: <span class="j-num">3</span>
+    }
+  }
+}</code></pre>
+    </div>
+    <div class="turn res">
+      <div class="turn-label">← result<span class="ms">760 ms · live</span></div>
+      <pre><code>{
+  &quot;network&quot;: &quot;mainnet&quot;,
+  &quot;query&quot;: &quot;NVDA&quot;,
+  &quot;count&quot;: <span class="j-num">3</span>,
+  &quot;results&quot;: [
+    {
+      &quot;address&quot;: &quot;<span class="j-num">0</span>xd<span class="j-num">0601</span>CE<span class="j-num">157</span>Db<span class="j-num">5</span>bdC<span class="j-num">3162</span>BbaC<span class="j-num">2</span>a<span class="j-num">2</span>C<span class="j-num">8</span>aF<span class="j-num">5320</span>D<span class="j-num">9</span>EEC&quot;,
+      &quot;symbol&quot;: &quot;NVDA&quot;,
+      &quot;name&quot;: &quot;NVIDIA • Robinhood Token&quot;,
+      &quot;type&quot;: &quot;stock-token&quot;,
+      &quot;isStockToken&quot;: <span class="j-bool">true</span>,
+      &quot;verified&quot;: <span class="j-bool">true</span>,
+      &quot;explorer&quot;: &quot;https://robinhoodchain.blockscout.com/address/<span class="j-num">0</span>xd<span class="j-num">0601</span>CE<span class="j-num">157</span>Db<span class="j-num">5</span>bdC<span class="j-num">3162</span>BbaC<span class="j-num">2</span>a<span class="j-num">2</span>C<span class="j-num">8</span>aF<span class="j-num">5320</span>D<span class="j-num">9</span>EEC&quot;
+    },
+    {
+      &quot;address&quot;: &quot;<span class="j-num">0</span>xDeCF<span class="j-num">74e4</span>AA<span class="j-num">6</span>fF<span class="j-num">30</span>b<span class="j-num">1612e65665</span>AAF<span class="j-num">650</span>BEdecbA<span class="j-num">3</span>&quot;,
+      &quot;symbol&quot;: &quot;NVDA&quot;,
+      &quot;name&quot;: &quot;NVDA&quot;,
+      &quot;type&quot;: &quot;token&quot;,
+      &quot;isStockToken&quot;: <span class="j-bool">false</span>,
+      &quot;verified&quot;: <span class="j-bool">false</span>,
+      &quot;marketCapUsd&quot;: <span class="j-null">null</span>,
+      &quot;explorer&quot;: &quot;https://robinhoodchain.blockscout.com/address/<span class="j-num">0</span>xDeCF<span class="j-num">74e4</span>AA<span class="j-num">6</span>fF<span class="j-num">30</span>b<span class="j-num">1612e65665</span>AAF<span class="j-num">650</span>BEdecbA<span class="j-num">3</span>&quot;
+    },
+    {
+      &quot;address&quot;: &quot;<span class="j-num">0</span>xf<span class="j-num">94217</span>F<span class="j-num">3</span>bf<span class="j-num">7804e6</span>cd<span class="j-num">080</span>aEbB<span class="j-num">40271</span>aCbc<span class="j-num">0</span>D<span class="j-num">6</span>a<span class="j-num">09</span>&quot;,
+      &quot;symbol&quot;: &quot;NVDACAT&quot;,
+      &quot;name&quot;: &quot;NVIDIA CAT&quot;,
+      &quot;type&quot;: &quot;token&quot;,
+      &quot;isStockToken&quot;: <span class="j-bool">false</span>,
+      &quot;verified&quot;: <span class="j-bool">true</span>,
+      &quot;marketCapUsd&quot;: <span class="j-null">null</span>,
+      &quot;explorer&quot;: &quot;https://robinhoodchain.blockscout.com/address/<span class="j-num">0</span>xf<span class="j-num">94217</span>F<span class="j-num">3</span>bf<span class="j-num">7804e6</span>cd<span class="j-num">080</span>aEbB<span class="j-num">40271</span>aCbc<span class="j-num">0</span>D<span class="j-num">6</span>a<span class="j-num">09</span>&quot;
+    }
+  ],
+  &quot;sources&quot;: [
+    &quot;hoodchain-registry&quot;,
+    &quot;blockscout&quot;
+  ],
+  &quot;asOf&quot;: &quot;<span class="j-num">2026</span><span class="j-num">-07</span><span class="j-num">-29</span>T<span class="j-num">05</span>:<span class="j-num">54</span>:<span class="j-num">55.395</span>Z&quot;
+}</code></pre>
+    </div>
+    </div>
+
+    <p class="section-lede" style="margin-top:18px;">
+      The server's <code>instructions</code> string (returned in the handshake and shown to the model
+      before any tool is picked) is what keeps routing sane on a chain with both tokenized equities
+      and memecoins:
+    </p>
+    <pre><code>Read-only market data for Robinhood Chain (chain ID 4663), the permissionless
+Arbitrum Orbit L2 with tokenized-equity &quot;Stock Tokens&quot;, the USDG stablecoin, and the NOXA / The
+Odyssey memecoin launchpads. Use get_stock_quote for a ticker&#39;s oracle+DEX price and premium,
+get_portfolio for a wallet&#39;s holdings, list_trending_coins / get_coin for memecoins,
+get_recent_launches / watch_launches for launchpad activity, and get_chain_stats for the chain.
+All data is public and read-only. To place trades, use the separate hood-mcp-trading server.</code></pre>
+  </section>
+
+  <section id="testnet">
+    <h2>Same server, testnet 46630</h2>
+    <p class="section-lede">
+      One env var switches networks. Captured in the same run against the live testnet, which is a
+      different chain with its own block height, gas market, and Blockscout index.
+    </p>
+    <div class="transcript">
+      <div class="transcript-head">
+        <span class="dots" aria-hidden="true"><i></i><i></i><i></i></span>
+        <span>node dist/data-server.js &nbsp;·&nbsp; stdio &nbsp;·&nbsp; HOOD_MCP_NETWORK=testnet</span>
+        <span style="margin-left:auto">7 frames · 8024 ms total</span>
+      </div>
+      <div class="turn req">
+      <div class="turn-label">→ tools/call  get_chain_stats</div>
+      <pre><code>{
+  &quot;jsonrpc&quot;: &quot;<span class="j-num">2.0</span>&quot;,
+  &quot;id&quot;: &quot;get_chain_stats&quot;,
+  &quot;method&quot;: &quot;tools/call&quot;,
+  &quot;params&quot;: {
+    &quot;name&quot;: &quot;get_chain_stats&quot;,
+    &quot;arguments&quot;: {}
+  }
+}</code></pre>
+    </div>
+    <div class="turn res">
+      <div class="turn-label">← result<span class="ms">429 ms · live</span></div>
+      <pre><code>{
+  &quot;network&quot;: &quot;testnet&quot;,
+  &quot;chainId&quot;: <span class="j-num">46630</span>,
+  &quot;latestBlock&quot;: &quot;<span class="j-num">94828462</span>&quot;,
+  &quot;gasPriceWei&quot;: &quot;<span class="j-num">10000000</span>&quot;,
+  &quot;gasPriceGwei&quot;: <span class="j-num">0.01</span>,
+  &quot;tvlUsd&quot;: <span class="j-num">338136167.5648021</span>,
+  &quot;blockscout&quot;: {
+    &quot;averageBlockTimeMs&quot;: <span class="j-num">293</span>,
+    &quot;totalBlocks&quot;: &quot;<span class="j-num">94823272</span>&quot;,
+    &quot;totalAddresses&quot;: &quot;<span class="j-num">20191230</span>&quot;,
+    &quot;totalTransactions&quot;: &quot;<span class="j-num">216329432</span>&quot;,
+    &quot;transactionsToday&quot;: &quot;<span class="j-num">1351781</span>&quot;,
+    &quot;gasPrices&quot;: {
+      &quot;slow&quot;: <span class="j-num">0.13</span>,
+      &quot;average&quot;: <span class="j-num">0.15</span>,
+      &quot;fast&quot;: <span class="j-num">0.15</span>
+    },
+    &quot;ethPriceUsd&quot;: <span class="j-null">null</span>
+  },
+  &quot;sources&quot;: [
+    &quot;robinhood-chain-rpc&quot;,
+    &quot;defillama&quot;,
+    &quot;blockscout&quot;
+  ],
+  &quot;asOf&quot;: &quot;<span class="j-num">2026</span><span class="j-num">-07</span><span class="j-num">-29</span>T<span class="j-num">05</span>:<span class="j-num">55</span>:<span class="j-num">03.789</span>Z&quot;
+}</code></pre>
+    </div>
+    </div>
+  </section>
+
+  <section id="install">
+    <h2>Add it to your client</h2>
+    <p class="section-lede">
+      The data server is zero-config and read-only: no API key, no wallet, no account. The full
+      matrix (Claude Desktop, Cursor, Smithery, raw stdio, Streamable HTTP) is on the
+      <a href="install.html">install page</a>.
+    </p>
+    <pre><code>claude mcp add hood-mcp -- npx -y hood-mcp</code></pre>
+    <div class="grid">
+      <div class="card">
+        <h3>Data server <span class="pill free">free</span></h3>
+        <p>9 read-only tools: quotes with the oracle/DEX premium, multiplier-correct portfolios, launches, trending coins, chain stats, token search.</p>
+        <p style="margin:0"><a href="tools.html">Tool reference →</a></p>
+      </div>
+      <div class="card">
+        <h3>Trading server <span class="pill guarded">opt-in</span></h3>
+        <p>A separate binary that never starts unless you set <code>HOOD_MCP_ENABLE_TRADING=1</code> and a wallet key. Hard USD spend caps per call and per session, plus a simulate-then-confirm round trip on every mutating tool.</p>
+        <p style="margin:0"><a href="safety.html">Safety model →</a></p>
+      </div>
+    </div>
+  </section>
+
+</main>
+
+<footer class="wrap">
+  © 2026 nirholas · Built by <a href="https://x.com/nichxbt">nirholas</a> ·
+  <a href="https://three.ws">three.ws</a> ·
+  <a href="https://www.npmjs.com/package/hood-mcp">npm</a>
+</footer>
+
+</body>
+</html>

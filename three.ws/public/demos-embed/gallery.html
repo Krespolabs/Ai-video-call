@@ -1,0 +1,246 @@
+<!doctype html>
+<html lang="en" style="background:transparent">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title data-i18n="demos_embed_gallery.meta_title">Avatar Gallery · three.ws</title>
+  <meta name="robots" content="noindex">
+  <script type="module" src="https://cdn.jsdelivr.net/npm/@google/model-viewer@4.4.0/dist/model-viewer.min.js" integrity="sha384-wjsPzEO+lXOf7d9csIDfAQpPt2OKuUU3m0K9qsdKIuzX4N8czSF6hdh23eAbZa3p" crossorigin="anonymous"></script>
+  <link rel="stylesheet" href="/style.css">
+  <link rel="stylesheet" href="/gallery/gallery.css">
+  <link rel="stylesheet" href="/fonts/fonts.css">
+  <!-- Light theme override — every background transparent -->
+  <style>
+    html, body {
+      background: transparent !important;
+      color: #161616 !important;
+      font-family: 'Helvetica Neue', 'Helvetica Neue', Arial, sans-serif !important;
+    }
+    /* Force light mode CSS variables */
+    :root {
+      color-scheme: light !important;
+      --bg: transparent !important;
+      --bg-1: transparent !important;
+      --bg-2: transparent !important;
+      --surface-1: rgba(0,0,0,0.03) !important;
+      --surface-2: rgba(0,0,0,0.05) !important;
+      --ink: #161616 !important;
+      --ink-dim: #525252 !important;
+      --ink-subtle: #6f6f6f !important;
+      --border: #e0e0e0 !important;
+      --accent: #0f62fe !important;
+    }
+    /* Strip all dark backgrounds */
+    *, *::before, *::after {
+      box-shadow: none !important;
+    }
+    body.gallery-page {
+      background: transparent !important;
+      color: #161616 !important;
+      display: block !important;
+    }
+    html:has(body.gallery-page) {
+      background: transparent !important;
+      overflow: auto !important;
+    }
+    /* Hero */
+    .gallery-hero {
+      background: transparent !important;
+      padding: 32px 0 24px !important;
+    }
+    .gallery-title {
+      background: none !important;
+      -webkit-background-clip: unset !important;
+      background-clip: unset !important;
+      -webkit-text-fill-color: #161616 !important;
+      color: #161616 !important;
+      font-size: clamp(24px,4vw,36px) !important;
+      font-weight: 300 !important;
+    }
+    .gallery-sub { color: #525252 !important; }
+    .gallery-stat-value { color: #161616 !important; }
+    .gallery-stat-label { color: #525252 !important; }
+    /* Hero chips */
+    .gallery-hero-chip {
+      background: transparent !important;
+      border: 1px solid #e0e0e0 !important;
+      color: #525252 !important;
+    }
+    .gallery-hero-chip--link { color: #0f62fe !important; }
+    /* Buttons */
+    .gallery-hero-btn {
+      background: transparent !important;
+      border: 1px solid #e0e0e0 !important;
+      color: #161616 !important;
+    }
+    .gallery-hero-btn--primary {
+      background: #0f62fe !important;
+      border-color: #0f62fe !important;
+      color: #fff !important;
+    }
+    .gallery-hero-btn:hover { border-color: #161616 !important; }
+    .gallery-hero-btn--primary:hover { background: #0353e9 !important; }
+    /* Controls */
+    .gallery-controls { background: transparent !important; }
+    .gallery-search { background: transparent !important; }
+    .gallery-search input {
+      background: transparent !important;
+      border: 1px solid #e0e0e0 !important;
+      color: #161616 !important;
+    }
+    .gallery-search input::placeholder { color: #a8a8a8 !important; }
+    .gallery-search input:focus { border-color: #0f62fe !important; }
+    .gallery-search-icon { color: #6f6f6f !important; }
+    .gallery-sort-select select,
+    .gallery-sort-select label {
+      background: transparent !important;
+      color: #161616 !important;
+      border-color: #e0e0e0 !important;
+    }
+    .gallery-tag-label { color: #525252 !important; }
+    /* Cards */
+    .gallery-card {
+      background: transparent !important;
+      border: 1px solid #e0e0e0 !important;
+      color: #161616 !important;
+    }
+    .gallery-card:hover {
+      border-color: #0f62fe !important;
+      background: rgba(15,98,254,0.03) !important;
+    }
+    .gallery-card-name { color: #161616 !important; }
+    .gallery-card-meta { color: #525252 !important; }
+    .gallery-card-footer { background: transparent !important; border-top-color: #e0e0e0 !important; }
+    /* Forge section */
+    .gallery-forge-section { background: transparent !important; }
+    .gallery-forge-title { color: #161616 !important; }
+    .gallery-forge-sub { color: #525252 !important; }
+    .gallery-forge-card {
+      background: transparent !important;
+      border: 1px solid #e0e0e0 !important;
+    }
+    .gallery-forge-card:hover { border-color: #0f62fe !important; }
+    .gallery-forge-cta {
+      background: transparent !important;
+      color: #0f62fe !important;
+      border: 1px solid #0f62fe !important;
+    }
+    /* Status / empty */
+    .gallery-status, .gallery-empty { color: #525252 !important; }
+    .gallery-load-more {
+      background: transparent !important;
+      border: 1px solid #e0e0e0 !important;
+      color: #161616 !important;
+    }
+    .gallery-load-more:hover { border-color: #0f62fe !important; color: #0f62fe !important; }
+    /* Tags */
+    .gallery-tag {
+      background: transparent !important;
+      border: 1px solid #e0e0e0 !important;
+      color: #525252 !important;
+    }
+    .gallery-tag.active {
+      background: #0f62fe !important;
+      border-color: #0f62fe !important;
+      color: #fff !important;
+    }
+    /* Modal overlay */
+    .gallery-modal-overlay { background: rgba(0,0,0,0.5) !important; }
+    .gallery-modal {
+      background: #fff !important;
+      color: #161616 !important;
+    }
+    /* No nav/footer */
+    header, footer, #nav-container, #footer-container { display: none !important; }
+    /* Remove any radial gradient backgrounds */
+    body.gallery-page::before,
+    body.gallery-page::after { display: none !important; background: transparent !important; }
+    .gallery-grid-wrap { background: transparent !important; }
+    .gallery-main { background: transparent !important; padding-top: 0 !important; }
+  </style>
+	<script src="/model-viewer-meshopt.js"></script>
+</head>
+<body class="gallery-page" style="background:transparent">
+  <main class="gallery-main">
+    <section class="gallery-hero">
+      <div class="gallery-hero-inner">
+        <div class="gallery-hero-chips">
+          <div class="gallery-hero-chip">
+            <span class="gallery-hero-dot"></span>
+            <span data-i18n="demos_embed_gallery.three_ws_avatar_gallery">three.ws · Avatar Gallery</span>
+          </div>
+        </div>
+        <h1 class="gallery-title" data-i18n="demos_embed_gallery.every_avatar_ever_made">Every avatar, ever made.</h1>
+        <p class="gallery-sub" data-i18n="demos_embed_gallery.community_made_3d_avatars_on_three_ws">Community-made 3D avatars on three.ws. Click any card to preview, then embed or remix.</p>
+        <div class="gallery-stats">
+          <div class="gallery-stat">
+            <div class="gallery-stat-value" data-role="stat-count">—</div>
+            <div class="gallery-stat-label">Avatars</div>
+          </div>
+        </div>
+        <div class="gallery-hero-ctas">
+          <a class="gallery-hero-btn gallery-hero-btn--primary" href="https://three.ws/create/prompt" target="_blank" rel="noopener" data-i18n="demos_embed_gallery.create_from_a_prompt">Create from a prompt</a>
+          <a class="gallery-hero-btn" href="https://three.ws/create/selfie" target="_blank" rel="noopener" data-i18n="demos_embed_gallery.create_from_selfie">Create from selfie</a>
+          <a class="gallery-hero-btn" href="https://three.ws/forge" target="_blank" rel="noopener" data-i18n="demos_embed_gallery.open_forge">Open Forge</a>
+        </div>
+      </div>
+    </section>
+
+    <section class="gallery-controls">
+      <div class="gallery-controls-top">
+        <div class="gallery-search">
+          <svg class="gallery-search-icon" viewBox="0 0 20 20" fill="none" aria-hidden="true">
+            <circle cx="9" cy="9" r="6" stroke="currentColor" stroke-width="1.6"/>
+            <path d="m14 14 4 4" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>
+          </svg>
+          <input type="search" placeholder="Search by name or description…" data-role="search" aria-label="Search avatars" autocomplete="off" spellcheck="false">
+          <button type="button" class="gallery-search-clear" data-role="search-clear" aria-label="Clear search" hidden data-i18n-attr="aria-label:demos_embed_gallery.clear_search_arialabel">×</button>
+        </div>
+        <div class="gallery-sort-select">
+          <label for="gallery-sort-embed" data-i18n="demos_embed_gallery.sort">Sort:</label>
+          <select id="gallery-sort-embed" data-role="sort">
+            <option value="newest" data-i18n="demos_embed_gallery.newest">Newest</option>
+            <option value="alpha" data-i18n="demos_embed_gallery.a_z">A → Z</option>
+          </select>
+        </div>
+      </div>
+      <div class="gallery-tag-wrap" data-role="tag-wrap" hidden>
+        <div class="gallery-tag-label">Tags</div>
+        <div class="gallery-tags" data-role="tags"></div>
+      </div>
+    </section>
+
+    <section class="gallery-grid-wrap">
+      <div class="gallery-grid" data-role="grid"></div>
+      <div class="gallery-status" data-role="status"></div>
+      <div class="gallery-sentinel" data-role="sentinel" aria-hidden="true"></div>
+      <div class="gallery-load-more-wrap">
+        <button class="gallery-load-more" data-role="load-more" hidden data-i18n="demos_embed_gallery.load_more">Load more</button>
+      </div>
+    </section>
+
+    <section class="gallery-forge-section" id="forge-section" hidden>
+      <div class="gallery-forge-head">
+        <div>
+          <div class="gallery-forge-title-row">
+            <svg class="gallery-forge-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="M12 2 3 7v10l9 5 9-5V7l-9-5Z"/><path d="m3 7 9 5 9-5"/><line x1="12" y1="12" x2="12" y2="22"/>
+            </svg>
+            <h2 class="gallery-forge-title" data-i18n="demos_embed_gallery.from_the_forge">From the Forge</h2>
+            <span class="gallery-forge-count" id="forge-count"></span>
+          </div>
+          <p class="gallery-forge-sub" data-i18n="demos_embed_gallery.3d_models_auto_saved_as_the_community">3D models auto-saved as the community generates them.</p>
+        </div>
+        <a href="https://three.ws/forge" target="_blank" class="gallery-forge-cta" rel="noopener" data-i18n="demos_embed_gallery.generate_your_own">Generate your own →</a>
+      </div>
+      <div class="gallery-forge-grid" id="forge-grid"></div>
+    </section>
+  </main>
+
+  <script type="module">import '/src/shared/onchain-badge.js';</script>
+  <script type="module">import '/src/shared/template-picker.js';</script>
+  <script type="module" src="/gallery/gallery.js"></script>
+	<!-- Runtime i18n: detects locale, swaps annotated copy, mounts <lang-switcher>. -->
+	<script type="module" src="/i18n.js"></script>
+</body>
+</html>

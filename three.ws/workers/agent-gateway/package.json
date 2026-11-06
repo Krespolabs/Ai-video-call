@@ -1,0 +1,27 @@
+{
+	"name": "@three-ws/agent-gateway",
+	"version": "0.1.0",
+	"private": true,
+	"description": "Drains the three.ws chat gateway inbox: runs every queued Telegram and Discord message, button press and notification through the shared gateway core and delivers the replies, previews and alerts. The adapter registry is where the next platform plugs in.",
+	"type": "module",
+	"main": "src/index.js",
+	"scripts": {
+		"start": "node src/index.js",
+		"dev": "node --env-file-if-exists=../../.env --env-file-if-exists=../../.env.local src/index.js",
+		"test": "vitest run --config vitest.config.js",
+		"setup": "node --env-file-if-exists=../../.env --env-file-if-exists=../../.env.local src/setup.js",
+		"register:discord": "node --env-file-if-exists=../../.env --env-file-if-exists=../../.env.local src/setup.js discord-commands",
+		"webhook:telegram": "node --env-file-if-exists=../../.env --env-file-if-exists=../../.env.local src/setup.js telegram-webhook",
+		"inbox": "node --env-file-if-exists=../../.env --env-file-if-exists=../../.env.local src/setup.js inbox"
+	},
+	"engines": {
+		"node": ">=22"
+	},
+	"dependencies": {
+		"discord.js": "^14.27.0",
+		"grammy": "^1.46.0"
+	},
+	"overrides": {
+		"undici@^6": "^6.29.1"
+	}
+}

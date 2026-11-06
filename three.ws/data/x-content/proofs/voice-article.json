@@ -1,0 +1,100 @@
+{
+	"id": "voice-article",
+	"scenarioHash": "50b369513d20dc3892896ba407bf68497cee7419fe895af8ab0ba8d06b60fa1a",
+	"ranAt": "2026-10-13T19:10:09.220Z",
+	"target": {
+		"commit": "7d172d48e",
+		"revision": "three-ws-api-00499-fgc"
+	},
+	"passed": false,
+	"steps": [
+		{
+			"index": 1,
+			"kind": "goto",
+			"target": "https://three.ws/voice",
+			"detail": "loaded https://three.ws/voice",
+			"ok": true,
+			"ms": 8703,
+			"frames": 0
+		},
+		{
+			"index": 2,
+			"kind": "scroll",
+			"target": "Browse voices",
+			"detail": "scrolled 693 px",
+			"ok": true,
+			"ms": 3346,
+			"frames": 27
+		},
+		{
+			"index": 3,
+			"kind": "read",
+			"target": "voices",
+			"detail": "voices = \"357\"",
+			"ok": true,
+			"ms": 2,
+			"frames": 0
+		},
+		{
+			"index": 4,
+			"kind": "hold",
+			"target": "1600",
+			"detail": "1600 ms",
+			"ok": true,
+			"ms": 4932,
+			"frames": 48
+		},
+		{
+			"index": 5,
+			"kind": "type",
+			"target": "Andrew",
+			"detail": "typed 6 characters",
+			"ok": true,
+			"ms": 3165,
+			"frames": 28
+		},
+		{
+			"index": 6,
+			"kind": "wait",
+			"target": "1200",
+			"detail": "1200 ms, not filmed",
+			"ok": true,
+			"ms": 1216,
+			"frames": 0
+		},
+		{
+			"index": 7,
+			"kind": "hold",
+			"target": "1200",
+			"detail": "1200 ms",
+			"ok": true,
+			"ms": 3700,
+			"frames": 36
+		},
+		{
+			"index": 8,
+			"kind": "click",
+			"target": "Use this voice",
+			"detail": "clicked",
+			"ok": true,
+			"ms": 2332,
+			"frames": 21
+		},
+		{
+			"index": 9,
+			"kind": "click",
+			"target": "Speak",
+			"ok": false,
+			"detail": "POST /api/tts/synthesize answered HTTP 502",
+			"ms": 2362,
+			"frames": 21
+		}
+	],
+	"facts": {
+		"voices": "357"
+	},
+	"saw": [],
+	"responses": [],
+	"cuts": [],
+	"video": null
+}

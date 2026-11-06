@@ -1,0 +1,28 @@
+{
+  "publish": {
+    "id": "d6892889-ca6b-4d77-8ffc-638a60002b15",
+    "remixable": true,
+    "royaltyBps": 1000,
+    "creatorWallet": "9xQeWvG816bUx9EPjHmaT23yvVM2ZWbrrpZb9PQGHRVn",
+    "license": "remix-royalty"
+  },
+  "sourceView": {
+    "remixable": true,
+    "royaltyBps": 1000,
+    "walletSet": true
+  },
+  "feedItem": {
+    "id": "d6892889-ca6b-4d77-8ffc-638a60002b15",
+    "prompt": "a friendly round robot mascot, glossy white plastic",
+    "glb_url": "https://pub-2534e921bf9c4314addcd4d8a6e98b7b.r2.dev/forge/anon/d6892889-ca6b-4d77-8ffc-638a60002b15.glb",
+    "preview_image_url": null,
+    "royaltyBps": 1000,
+    "royaltyPayable": true,
+    "isDerived": false,
+    "lineageIndex": 0,
+    "backend": "nvidia",
+    "model_category": "other",
+    "created_at": "2026-07-07T11:49:29.792Z"
+  },
+  "lineageRowCount": 1
+}

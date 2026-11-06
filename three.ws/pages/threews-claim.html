@@ -1,0 +1,664 @@
+<!doctype html>
+<html lang="en">
+	<head>
+		<script>/* three.ws theme boot, no-flash; runtime in /theme-switcher.js */(function(){try{var m=localStorage.getItem('twx_theme');var l=m==='auto'?(window.matchMedia&&window.matchMedia('(prefers-color-scheme: light)').matches):m==='light';document.documentElement.setAttribute('data-theme',l?'light':'dark');}catch(e){document.documentElement.setAttribute('data-theme','dark');}})();</script>
+		<meta charset="utf-8" />
+		<title data-i18n="threews_claim.meta_title">Claim your threews.sol subdomain</title>
+		<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+		<meta name="description" content="Claim your own subdomain on threews.sol and get a Brave-resolvable personal showcase page."  data-i18n-attr="content:threews_claim.meta_description"/>
+		<meta name="theme-color" content="#000000" />
+		<link rel="icon" href="/favicon.ico" sizes="any" />
+		<link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+		<link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png" />
+		<link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png" />
+		<link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+		<link rel="manifest" href="/manifest.webmanifest" />
+		<link rel="stylesheet" href="/style.css" />
+		<link rel="stylesheet" href="/fonts/fonts.css" />
+		<link rel="stylesheet" href="/nav.css" />
+		<link rel="stylesheet" href="/footer.css" />
+		<link rel="stylesheet" href="/mobile.css" />
+		<style>
+			body {
+				min-height: 100vh;
+				display: flex;
+				flex-direction: column;
+				background: var(--bg-0, #0a0a0a);
+				color: var(--ink, #e8e8e8);
+				font-family: 'PPNeueMontreal', system-ui, sans-serif;
+			}
+			.tw-wrap {
+				--tw-ok: var(--success);
+				--tw-bad: var(--danger);
+				max-width: 720px;
+				margin: 0 auto;
+				padding: 4rem 1.618rem 6rem;
+				width: 100%;
+			}
+			/* The dark-tuned success/danger hues measure under 2:1 on white. */
+			:root[data-theme="light"] .tw-wrap {
+				--tw-ok: #15803d;
+				--tw-bad: #b91c1c;
+			}
+			.tw-eyebrow {
+				font-size: 0.764rem;
+				letter-spacing: 0.1em;
+				color: var(--ink-dim, #888888);
+				text-transform: uppercase;
+				margin-bottom: 0.5rem;
+			}
+			.tw-wrap h1 {
+				font-size: 2.2rem;
+				font-weight: 500;
+				margin: 0 0 0.4rem;
+				line-height: 1.1;
+			}
+			.tw-wrap h2 {
+				margin: 0 0 0.5rem;
+				font-weight: 500;
+				font-size: 1.05rem;
+			}
+			.tw-sub {
+				color: var(--ink-dim, #888888);
+				margin: 0 0 2.5rem;
+				font-size: 1rem;
+				line-height: 1.5;
+			}
+			.tw-code {
+				background: var(--surface-2, rgba(255, 255, 255, 0.06));
+				padding: 0.1em 0.4em;
+				border-radius: 4px;
+				font-size: 0.9em;
+			}
+			.tw-card {
+				border: 1px solid var(--stroke, rgba(255, 255, 255, 0.08));
+				border-radius: 14px;
+				padding: 1.5rem;
+				background: var(--surface-1, rgba(255, 255, 255, 0.02));
+				margin-bottom: 1.5rem;
+			}
+			.tw-card label {
+				display: block;
+				font-size: 0.85rem;
+				color: var(--ink-dim, #888888);
+				margin-bottom: 0.4rem;
+			}
+			.tw-input-row {
+				display: flex;
+				flex-wrap: wrap;
+				align-items: stretch;
+				border: 1px solid var(--stroke-strong, rgba(255, 255, 255, 0.14));
+				border-radius: 10px;
+				overflow: hidden;
+				background: var(--surface-1, rgba(255, 255, 255, 0.03));
+				transition: border-color var(--duration-fast) var(--ease-standard), box-shadow var(--duration-fast) var(--ease-standard);
+			}
+			.tw-input-row:focus-within {
+				border-color: var(--focus-ring-color, #ffffff);
+				box-shadow: 0 0 0 var(--focus-ring-width, 2px) var(--focus-ring-color, #ffffff);
+			}
+			.tw-input-row input {
+				flex: 1 1 8rem;
+				min-width: 0;
+				border: 0;
+				background: transparent;
+				color: var(--ink, #e8e8e8);
+				padding: 0.95rem 1rem;
+				font-size: 1.05rem;
+				font-family: inherit;
+				outline: none;
+			}
+			.tw-input-row input::placeholder { color: var(--ink-dim, #888888); }
+			.tw-input-row input:read-only { color: var(--ink-dim, #888888); }
+			.tw-input-row input:disabled { color: var(--ink-dim, #888888); cursor: not-allowed; }
+			.tw-suffix {
+				display: flex;
+				align-items: center;
+				padding: 0 1rem;
+				color: var(--ink-dim, #888888);
+				background: var(--surface-2, rgba(255, 255, 255, 0.05));
+				border-left: 1px solid var(--stroke, rgba(255, 255, 255, 0.08));
+				font-variant-numeric: tabular-nums;
+				white-space: nowrap;
+			}
+			@media (max-width: 420px) {
+				.tw-suffix {
+					flex-basis: 100%;
+					border-left: 0;
+					border-top: 1px solid var(--stroke, rgba(255, 255, 255, 0.08));
+					padding: 0.45rem 1rem;
+					font-size: 0.85rem;
+				}
+			}
+			.tw-status {
+				margin-top: 0.75rem;
+				font-size: 0.85rem;
+				min-height: 1.2em;
+				line-height: 1.45;
+			}
+			.tw-status.ok { color: var(--tw-ok); }
+			.tw-status.bad { color: var(--tw-bad); }
+			.tw-status.muted { color: var(--ink-dim, #888888); }
+			.tw-link-btn {
+				background: none;
+				border: 0;
+				padding: 0;
+				margin-left: 0.4em;
+				font: inherit;
+				color: var(--ink, #e8e8e8);
+				text-decoration: underline;
+				text-underline-offset: 0.15em;
+				cursor: pointer;
+				border-radius: 3px;
+			}
+			.tw-link-btn:hover { color: var(--accent, #ffffff); }
+			.tw-link-btn:focus-visible {
+				outline: var(--focus-ring-width, 2px) solid var(--focus-ring-color, #ffffff);
+				outline-offset: var(--focus-ring-offset, 2px);
+			}
+			.tw-btn {
+				display: inline-flex;
+				align-items: center;
+				gap: 0.5rem;
+				background: var(--btn-primary-bg, #ffffff);
+				color: var(--btn-primary-fg, #0a0a0a);
+				border: 1px solid var(--btn-primary-border, transparent);
+				border-radius: 10px;
+				padding: 0.85rem 1.25rem;
+				font-size: 1rem;
+				font-weight: 500;
+				font-family: inherit;
+				text-decoration: none;
+				cursor: pointer;
+				margin-top: 1rem;
+				transition: background-color var(--duration-fast) var(--ease-standard), border-color var(--duration-fast) var(--ease-standard), transform var(--duration-instant) var(--ease-standard), opacity var(--duration-fast) var(--ease-standard);
+			}
+			.tw-btn:hover { background: var(--btn-primary-bg-hover, rgba(255, 255, 255, 0.88)); }
+			.tw-btn:active { background: var(--btn-primary-bg-active, rgba(255, 255, 255, 0.76)); transform: translateY(1px); }
+			.tw-btn:focus-visible {
+				outline: var(--focus-ring-width, 2px) solid var(--focus-ring-color, #ffffff);
+				outline-offset: var(--focus-ring-offset, 2px);
+			}
+			.tw-btn[disabled] { opacity: 0.5; cursor: not-allowed; transform: none; }
+			.tw-btn[disabled]:hover { background: var(--btn-primary-bg, #ffffff); }
+			.tw-btn.ghost {
+				background: transparent;
+				color: var(--ink, #e8e8e8);
+				border-color: var(--stroke-strong, rgba(255, 255, 255, 0.14));
+			}
+			.tw-btn.ghost:hover { background: var(--surface-2, rgba(255, 255, 255, 0.05)); border-color: var(--ink-dim, #888888); }
+			.tw-btn.ghost:active { background: var(--surface-3, rgba(255, 255, 255, 0.08)); }
+			.tw-btn.busy::before {
+				content: '';
+				width: 0.85em;
+				height: 0.85em;
+				border-radius: 50%;
+				border: 2px solid currentColor;
+				border-right-color: transparent;
+				animation: tw-spin 0.8s linear infinite;
+			}
+			#tw-account-actions:empty { display: none; }
+			#tw-account-actions .tw-btn + .tw-btn { margin-left: 0.5rem; }
+			.tw-skel {
+				display: block;
+				height: 0.85em;
+				border-radius: 4px;
+				background: linear-gradient(90deg, var(--surface-2, rgba(255, 255, 255, 0.05)) 25%, var(--surface-3, rgba(255, 255, 255, 0.1)) 50%, var(--surface-2, rgba(255, 255, 255, 0.05)) 75%);
+				background-size: 200% 100%;
+				animation: tw-shimmer 1.2s linear infinite;
+			}
+			.tw-skel + .tw-skel { margin-top: 0.6em; }
+			.tw-result {
+				border: 1px solid color-mix(in srgb, var(--tw-ok) 35%, transparent);
+				background: color-mix(in srgb, var(--tw-ok) 7%, transparent);
+				border-radius: 12px;
+				padding: 1.25rem;
+				margin-top: 1.5rem;
+				display: none;
+			}
+			.tw-result.on { display: block; animation: tw-rise 0.25s ease-out; }
+			.tw-result h2 { margin: 0 0 0.5rem; font-weight: 500; font-size: 1.05rem; }
+			.tw-result a {
+				color: var(--tw-ok);
+				text-decoration: none;
+				font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+				font-size: 0.9rem;
+				word-break: break-all;
+				border-radius: 3px;
+			}
+			.tw-result a:hover { text-decoration: underline; }
+			.tw-result a:focus-visible {
+				outline: var(--focus-ring-width, 2px) solid var(--focus-ring-color, #ffffff);
+				outline-offset: var(--focus-ring-offset, 2px);
+			}
+			.tw-help {
+				font-size: 0.85rem;
+				color: var(--ink-dim, #888888);
+				line-height: 1.6;
+			}
+			.tw-help code {
+				background: var(--surface-2, rgba(255, 255, 255, 0.06));
+				padding: 0.1em 0.4em;
+				border-radius: 4px;
+				font-size: 0.85em;
+			}
+			.tw-help code.tw-showcase { color: var(--tw-ok); }
+			.tw-bullets {
+				margin: 0;
+				padding-left: 1.2em;
+			}
+			.tw-bullets li { margin-bottom: 0.4em; }
+			.tw-sr-only {
+				position: absolute;
+				width: 1px;
+				height: 1px;
+				overflow: hidden;
+				clip: rect(0 0 0 0);
+				white-space: nowrap;
+			}
+			@keyframes tw-shimmer { from { background-position: 200% 0; } to { background-position: -200% 0; } }
+			@keyframes tw-spin { to { transform: rotate(360deg); } }
+			@keyframes tw-rise { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+			@media (prefers-reduced-motion: reduce) {
+				.tw-skel, .tw-btn.busy::before, .tw-result.on { animation: none; }
+				.tw-btn, .tw-input-row { transition: none; }
+			}
+		</style>
+	
+	<link rel="canonical" href="https://three.ws/threews/claim">
+	<meta property="og:type" content="website">
+	<meta property="og:site_name" content="three.ws">
+	<meta property="og:title" content="Claim threews.sol Subdomain · three.ws" data-i18n-attr="content:threews_claim.meta_og_title">
+	<meta property="og:description" content="Claim your own &lt;name&gt;.threews.sol subdomain and get a Brave-resolvable personal showcase page." data-i18n-attr="content:threews_claim.meta_og_description">
+	<meta property="og:url" content="https://three.ws/threews/claim">
+	<meta property="og:image" content="https://three.ws/api/page-og?s=build&amp;t=Claim+threews.sol+Subdomain&amp;d=Claim+your+own+%3Cname%3E.threews.sol+subdomain+and+get+a+Brave-resolvable+personal+showcase+page.&amp;p=%2Fthreews%2Fclaim">
+	<meta property="og:image:width" content="1200">
+	<meta property="og:image:height" content="630">
+	<meta name="twitter:card" content="summary_large_image">
+	<meta name="twitter:title" content="Claim threews.sol Subdomain · three.ws" data-i18n-attr="content:threews_claim.meta_twitter_title">
+	<meta name="twitter:description" content="Claim your own &lt;name&gt;.threews.sol subdomain and get a Brave-resolvable personal showcase page." data-i18n-attr="content:threews_claim.meta_twitter_description">
+	<meta name="twitter:image" content="https://three.ws/api/page-og?s=build&amp;t=Claim+threews.sol+Subdomain&amp;d=Claim+your+own+%3Cname%3E.threews.sol+subdomain+and+get+a+Brave-resolvable+personal+showcase+page.&amp;p=%2Fthreews%2Fclaim">
+	<script type="application/ld+json">{"@context":"https://schema.org","@type":"WebPage","name":"Claim threews.sol Subdomain","description":"Claim your own \u003cname>.threews.sol subdomain and get a Brave-resolvable personal showcase page.","url":"https://three.ws/threews/claim","isPartOf":{"@type":"WebSite","name":"three.ws","url":"https://three.ws"}}</script>
+
+	<meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1">
+	<meta property="og:locale" content="en_US">
+	<meta property="og:image:alt" content="Claim threews.sol Subdomain - three.ws">
+	<meta name="twitter:site" content="@trythreews">
+</head>
+	<body>
+		<header><div id="nav-container"></div></header>
+		<script src="/nav.js"></script>
+
+		<main class="tw-wrap">
+			<div class="tw-eyebrow">threews.sol</div>
+			<h1 data-i18n="threews_claim.claim_your_subdomain">Claim your subdomain</h1>
+			<p class="tw-sub" data-i18n-html="threews_claim.get_as_a_solana_name_service_subdomain">
+				Get <code class="tw-code">yourname.threews.sol</code>
+				as a Solana Name Service subdomain. Brave Browser resolves it directly to
+				your three.ws showcase. Your agents, avatars, and skills, all under one name.
+			</p>
+
+			<section class="tw-card" id="tw-account" data-state="loading" aria-live="polite" aria-busy="true">
+				<div class="tw-status muted" id="tw-account-status">
+					<span class="tw-sr-only">Checking your account</span>
+					<span class="tw-skel" style="width:62%" aria-hidden="true"></span>
+					<span class="tw-skel" style="width:38%" aria-hidden="true"></span>
+				</div>
+				<div id="tw-account-actions"></div>
+			</section>
+
+			<section class="tw-card" id="tw-mint-card">
+				<label for="tw-label" data-i18n="threews_claim.subdomain_label">Subdomain label</label>
+				<div class="tw-input-row">
+					<input id="tw-label" type="text" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="yourhandle" maxlength="63" aria-describedby="tw-status" />
+					<div class="tw-suffix" aria-hidden="true">.threews.sol</div>
+				</div>
+				<div class="tw-status muted" id="tw-status" role="status">Type a label to check availability.</div>
+				<button class="tw-btn" id="tw-mint" type="button" disabled data-i18n="threews_claim.mint_subdomain">Mint subdomain</button>
+				<p class="tw-help" style="margin-top:1rem" data-i18n="threews_claim.minting_is_paid_by_three_ws_the">
+					Minting is paid by three.ws. The on-chain subdomain is transferred to
+					your agent's Solana wallet (or a wallet you've linked). Your label must
+					match your account username.
+				</p>
+			</section>
+
+			<div class="tw-result" id="tw-result" aria-live="polite"></div>
+
+			<section class="tw-card">
+				<h2 data-i18n="threews_claim.what_this_gives_you">What this gives you</h2>
+				<ul class="tw-bullets tw-help">
+					<li data-i18n-html="threews_claim.resolves_to_your_showcase_in_brave"><code>yourname.threews.sol</code> resolves to your showcase in Brave</li>
+					<li data-i18n-html="threews_claim.a_pay_by_name_handle_anyone_can">A pay-by-name handle: anyone can <code>POST /api/x402/pay-by-name</code> with <code>yourname.threews.sol</code> to send you USDC</li>
+					<li data-i18n="threews_claim.ownership_transfers_to_your_wallet_we_just">Ownership transfers to your wallet; we just set the URL record</li>
+					<li data-i18n-html="threews_claim.verified_profile_badge_at">Verified profile badge at <code class="tw-showcase">/u/yourname</code></li>
+				</ul>
+			</section>
+		</main>
+
+		<div id="footer-container"></div>
+		<script src="/footer.js"></script>
+
+		<script type="module">
+			const labelEl = document.getElementById('tw-label');
+			const statusEl = document.getElementById('tw-status');
+			const mintBtn = document.getElementById('tw-mint');
+			const resultEl = document.getElementById('tw-result');
+			const mintCard = document.getElementById('tw-mint-card');
+			const acctCard = document.getElementById('tw-account');
+			const acctStatus = document.getElementById('tw-account-status');
+			const acctActions = document.getElementById('tw-account-actions');
+
+			// Same shape the SNS API enforces server-side (src/solana/sns-subdomain.js):
+			// no leading or trailing hyphen, 63 chars max.
+			const LABEL_RE = /^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$/;
+			// Written by /nav-auth.js on every reconciled sign-in; lets a signed-in
+			// visitor skip the anonymous probe below.
+			const AUTH_HINT_KEY = '3dagent:auth-hint';
+			const SIGN_IN_HREF = '/login?next=/threews/claim';
+			const ACCOUNT_HREF = '/dashboard/account';
+
+			let checkTimer = null;
+			let lastChecked = null;
+			let csrfToken = null;
+			let forcedLabel = null;
+
+			function escapeHtml(value) {
+				return String(value).replace(/[&<>"']/g, (c) => ({
+					'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;',
+				})[c]);
+			}
+
+			function readAuthHint() {
+				try {
+					const raw = localStorage.getItem(AUTH_HINT_KEY);
+					return raw ? JSON.parse(raw) : null;
+				} catch {
+					return null;
+				}
+			}
+
+			function setStatus(text, tone, retry) {
+				statusEl.textContent = text;
+				statusEl.className = `tw-status ${tone}`;
+				if (retry) {
+					const btn = document.createElement('button');
+					btn.type = 'button';
+					btn.className = 'tw-link-btn';
+					btn.textContent = 'Retry';
+					btn.addEventListener('click', retry);
+					statusEl.append(btn);
+				}
+			}
+
+			function setAccount(state, text, tone, actionsHtml = '') {
+				acctCard.hidden = false;
+				acctCard.dataset.state = state;
+				acctCard.setAttribute('aria-busy', state === 'loading' ? 'true' : 'false');
+				acctStatus.textContent = text;
+				acctStatus.className = `tw-status ${tone}`;
+				acctActions.innerHTML = actionsHtml;
+			}
+
+			function actionLink(href, text) {
+				return `<a class="tw-btn ghost" href="${escapeHtml(href)}">${escapeHtml(text)}</a>`;
+			}
+
+			function showOwnedClaim(claim) {
+				const full = escapeHtml(claim.full);
+				resultEl.innerHTML = `
+					<h2>${full} is yours.</h2>
+					<p class="tw-help" style="margin:.4em 0">
+						Brave users can type <strong>${full}</strong> in the URL bar and land on
+						your showcase. Anyone can pay you by sending to that name via the
+						pay-by-name API.
+					</p>
+					<p style="margin:.4em 0">
+						${claim.showcase_url ? `<a href="${escapeHtml(claim.showcase_url)}">${escapeHtml(claim.showcase_url)}</a><br>` : ''}
+						${claim.explorer ? `<span class="tw-help">tx: <a href="${escapeHtml(claim.explorer)}" target="_blank" rel="noopener">${escapeHtml(claim.signature || 'view on Solscan')}</a></span>` : ''}
+					</p>
+				`;
+				resultEl.classList.add('on');
+			}
+
+			function renderSignedOut() {
+				setAccount(
+					'anonymous',
+					'Sign in to mint a subdomain. You can still check availability below.',
+					'muted',
+					actionLink(SIGN_IN_HREF, 'Sign in'),
+				);
+			}
+
+			function renderAccountError(detail) {
+				setAccount(
+					'error',
+					detail
+						? `Could not load your account status (${detail}). The availability check below still works.`
+						: 'Could not reach three.ws to load your account status. Check your connection; the availability check below still works.',
+					'bad',
+				);
+				const retry = document.createElement('button');
+				retry.type = 'button';
+				retry.className = 'tw-btn ghost';
+				retry.textContent = 'Retry';
+				retry.addEventListener('click', loadAccountState);
+				acctActions.append(retry);
+			}
+
+			function renderClaimed(me) {
+				setAccount(
+					'claimed',
+					`You already own ${me.claim.full}.`,
+					'ok',
+					me.claim.showcase_url ? actionLink(me.claim.showcase_url, 'View your showcase') : '',
+				);
+				mintCard.hidden = true;
+				showOwnedClaim(me.claim);
+			}
+
+			function renderNeedsUsername(me) {
+				setAccount(
+					'needs_username',
+					me.blocked_reason || 'Set a username before claiming a subdomain.',
+					'bad',
+					actionLink(ACCOUNT_HREF, 'Set a username'),
+				);
+				labelEl.disabled = true;
+				mintBtn.disabled = true;
+				setStatus('A username is required before a label can be minted.', 'muted');
+			}
+
+			// The label is forced to equal the username, so a username that can never
+			// be a .sol label is a dead end the user has to be told about, not a 400
+			// they discover after the fact.
+			function renderUnmintableUsername(handle) {
+				setAccount(
+					'blocked',
+					`Your username @${handle} cannot be a .sol label: labels use only a-z, 0-9 and hyphens, and cannot start or end with a hyphen.`,
+					'bad',
+					actionLink(ACCOUNT_HREF, 'Change your username'),
+				);
+				labelEl.value = handle.toLowerCase();
+				labelEl.disabled = true;
+				mintBtn.disabled = true;
+				setStatus('Change your username to one that fits, then come back to mint it.', 'muted');
+			}
+
+			function renderReady(handle) {
+				setAccount(
+					'available',
+					`Signed in as @${handle}. Your subdomain label must match your username.`,
+					'muted',
+				);
+				forcedLabel = handle.toLowerCase();
+				labelEl.value = forcedLabel;
+				labelEl.readOnly = true;
+				check(forcedLabel);
+			}
+
+			// Anonymous visitors are the common case, and /api/threews/me answers them
+			// with a 401 that every browser logs as an error. The nav's local sign-in
+			// hint skips the probe for known-signed-in visitors; everyone else is asked
+			// via /api/auth/me, which answers { user: null } with a 200.
+			async function isSignedIn() {
+				if (readAuthHint()?.authed) return true;
+				const res = await fetch('/api/auth/me', { credentials: 'same-origin' });
+				if (res.status === 401) return false;
+				if (!res.ok) throw new Error(`HTTP ${res.status}`);
+				const payload = await res.json().catch(() => null);
+				return !!payload?.user;
+			}
+
+			async function loadAccountState() {
+				acctCard.dataset.state = 'loading';
+				acctCard.setAttribute('aria-busy', 'true');
+				acctStatus.className = 'tw-status muted';
+				acctStatus.innerHTML = '<span class="tw-sr-only">Checking your account</span><span class="tw-skel" style="width:62%" aria-hidden="true"></span><span class="tw-skel" style="width:38%" aria-hidden="true"></span>';
+				acctActions.innerHTML = '';
+
+				let res;
+				try {
+					if (!(await isSignedIn())) return renderSignedOut();
+					res = await fetch('/api/threews/me', { credentials: 'same-origin' });
+				} catch {
+					return renderAccountError();
+				}
+				if (res.status === 401) return renderSignedOut();
+				if (!res.ok) return renderAccountError(`three.ws answered ${res.status}`);
+				const payload = await res.json().catch(() => null);
+				const me = payload?.data;
+				if (!me) return renderAccountError('unexpected response');
+
+				if (me.status === 'claimed' && me.claim) return renderClaimed(me);
+				if (me.status === 'needs_username' || !me.user?.username) return renderNeedsUsername(me);
+				const handle = me.user.username;
+				if (!LABEL_RE.test(handle.toLowerCase())) return renderUnmintableUsername(handle);
+				renderReady(handle);
+			}
+
+			labelEl.addEventListener('input', () => {
+				const raw = labelEl.value.trim().toLowerCase();
+				const cleaned = raw.replace(/[^a-z0-9-]/g, '');
+				if (cleaned !== raw) labelEl.value = cleaned;
+				mintBtn.disabled = true;
+				clearTimeout(checkTimer);
+				if (!cleaned) {
+					setStatus('Type a label to check availability.', 'muted');
+					return;
+				}
+				setStatus('Checking availability…', 'muted');
+				checkTimer = setTimeout(() => check(cleaned), 350);
+			});
+
+			async function check(label) {
+				let res;
+				let data;
+				try {
+					res = await fetch(`/api/threews/subdomain?label=${encodeURIComponent(label)}`);
+					data = await res.json();
+				} catch {
+					setStatus('Could not reach three.ws to check availability. Check your connection and', 'bad', () => check(label));
+					return;
+				}
+				if (!res.ok) {
+					setStatus(data?.error_description || 'Could not check this label.', 'bad');
+					if (forcedLabel && res.status === 400) {
+						acctActions.innerHTML = actionLink(ACCOUNT_HREF, 'Change your username');
+					}
+					return;
+				}
+				lastChecked = data?.data;
+				if (!lastChecked) {
+					setStatus('Unexpected reply from three.ws.', 'bad', () => check(label));
+					return;
+				}
+				if (lastChecked.available) {
+					const unverified = lastChecked.on_chain_check === 'unavailable';
+					setStatus(
+						unverified
+							? `${lastChecked.full} is free in our records, but Solana could not be reached to confirm it. Minting re-checks on-chain first.`
+							: `${lastChecked.full} is available.`,
+						'ok',
+					);
+					mintBtn.disabled = false;
+				} else {
+					const who = lastChecked.claim?.username
+						? `claimed by @${lastChecked.claim.username}`
+						: `owned by ${lastChecked.owner}`;
+					setStatus(`${lastChecked.full} is ${who}.`, 'bad');
+				}
+			}
+
+			async function getCsrf() {
+				if (csrfToken) return csrfToken;
+				const res = await fetch('/api/csrf-token', { credentials: 'same-origin' });
+				if (!res.ok) throw new Error('not signed in');
+				const data = await res.json();
+				csrfToken = data?.data?.token;
+				return csrfToken;
+			}
+
+			function setMinting(on) {
+				mintBtn.disabled = true;
+				mintBtn.classList.toggle('busy', on);
+				mintBtn.setAttribute('aria-busy', on ? 'true' : 'false');
+			}
+
+			mintBtn.addEventListener('click', async () => {
+				if (!lastChecked?.available) return;
+				setMinting(true);
+				setStatus('Minting on-chain…', 'muted');
+				resultEl.classList.remove('on');
+				try {
+					const token = await getCsrf().catch(() => null);
+					const headers = { 'content-type': 'application/json' };
+					if (token) headers['x-csrf-token'] = token;
+					const res = await fetch('/api/threews/subdomain', {
+						method: 'POST',
+						headers,
+						credentials: 'same-origin',
+						body: JSON.stringify({ label: lastChecked.label }),
+					});
+					const data = await res.json().catch(() => null);
+					setMinting(false);
+					if (res.status === 401) {
+						setStatus('Your session has expired. Sign in again to mint.', 'bad');
+						acctActions.innerHTML = actionLink(SIGN_IN_HREF, 'Sign in');
+						return;
+					}
+					if (!res.ok) {
+						const retryable = res.status === 503 || res.status === 502 || res.status === 429;
+						setStatus(
+							data?.error_description || 'Mint failed.',
+							'bad',
+							retryable ? () => mintBtn.click() : null,
+						);
+						if (data?.error === 'no_wallet') {
+							acctActions.innerHTML = actionLink('/create', 'Create an agent');
+						}
+						mintBtn.disabled = false;
+						return;
+					}
+					const d = data.data;
+					setStatus(`${d.full} minted.`, 'ok');
+					setAccount('claimed', `You own ${d.full}.`, 'ok', d.showcase_url ? actionLink(d.showcase_url, 'View your showcase') : '');
+					showOwnedClaim({
+						full: d.full,
+						showcase_url: d.showcase_url,
+						signature: d.signature,
+						explorer: d.explorer || (d.signature ? `https://solscan.io/tx/${encodeURIComponent(d.signature)}` : null),
+					});
+				} catch {
+					setMinting(false);
+					setStatus('Could not reach three.ws to mint. Check your connection and', 'bad', () => mintBtn.click());
+					mintBtn.disabled = false;
+				}
+			});
+
+			loadAccountState();
+		</script>
+		<script src="/brand.js" defer></script>
+	<!-- Runtime i18n: detects locale, swaps annotated copy, mounts <lang-switcher>. -->
+	<script type="module" src="/i18n.js"></script>
+</body>
+</html>

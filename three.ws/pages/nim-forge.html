@@ -1,0 +1,222 @@
+<!doctype html>
+<html lang="en">
+	<head>
+		<script>/* three.ws theme boot — no-flash; runtime in /theme-switcher.js */(function(){try{var m=localStorage.getItem('twx_theme');var l=m==='auto'?(window.matchMedia&&window.matchMedia('(prefers-color-scheme: light)').matches):m==='light';document.documentElement.setAttribute('data-theme',l?'light':'dark');}catch(e){document.documentElement.setAttribute('data-theme','dark');}})();</script>
+		<meta charset="UTF-8" />
+		<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+		<title data-i18n="nim_forge.meta_title">TRELLIS NIM · Image → 3D · three.ws</title>
+		<meta name="description" content="Drop in a photo, get a textured 3D model — reconstructed natively on a self-hosted Microsoft TRELLIS NIM. Single-hop image → GLB."  data-i18n-attr="content:nim_forge.meta_description"/>
+		<meta name="robots" content="noindex" />
+		<link rel="icon" href="/favicon.ico" sizes="any" />
+		<link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+		<link rel="stylesheet" href="/style.css" />
+		<link rel="preconnect" href="https://cdn.jsdelivr.net" />
+		<script src="/model-viewer-meshopt.js"></script>
+		<script
+			type="module"
+			src="https://cdn.jsdelivr.net/npm/@google/model-viewer@4.4.0/dist/model-viewer.min.js"
+			integrity="sha384-wjsPzEO+lXOf7d9csIDfAQpPt2OKuUU3m0K9qsdKIuzX4N8czSF6hdh23eAbZa3p"
+			crossorigin="anonymous"
+		></script>
+		<style>
+			.nf-main { max-width: 1200px; margin: 0 auto; padding: clamp(20px, 4vw, 48px) clamp(16px, 4vw, 32px) 64px; }
+			.nf-head { margin-bottom: clamp(20px, 3vw, 32px); }
+			.nf-eyebrow {
+				display: inline-flex; align-items: center; gap: 8px;
+				font: 600 12px/1 var(--font-mono, ui-monospace, monospace);
+				letter-spacing: 0.08em; text-transform: uppercase;
+				color: var(--ink-dim, #9aa0b5); padding: 6px 10px;
+				border: 1px solid var(--stroke, rgba(255,255,255,0.1)); border-radius: 999px;
+				background: var(--surface-2, rgba(255,255,255,0.03));
+			}
+			.nf-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--ink-dim, #9aa0b5); transition: background var(--duration-base); }
+			.nf-eyebrow[data-state="up"] .nf-dot { background: #36d399; box-shadow: 0 0 10px #36d39988; }
+			.nf-eyebrow[data-state="down"] .nf-dot { background: #f87272; }
+			.nf-head h1 { font: 700 clamp(28px, 5vw, 44px)/1.05 var(--font-display, system-ui); margin: 14px 0 8px; letter-spacing: -0.02em; }
+			.nf-head p { color: var(--ink-dim, #9aa0b5); max-width: 60ch; font-size: 15px; line-height: 1.5; }
+			.nf-head code { font-family: var(--font-mono, monospace); font-size: 0.86em; color: var(--accent, #7c9cff); }
+
+			.nf-workspace { display: grid; grid-template-columns: minmax(0, 380px) minmax(0, 1fr); gap: clamp(16px, 2.5vw, 28px); align-items: start; }
+			@media (max-width: 860px) { .nf-workspace { grid-template-columns: 1fr; } }
+
+			.nf-rail { display: flex; flex-direction: column; gap: 18px; }
+			.nf-card {
+				background: var(--surface-1, rgba(255,255,255,0.02)); border: 1px solid var(--stroke, rgba(255,255,255,0.1));
+				border-radius: 16px; padding: 18px;
+			}
+			.nf-label { font: 600 12px/1 var(--font-mono, monospace); letter-spacing: 0.06em; text-transform: uppercase; color: var(--ink-dim, #9aa0b5); margin-bottom: 10px; }
+
+			.nf-drop {
+				position: relative; border: 1.5px dashed var(--stroke-strong, rgba(255,255,255,0.18)); border-radius: 14px;
+				aspect-ratio: 1 / 1; display: grid; place-items: center; text-align: center; cursor: pointer;
+				overflow: hidden; transition: border-color var(--duration-base), background var(--duration-base); background: var(--surface-2, rgba(255,255,255,0.03));
+			}
+			.nf-drop:hover, .nf-drop.is-over { border-color: var(--accent, #7c9cff); background: color-mix(in srgb, var(--accent, #7c9cff) 8%, transparent); }
+			.nf-drop img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; background: #0a0a12; }
+			.nf-drop .nf-drop-hint { padding: 24px; color: var(--ink-dim, #9aa0b5); display: grid; gap: 8px; pointer-events: none; }
+			.nf-drop .nf-drop-hint strong { color: var(--ink, #eef0ff); font-weight: 600; }
+			.nf-drop input[type="file"] { position: absolute; inset: 0; opacity: 0; cursor: pointer; }
+			.nf-clear { position: absolute; top: 8px; right: 8px; z-index: 2; border: none; background: rgba(0,0,0,0.6); color: #fff; width: 28px; height: 28px; border-radius: 8px; cursor: pointer; font-size: 16px; display: none; }
+			.nf-drop.has-image .nf-clear { display: block; }
+			.nf-drop.has-image .nf-drop-hint { display: none; }
+
+			.nf-mode { display: inline-flex; padding: 3px; gap: 3px; background: var(--surface-2, rgba(255,255,255,0.03)); border: 1px solid var(--stroke, rgba(255,255,255,0.1)); border-radius: 10px; margin-bottom: 12px; }
+			.nf-mode button { border: none; background: transparent; color: var(--ink-dim, #9aa0b5); padding: 7px 14px; border-radius: 7px; cursor: pointer; font: 600 13px var(--font-body, system-ui); transition: all var(--duration-fast); }
+			.nf-mode button[aria-pressed="true"] { background: var(--surface-3, rgba(255,255,255,0.08)); color: var(--ink, #eef0ff); }
+
+			.nf-textarea { width: 100%; min-height: 84px; resize: vertical; background: var(--surface-2, rgba(255,255,255,0.03)); border: 1px solid var(--stroke, rgba(255,255,255,0.1)); border-radius: 10px; padding: 11px 13px; color: var(--ink, #eef0ff); font: 14px/1.5 var(--font-body, system-ui); }
+			.nf-textarea:focus { outline: none; border-color: var(--accent, #7c9cff); }
+
+			.nf-tiers { display: flex; gap: 6px; }
+			.nf-tiers button { flex: 1; border: 1px solid var(--stroke, rgba(255,255,255,0.1)); background: var(--surface-2, rgba(255,255,255,0.03)); color: var(--ink-dim, #9aa0b5); padding: 9px; border-radius: 9px; cursor: pointer; font: 600 13px var(--font-body, system-ui); transition: all var(--duration-fast); }
+			.nf-tiers button[aria-pressed="true"] { border-color: var(--accent, #7c9cff); color: var(--ink, #eef0ff); background: color-mix(in srgb, var(--accent, #7c9cff) 12%, transparent); }
+
+			.nf-btn { width: 100%; border: none; border-radius: 12px; padding: 14px; font: 700 15px var(--font-body, system-ui); cursor: pointer; background: var(--accent, #7c9cff); color: #08080f; transition: filter var(--duration-fast), transform var(--duration-instant); }
+			.nf-btn:hover:not(:disabled) { filter: brightness(1.08); }
+			.nf-btn:active:not(:disabled) { transform: translateY(1px); }
+			.nf-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+			.nf-foot { font: 500 11.5px/1.5 var(--font-mono, monospace); color: var(--ink-dim, #9aa0b5); text-align: center; }
+
+			.nf-stage { position: relative; min-height: 520px; border: 1px solid var(--stroke, rgba(255,255,255,0.1)); border-radius: 18px; background: radial-gradient(120% 120% at 50% 0%, var(--surface-2, rgba(255,255,255,0.03)), var(--surface-1, rgba(0,0,0,0.1))); overflow: hidden; display: grid; }
+			.nf-panel { grid-area: 1 / 1; display: grid; place-items: center; padding: 24px; text-align: center; opacity: 0; visibility: hidden; transition: opacity var(--duration-slow); }
+			.nf-panel.is-active { opacity: 1; visibility: visible; }
+			.nf-empty-art { width: 90px; height: 90px; border-radius: 22px; background: conic-gradient(from 210deg, var(--accent, #7c9cff), #c084fc, #7c9cff); opacity: 0.85; margin: 0 auto 18px; filter: blur(0.3px); animation: nf-float 5s ease-in-out infinite; }
+			@keyframes nf-float { 0%,100% { transform: translateY(0) rotate(0); } 50% { transform: translateY(-10px) rotate(8deg); } }
+			.nf-panel h2 { font: 600 20px var(--font-display, system-ui); margin-bottom: 8px; }
+			.nf-panel p { color: var(--ink-dim, #9aa0b5); max-width: 42ch; font-size: 14px; line-height: 1.5; }
+
+			.nf-spinner { width: 54px; height: 54px; border-radius: 50%; border: 3px solid var(--stroke, rgba(255,255,255,0.12)); border-top-color: var(--accent, #7c9cff); animation: nf-spin 0.8s linear infinite; margin: 0 auto 20px; }
+			@keyframes nf-spin { to { transform: rotate(360deg); } }
+			.nf-elapsed { font: 600 28px var(--font-mono, monospace); color: var(--ink, #eef0ff); }
+			.nf-substep { color: var(--ink-dim, #9aa0b5); font-size: 13px; margin-top: 6px; }
+
+			model-viewer { grid-area: 1 / 1; width: 100%; height: 100%; min-height: 520px; --poster-color: transparent; background: transparent; opacity: 0; visibility: hidden; transition: opacity var(--duration-slow); }
+			model-viewer.is-active { opacity: 1; visibility: visible; }
+			.nf-resultbar { position: absolute; left: 0; right: 0; bottom: 0; z-index: 3; display: none; align-items: center; gap: 12px; padding: 14px 18px; background: linear-gradient(0deg, rgba(0,0,0,0.55), transparent); }
+			.nf-resultbar.is-active { display: flex; }
+			.nf-resultmeta { font: 500 12px var(--font-mono, monospace); color: var(--ink, #eef0ff); margin-right: auto; }
+			.nf-resultmeta b { color: var(--accent, #7c9cff); }
+			.nf-download { border: 1px solid var(--stroke-strong, rgba(255,255,255,0.2)); background: var(--surface-3, rgba(255,255,255,0.08)); color: var(--ink, #eef0ff); padding: 9px 16px; border-radius: 10px; cursor: pointer; font: 600 13px var(--font-body, system-ui); text-decoration: none; }
+			.nf-download:hover { background: var(--surface-2, rgba(255,255,255,0.12)); }
+			.nf-err { color: #fca5a5; font: 500 13px/1.5 var(--font-mono, monospace); max-width: 50ch; word-break: break-word; }
+		</style>
+	
+	<link rel="canonical" href="https://three.ws/nim-forge">
+	<meta property="og:type" content="website">
+	<meta property="og:site_name" content="three.ws">
+	<meta property="og:locale" content="en_US">
+	<meta property="og:title" content="TRELLIS NIM Forge · three.ws" data-i18n-attr="content:nim_forge.meta_og_title">
+	<meta property="og:description" content="Drop in a photo, get a textured 3D model, reconstructed on a self-hosted Microsoft TRELLIS NIM. Single-hop image to GLB." data-i18n-attr="content:nim_forge.meta_og_description">
+	<meta property="og:url" content="https://three.ws/nim-forge">
+	<meta property="og:image" content="https://three.ws/api/page-og?s=build&amp;t=TRELLIS+NIM+Forge&amp;d=Drop+in+a+photo%2C+get+a+textured+3D+model%2C+reconstructed+on+a+self-hosted+Microsoft+TRELLIS+NIM.+Single-hop+image+to+GLB.&amp;p=%2Fnim-forge">
+	<meta property="og:image:width" content="1200">
+	<meta property="og:image:height" content="630">
+	<meta property="og:image:type" content="image/png">
+	<meta property="og:image:alt" content="TRELLIS NIM Forge — three.ws">
+	<meta name="twitter:card" content="summary_large_image">
+	<meta name="twitter:site" content="@trythreews">
+	<meta name="twitter:title" content="TRELLIS NIM Forge · three.ws" data-i18n-attr="content:nim_forge.meta_twitter_title">
+	<meta name="twitter:description" content="Drop in a photo, get a textured 3D model, reconstructed on a self-hosted Microsoft TRELLIS NIM. Single-hop image to GLB." data-i18n-attr="content:nim_forge.meta_twitter_description">
+	<meta name="twitter:image" content="https://three.ws/api/page-og?s=build&amp;t=TRELLIS+NIM+Forge&amp;d=Drop+in+a+photo%2C+get+a+textured+3D+model%2C+reconstructed+on+a+self-hosted+Microsoft+TRELLIS+NIM.+Single-hop+image+to+GLB.&amp;p=%2Fnim-forge">
+	<script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"WebPage","name":"TRELLIS NIM Forge","description":"Drop in a photo, get a textured 3D model, reconstructed on a self-hosted Microsoft TRELLIS NIM. Single-hop image to GLB.","url":"https://three.ws/nim-forge","isPartOf":{"@type":"WebSite","name":"three.ws","url":"https://three.ws"},"primaryImageOfPage":"https://three.ws/api/page-og?s=build&t=TRELLIS+NIM+Forge&d=Drop+in+a+photo%2C+get+a+textured+3D+model%2C+reconstructed+on+a+self-hosted+Microsoft+TRELLIS+NIM.+Single-hop+image+to+GLB.&p=%2Fnim-forge"}]}</script>
+</head>
+	<body>
+		<main class="nf-main">
+			<header class="nf-head">
+				<span class="nf-eyebrow" id="status-badge" data-state="checking" data-i18n-html="nim_forge.checking_engine"><span class="nf-dot"></span><span id="status-text">checking engine…</span></span>
+				<h1 data-i18n="nim_forge.image_3d">Image → 3D</h1>
+				<p data-i18n-html="nim_forge.drop_in_a_photo_and_get_a">Drop in a photo and get a textured 3D model — reconstructed natively on a self-hosted <strong>Microsoft TRELLIS NIM</strong>. Single-hop <code>image → /v1/infer → GLB</code>, no intermediate step. This is an isolated demo surface; it shares nothing with production Forge.</p>
+			</header>
+
+			<div class="nf-workspace">
+				<div class="nf-rail">
+					<div class="nf-card">
+						<div class="nf-mode" role="group" aria-label="Input mode">
+							<button type="button" id="mode-image" aria-pressed="true" data-i18n="nim_forge.from_a_photo">From a photo</button>
+							<button type="button" id="mode-text" aria-pressed="false" data-i18n="nim_forge.describe_it">Describe it</button>
+						</div>
+
+						<div id="pane-image">
+							<div class="nf-label">Reference photo</div>
+							<label class="nf-drop" id="drop">
+								<button type="button" class="nf-clear" id="clear" aria-label="Remove image" data-i18n-attr="aria-label:nim_forge.remove_image_arialabel">✕</button>
+								<img id="preview" alt="" hidden />
+								<div class="nf-drop-hint">
+									<strong data-i18n="nim_forge.drop_a_photo_or_click">Drop a photo or click</strong>
+									<span data-i18n="nim_forge.one_clean_object_on_a_simple_background">One clean object on a simple background works best.</span>
+								</div>
+								<input type="file" id="file" accept="image/png,image/jpeg,image/webp" />
+							</label>
+						</div>
+
+						<div id="pane-text" hidden>
+							<div class="nf-label">Prompt</div>
+							<textarea class="nf-textarea" id="prompt" maxlength="200" placeholder="a worn leather armchair, studio lighting"></textarea>
+						</div>
+					</div>
+
+					<div class="nf-card">
+						<div class="nf-label">Quality</div>
+						<div class="nf-tiers" id="tiers" role="group" aria-label="Quality tier">
+							<button type="button" data-tier="draft" aria-pressed="false" data-i18n="nim_forge.draft">Draft</button>
+							<button type="button" data-tier="standard" aria-pressed="true" data-i18n="nim_forge.standard">Standard</button>
+							<button type="button" data-tier="high" aria-pressed="false" data-i18n="nim_forge.high">High</button>
+						</div>
+					</div>
+
+					<button class="nf-btn" id="generate" disabled data-i18n="nim_forge.add_a_photo_to_start">Add a photo to start</button>
+					<div class="nf-foot">Self-hosted NVIDIA TRELLIS NIM · <code>/v1/infer</code></div>
+				</div>
+
+				<section class="nf-stage" id="stage">
+					<div class="nf-panel is-active" id="panel-empty">
+						<div>
+							<div class="nf-empty-art"></div>
+							<h2 data-i18n="nim_forge.your_model_appears_here">Your model appears here</h2>
+							<p data-i18n="nim_forge.drop_in_a_photo_on_the_left">Drop in a photo on the left and hit Generate. The mesh reconstructs in seconds and renders right here — orbit it, inspect it, download the GLB.</p>
+						</div>
+					</div>
+
+					<div class="nf-panel" id="panel-loading">
+						<div>
+							<div class="nf-spinner"></div>
+							<div class="nf-elapsed" id="elapsed">0.0s</div>
+							<div class="nf-substep" id="substep">Reconstructing mesh on the NIM…</div>
+						</div>
+					</div>
+
+					<div class="nf-panel" id="panel-error">
+						<div>
+							<h2 data-i18n="nim_forge.that_didn_t_land">That didn't land</h2>
+							<p class="nf-err" id="error-msg"></p>
+						</div>
+					</div>
+
+					<model-viewer
+						id="viewer"
+						camera-controls
+						auto-rotate
+						auto-rotate-delay="0"
+						rotation-per-second="20deg"
+						shadow-intensity="1.0"
+						shadow-softness="0.9"
+						exposure="1.25"
+						tone-mapping="aces"
+						interaction-prompt="none"
+						alt="Generated 3D model"
+					></model-viewer>
+
+					<div class="nf-resultbar" id="resultbar">
+						<span class="nf-resultmeta" id="result-meta"></span>
+						<a class="nf-download" id="download" download="trellis-model.glb" data-i18n="nim_forge.download_glb">Download GLB</a>
+					</div>
+				</section>
+			</div>
+		</main>
+
+		<script type="module" src="/src/nim-forge.js"></script>
+		<!-- Runtime i18n: detects locale, swaps annotated copy, mounts <lang-switcher>. -->
+	<script type="module" src="/i18n.js"></script>
+</body>
+</html>

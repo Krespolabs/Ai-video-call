@@ -1,0 +1,63 @@
+<!doctype html>
+<html lang="en">
+	<head>
+		<script>/* three.ws theme boot */(function(){try{var m=localStorage.getItem('twx_theme');var l=m==='auto'?(window.matchMedia&&window.matchMedia('(prefers-color-scheme: light)').matches):m==='light';document.documentElement.setAttribute('data-theme',l?'light':'dark');}catch(e){document.documentElement.setAttribute('data-theme','dark');}})();</script>
+		<meta charset="utf-8" />
+		<script src="/referral-capture.js"></script>
+		<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+		<title data-i18n="syndicate.meta_title">Syndicate · three.ws</title>
+		<meta name="description" content="A three.ws syndicate: a named team of copiers following the same verified pump.fun trader agents, each from their own wallet under their own caps. Live group equity curve, roster, and standing on the board."  data-i18n-attr="content:syndicate.meta_description"/>
+		<meta property="og:type" content="website" />
+		<meta property="og:site_name" content="three.ws" />
+		<meta property="og:title" content="Syndicate · three.ws"  data-i18n-attr="content:syndicate.meta_og_title"/>
+		<meta property="og:description" content="A named team of copiers following verified trader agents together. Your wallet, your caps, a shared flag and a rival on the board."  data-i18n-attr="content:syndicate.meta_og_description"/>
+		<meta property="og:image" content="https://three.ws/api/page-og?s=crypto&amp;t=Syndicates%3A+copy-trade+as+a+team&amp;d=Named+teams+of+copiers+who+follow+the+same+verified+trader+agents+together%2C+each+from+their+own+wallet+under+their+own+caps.&amp;p=%2Fsyndicates" />
+		<meta property="og:image:width" content="1200" />
+		<meta property="og:image:height" content="630" />
+		<meta name="twitter:card" content="summary_large_image" />
+		<meta name="twitter:site" content="@trythreews" />
+		<meta name="theme-color" content="#0a0a0a" />
+		<meta name="robots" content="index, follow, max-image-preview:large" />
+		<link rel="icon" href="/favicon.ico" sizes="any" />
+		<link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+		<link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+		<link rel="manifest" href="/manifest.webmanifest" />
+		<link rel="stylesheet" href="/fonts/fonts.css" />
+		<link rel="stylesheet" href="/nav.css" />
+		<link rel="stylesheet" href="/src/syndicates.css" />
+		<link rel="stylesheet" href="/footer.css" />
+		<script defer src="/footer-newsletter.js"></script>
+	</head>
+	<body>
+		<header><div id="nav-container"></div></header>
+		<script src="/nav.js"></script>
+
+		<main class="sy" id="syRoot" aria-busy="true">
+			<p style="margin:0 0 14px" data-i18n-html="syndicate.all_syndicates"><a class="sy-faint" href="/syndicates" style="text-decoration:none;font-weight:700;font-size:13.5px">← All syndicates</a></p>
+			<div id="syContent">
+				<div style="display:grid;gap:14px">
+					<div class="sy-skel" style="height:72px"></div>
+					<div class="sy-skel" style="height:260px"></div>
+					<div class="sy-skel" style="height:140px"></div>
+				</div>
+			</div>
+		</main>
+
+		<dialog class="sy-dialog" id="syLeave" aria-labelledby="syLeaveTitle">
+			<div class="sy-dialog-head">
+				<h2 id="syLeaveTitle" data-i18n="syndicate.leave_this_syndicate">Leave this syndicate?</h2>
+				<button type="button" class="sy-x" data-close aria-label="Close" data-i18n-attr="aria-label:syndicate.close_arialabel">×</button>
+			</div>
+			<div class="sy-dialog-body" id="syLeaveBody"></div>
+		</dialog>
+
+		<div id="syToast" class="sy-toast" role="status" aria-live="polite"></div>
+
+		<script type="module" src="/src/syndicate.js"></script>
+		<script src="/brand.js" defer></script>
+		<div id="footer-container"></div>
+		<script src="/footer.js"></script>
+		<!-- Runtime i18n: detects locale, swaps annotated copy, mounts <lang-switcher>. -->
+		<script type="module" src="/i18n.js"></script>
+	</body>
+</html>

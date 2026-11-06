@@ -1,0 +1,103 @@
+import { describe, it, expect, beforeAll, afterAll } from 'vitest';
+import { startTestServer } from './helpers/test-server.js';
+
+// Guards a real production outage class: vercel.json pretty routes that rewrite
+// to an API function with query captures ("/oracle/coin/<mint>" →
+// "/api/oracle-share?mint=$1"). Vercel hands the function the REWRITTEN url on
+// req.url; many handlers (api/oracle-share.js, api/agent-share.js, …) parse
+// their params with `new URL(req.url)` rather than req.query. The Cloud Run
+// server (server/index.mjs) originally injected dest-query params into
+// req.query only, so every such handler saw an empty query — /oracle/coin/*
+// 302-redirected to /oracle for every coin instead of serving the detail page.
+//
+// This test boots the real server and asserts the pretty route serves the page.
+
+// Any syntactically valid base58 mint works: the page must render its shell
+// even when the DB and pump.fun are unreachable (both are best-effort).
+const MINT = 'FeMbDoX7R1Psc4GEcvJdsbNbZA3bfztcyDCatJVJpump';
+
+let BASE;
+let server;
+
+// 90s, not 30s: startTestServer waits up to 60s for readiness because a boot
+// that takes ~1.5s idle takes tens of seconds under full-suite load. This suite
+// is the one that proved it, timing out at exactly the old 20s readiness
+// deadline in a full run and passing in 7s on its own.
+beforeAll(async () => {
+	server = await startTestServer();
+	BASE = server.base;
+}, 90000);
+
+afterAll(() => {
+	server?.close();
+});
+
+describe('rewrite-dest query params reach handlers on req.url', () => {
+	it('/oracle/coin/<mint> serves the coin detail page (no redirect to /oracle)', async () => {
+		const res = await fetch(`${BASE}/oracle/coin/${MINT}`, { redirect: 'manual' });
+		expect(res.status).toBe(200);
+		const html = await res.text();
+		expect(html).toContain('ocHeroDynamic'); // SSR conviction header
+		expect(html).toContain('/oracle-coin.js'); // hydration script
+		expect(html).toContain(MINT);            // boot payload carries the mint
+	}, 30000);
+
+	it('a malformed mint still redirects to /oracle', async () => {
+		const res = await fetch(`${BASE}/oracle/coin/not-a-mint!!`, { redirect: 'manual' });
+		// Bad path segment falls through this route's base58 regex → static 404 or
+		// oracle redirect depending on route table; it must NOT render a coin page.
+		expect(res.status).not.toBe(200);
+	}, 15000);
+
+	it('original query params survive alongside injected dest params', async () => {
+		// /agent/<uuid>/share → /api/agent-share?id=$1 parses id from req.url; an
+		// unknown-but-valid uuid redirects to /agents (id parsed, row missing),
+		// while a lost id would ALSO redirect to /agents — so distinguish via the
+		// oracle route which renders 200 only when the param arrives.
+		const res = await fetch(`${BASE}/agent/00000000-0000-4000-8000-000000000000/share`, { redirect: 'manual' });
+		expect([302, 307]).toContain(res.status);
+		expect(res.headers.get('location')).toBeTruthy();
+	}, 15000);
+
+	it('bare [action] index paths dispatch to the index, not the catch-all branch', async () => {
+		// /api/auth/wallets and /api/auth/sessions rewrite to their [action]
+		// handlers with NO ?action= in the dest, and req.url keeps the ORIGINAL
+		// pathname. The dispatcher's URL fallback must not mistake the endpoint's
+		// own directory segment ("wallets"/"sessions") for an address/session id,
+		// which routed GET to the DELETE-only branch and 405'd every dashboard
+		// page that lists wallets or sessions. Unauthenticated, the healthy index
+		// answer is 401 (sign in required); the regression answer was 405.
+		for (const path of ['/api/auth/wallets', '/api/auth/sessions']) {
+			const res = await fetch(`${BASE}${path}`);
+			expect(res.status, path).toBe(401);
+		}
+	}, 15000);
+
+	it('[action] subpaths still reach their per-action branch', async () => {
+		// A concrete session id must still land in the revoke-one branch, whose
+		// method gate rejects GET with 405 (it is DELETE-only). Guards against
+		// over-correcting the index fix into swallowing real actions.
+		const res = await fetch(`${BASE}/api/auth/sessions/00000000-0000-4000-8000-000000000000`);
+		expect(res.status).toBe(405);
+	}, 15000);
+
+	it('OPTIONS on a POST-only API resolves without a 405 (the /bnb liveness probe)', async () => {
+		// src/bnb.js probes /api/bnb/register-agent with OPTIONS to check the
+		// route is deployed without triggering the POST-only 405 console error.
+		const res = await fetch(`${BASE}/api/bnb/register-agent`, { method: 'OPTIONS' });
+		expect(res.status).toBe(204);
+	}, 15000);
+
+	it('handlers behind a [param].js dest still see the ORIGINAL pathname on req.url', async () => {
+		// /api/marketplace/categories → dest /api/marketplace/[action]?action=categories.
+		// api/marketplace/[action].js routes by parsing req.url's path segments, so if
+		// req.url carried the dest's literal "[action]" segment the handler would 404
+		// "unknown marketplace action" (broke /marketplace, /skills, /economy). With no
+		// DATABASE_URL in this harness the healthy outcome is the handler's own 5xx
+		// degradation — never its unknown-action 404.
+		const res = await fetch(`${BASE}/api/marketplace/categories`);
+		const body = await res.text();
+		expect(body).not.toContain('unknown marketplace action');
+		expect(res.status).not.toBe(404);
+	}, 15000);
+});

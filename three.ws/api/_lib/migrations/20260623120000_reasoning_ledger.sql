@@ -1,0 +1,86 @@
+begin;
+
+-- The Reasoning Ledger — an auditable, tamper-evident record of every
+-- consequential decision an agent makes, what it predicted, and what actually
+-- happened. Three tables:
+--
+--   agent_decisions   — the append-only, per-agent HASH CHAIN. Each row commits to
+--                       the previous (prev_hash → entry_hash) so a backdated or
+--                       silently-edited "thought" is detectable: recompute the
+--                       chain and any altered field breaks the linkage. Rows are
+--                       IMMUTABLE after insert — outcomes live in a separate table
+--                       so the committed decision is never rewritten.
+--   decision_outcomes — the reconciled ground truth (one row per decision, written
+--                       once outcome is known). A decision with no outcome row is
+--                       "pending".
+--   ledger_anchors    — periodic on-chain commitments of each agent's chain head.
+--                       Because the chain is a hash chain, the head hash commits
+--                       the ENTIRE prefix, so anchoring the head is a
+--                       Merkle-root-equivalent tamper proof. Verified independently
+--                       via GET /api/ledger/verify/:agentId.
+
+create table if not exists agent_decisions (
+	id             uuid primary key default gen_random_uuid(),
+	agent_id       uuid not null,
+	-- Per-agent monotonic sequence (1-based). The chain is ordered by this.
+	seq            bigint not null,
+	kind           text not null,            -- 'snipe' | 'exit' | 'bounty_award' | 'moderation' | 'signal' | …
+	subject_ref    text,                     -- what the decision is about (mint, bounty id, pin id)
+	action_ref     text,                     -- proof of the action (tx signature, db ref)
+	inputs         jsonb not null default '{}'::jsonb,  -- snapshot of what the agent saw
+	rationale      text not null default '', -- the reasoning, captured at decision time
+	prediction     jsonb not null default '{}'::jsonb,  -- {direction, basis, target}
+	confidence     double precision not null default 0.5, -- 0..1, agent's self-rated conviction
+	network        text,
+	decided_at     timestamptz not null,     -- caller-supplied ISO (ms precision) — hashed, so never now()
+	-- hash chain
+	prev_hash      text not null,            -- entry_hash of seq-1 (genesis for seq 1)
+	entry_hash     text not null,            -- sha256(prev_hash || canonical(committed fields))
+	created_at     timestamptz not null default now(),
+	unique (agent_id, seq),
+	-- idempotent capture: a chokepoint that fires twice for the same action is a no-op
+	unique (agent_id, kind, subject_ref, action_ref)
+);
+
+create index if not exists agent_decisions_agent_seq
+	on agent_decisions(agent_id, seq desc);
+create index if not exists agent_decisions_kind
+	on agent_decisions(agent_id, kind, decided_at desc);
+-- Reconciliation backlog: snipe decisions awaiting an outcome, found by position id.
+create index if not exists agent_decisions_position
+	on agent_decisions((inputs->>'position_id'))
+	where kind = 'snipe';
+
+create table if not exists decision_outcomes (
+	decision_id    uuid primary key references agent_decisions(id) on delete cascade,
+	agent_id       uuid not null,
+	observed       jsonb not null default '{}'::jsonb,   -- {pnl_sol, pnl_pct, sell_sig, exit_reason, …}
+	was_correct    boolean,                  -- did the call go the predicted way?
+	pnl_sol        double precision,         -- realized P&L in SOL (trade kinds)
+	impact         double precision,         -- generic signed magnitude of the outcome
+	status         text not null default 'reconciled', -- reconciled | unresolved
+	reconciled_at  timestamptz not null default now()
+);
+
+create index if not exists decision_outcomes_agent
+	on decision_outcomes(agent_id, reconciled_at desc);
+
+create table if not exists ledger_anchors (
+	id             uuid primary key default gen_random_uuid(),
+	agent_id       uuid not null,
+	network        text not null default 'mainnet',
+	through_seq    bigint not null,          -- chain head seq committed by this anchor
+	head_hash      text not null,            -- entry_hash at through_seq (commits the whole chain)
+	entry_count    bigint not null,
+	signature      text,                     -- on-chain memo tx signature (null until anchored)
+	status         text not null default 'pending', -- pending | anchored | failed
+	detail         text,                     -- failure/skip reason when not anchored
+	anchored_at    timestamptz,
+	created_at     timestamptz not null default now(),
+	unique (agent_id, head_hash)
+);
+
+create index if not exists ledger_anchors_agent
+	on ledger_anchors(agent_id, through_seq desc);
+
+commit;

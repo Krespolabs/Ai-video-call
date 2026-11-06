@@ -1,0 +1,25 @@
+{
+	"$schema": "NPC dialogue table for the walk scene (Task 19). Slots: greeter, guide-wait, guide-arrive ({landmark} token). landmarks steer the guide NPC.",
+	"greeter": [
+		"Welcome to the three.ws office — make yourself at home.",
+		"Hey, good to have you in. Desks are open, wander freely.",
+		"Welcome aboard. The plants are real, the coffee's hot.",
+		"Glad you stopped by. Take a lap, see the whole floor."
+	],
+	"guide-wait": [
+		"Take your time — I'll wait by the desks.",
+		"No rush, the floor's quiet today.",
+		"I'll hold here until you're ready to move on."
+	],
+	"guide-arrive": [
+		"And this is — {landmark}.",
+		"Here's {landmark}. Heart of the place.",
+		"We've reached {landmark}. Have a look around."
+	],
+	"landmarks": [
+		{ "name": "the brand wall", "pos": [0, 0, 2.6] },
+		{ "name": "the east desks", "pos": [4.147, 0, 1.753] },
+		{ "name": "the plant corner", "pos": [-4.525, 0, 4.525] },
+		{ "name": "the south meeting space", "pos": [-0.573, 0, -4.615] }
+	]
+}

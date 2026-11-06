@@ -1,0 +1,799 @@
+// Pump.fun live feed via PumpPortal public WebSocket.
+// No Redis, no Solana RPC, no auth required.
+// wss://pumpportal.fun/api/data — same source pumpkit tools use.
+// Each mint event is enriched with SOL price + token metadata before emit.
+
+import WebSocket from 'ws';
+import { solPriceUsd as sharedSolPriceUsd } from './sol-price.js';
+import { pumpPortalWsUrl, handlePumpPortalAck, isPumpPortalRefusal } from './pumpportal.js';
+import { fetchSafePublicUrlPinned } from './ssrf-guard.js';
+
+const RECONNECT_DELAY_MS = 2_000;
+const MAX_RECONNECTS = 5;
+const RECONNECT_MAX_DELAY_MS = 30_000;
+
+// PumpPortal answers the WS handshake with 403 when it has blocked this
+// egress IP (datacenter ranges get rate-banned). That is a standing refusal,
+// not a transient drop — pause ALL WS attempts process-wide and lean on the
+// REST fallback, instead of every SSE client re-hammering the handshake every
+// 2 s and spamming the logs. Attempts resume automatically when the pause
+// lapses, so an unban is picked up without a restart.
+const WS_FORBIDDEN_PAUSE_MS = 10 * 60_000;
+let _wsForbiddenUntil = 0;
+
+// REST fallback for the new-mint feed (used when the PumpPortal WS yields no
+// `create` events — e.g. blocked/failed WS egress from a serverless instance).
+const FALLBACK_POLL_MS = 5_000;
+const FALLBACK_LIMIT = 40;
+const RECENT_COINS_TTL_MS = 3_000; // collapse concurrent SSE clients to one upstream poll
+
+// Cross-emit dedupe by tx signature. PumpPortal can occasionally redeliver an
+// event after a transient WS hiccup; this prevents duplicate cards.
+const SEEN_SIG_LIMIT = 2_000;
+const _seenSigs = new Map(); // sig → ts
+function markSeen(sig) {
+	if (!sig) return false;
+	if (_seenSigs.has(sig)) return false;
+	_seenSigs.set(sig, Date.now());
+	if (_seenSigs.size > SEEN_SIG_LIMIT) {
+		// Drop the oldest 25% — Map preserves insertion order.
+		const drop = Math.floor(SEEN_SIG_LIMIT / 4);
+		const it = _seenSigs.keys();
+		for (let i = 0; i < drop; i++) _seenSigs.delete(it.next().value);
+	}
+	return true;
+}
+const META_TIMEOUT_MS = 2_500;
+const META_MAX_BYTES = 256 * 1024;
+
+// SOL/USD via the shared 7-source failover helper (CoinGecko → Jupiter → Kraken
+// → Coinbase → DefiLlama → DIA → Bitfinex, itself cached ~60s and shared across
+// connections). Returns 0 when every source is down — callers leave the USD
+// figure null rather than the old hardcoded $150 guess, which silently corrupted
+// live market caps during an outage.
+const getSolPrice = () => sharedSolPriceUsd();
+
+// Token metadata cache — avoids re-fetching the same URI on reconnects
+const _metaCache = new Map();
+
+async function fetchMeta(uri) {
+	if (!uri) return null;
+	if (_metaCache.has(uri)) return _metaCache.get(uri);
+	try {
+		const ctrl = new AbortController();
+		const tid = setTimeout(() => ctrl.abort(), META_TIMEOUT_MS);
+		// The uri is whatever the coin's creator put in its metadata, so it goes
+		// through the pinned SSRF guard: no private or metadata address on any
+		// redirect hop, and a byte cap while streaming. Fields from the response
+		// are broadcast to every stream subscriber.
+		const r = await fetchSafePublicUrlPinned(
+			uri,
+			{ signal: ctrl.signal, headers: { accept: 'application/json' } },
+			{ allowHttp: true, maxBytes: META_MAX_BYTES },
+		);
+		clearTimeout(tid);
+		if (!r.ok) return null;
+		const d = await r.json();
+		const meta = {
+			description: d.description || null,
+			twitter: d.twitter || null,
+			telegram: d.telegram || null,
+			website: d.website || null,
+		};
+		if (_metaCache.size > 500) _metaCache.clear();
+		_metaCache.set(uri, meta);
+		return meta;
+	} catch { return null; }
+}
+
+/**
+ * Connect to the PumpPortal WebSocket and stream pump.fun events.
+ *
+ * @param {object} opts
+ * @param {(ev: { kind: 'mint'|'graduation'|'trade', data: object }) => void} opts.onEvent
+ * @param {AbortSignal} [opts.signal] — abort to tear down the connection.
+ * @param {'all'|'mint'|'graduation'|'trades'} [opts.kind='all'] — which event
+ *   classes to subscribe to. `trades` requires `mints` (PumpPortal's
+ *   subscribeTokenTrade is per-mint; there is no firehose for all trades).
+ * @param {string[]} [opts.mints=[]] — token mints to stream buy/sell trades for.
+ * @param {(notice: { code: string, message: string, detail: string }) => void} [opts.onNotice]
+ *   called at most once per connection when the upstream refuses a
+ *   subscription (PumpPortal gates per-token trades behind a funded API key).
+ *   Live surfaces use it to tell their own viewers the stream is degraded
+ *   rather than holding open a socket that will never deliver an event.
+ * @returns {Function} stop
+ */
+export function connectPumpFunFeed({ onEvent, signal, kind = 'all', mints = [], onNotice }) {
+	let active = true;
+	let ws = null;
+	let reconnects = 0;
+	let reconnectTimer = null;
+	let fallbackTimer = null;
+	const tradeMints = Array.isArray(mints) ? mints.filter(Boolean) : [];
+	const wantsTrades = (kind === 'all' || kind === 'trades') && tradeMints.length > 0;
+	const wantsMints = kind === 'all' || kind === 'mint';
+
+	// One notice per connection: a refusal is a standing condition of the upstream
+	// credential, so repeating it on every reconnect would spam the consumer's own
+	// clients with a fact they already have.
+	let _noticed = false;
+	function notifyRefused(text) {
+		if (_noticed || typeof onNotice !== 'function') return;
+		_noticed = true;
+		const detail = process.env.PUMPPORTAL_API_KEY
+			? 'PUMPPORTAL_API_KEY is set but the upstream refused it (check the key and its SOL balance).'
+			: 'PUMPPORTAL_API_KEY is not configured on this deployment.';
+		try {
+			onNotice({ code: 'upstream_subscription_refused', message: text, detail });
+		} catch { /* a consumer's notice handler must never break the feed */ }
+	}
+
+	// Per-connection mint dedupe, shared between the WS and the REST fallback so a
+	// launch surfaced by one source is never re-emitted by the other.
+	const _seenMints = new Set();
+	function markMint(mint) {
+		if (!mint || _seenMints.has(mint)) return false;
+		_seenMints.add(mint);
+		if (_seenMints.size > 4_000) {
+			const it = _seenMints.values();
+			for (let i = 0; i < 1_000; i++) _seenMints.delete(it.next().value);
+		}
+		return true;
+	}
+
+	// WebSocket.CONNECTING. A socket torn down before its handshake completes is
+	// the common serverless case here: collectLiveMints (and the request abort
+	// signal) fire on a short timer, often before the upstream open lands.
+	const WS_CONNECTING = 0;
+
+	function stop() {
+		active = false;
+		clearTimeout(reconnectTimer);
+		clearInterval(fallbackTimer);
+		const sock = ws;
+		ws = null;
+		if (!sock) return;
+		try {
+			if (sock.readyState === WS_CONNECTING) {
+				// Closing a socket mid-handshake makes `ws` emit a benign
+				// "WebSocket was closed before the connection was established"
+				// error. This teardown is intentional, so drop our listeners and
+				// swallow that one error rather than logging it as a failure —
+				// terminate() still aborts the pending request and frees the socket.
+				sock.removeAllListeners?.('open');
+				sock.removeAllListeners?.('message');
+				sock.removeAllListeners?.('close');
+				sock.removeAllListeners?.('error');
+				sock.on?.('error', () => {});
+				(sock.terminate ?? sock.close).call(sock);
+			} else {
+				sock.close();
+			}
+		} catch {}
+	}
+
+	signal?.addEventListener('abort', stop);
+
+	// Resilience: pump.fun new-mint REST fallback. Serverless egress can fail to
+	// establish (or sustain) the PumpPortal WebSocket while plain HTTPS to
+	// pump.fun keeps working — when that happens the WS delivers no `create`
+	// events and the live feed goes dark. We poll pump.fun's most-recent-coins
+	// endpoint and emit any launch the WS hasn't already surfaced, so the feed
+	// always has data. When the WS is healthy this is near-silent: it just
+	// backfills the cold-start window, and mint-level dedupe suppresses overlap.
+	async function pollMintFallback() {
+		if (!active || !wantsMints) return;
+		try {
+			const [coins, solPrice] = await Promise.all([fetchRecentCoins(), getSolPrice()]);
+			if (!active || !Array.isArray(coins) || !coins.length) return;
+			// Oldest-first: the client unshifts each row, so emitting in chronological
+			// order leaves the newest launch on top.
+			for (let i = coins.length - 1; i >= 0; i--) {
+				const c = coins[i];
+				if (!c?.mint || !markMint(c.mint)) continue;
+				onEvent({ kind: 'mint', data: normalizeRestCoin(c, solPrice) });
+			}
+		} catch (err) {
+			console.warn('[pumpportal-ws] mint REST fallback failed:', err?.message);
+		}
+	}
+
+	function connect() {
+		if (!active) return;
+		const pausedFor = _wsForbiddenUntil - Date.now();
+		if (pausedFor > 0) {
+			// IP currently blocked upstream: don't open a socket that will 403.
+			// Re-try shortly after the pause lifts so long-lived trade watchers
+			// recover; mint clients keep flowing via the REST fallback meanwhile.
+			clearTimeout(reconnectTimer);
+			reconnectTimer = setTimeout(connect, pausedFor + 1_000);
+			return;
+		}
+		ws = new WebSocket(pumpPortalWsUrl());
+
+		ws.on('open', () => {
+			reconnects = 0;
+			if (kind === 'all' || kind === 'mint') {
+				ws.send(JSON.stringify({ method: 'subscribeNewToken' }));
+			}
+			// Trade subscribers also watch migrations so a tracked token's
+			// graduation surfaces alongside its trades (filtered to the mint below).
+			if (kind === 'all' || kind === 'graduation' || wantsTrades) {
+				ws.send(JSON.stringify({ method: 'subscribeMigration' }));
+			}
+			if (wantsTrades) {
+				ws.send(JSON.stringify({ method: 'subscribeTokenTrade', keys: tradeMints }));
+			}
+		});
+
+		ws.on('message', (raw) => {
+			if (!active) return;
+			let msg;
+			try { msg = JSON.parse(raw.toString()); } catch { return; }
+			if (isPumpPortalRefusal(msg)) notifyRefused(msg.message);
+			if (handlePumpPortalAck(msg, (line) => console.warn('[pumpportal-ws]', line))) return;
+
+			if (msg.txType === 'create' && wantsMints) {
+				if (!markSeen(msg.signature)) return;
+				// Claim the mint so the REST fallback won't re-emit this launch.
+				markMint(msg.mint);
+				enrichMint(msg).then((data) => {
+					pushBuffer('mint', data);
+					if (active) onEvent({ kind: 'mint', data });
+				}).catch((err) => {
+					console.warn('[pumpportal-ws] mint enrich failed:', err?.message);
+					const data = normalizeMint(msg, null, 0);
+					pushBuffer('mint', data);
+					if (active) onEvent({ kind: 'mint', data });
+				});
+			} else if (msg.txType === 'migrate' || msg.txType === 'migration') {
+				const wantGrad = kind === 'all' || kind === 'graduation';
+				// In trades-only mode, only the tracked mint's graduation is relevant —
+				// filter before the (expensive) enrichment so we don't enrich the
+				// whole firehose for one watched token.
+				if (!wantGrad && !(wantsTrades && tradeMints.includes(msg.mint))) return;
+				if (!markSeen(msg.signature)) return;
+				enrichGrad(msg).then((data) => {
+					pushBuffer('graduation', data);
+					persistGraduation(data);
+					if (active) onEvent({ kind: 'graduation', data });
+				}).catch((err) => {
+					console.warn('[pumpportal-ws] grad enrich failed:', err?.message);
+					const data = normalizeGrad(msg);
+					pushBuffer('graduation', data);
+					persistGraduation(data);
+					if (active) onEvent({ kind: 'graduation', data });
+				});
+			} else if ((msg.txType === 'buy' || msg.txType === 'sell') && wantsTrades) {
+				if (!markSeen(msg.signature)) return;
+				// Trades are high-frequency; enrich only with the cached SOL price
+				// (no per-trade metadata fetch) so we never block the message loop.
+				getSolPrice()
+					.then((solPrice) => { if (active) onEvent({ kind: 'trade', data: normalizeTrade(msg, solPrice) }); })
+					.catch(() => { if (active) onEvent({ kind: 'trade', data: normalizeTrade(msg, 0) }); });
+			}
+		});
+
+		ws.on('error', (err) => {
+			// A handshake aborted during teardown is expected, not a failure — don't
+			// surface it as an error (stop() already silences the common path).
+			if (!active && /closed before the connection was established/i.test(err?.message || '')) return;
+			// 403 on the handshake = PumpPortal has blocked this IP (see
+			// WS_FORBIDDEN_PAUSE_MS above) — pause every connection's WS attempts.
+			if (/unexpected server response: 403/i.test(err?.message || '')) {
+				_wsForbiddenUntil = Date.now() + WS_FORBIDDEN_PAUSE_MS;
+			}
+			console.warn('[pumpportal-ws] error:', err?.message);
+		});
+
+		ws.on('close', () => {
+			if (!active || reconnects >= MAX_RECONNECTS) return;
+			reconnects++;
+			// Exponential backoff: an unhealthy upstream gets 2s → 4s → … → 30s,
+			// not a fixed-rate hammer.
+			const delay = Math.min(RECONNECT_DELAY_MS * 2 ** (reconnects - 1), RECONNECT_MAX_DELAY_MS);
+			reconnectTimer = setTimeout(connect, delay);
+		});
+	}
+
+	connect();
+	if (wantsMints) {
+		// Immediate backfill so a fresh client never stares at a blank feed, then
+		// keep polling as a live safety net behind the WS.
+		pollMintFallback();
+		fallbackTimer = setInterval(pollMintFallback, FALLBACK_POLL_MS);
+	}
+	return stop;
+}
+
+async function enrichMint(d) {
+	const [solPrice, meta] = await Promise.all([
+		getSolPrice(),
+		fetchMeta(d.uri),
+	]);
+	const base = normalizeMint(d, meta, solPrice);
+	// Add creator history so mint cards can flag "10 launches, 0 graduated"
+	// rugger profiles at a glance. Best-effort — if the creator endpoint
+	// times out we keep the base card.
+	try {
+		const userCoins = d.traderPublicKey ? await fetchCreatorCoins(d.traderPublicKey) : null;
+		if (Array.isArray(userCoins)) {
+			base.creator_launches = userCoins.length;
+			base.creator_graduated = userCoins.reduce((n, c) => n + (isGraduated(c) ? 1 : 0), 0);
+			base.creator_tokens = userCoins
+				.map((c) => ({
+					mint: c.mint,
+					symbol: c.symbol,
+					name: c.name,
+					mc: pickMc(c, solPrice),
+					graduated: isGraduated(c),
+				}))
+				.filter((c) => c.symbol);
+		}
+	} catch (err) {
+		console.warn('[pumpportal-ws] mint creator-history failed:', err?.message);
+	}
+	return base;
+}
+
+// USDC mint on Solana mainnet — used to flag USDC-paired pump.fun v2 coins
+// when the upstream feed reports a non-WSOL quote_mint. We don't bother with a
+// devnet branch here: PumpPortal only streams mainnet events.
+const WSOL_MINT_STR = 'So11111111111111111111111111111111111111112';
+const USDC_MINT_STR = 'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v';
+
+// Classify the quote mint reported by PumpPortal. PumpPortal exposes the
+// quote_mint field on v2 coins (post-May-21-2026 USDC launch); for legacy
+// SOL-paired coins the field is absent or echoes WSOL. Returning a stable
+// symbol lets the UI label trades/cards without each consumer reimplementing
+// the same comparison.
+function classifyQuote(quoteMintStr) {
+	if (!quoteMintStr || quoteMintStr === WSOL_MINT_STR) {
+		return { quote_mint: WSOL_MINT_STR, quote_symbol: 'SOL', is_usdc_pair: false };
+	}
+	if (quoteMintStr === USDC_MINT_STR) {
+		return { quote_mint: USDC_MINT_STR, quote_symbol: 'USDC', is_usdc_pair: true };
+	}
+	return { quote_mint: quoteMintStr, quote_symbol: 'OTHER', is_usdc_pair: false };
+}
+
+function normalizeMint(d, meta, solPrice) {
+	const mcSol = d.marketCapSol ?? 0;
+	const quote = classifyQuote(d.quoteMint || d.quote_mint);
+	return {
+		mint: d.mint,
+		name: d.name,
+		symbol: d.symbol,
+		creator: d.traderPublicKey,
+		signature: d.signature,
+		market_cap_sol: mcSol,
+		market_cap_usd: solPrice > 0 ? mcSol * solPrice : null,
+		initial_buy_sol: d.solAmount ?? null,
+		initial_buy_usd: solPrice > 0 && d.solAmount ? d.solAmount * solPrice : null,
+		// USDC-paired v2 coins report initial_buy in USDC base units (6-dec) on
+		// the upstream `quoteAmount` / `usdcAmount` field. We surface both raw
+		// quote in/out and a USD figure so downstream renderers can show "Y
+		// USDC initial buy" without re-parsing the event.
+		initial_buy_quote: d.quoteAmount ?? d.usdcAmount ?? null,
+		initial_buy_usd_quote: quote.is_usdc_pair && (d.quoteAmount || d.usdcAmount)
+			? Number(d.quoteAmount ?? d.usdcAmount)
+			: null,
+		sol_price: solPrice,
+		bonding_curve: d.bondingCurveKey,
+		image_uri: d.uri,
+		description: meta?.description || null,
+		twitter: meta?.twitter || null,
+		telegram: meta?.telegram || null,
+		website: meta?.website || null,
+		created_at: Math.floor(Date.now() / 1000),
+		...quote,
+	};
+}
+
+function normalizeGrad(d) {
+	const quote = classifyQuote(d.quoteMint || d.quote_mint);
+	return {
+		tx_signature: d.signature,
+		signature: d.signature,
+		mint: d.mint,
+		name: d.name,
+		symbol: d.symbol,
+		pool: d.pool,
+		timestamp: Math.floor(Date.now() / 1000),
+		...quote,
+	};
+}
+
+function normalizeTrade(d, solPrice = 0) {
+	const quote = classifyQuote(d.quoteMint || d.quote_mint);
+	const solAmount = typeof d.solAmount === 'number' ? d.solAmount : null;
+	const mcSol = typeof d.marketCapSol === 'number' ? d.marketCapSol : null;
+	const isBuy = d.txType === 'buy';
+	return {
+		signature: d.signature,
+		tx_signature: d.signature,
+		mint: d.mint,
+		trader: d.traderPublicKey || null,
+		// Preserve raw txType so consumers can branch on 'buy'/'sell' directly.
+		txType: d.txType,
+		tx_type: d.txType,
+		is_buy: isBuy,
+		token_amount: typeof d.tokenAmount === 'number' ? d.tokenAmount : null,
+		// Both camelCase passthrough and snake_case so the avatar reaction buffer
+		// (which reads solAmount ?? sol_amount ?? amount) and the dashboard agree.
+		solAmount,
+		sol_amount: solAmount,
+		sol_value_usd: solAmount != null && solPrice > 0 ? solAmount * solPrice : null,
+		market_cap_sol: mcSol,
+		market_cap_usd: mcSol != null && solPrice > 0 ? mcSol * solPrice : null,
+		sol_price: solPrice > 0 ? solPrice : null,
+		pool: d.pool || null,
+		bonding_curve: d.bondingCurveKey || null,
+		timestamp: Math.floor(Date.now() / 1000),
+		...quote,
+	};
+}
+
+// ── graduation enrichment ────────────────────────────────────────────────────
+//
+// PumpPortal's migration message only carries {signature, mint, name, symbol,
+// pool}. To render a rich card matching the desired feed format we resolve:
+//   - coin metadata: usd_market_cap, market_cap_at_launch, created_timestamp,
+//     description, creator from pump.fun's frontend coin endpoint
+//   - creator history: total launches + best-token by market cap by listing
+//     the creator's coins
+// A short pump.fun coin TTL cache prevents hammering the endpoint when a
+// migration shows up multiple times across reconnects, and per-fetch timeouts
+// keep stalls bounded so a slow upstream can't pin the SSE worker.
+
+const PUMPFUN_COIN_API = 'https://frontend-api-v3.pump.fun/coins';
+// Per-coin lookups use the v2 route: pump.fun retired `/coins/:mint` on this host
+// around 2026-09-17 (404 "Cannot GET"); `/coins-v2/:mint` returns the same fields.
+const PUMPFUN_COIN_DETAIL_API = 'https://frontend-api-v3.pump.fun/coins-v2';
+const PUMPFUN_USER_COINS_API = 'https://frontend-api-v3.pump.fun/coins/user-created-coins';
+const ENRICH_TIMEOUT_MS = 2_500;
+const COIN_CACHE_TTL_MS = 30_000;
+const _coinCache = new Map();
+const _creatorCache = new Map();
+
+async function fetchJsonWithTimeout(url, ms = ENRICH_TIMEOUT_MS) {
+	const ctrl = new AbortController();
+	const tid = setTimeout(() => ctrl.abort(), ms);
+	try {
+		const r = await fetch(url, {
+			signal: ctrl.signal,
+			headers: { 'accept': 'application/json', 'user-agent': 'three.ws-pumpfun-feed/1' },
+		});
+		if (!r.ok) return null;
+		return await r.json();
+	} catch { return null; } finally { clearTimeout(tid); }
+}
+
+async function fetchCoin(mint) {
+	const hit = _coinCache.get(mint);
+	if (hit && Date.now() - hit.t < COIN_CACHE_TTL_MS) return hit.v;
+	const v = await fetchJsonWithTimeout(`${PUMPFUN_COIN_DETAIL_API}/${encodeURIComponent(mint)}`);
+	if (_coinCache.size > 500) _coinCache.clear();
+	_coinCache.set(mint, { t: Date.now(), v });
+	return v;
+}
+
+async function fetchCreatorCoins(creator) {
+	if (!creator) return null;
+	const hit = _creatorCache.get(creator);
+	if (hit && Date.now() - hit.t < COIN_CACHE_TTL_MS) return hit.v;
+	const v = await fetchJsonWithTimeout(
+		`${PUMPFUN_USER_COINS_API}/${encodeURIComponent(creator)}?offset=0&limit=50&includeNsfw=true`,
+	);
+	if (_creatorCache.size > 500) _creatorCache.clear();
+	_creatorCache.set(creator, { t: Date.now(), v });
+	return v;
+}
+
+// ── new-mint REST fallback ───────────────────────────────────────────────────
+//
+// pump.fun's coins listing, newest-first, is the same HTTPS API we already use
+// for graduation enrichment — reachable from any environment that can make an
+// outbound fetch, including serverless instances where the WS won't connect. A
+// short shared TTL means many concurrent SSE clients on one instance collapse
+// to a single upstream request.
+
+let _recentCoinsCache = { t: 0, coins: [] };
+let _recentCoinsInFlight = null;
+async function fetchRecentCoins() {
+	if (Date.now() - _recentCoinsCache.t < RECENT_COINS_TTL_MS) return _recentCoinsCache.coins;
+	if (_recentCoinsInFlight) return _recentCoinsInFlight;
+	_recentCoinsInFlight = fetchJsonWithTimeout(
+		`${PUMPFUN_COIN_API}?offset=0&limit=${FALLBACK_LIMIT}&sort=created_timestamp&order=DESC&includeNsfw=true`,
+	)
+		.then((data) => {
+			const coins = Array.isArray(data) ? data : Array.isArray(data?.coins) ? data.coins : [];
+			if (coins.length) _recentCoinsCache = { t: Date.now(), coins };
+			return _recentCoinsCache.coins;
+		})
+		.catch(() => _recentCoinsCache.coins)
+		.finally(() => { _recentCoinsInFlight = null; });
+	return _recentCoinsInFlight;
+}
+
+/** Map a pump.fun REST coin to the same mint-event shape `normalizeMint` emits. */
+function normalizeRestCoin(c, solPrice = 0) {
+	const mcSol = typeof c.market_cap === 'number' ? c.market_cap : null;
+	const usdMc = typeof c.usd_market_cap === 'number' ? c.usd_market_cap
+		: mcSol != null && solPrice > 0 ? mcSol * solPrice : null;
+	const createdMs = c.created_timestamp ? Number(c.created_timestamp) : null;
+	// Bonding-curve coins quote in SOL (the upstream reports the System Program id
+	// for native pairs); only an explicit USDC mint flips the pair.
+	const quote = c.quote_mint === USDC_MINT_STR
+		? { quote_mint: USDC_MINT_STR, quote_symbol: 'USDC', is_usdc_pair: true }
+		: { quote_mint: WSOL_MINT_STR, quote_symbol: 'SOL', is_usdc_pair: false };
+	return {
+		mint: c.mint,
+		name: c.name,
+		symbol: c.symbol,
+		creator: c.creator || null,
+		signature: null,
+		market_cap_sol: mcSol,
+		market_cap_usd: usdMc,
+		initial_buy_sol: null,
+		initial_buy_usd: null,
+		sol_price: solPrice || null,
+		bonding_curve: c.bonding_curve || null,
+		image_uri: c.image_uri || null,
+		description: c.description || null,
+		twitter: c.twitter || null,
+		telegram: c.telegram || null,
+		website: c.website || null,
+		created_at: createdMs ? Math.floor(createdMs / 1000) : Math.floor(Date.now() / 1000),
+		complete: c.complete === true || !!c.raydium_pool || !!c.pump_swap_pool,
+		source: 'rest',
+		...quote,
+	};
+}
+
+function formatAge(createdAtMs) {
+	if (!createdAtMs) return '';
+	const s = Math.max(0, Math.floor((Date.now() - createdAtMs) / 1000));
+	if (s < 60) return s + 's';
+	const m = Math.floor(s / 60);
+	if (m < 60) return m + 'm';
+	const h = Math.floor(m / 60);
+	if (h < 24) return h + 'h';
+	return Math.floor(h / 24) + 'd';
+}
+
+function pickMc(c, solPrice) {
+	if (typeof c?.usd_market_cap === 'number') return c.usd_market_cap;
+	if (typeof c?.market_cap === 'number' && solPrice > 0) return c.market_cap * solPrice;
+	return null;
+}
+
+function isGraduated(c) {
+	return c?.complete === true || !!c?.raydium_pool || !!c?.pump_swap_pool;
+}
+
+async function enrichGrad(d) {
+	const base = normalizeGrad(d);
+	const mint = d.mint;
+	if (!mint) return base;
+
+	const [solPrice, coin] = await Promise.all([
+		getSolPrice(),
+		fetchCoin(mint),
+	]);
+
+	if (!coin) return base;
+
+	const creator = coin.creator || d.traderPublicKey || null;
+	const userCoins = creator ? await fetchCreatorCoins(creator) : null;
+
+	const usdMc = pickMc(coin, solPrice);
+	const launchSol = typeof coin.market_cap_at_launch === 'number' ? coin.market_cap_at_launch : null;
+	const launchUsd = launchSol != null && solPrice > 0 ? launchSol * solPrice : null;
+
+	// ATH: pump.fun frontend exposes ath_market_cap (USD) on some mints; fall
+	// back to current MC as a floor so the renderer always has a value.
+	const athUsd = typeof coin.ath_market_cap === 'number' ? coin.ath_market_cap
+		: typeof coin.ath_market_cap_usd === 'number' ? coin.ath_market_cap_usd
+		: usdMc;
+
+	const createdMs = coin.created_timestamp ? Number(coin.created_timestamp) : null;
+	const age = formatAge(createdMs);
+
+	let creatorTokens = [];
+	let launches = null;
+	let creatorGraduated = null;
+	if (Array.isArray(userCoins)) {
+		launches = userCoins.length;
+		creatorGraduated = userCoins.reduce((n, c) => n + (isGraduated(c) ? 1 : 0), 0);
+		creatorTokens = userCoins
+			.map((c) => ({
+				mint: c.mint,
+				symbol: c.symbol,
+				name: c.name,
+				mc: pickMc(c, solPrice),
+				graduated: isGraduated(c),
+			}))
+			.filter((c) => c.symbol);
+	}
+
+	// Migration `solAmount` is the most accurate "graduation deposit" number.
+	// If absent (PumpPortal sometimes omits), fall back to the real_sol_reserves
+	// at graduation (≈ 85 SOL bonding-curve floor).
+	const amountSol = typeof d.solAmount === 'number' ? d.solAmount
+		: typeof coin.real_sol_reserves === 'number' && coin.real_sol_reserves > 0
+			? coin.real_sol_reserves / 1e9
+			: null;
+	const amountUsd = amountSol != null && solPrice > 0 ? amountSol * solPrice : null;
+
+	const graduated = isGraduated(coin);
+	const raydiumPool = coin.raydium_pool || null;
+	const pumpSwapPool = coin.pump_swap_pool || null;
+
+	// Pump.fun's v3 frontend API surfaces `quote_mint` on coins launched after
+	// the v2 / USDC rollout. When present it's the authoritative on-chain
+	// quote — override what we guessed from the WS event so AMM-paired
+	// USDC coins render correctly even if PumpPortal omits the field on the
+	// migrate event.
+	const coinQuote = classifyQuote(coin.quote_mint || coin.quoteMint || base.quote_mint);
+
+	return {
+		...base,
+		...coinQuote,
+		name: coin.name || base.name,
+		symbol: coin.symbol || base.symbol,
+		description: coin.description || null,
+		creator,
+		creator_username: coin.username || null,
+		creator_profile_image: coin.profile_image || null,
+		image_uri: coin.image_uri || null,
+		video_uri: coin.video_uri || null,
+		twitter: coin.twitter || null,
+		telegram: coin.telegram || null,
+		website: coin.website || null,
+		usd_market_cap: usdMc,
+		market_cap: usdMc,
+		market_cap_usd_initial: launchUsd,
+		market_cap_at_launch: launchSol,
+		ath_market_cap: athUsd,
+		sol_price: solPrice || null,
+		created_at: createdMs ? Math.floor(createdMs / 1000) : null,
+		age,
+		amount_sol: amountSol,
+		amount_usd: amountUsd,
+		bonding_curve_pct: 100,
+		complete: graduated,
+		raydium_pool: raydiumPool,
+		pump_swap_pool: pumpSwapPool,
+		reply_count: typeof coin.reply_count === 'number' ? coin.reply_count : null,
+		creator_launches: launches,
+		creator_graduated: creatorGraduated,
+		creator_tokens: creatorTokens,
+	};
+}
+
+// ── Process-local replay buffer ──────────────────────────────────────────────
+//
+// The PumpPortal WS connection is shared per Vercel instance. We keep a small
+// rolling buffer of the most-recent enriched mint and graduation events so each
+// new SSE client (which would otherwise see a blank feed until the next event)
+// can immediately render a contextual backlog. Buffered events are emitted with
+// a `replay: true` marker so the UI can dim them.
+
+const BUFFER_LIMIT = { mint: 25, graduation: 25 };
+const _buffer = { mint: [], graduation: [] };
+
+function pushBuffer(kind, data) {
+	const arr = _buffer[kind];
+	if (!arr) return;
+	const sig = data?.signature || data?.tx_signature;
+	if (sig && arr.some((e) => (e.signature || e.tx_signature) === sig)) return;
+	arr.unshift(data);
+	while (arr.length > BUFFER_LIMIT[kind]) arr.pop();
+}
+
+/**
+ * Snapshot of recently buffered events, newest-first. Caller filters by kind.
+ * @param {{ kind?: 'all'|'mint'|'graduation'|'claims', limit?: number }} opts
+ */
+export function recentBuffered({ kind = 'all', limit = 10 } = {}) {
+	const out = [];
+	if (kind === 'all' || kind === 'mint') {
+		for (const data of _buffer.mint.slice(0, limit)) out.push({ kind: 'mint', data });
+	}
+	if (kind === 'all' || kind === 'graduation' || kind === 'claims') {
+		for (const data of _buffer.graduation.slice(0, limit)) out.push({ kind: 'graduation', data });
+	}
+	// Sort by timestamp/created_at descending so a multi-kind replay is interleaved.
+	out.sort((a, b) => {
+		const ta = a.data.timestamp || a.data.created_at || 0;
+		const tb = b.data.timestamp || b.data.created_at || 0;
+		return tb - ta;
+	});
+	return out.slice(0, limit);
+}
+
+// ── Persistence ──────────────────────────────────────────────────────────────
+//
+// Writing graduations to Postgres lets a fresh container backfill from real
+// history rather than the in-memory buffer (which dies on every cold start).
+// The DB write is fire-and-forget — we never block the SSE stream on it. If
+// DATABASE_URL isn't configured (dev), the import is lazy so we don't fail.
+
+let _sqlPromise = null;
+async function getSql() {
+	if (_sqlPromise) return _sqlPromise;
+	_sqlPromise = import('./db.js').then((m) => m.sql).catch((err) => {
+		console.warn('[pumpportal-ws] db import failed:', err?.message);
+		return null;
+	});
+	return _sqlPromise;
+}
+
+async function persistGraduation(data) {
+	if (!data?.tx_signature && !data?.signature) return;
+	const sql = await getSql();
+	if (!sql) return;
+	try {
+		const sig = data.tx_signature || data.signature;
+		const finite = (n) => (typeof n === 'number' && Number.isFinite(n) ? n : null);
+		await sql`
+			insert into pumpfun_graduations (
+				tx_signature, mint, name, symbol, creator, pool, raydium_pool, pump_swap_pool,
+				market_cap_usd, market_cap_usd_initial, ath_market_cap,
+				amount_sol, amount_usd, sol_price, image_uri, description,
+				twitter, telegram, website, creator_launches, creator_graduated, payload
+			) values (
+				${sig}, ${data.mint || null}, ${data.name || null}, ${data.symbol || null},
+				${data.creator || null}, ${data.pool || null}, ${data.raydium_pool || null},
+				${data.pump_swap_pool || null},
+				${finite(data.usd_market_cap ?? data.market_cap)},
+				${finite(data.market_cap_usd_initial)},
+				${finite(data.ath_market_cap)},
+				${finite(data.amount_sol)},
+				${finite(data.amount_usd)},
+				${finite(data.sol_price)},
+				${data.image_uri || null}, ${data.description || null},
+				${data.twitter || null}, ${data.telegram || null}, ${data.website || null},
+				${Number.isFinite(data.creator_launches) ? data.creator_launches : null},
+				${Number.isFinite(data.creator_graduated) ? data.creator_graduated : null},
+				${JSON.stringify(data)}::jsonb
+			)
+			on conflict (tx_signature) do nothing
+		`;
+	} catch (err) {
+		// Don't take down the feed if a single write fails (e.g. transient
+		// Neon timeout). Log once and move on.
+		console.warn('[pumpportal-ws] persist failed:', err?.message);
+	}
+}
+
+/**
+ * Read recent graduations from Postgres. Falls back to the in-memory ring
+ * buffer when the DB is unreachable so dev/test environments still work.
+ * Used by the HTTP backfill endpoint and as a warmup source on cold start.
+ *
+ * @param {{ limit?: number }} opts
+ * @returns {Promise<Array<object>>} newest-first array of graduation payloads.
+ */
+export async function recentGraduations({ limit = 20 } = {}) {
+	const cap = Math.max(1, Math.min(100, limit | 0 || 20));
+	try {
+		const sql = await getSql();
+		if (sql) {
+			const rows = await sql`
+				select payload, seen_at
+				from pumpfun_graduations
+				order by seen_at desc
+				limit ${cap}
+			`;
+			if (Array.isArray(rows) && rows.length) {
+				return rows.map((r) => ({ ...r.payload, _seen_at: r.seen_at }));
+			}
+		}
+	} catch (err) {
+		console.warn('[pumpportal-ws] recentGraduations db read failed:', err?.message);
+	}
+	// Buffer fallback (dev / DB outage).
+	return _buffer.graduation.slice(0, cap);
+}

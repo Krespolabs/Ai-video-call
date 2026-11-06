@@ -1,0 +1,5 @@
+# Layered on top of .gitignore by `comfy node pack` / `comfy node publish`.
+# The smoke test runs against a local stub server and is not part of the node.
+test_nodes.py
+__pycache__/
+*.zip

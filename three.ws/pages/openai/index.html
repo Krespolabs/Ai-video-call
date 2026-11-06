@@ -1,0 +1,383 @@
+<!doctype html>
+<html lang="en">
+<head>
+	<style>/* three.ws hidden-guard — make the `hidden` attribute authoritative; see scripts/lib/hidden-guard.mjs */[hidden]{display:none!important}</style>
+	<meta charset="utf-8" />
+	<meta name="viewport" content="width=device-width,initial-scale=1" />
+	<title data-i18n="openai_index.meta_title">three.ws is an OpenAI Select Partner: 3D for ChatGPT</title>
+	<meta name="description" content="three.ws is an OpenAI Select Partner in the OpenAI Partner Network. Connect the free three.ws 3D Studio MCP server to ChatGPT and turn a prompt into an interactive, riggable, AR-ready 3D model inline in the conversation."  data-i18n-attr="content:openai_index.meta_description"/>
+	<link rel="canonical" href="https://three.ws/openai" />
+
+	<meta property="og:type" content="website" />
+	<meta property="og:title" content="three.ws is an OpenAI Select Partner"  data-i18n-attr="content:openai_index.meta_og_title"/>
+	<meta property="og:description" content="Free 3D generation inside ChatGPT: connect the three.ws 3D Studio MCP server and get an interactive model inline, riggable, animatable, and placeable in AR."  data-i18n-attr="content:openai_index.meta_og_description"/>
+	<meta property="og:url" content="https://three.ws/openai" />
+	<meta property="og:image" content="https://three.ws/partners/openai/social-card-announcement.png" />
+	<meta property="og:image:width" content="3200" />
+	<meta property="og:image:height" content="1800" />
+	<meta property="og:image:alt" content="three.ws is an OpenAI Select Partner. 3D, natively, inside ChatGPT." />
+
+	<meta name="twitter:card" content="summary_large_image" />
+	<meta name="twitter:title" content="three.ws is an OpenAI Select Partner"  data-i18n-attr="content:openai_index.meta_twitter_title"/>
+	<meta name="twitter:description" content="Free 3D generation inside ChatGPT: connect the three.ws 3D Studio MCP server and get an interactive model inline."  data-i18n-attr="content:openai_index.meta_twitter_description"/>
+	<meta name="twitter:image" content="https://three.ws/partners/openai/social-card-announcement.png" />
+	<meta name="twitter:site" content="@trythreews" />
+
+	<meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1" />
+	<meta property="og:site_name" content="three.ws" />
+	<meta property="og:locale" content="en_US" />
+
+	<link rel="icon" href="/favicon.ico" />
+	<link rel="stylesheet" href="/nav.css" />
+	<link rel="stylesheet" href="/footer.css" />
+	<script src="/nav.js" defer></script>
+	<style>
+		/* The site theme toggle stamps :root[data-theme] (0,2,0), which outranks a
+		   plain :root (0,1,0) and was repainting --accent, --bg and --text on this
+		   page: dark body text on a black ground once light mode was picked. This
+		   surface is a deliberate fixed-dark OpenAI plate, so its palette is
+		   declared at matching specificity and stays put in either theme. */
+		:root,
+		:root[data-theme='light'],
+		:root[data-theme='dark'] {
+			color-scheme: dark;
+			--accent: #ffffff; --accent2: #cccccc;
+			--border: #222222; --bg: #000000;
+			--panel: #141414; --panel2: #1c1c1c;
+			--text: #e8e8f0; --muted: #8b8b99;
+			--oai: #10a37f;
+			/* Pinned locally, not inherited: this page paints one fixed dark palette,
+			   so nothing here may flip with the site theme toggle. */
+			--duration-fast: 140ms;
+			--ease-standard: cubic-bezier(0.2, 0.8, 0.2, 1);
+		}
+		* { box-sizing: border-box; margin: 0; padding: 0; }
+		body { font: 16px/1.6 -apple-system, system-ui, "Segoe UI", Roboto, sans-serif; color: var(--text); background: var(--bg); min-height: 100vh; }
+		a { color: inherit; }
+		:focus-visible { outline: 2px solid var(--oai); outline-offset: 3px; border-radius: 6px; }
+
+		main { max-width: 900px; margin: 0 auto; padding: 72px 24px 120px; }
+
+		/* ── Hero ─────────────────────────────────────────────── */
+		.eyebrow { display: inline-flex; align-items: center; gap: 10px; background: var(--panel); border: 1px solid var(--border); border-radius: 99px; padding: 7px 16px 7px 12px; font-size: 13px; color: var(--muted); margin-bottom: 32px; }
+		.eyebrow .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--oai); box-shadow: 0 0 12px var(--oai); }
+		.eyebrow strong { color: var(--text); font-weight: 500; }
+
+		h1 { font-size: clamp(36px, 6vw, 56px); letter-spacing: -0.03em; line-height: 1.05; font-weight: 600; margin-bottom: 20px; }
+		h1 .gradient { background: linear-gradient(110deg, #ffffff 30%, #9fe8d4 85%); -webkit-background-clip: text; background-clip: text; color: transparent; }
+
+		.lede { font-size: clamp(17px, 2vw, 19px); color: var(--muted); line-height: 1.55; max-width: 660px; margin-bottom: 36px; }
+		.lede strong { color: var(--text); font-weight: 500; }
+
+		.badge-plate { display: inline-block; background: #ffffff; border-radius: 20px; padding: 18px 22px; margin-bottom: 36px; transition: transform var(--duration-fast) var(--ease-standard), box-shadow var(--duration-fast) var(--ease-standard); box-shadow: 0 0 0 1px rgba(255,255,255,.08); }
+		.badge-plate:hover { transform: translateY(-2px); box-shadow: 0 12px 40px rgba(16,163,127,.22), 0 0 0 1px rgba(255,255,255,.16); }
+		.badge-plate img { display: block; width: 260px; max-width: 100%; height: auto; }
+
+		.cta-row { display: flex; gap: 12px; flex-wrap: wrap; margin-bottom: 88px; }
+		.btn { display: inline-flex; align-items: center; gap: 8px; padding: 13px 22px; border-radius: 11px; border: 0; font-size: 14px; font-weight: 600; text-decoration: none; cursor: pointer; transition: filter var(--duration-fast), background var(--duration-fast), transform var(--duration-fast); }
+		.btn-primary { background: var(--accent); color: #000; }
+		.btn-primary:hover { filter: brightness(.9); }
+		.btn-primary:active { transform: translateY(1px); }
+		.btn-sec { background: var(--panel); border: 1px solid var(--border); color: var(--text); }
+		.btn-sec:hover { background: var(--panel2); border-color: #333; }
+		.btn-sec:active { transform: translateY(1px); }
+		.btn svg { width: 16px; height: 16px; }
+
+		section { margin-bottom: 80px; }
+		section h2 { font-size: clamp(24px, 3.5vw, 32px); letter-spacing: -0.02em; line-height: 1.15; font-weight: 600; margin-bottom: 14px; }
+		section .sub { color: var(--muted); font-size: 16px; margin-bottom: 30px; max-width: 640px; }
+
+		/* ── Surfaces ─────────────────────────────────────────── */
+		.surface-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 16px; }
+		.surface { background: var(--panel); border: 1px solid var(--border); border-radius: 14px; padding: 22px; transition: border-color var(--duration-fast), background var(--duration-fast), transform var(--duration-fast); }
+		a.surface { text-decoration: none; display: block; }
+		a.surface:hover { border-color: #2f4d45; background: var(--panel2); transform: translateY(-2px); }
+		.surface .icon { width: 36px; height: 36px; border-radius: 9px; background: rgba(16,163,127,.1); border: 1px solid rgba(16,163,127,.32); display: flex; align-items: center; justify-content: center; margin-bottom: 14px; }
+		.surface h3 { font-size: 15px; font-weight: 600; margin-bottom: 6px; letter-spacing: -0.01em; }
+		.surface p { font-size: 14px; color: var(--muted); line-height: 1.55; }
+		.surface .more { display: inline-flex; align-items: center; gap: 5px; margin-top: 12px; font-size: 13px; color: #6fd6b8; }
+
+		/* ── Connect ──────────────────────────────────────────── */
+		.connect { background: var(--panel); border: 1px solid var(--border); border-radius: 14px; overflow: hidden; }
+		.connect-row { padding: 15px 22px; border-bottom: 1px solid var(--border); display: grid; grid-template-columns: 150px 1fr; gap: 20px; align-items: baseline; }
+		.connect-row:last-child { border-bottom: none; }
+		.connect-row .k { font-size: 12px; color: var(--muted); text-transform: uppercase; letter-spacing: .08em; }
+		.connect-row .v { font-size: 14px; }
+		.connect-row code { font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace; font-size: 13px; color: #6fd6b8; word-break: break-all; }
+
+		pre { background: var(--panel); border: 1px solid var(--border); border-radius: 14px; padding: 22px; margin-top: 16px; overflow-x: auto; font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace; font-size: 12.5px; line-height: 1.7; color: var(--text); }
+		pre .c { color: var(--muted); }
+		pre .s { color: #6fd6b8; }
+
+		/* ── Tools ────────────────────────────────────────────── */
+		.tools { background: var(--panel); border: 1px solid var(--border); border-radius: 14px; overflow: hidden; }
+		.tool { padding: 15px 22px; border-bottom: 1px solid var(--border); display: grid; grid-template-columns: 210px 1fr; gap: 20px; row-gap: 4px; align-items: baseline; }
+		.tool:last-child { border-bottom: none; }
+		.tool code { font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace; font-size: 13px; color: #6fd6b8; }
+		.tool .desc { font-size: 14px; color: var(--muted); }
+
+		.note { background: var(--panel); border: 1px solid var(--border); border-radius: 12px; padding: 16px 20px; font-size: 14px; color: var(--muted); margin-top: 14px; }
+		.note strong { color: var(--text); }
+		/* Underlined at rest: these sit inside running text, where colour alone
+		   is not enough to mark a link (WCAG 1.4.1). */
+		.note a { color: #6fd6b8; text-decoration: underline; text-underline-offset: 2px; }
+		.note a:hover { text-decoration-thickness: 2px; }
+
+		.disclaimer { font-size: 12px; color: var(--muted); margin-top: 64px; line-height: 1.6; max-width: 720px; }
+		.disclaimer a { color: #6fd6b8; text-decoration: underline; text-underline-offset: 2px; }
+		.disclaimer a:hover { text-decoration-thickness: 2px; }
+
+		/* ── Copy buttons + code panel ────────────────────── */
+		.copy-btn { display: inline-flex; align-items: center; gap: 6px; flex: none; background: var(--panel2); border: 1px solid var(--border); color: var(--muted); border-radius: 8px; padding: 5px 11px; font: 600 12px/1.4 inherit; cursor: pointer; transition: color var(--duration-fast), border-color var(--duration-fast), transform var(--duration-fast); }
+		.copy-btn:hover { color: var(--text); border-color: #2f4d45; }
+		.copy-btn:active { transform: translateY(1px); }
+		.copy-btn[data-result="ok"] { color: #6fd6b8; border-color: #2f4d45; }
+		.copy-btn[data-result="fail"] { color: #f0938c; border-color: #5a2f2c; }
+
+		.url-cell { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+
+		.code-panel { background: var(--panel); border: 1px solid var(--border); border-radius: 14px; overflow: hidden; margin-top: 16px; }
+		.code-bar { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 10px 14px 10px 20px; border-bottom: 1px solid var(--border); }
+		.code-bar .label { font-size: 12px; color: var(--muted); text-transform: uppercase; letter-spacing: .08em; }
+		.code-panel pre { margin-top: 0; border: 0; border-radius: 0; background: transparent; }
+
+		/* ── Live connector status ─────────────────────── */
+		.status { display: flex; align-items: flex-start; gap: 11px; flex-wrap: wrap; background: var(--panel); border: 1px solid var(--border); border-radius: 12px; padding: 13px 18px; margin-bottom: 16px; font-size: 14px; color: var(--muted); }
+		.status .sdot { width: 9px; height: 9px; margin-top: 7px; border-radius: 50%; flex: none; background: var(--muted); }
+		/* Keeps the dot and the message on one line down to 320px: without a
+		   flex basis the text is treated as unshrinkable and wraps below it. */
+		.status .stext { flex: 1 1 12rem; min-width: 0; }
+		.status[data-state="checking"] .sdot { background: #d9a441; animation: statusPulse 1.3s ease-in-out infinite; }
+		.status[data-state="live"] .sdot { background: var(--oai); box-shadow: 0 0 10px var(--oai); }
+		.status[data-state="empty"] .sdot { background: #d9a441; }
+		.status[data-state="down"] .sdot { background: #e0645c; }
+		.status .stext strong { color: var(--text); font-weight: 600; }
+		.status .retry { margin-left: auto; margin-top: 1px; }
+		@keyframes statusPulse { 0%, 100% { opacity: 1; } 50% { opacity: .22; } }
+
+		/* ── Per-tool verification marks ──────────────── */
+		.tool .tname { display: flex; align-items: baseline; gap: 8px; }
+		.tool .tmark { flex: none; width: 12px; font-size: 12px; line-height: 1.5; color: transparent; transition: color var(--duration-fast); }
+		.tool[data-live="yes"] .tmark { color: var(--oai); }
+		.tool[data-live="no"] .tmark { color: #e0645c; }
+		.tool[data-live="new"] .tmark { color: #d9a441; }
+		/* Spans the row rather than living inside .desc: runtime i18n rewrites
+		   .desc textContent wholesale and would eat a note nested in it. */
+		.tnote { display: block; grid-column: 1 / -1; font-size: 13px; color: #f0938c; }
+		.tool[data-live="new"] .tnote { color: #d9a441; }
+
+		@media (max-width: 720px) {
+			main { padding: 52px 20px 96px; }
+			.connect-row, .tool { grid-template-columns: 1fr; gap: 5px; }
+			.badge-plate img { width: 220px; }
+		}
+		@media (prefers-reduced-motion: reduce) {
+			* { transition: none !important; animation: none !important; }
+		}
+	</style>
+
+	<script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"WebPage","name":"three.ws is an OpenAI Select Partner","description":"three.ws is an OpenAI Select Partner in the OpenAI Partner Network. Free 3D generation inside ChatGPT through the three.ws 3D Studio MCP server.","url":"https://three.ws/openai","isPartOf":{"@type":"WebSite","name":"three.ws","url":"https://three.ws"},"primaryImageOfPage":"https://three.ws/partners/openai/social-card-announcement.png"}]}</script>
+</head>
+<body>
+
+<header><div id="nav-container"></div></header>
+
+<main>
+
+	<div class="eyebrow">
+		<span class="dot" aria-hidden="true"></span>
+		<strong data-i18n="openai_index.openai_select_partner">OpenAI Select Partner</strong>
+		<span>·</span>
+		<span data-i18n="openai_index.openai_partner_network">OpenAI Partner Network</span>
+	</div>
+
+	<h1 data-i18n-html="openai_index.3d_natively_inside_chatgpt">3D, natively, inside <span class="gradient">ChatGPT</span>.</h1>
+
+	<p class="lede" data-i18n-html="openai_index.three_ws_has_been_named_an_openai">
+		three.ws has been named an <strong>OpenAI Select Partner</strong> within the OpenAI Partner Network.
+		The platform's free 3D Studio connector turns a sentence into an interactive, textured 3D model that
+		renders inline in the conversation, then rigs it, animates it, and places it in your room in AR.
+		No key, no account, no cost.
+	</p>
+
+	<div class="badge-plate">
+		<img src="/partners/openai/openai-select-partner.svg" width="375" height="177" alt="OpenAI Partner Network badge: Select Partner" />
+	</div>
+
+	<div class="cta-row">
+		<a href="/docs/mcp-studio" class="btn btn-primary">
+			Connect it to ChatGPT
+			<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" aria-hidden="true"><path d="M5 12h14M13 5l7 7-7 7"/></svg>
+		</a>
+		<a href="/forge" class="btn btn-sec" data-i18n="openai_index.try_it_in_the_browser">Try it in the browser</a>
+		<a href="/blog/three-ws-openai-select-partner" class="btn btn-sec" data-i18n="openai_index.read_the_announcement">Read the announcement</a>
+		<a href="/press" class="btn btn-sec">Press kit</a>
+	</div>
+
+	<section>
+		<h2 data-i18n="openai_index.what_we_ship_on_openai_surfaces">What we ship on OpenAI surfaces.</h2>
+		<p class="sub" data-i18n="openai_index.four_live_surfaces_all_free_and_keyless">Four live surfaces, all free and keyless. Every one of them is open source.</p>
+
+		<div class="surface-grid">
+
+			<a class="surface" href="/docs/mcp-studio">
+				<div class="icon" aria-hidden="true">
+					<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#6fd6b8" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2 3 7v10l9 5 9-5V7z"/><path d="m3 7 9 5 9-5M12 22V12"/></svg>
+				</div>
+				<h3 data-i18n="openai_index.three_ws_3d_studio_apps_sdk">three.ws 3D Studio (Apps SDK)</h3>
+				<p data-i18n-html="openai_index.an_mcp_connector_for_chatgpt_with_eleven">An MCP connector for ChatGPT with eleven free tools. Results render in an interactive
+				<code>model-viewer</code> widget inline in the chat, with a declared widget CSP so models load in real ChatGPT.</p>
+				<span class="more">Connector docs
+					<svg width="12" height="12" viewBox="0 0 12 12" fill="none" aria-hidden="true"><path d="M2.5 6h7M6.5 3l3 3-3 3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+				</span>
+			</a>
+
+			<a class="surface" href="/docs/api-reference">
+				<div class="icon" aria-hidden="true">
+					<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#6fd6b8" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4h16v12H4z"/><path d="M8 20h8M12 16v4"/></svg>
+				</div>
+				<h3 data-i18n="openai_index.custom_gpt_actions">Custom GPT Actions</h3>
+				<p data-i18n="openai_index.the_same_free_lane_as_a_rest">The same free lane as a REST Actions surface for the "three.ws 3D Studio" custom GPT, with an
+				age-13+ safety gate and store-clean responses. Covers plans without connector support.</p>
+				<span class="more">API reference
+					<svg width="12" height="12" viewBox="0 0 12 12" fill="none" aria-hidden="true"><path d="M2.5 6h7M6.5 3l3 3-3 3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+				</span>
+			</a>
+
+			<a class="surface" href="/spatial-mcp">
+				<div class="icon" aria-hidden="true">
+					<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#6fd6b8" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c3 3.5 3 14 0 18-3-4-3-14.5 0-18"/></svg>
+				</div>
+				<h3 data-i18n="openai_index.spatial_mcp">Spatial MCP</h3>
+				<p data-i18n="openai_index.an_open_cc0_response_shape_for_returning">An open, CC0 response shape for returning a live 3D scene as a first-class tool result: scene GLB,
+				camera, environment, animation, AR handoff. Any client can render it, not just ours.</p>
+				<span class="more">Live demo
+					<svg width="12" height="12" viewBox="0 0 12 12" fill="none" aria-hidden="true"><path d="M2.5 6h7M6.5 3l3 3-3 3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+				</span>
+			</a>
+
+			<a class="surface" href="/docs/chatgpt-ar">
+				<div class="icon" aria-hidden="true">
+					<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#6fd6b8" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2 3 7v10l9 5 9-5V7z"/><path d="M7.5 9.5 12 12l4.5-2.5M12 12v6"/></svg>
+				</div>
+				<h3 data-i18n="openai_index.ar_from_the_conversation">AR from the conversation</h3>
+				<p data-i18n="openai_index.every_generated_model_carries_a_one_tap">Every generated model carries a one-tap AR link. iOS gets a Quick Look USDZ converted on the fly,
+				Android gets a Scene Viewer intent, desktop gets the WebGL viewer.</p>
+				<span class="more">How it works
+					<svg width="12" height="12" viewBox="0 0 12 12" fill="none" aria-hidden="true"><path d="M2.5 6h7M6.5 3l3 3-3 3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+				</span>
+			</a>
+
+		</div>
+	</section>
+
+	<section>
+		<h2 data-i18n="openai_index.connect_the_server">Connect the server.</h2>
+		<p class="sub" data-i18n="openai_index.add_it_as_a_connector_with_no">Add it as a connector with no authentication. It answers every request synchronously over POST.</p>
+
+		<div class="status" id="mcp-status" data-state="checking" role="status" aria-live="polite">
+			<span class="sdot" aria-hidden="true"></span>
+			<span class="stext">Checking the connector from this browser.</span>
+			<button type="button" class="copy-btn retry" id="mcp-retry" hidden>Check again</button>
+		</div>
+
+		<div class="connect">
+			<div class="connect-row">
+				<span class="k" data-i18n="openai_index.url">URL</span>
+				<span class="v url-cell"><code id="mcp-url">https://three.ws/api/mcp-studio</code><button type="button" class="copy-btn" data-copy="mcp-url">Copy</button></span>
+			</div>
+			<div class="connect-row">
+				<span class="k" data-i18n="openai_index.transport">Transport</span>
+				<span class="v" data-i18n="openai_index.streamable_http_json_rpc_over_post">Streamable HTTP (JSON-RPC over POST)</span>
+			</div>
+			<div class="connect-row">
+				<span class="k" data-i18n="openai_index.auth">Auth</span>
+				<span class="v" data-i18n="openai_index.none_no_key_no_account_no_wallet">None. No key, no account, no wallet.</span>
+			</div>
+			<div class="connect-row">
+				<span class="k" data-i18n="openai_index.protocol">Protocol</span>
+				<span class="v" id="mcp-protocol-cell"><span data-i18n-html="openai_index.mcp">MCP <code>2025-06-18</code></span></span>
+			</div>
+			<div class="connect-row">
+				<span class="k" data-i18n="openai_index.manifest">Manifest</span>
+				<span class="v"><a href="https://github.com/nirholas/three.ws/blob/main/server-studio.json" target="_blank" rel="noopener"><code>server-studio.json</code></a></span>
+			</div>
+		</div>
+
+	<div class="code-panel">
+		<div class="code-bar">
+			<span class="label">List the tools from any MCP client</span>
+			<button type="button" class="copy-btn" data-copy="mcp-curl">Copy</button>
+		</div>
+<pre id="mcp-curl">curl -s <span class="s">https://three.ws/api/mcp-studio</span> \
+  -H <span class="s">'content-type: application/json'</span> \
+  -d <span class="s">'{"jsonrpc":"2.0","id":1,"method":"tools/list"}'</span></pre>
+	</div>
+	</section>
+
+	<section>
+		<h2 data-i18n="openai_index.the_generation_tools">The generation tools.</h2>
+		<p class="sub" data-i18n="openai_index.six_generation_tools_a_collector_an_inspector">Six generation tools, a collector that picks up a model which took longer than one turn, an inspector that renders a finished model so the assistant can check its own work, plus three persona tools that give an assistant a living, lip-syncing body in the panel. All eleven free, all operator-funded.</p>
+
+		<div class="tools">
+			<div class="tool" data-tool="forge_free"><span class="tname"><span class="tmark" aria-hidden="true"></span><code>forge_free</code></span><span class="desc" data-i18n="openai_index.generate_a_textured_3d_model_from_a">Generate a textured 3D model from a text prompt. Returns a GLB.</span></div>
+			<div class="tool" data-tool="text_to_avatar"><span class="tname"><span class="tmark" aria-hidden="true"></span><code>text_to_avatar</code></span><span class="desc" data-i18n="openai_index.generate_a_3d_avatar_from_a_prompt">Generate a 3D avatar from a prompt or a reference image.</span></div>
+			<div class="tool" data-tool="mesh_forge"><span class="tname"><span class="tmark" aria-hidden="true"></span><code>mesh_forge</code></span><span class="desc" data-i18n="openai_index.art_directed_mesh_generation_from_text_or">Art-directed mesh generation from text or an image.</span></div>
+			<div class="tool" data-tool="rig_mesh"><span class="tname"><span class="tmark" aria-hidden="true"></span><code>rig_mesh</code></span><span class="desc" data-i18n="openai_index.add_a_humanoid_skeleton_to_an_existing">Add a humanoid skeleton to an existing GLB so it can be animated.</span></div>
+			<div class="tool" data-tool="forge_avatar"><span class="tname"><span class="tmark" aria-hidden="true"></span><code>forge_avatar</code></span><span class="desc" data-i18n="openai_index.one_call_generate_the_mesh_and_rig">One call: generate the mesh and rig it, behind a humanoid gate.</span></div>
+			<div class="tool" data-tool="refine_model"><span class="tname"><span class="tmark" aria-hidden="true"></span><code>refine_model</code></span><span class="desc" data-i18n="openai_index.iterate_by_describing_a_change_make_it">Iterate by describing a change ("make it metallic"), with a revertable version lineage.</span></div>
+			<div class="tool" data-tool="check_job"><span class="tname"><span class="tmark" aria-hidden="true"></span><code>check_job</code></span><span class="desc" data-i18n="openai_index.collect_a_generation_that_outran_its_tool">Collect a generation that outran its tool call. Read-only, and it never spends generation quota.</span></div>
+			<div class="tool" data-tool="look_at_model"><span class="tname"><span class="tmark" aria-hidden="true"></span><code>look_at_model</code></span><span class="desc" data-i18n="openai_index.render_any_public_glb_from_several_angles">Render any public GLB from several angles and read back its geometry, so the assistant can see the model before it links it.</span></div>
+			<div class="tool" data-tool="create_agent_persona"><span class="tname"><span class="tmark" aria-hidden="true"></span><code>create_agent_persona</code></span><span class="desc" data-i18n="openai_index.turn_a_generated_avatar_into_a_persistent">Turn a generated avatar into a persistent, named body that reloads by id.</span></div>
+			<div class="tool" data-tool="get_agent_persona"><span class="tname"><span class="tmark" aria-hidden="true"></span><code>get_agent_persona</code></span><span class="desc" data-i18n="openai_index.reload_a_persona_in_a_fresh_session">Reload a persona in a fresh session. The id is the capability.</span></div>
+			<div class="tool" data-tool="persona_say"><span class="tname"><span class="tmark" aria-hidden="true"></span><code>persona_say</code></span><span class="desc" data-i18n="openai_index.make_the_body_speak_a_line_lip">Make the body speak a line: lip-sync, expression, and gesture blended together.</span></div>
+		</div>
+
+		<div class="note">
+			<strong data-i18n="openai_index.zero_crypto_surface">Zero crypto surface.</strong> This server exposes 3D generation only. The paid, wallet-enabled
+			studio is a separate endpoint at <code>/api/mcp-3d</code> and shares none of this surface. Full contract in the
+			<a href="/docs/mcp-studio" data-i18n="openai_index.3d_studio_docs">3D Studio docs</a>.
+		</div>
+	</section>
+
+	<section>
+		<h2 data-i18n="openai_index.why_it_matters">Why it matters.</h2>
+		<p class="sub" data-i18n="openai_index.assistants_are_excellent_at_text_and_images">
+			Assistants are excellent at text and images and have had nothing to say in three dimensions. A model
+			you can orbit, rig, animate, and stand in your living room is a different kind of answer than a picture of one.
+			three.ws exists to make that response type ordinary: an open protocol shape, a free connector, and an
+			open-source stack under all of it. Being named an OpenAI Select Partner is the endorsement to go build
+			more of it.
+		</p>
+		<div class="cta-row" style="margin-bottom:0">
+			<a href="/forge" class="btn btn-primary">
+				Generate a model
+				<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" aria-hidden="true"><path d="M5 12h14M13 5l7 7-7 7"/></svg>
+			</a>
+			<a href="https://github.com/nirholas/three.ws" class="btn btn-sec" target="_blank" rel="noopener">
+				<svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 .3C5.4.3 0 5.7 0 12.3c0 5.3 3.4 9.8 8.2 11.4.6.1.8-.3.8-.6v-2.1c-3.3.7-4-1.6-4-1.6-.6-1.4-1.4-1.8-1.4-1.8-1.1-.7.1-.7.1-.7 1.2.1 1.9 1.2 1.9 1.2 1.1 1.8 2.9 1.3 3.6 1 .1-.8.4-1.3.8-1.6-2.7-.3-5.5-1.3-5.5-5.9 0-1.3.5-2.4 1.2-3.2-.1-.3-.5-1.5.1-3.2 0 0 1-.3 3.3 1.2 1-.3 2-.4 3-.4s2 .1 3 .4c2.3-1.5 3.3-1.2 3.3-1.2.7 1.7.2 2.9.1 3.2.8.8 1.2 1.9 1.2 3.2 0 4.6-2.8 5.6-5.5 5.9.4.4.8 1.1.8 2.2v3.3c0 .3.2.7.8.6 4.8-1.6 8.2-6.1 8.2-11.4C24 5.7 18.6.3 12 .3z"/></svg>
+				View source
+			</a>
+			<a href="/partners" class="btn btn-sec" data-i18n="openai_index.all_partners">All partners</a>
+		</div>
+	</section>
+
+	<p class="disclaimer" data-i18n-html="openai_index.three_ws_is_an_independent_member_of">
+		three.ws is an independent member of the OpenAI Partner Network at the Select tier. This page describes
+		three.ws products that integrate with OpenAI platforms; it is not an OpenAI product and is not endorsed by
+		OpenAI beyond the partner designation shown. OpenAI, ChatGPT, and the OpenAI Partner Network badge are
+		trademarks of OpenAI. Learn more about the network at
+		<a href="https://openai.com/business/partners/" target="_blank" rel="noopener">openai.com/business/partners</a>.
+	</p>
+
+</main>
+
+<div id="footer-container"></div>
+
+<script src="/mcp-studio-status.js" defer></script>
+<script src="/brand.js" defer></script>
+<script src="/footer.js"></script>
+<!-- Runtime i18n: detects locale, swaps annotated copy, mounts <lang-switcher>. -->
+<script type="module" src="/i18n.js"></script>
+</body>
+</html>

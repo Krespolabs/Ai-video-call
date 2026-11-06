@@ -1,0 +1,210 @@
+{
+  "address": "EdngSwxmDktyrr4phwGEZnCXEoQ27vgnBtowjhKa7Wr8",
+  "metadata": {
+    "name": "skill_license",
+    "version": "0.1.0",
+    "spec": "0.1.0",
+    "description": "On-chain skill-ownership licenses (1/1 NFT access keys) on Solana."
+  },
+  "instructions": [
+    {
+      "name": "initialize_marketplace",
+      "discriminator": [47, 81, 64, 0, 96, 56, 105, 7],
+      "accounts": [
+        {
+          "name": "marketplace",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              { "kind": "const", "value": [109, 97, 114, 107, 101, 116, 112, 108, 97, 99, 101] }
+            ]
+          }
+        },
+        { "name": "authority", "writable": true, "signer": true },
+        { "name": "system_program", "address": "11111111111111111111111111111111" }
+      ],
+      "args": [{ "name": "minter", "type": "pubkey" }]
+    },
+    {
+      "name": "set_minter",
+      "discriminator": [13, 170, 92, 172, 137, 194, 39, 2],
+      "accounts": [
+        {
+          "name": "marketplace",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              { "kind": "const", "value": [109, 97, 114, 107, 101, 116, 112, 108, 97, 99, 101] }
+            ]
+          }
+        },
+        { "name": "authority", "signer": true }
+      ],
+      "args": [{ "name": "new_minter", "type": "pubkey" }]
+    },
+    {
+      "name": "mint_skill_license",
+      "discriminator": [179, 127, 15, 8, 180, 22, 10, 122],
+      "docs": [
+        "skill_license, nft_mint, and owner_token_account are PDAs/ATAs derived from",
+        "(owner, agent_mint, sha256(skill_name)); the client derives and passes them."
+      ],
+      "accounts": [
+        {
+          "name": "marketplace",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              { "kind": "const", "value": [109, 97, 114, 107, 101, 116, 112, 108, 97, 99, 101] }
+            ]
+          }
+        },
+        { "name": "minter", "writable": true, "signer": true },
+        { "name": "owner" },
+        { "name": "agent_mint" },
+        { "name": "skill_license", "writable": true },
+        { "name": "nft_mint", "writable": true },
+        { "name": "owner_token_account", "writable": true },
+        { "name": "token_program", "address": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA" },
+        {
+          "name": "associated_token_program",
+          "address": "ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL"
+        },
+        { "name": "system_program", "address": "11111111111111111111111111111111" },
+        { "name": "rent", "address": "SysvarRent111111111111111111111111111111111" }
+      ],
+      "args": [{ "name": "skill_name", "type": "string" }]
+    },
+    {
+      "name": "burn_skill_license",
+      "discriminator": [208, 75, 132, 30, 218, 53, 153, 225],
+      "accounts": [
+        { "name": "skill_license", "writable": true },
+        { "name": "authority", "writable": true, "signer": true },
+        { "name": "nft_mint", "writable": true },
+        { "name": "owner_token_account", "writable": true },
+        { "name": "token_program", "address": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA" }
+      ],
+      "args": []
+    },
+    {
+      "name": "revoke_skill_license",
+      "discriminator": [126, 201, 251, 1, 207, 219, 170, 31],
+      "accounts": [
+        {
+          "name": "marketplace",
+          "pda": {
+            "seeds": [
+              { "kind": "const", "value": [109, 97, 114, 107, 101, 116, 112, 108, 97, 99, 101] }
+            ]
+          }
+        },
+        { "name": "minter", "signer": true },
+        { "name": "owner" },
+        { "name": "skill_license", "writable": true },
+        { "name": "nft_mint", "writable": true },
+        { "name": "owner_token_account", "writable": true },
+        { "name": "token_program", "address": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA" }
+      ],
+      "args": []
+    }
+  ],
+  "accounts": [
+    { "name": "Marketplace", "discriminator": [70, 222, 41, 62, 78, 3, 32, 174] },
+    { "name": "SkillLicense", "discriminator": [212, 242, 220, 5, 112, 253, 200, 97] }
+  ],
+  "events": [
+    { "name": "SkillLicenseMinted", "discriminator": [139, 57, 198, 225, 48, 35, 207, 177] },
+    { "name": "SkillLicenseBurned", "discriminator": [91, 36, 61, 129, 31, 152, 96, 100] },
+    { "name": "SkillLicenseRevoked", "discriminator": [24, 244, 206, 252, 213, 29, 50, 23] }
+  ],
+  "errors": [
+    { "code": 6000, "name": "EmptySkillName", "msg": "skill_name must not be empty" },
+    { "code": 6001, "name": "SkillNameTooLong", "msg": "skill_name exceeds the maximum allowed length" },
+    {
+      "code": 6002,
+      "name": "UnauthorizedAdmin",
+      "msg": "only the marketplace admin authority may perform this action"
+    },
+    {
+      "code": 6003,
+      "name": "UnauthorizedMinter",
+      "msg": "only the authorized minter may mint or revoke licenses"
+    },
+    { "code": 6004, "name": "NotLicenseOwner", "msg": "signer is not the owner of this license" },
+    {
+      "code": 6005,
+      "name": "MintMismatch",
+      "msg": "nft_mint does not match the one recorded on the license"
+    },
+    { "code": 6006, "name": "AlreadyRevoked", "msg": "license is already revoked" },
+    { "code": 6007, "name": "Overflow", "msg": "arithmetic overflow" }
+  ],
+  "types": [
+    {
+      "name": "Marketplace",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          { "name": "authority", "type": "pubkey" },
+          { "name": "minter", "type": "pubkey" },
+          { "name": "licenses_minted", "type": "u64" },
+          { "name": "bump", "type": "u8" }
+        ]
+      }
+    },
+    {
+      "name": "SkillLicense",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          { "name": "authority", "type": "pubkey" },
+          { "name": "agent_mint", "type": "pubkey" },
+          { "name": "nft_mint", "type": "pubkey" },
+          { "name": "skill_hash", "type": { "array": ["u8", 32] } },
+          { "name": "purchase_date", "type": "i64" },
+          { "name": "revoked_at", "type": "i64" },
+          { "name": "bump", "type": "u8" },
+          { "name": "skill_name", "type": "string" }
+        ]
+      }
+    },
+    {
+      "name": "SkillLicenseMinted",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          { "name": "license", "type": "pubkey" },
+          { "name": "owner", "type": "pubkey" },
+          { "name": "agent_mint", "type": "pubkey" },
+          { "name": "nft_mint", "type": "pubkey" },
+          { "name": "skill_name", "type": "string" },
+          { "name": "purchase_date", "type": "i64" }
+        ]
+      }
+    },
+    {
+      "name": "SkillLicenseBurned",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          { "name": "license", "type": "pubkey" },
+          { "name": "owner", "type": "pubkey" },
+          { "name": "nft_mint", "type": "pubkey" }
+        ]
+      }
+    },
+    {
+      "name": "SkillLicenseRevoked",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          { "name": "license", "type": "pubkey" },
+          { "name": "owner", "type": "pubkey" },
+          { "name": "nft_mint", "type": "pubkey" },
+          { "name": "revoked_at", "type": "i64" }
+        ]
+      }
+    }
+  ]
+}

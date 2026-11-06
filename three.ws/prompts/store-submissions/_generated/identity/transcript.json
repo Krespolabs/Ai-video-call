@@ -1,0 +1,255 @@
+[
+  {
+    "step": "persona_identity — before funding (real devnet RPC)",
+    "call": {
+      "persona_id": "persona_IGX5MrsiGrVObeie9BcM",
+      "network": "devnet"
+    },
+    "result": {
+      "persona_id": "persona_IGX5MrsiGrVObeie9BcM",
+      "address": "3F7h9J9ou6k2uLAa5hgTq3cYike8bLLZx7J1RT7gJ7Ed",
+      "network": "devnet",
+      "explorer": "https://solscan.io/account/3F7h9J9ou6k2uLAa5hgTq3cYike8bLLZx7J1RT7gJ7Ed?cluster=devnet",
+      "balances": {
+        "sol": 0,
+        "usdc": 0,
+        "sol_usd": 0,
+        "total_usd": 0
+      },
+      "reputation": {
+        "agent": "3F7h9J9ou6k2uLAa5hgTq3cYike8bLLZx7J1RT7gJ7Ed",
+        "network": "devnet",
+        "feedback": {
+          "total": 0,
+          "verified": 0,
+          "disputed": 0,
+          "score_avg": 0,
+          "score_avg_verified": 0
+        },
+        "validation": {
+          "passed": 0,
+          "failed": 0
+        },
+        "degraded": true
+      },
+      "holdings": {
+        "count": 1,
+        "total_usd": 0,
+        "sol_usd_price": 80.34736711420102,
+        "top": [
+          {
+            "symbol": "SOL",
+            "mint": null,
+            "amount": 0,
+            "usd": 0
+          }
+        ],
+        "degraded": false
+      },
+      "nameplate": {
+        "name": null,
+        "verified": false,
+        "source": "sns"
+      },
+      "visual": {
+        "reputation_tier": "unranked",
+        "holdings_tier": "none",
+        "muted": true,
+        "verified_name": null
+      },
+      "caps": {
+        "maxPerCallUsdc": 1,
+        "maxPerSessionUsdc": 5,
+        "confirmAboveUsdc": 0.25
+      },
+      "fetched_at": "2026-07-08T01:13:47.779Z",
+      "identity_card": {
+        "kind": "persona_identity_card",
+        "version": 1,
+        "personaId": "persona_IGX5MrsiGrVObeie9BcM",
+        "name": "Evidence Agent",
+        "wallet": {
+          "address": "3F7h9J9ou6k2uLAa5hgTq3cYike8bLLZx7J1RT7gJ7Ed",
+          "network": "devnet",
+          "explorer": "https://solscan.io/account/3F7h9J9ou6k2uLAa5hgTq3cYike8bLLZx7J1RT7gJ7Ed?cluster=devnet"
+        },
+        "balance": {
+          "sol": 0,
+          "usdc": 0,
+          "totalUsdDisplay": "$0.00"
+        },
+        "reputation": {
+          "tier": "unranked",
+          "verifiedFeedback": 0,
+          "totalFeedback": 0,
+          "scoreAvgVerified": 0,
+          "source": "threews-solana-attestations"
+        },
+        "holdings": {
+          "tier": "none",
+          "assetCount": 1,
+          "totalUsdDisplay": "$0.00"
+        },
+        "verifiedName": null,
+        "muted": true,
+        "fetchedAt": "2026-07-08T01:13:47.779Z"
+      },
+      "status": "ok"
+    },
+    "at": "2026-07-08T01:13:47.855Z"
+  },
+  {
+    "step": "devnet SOL airdrop to the derived persona wallet (real faucet call)",
+    "call": {
+      "to": "3F7h9J9ou6k2uLAa5hgTq3cYike8bLLZx7J1RT7gJ7Ed",
+      "sol": 0.1
+    },
+    "result": {
+      "ok": false,
+      "reason": "faucet_rate_limited",
+      "message": "429 Too Many Requests:  {\"jsonrpc\":\"2.0\",\"error\":{\"code\": 429, \"message\":\"You've either reached your airdrop limit today or the airdrop faucet has run dry. Please visit https://faucet.solana.com for alternate sources of test SOL\"}, \"id\": \"2ab9dae7-22b5-455d-a33a-6631d35b483a\" } \r\n"
+    },
+    "at": "2026-07-08T01:13:47.936Z"
+  },
+  {
+    "step": "persona_identity — after funding attempt (real devnet RPC)",
+    "call": {
+      "persona_id": "persona_IGX5MrsiGrVObeie9BcM",
+      "network": "devnet"
+    },
+    "result": {
+      "persona_id": "persona_IGX5MrsiGrVObeie9BcM",
+      "address": "3F7h9J9ou6k2uLAa5hgTq3cYike8bLLZx7J1RT7gJ7Ed",
+      "network": "devnet",
+      "explorer": "https://solscan.io/account/3F7h9J9ou6k2uLAa5hgTq3cYike8bLLZx7J1RT7gJ7Ed?cluster=devnet",
+      "balances": {
+        "sol": 0,
+        "usdc": 0,
+        "sol_usd": 0,
+        "total_usd": 0
+      },
+      "reputation": {
+        "agent": "3F7h9J9ou6k2uLAa5hgTq3cYike8bLLZx7J1RT7gJ7Ed",
+        "network": "devnet",
+        "feedback": {
+          "total": 0,
+          "verified": 0,
+          "disputed": 0,
+          "score_avg": 0,
+          "score_avg_verified": 0
+        },
+        "validation": {
+          "passed": 0,
+          "failed": 0
+        },
+        "degraded": true
+      },
+      "holdings": {
+        "count": 1,
+        "total_usd": 0,
+        "sol_usd_price": 80.3604861660509,
+        "top": [
+          {
+            "symbol": "SOL",
+            "mint": null,
+            "amount": 0,
+            "usd": 0
+          }
+        ],
+        "degraded": false
+      },
+      "nameplate": {
+        "name": null,
+        "verified": false,
+        "source": "sns"
+      },
+      "visual": {
+        "reputation_tier": "unranked",
+        "holdings_tier": "none",
+        "muted": true,
+        "verified_name": null
+      },
+      "caps": {
+        "maxPerCallUsdc": 1,
+        "maxPerSessionUsdc": 5,
+        "confirmAboveUsdc": 0.25
+      },
+      "fetched_at": "2026-07-08T01:13:48.321Z",
+      "identity_card": {
+        "kind": "persona_identity_card",
+        "version": 1,
+        "personaId": "persona_IGX5MrsiGrVObeie9BcM",
+        "name": "Evidence Agent",
+        "wallet": {
+          "address": "3F7h9J9ou6k2uLAa5hgTq3cYike8bLLZx7J1RT7gJ7Ed",
+          "network": "devnet",
+          "explorer": "https://solscan.io/account/3F7h9J9ou6k2uLAa5hgTq3cYike8bLLZx7J1RT7gJ7Ed?cluster=devnet"
+        },
+        "balance": {
+          "sol": 0,
+          "usdc": 0,
+          "totalUsdDisplay": "$0.00"
+        },
+        "reputation": {
+          "tier": "unranked",
+          "verifiedFeedback": 0,
+          "totalFeedback": 0,
+          "scoreAvgVerified": 0,
+          "source": "threews-solana-attestations"
+        },
+        "holdings": {
+          "tier": "none",
+          "assetCount": 1,
+          "totalUsdDisplay": "$0.00"
+        },
+        "verifiedName": null,
+        "muted": true,
+        "fetchedAt": "2026-07-08T01:13:48.321Z"
+      },
+      "status": "ok"
+    },
+    "at": "2026-07-08T01:13:48.321Z"
+  },
+  {
+    "step": "persona_tip — over the per-call cap (real guardrail enforcement)",
+    "call": {
+      "persona_id": "persona_IGX5MrsiGrVObeie9BcM",
+      "to": "6zc6pUTEyJrgb3x3XE33WsxQhgQrawDxFWnynzRVrUYK",
+      "usdc": 999
+    },
+    "result": {
+      "status": "blocked",
+      "code": "over_call_cap",
+      "cap_usdc": 1
+    },
+    "at": "2026-07-08T01:13:48.330Z"
+  },
+  {
+    "step": "persona_tip — above the confirmation threshold, confirm omitted (real guardrail enforcement)",
+    "call": {
+      "persona_id": "persona_IGX5MrsiGrVObeie9BcM",
+      "to": "6zc6pUTEyJrgb3x3XE33WsxQhgQrawDxFWnynzRVrUYK",
+      "usdc": 0.5
+    },
+    "result": {
+      "status": "confirmation_required",
+      "threshold_usdc": 0.25
+    },
+    "at": "2026-07-08T01:13:48.331Z"
+  },
+  {
+    "step": "persona_tip — real settlement attempt, confirmed (expected: insufficient USDC — the funding blocker)",
+    "call": {
+      "persona_id": "persona_IGX5MrsiGrVObeie9BcM",
+      "to": "6zc6pUTEyJrgb3x3XE33WsxQhgQrawDxFWnynzRVrUYK",
+      "usdc": 0.05,
+      "confirm": true
+    },
+    "result": {
+      "status": "failed",
+      "code": "SIM_FAILED",
+      "message": "pre-broadcast simulation failed: \"AccountNotFound\""
+    },
+    "at": "2026-07-08T01:13:48.500Z"
+  }
+]

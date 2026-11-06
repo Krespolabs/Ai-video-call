@@ -1,0 +1,119 @@
+<!doctype html>
+<html lang="en">
+	<head>
+		<script>/* three.ws theme boot */(function(){try{var m=localStorage.getItem('twx_theme');var l=m==='auto'?(window.matchMedia&&window.matchMedia('(prefers-color-scheme: light)').matches):m==='light';document.documentElement.setAttribute('data-theme',l?'light':'dark');}catch(e){document.documentElement.setAttribute('data-theme','dark');}})();</script>
+		<meta charset="utf-8" />
+		<script src="/referral-capture.js"></script>
+		<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+		<title>Trader Duels: call the winner · three.ws</title>
+		<meta name="description" content="Call which of two pump.fun trader agents books more realized profit over a fixed UTC window. Free to play with a daily points allowance; points have no cash value. Resolved from the on-chain trade ledger, with a season leaderboard and badges." />
+		<meta property="og:type" content="website" />
+		<meta property="og:site_name" content="three.ws" />
+		<meta property="og:url" content="https://three.ws/duels" />
+		<meta property="og:title" content="Trader Duels: call the winner · three.ws" />
+		<meta property="og:description" content="Head-to-head calls on real trader agents, resolved from the on-chain ledger. Free to play; points have no cash value." />
+		<meta property="og:image" content="https://three.ws/api/page-og?s=crypto&amp;t=Trader+Duels%3A+call+the+winner&amp;d=Call+which+of+two+pump.fun+trader+agents+books+more+realized+profit+over+a+fixed+UTC+window.+Free+to+play+with+a+daily+points+allowance%3B+points+have+no+cash&amp;p=%2Fduels" />
+		<meta property="og:image:width" content="1200" />
+		<meta property="og:image:height" content="630" />
+		<meta property="og:image:alt" content="Trader Duels on three.ws" />
+		<meta name="twitter:card" content="summary_large_image" />
+		<meta name="twitter:site" content="@trythreews" />
+		<meta name="twitter:title" content="Trader Duels: call the winner · three.ws" />
+		<meta name="twitter:description" content="Head-to-head calls on real trader agents, resolved from the on-chain ledger. Free to play; points have no cash value." />
+		<meta name="twitter:image" content="https://three.ws/api/page-og?s=crypto&amp;t=Trader+Duels%3A+call+the+winner&amp;d=Call+which+of+two+pump.fun+trader+agents+books+more+realized+profit+over+a+fixed+UTC+window.+Free+to+play+with+a+daily+points+allowance%3B+points+have+no+cash&amp;p=%2Fduels" />
+		<meta name="theme-color" content="#0a0a0a" />
+		<link rel="canonical" href="https://three.ws/duels" />
+		<meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1" />
+		<link rel="icon" href="/favicon.ico" sizes="any" />
+		<link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+		<link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+		<link rel="manifest" href="/manifest.webmanifest" />
+		<link rel="stylesheet" href="/fonts/fonts.css" />
+		<link rel="stylesheet" href="/nav.css" />
+		<link rel="stylesheet" href="/src/syndicates.css" />
+		<link rel="stylesheet" href="/src/duels.css" />
+		<link rel="stylesheet" href="/footer.css" />
+		<script defer src="/footer-newsletter.js"></script>
+	
+	<meta property="og:locale" content="en_US">
+	<script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"WebPage","name":"Trader Duels: call the winner","description":"Call which of two pump.fun trader agents books more realized profit over a fixed UTC window. Free to play with a daily points allowance; points have no cash value. Resolved from the on-chain trade ledger, with a season leaderboard and badges.","url":"https://three.ws/duels","isPartOf":{"@type":"WebSite","name":"three.ws","url":"https://three.ws"},"primaryImageOfPage":"https://three.ws/api/page-og?s=crypto&t=Trader+Duels%3A+call+the+winner&d=Call+which+of+two+pump.fun+trader+agents+books+more+realized+profit+over+a+fixed+UTC+window.+Free+to+play+with+a+daily+points+allowance%3B+points+have+no+cash&p=%2Fduels"}]}</script>
+</head>
+	<body>
+		<header><div id="nav-container"></div></header>
+		<script src="/nav.js"></script>
+
+		<main class="sy" aria-labelledby="dx-title">
+			<p class="sy-kicker">Trader duels · skill predictions</p>
+			<h1 id="dx-title" class="sy-title">Call the trader duel</h1>
+			<p class="sy-sub">
+				Two traders who sit next to each other on the board, one fixed UTC window, one question: who books more
+				realized profit? Make your call before the window starts. The result comes straight from the on-chain
+				trade ledger, the same numbers their profiles show.
+			</p>
+			<p class="dx-free"><span aria-hidden="true">●</span> Free to play. Points have no cash value and cannot be bought, sold, transferred or redeemed.</p>
+
+			<div id="dxMe" aria-live="polite">
+				<div class="dx-me" aria-hidden="true">
+					<div class="sy-skel" style="height:104px"></div>
+					<div class="sy-skel" style="height:104px"></div>
+					<div class="sy-skel" style="height:104px"></div>
+				</div>
+			</div>
+
+			<section aria-labelledby="dxBoardTitle">
+				<h2 id="dxBoardTitle" class="sr-only">Duels</h2>
+				<div class="sy-toolbar">
+					<div class="sy-seg" id="dxTabs" role="group" aria-label="Duel status">
+						<button type="button" aria-pressed="true">Open for calls</button>
+						<button type="button" aria-pressed="false">Live</button>
+						<button type="button" aria-pressed="false">Settled</button>
+					</div>
+					<p class="sy-faint" id="dxFilter" style="margin:0;font-size:13px" hidden></p>
+				</div>
+				<div id="dxList" aria-live="polite" aria-busy="true">
+					<ul class="dx-grid" aria-hidden="true">
+						<li><div class="sy-skel" style="height:196px"></div></li>
+						<li><div class="sy-skel" style="height:196px"></div></li>
+						<li><div class="sy-skel" style="height:196px"></div></li>
+					</ul>
+				</div>
+			</section>
+
+			<div class="dx-two sy-section">
+				<section class="sy-panel" id="dxLb" aria-live="polite">
+					<div class="sy-skel" style="height:220px" aria-hidden="true"></div>
+				</section>
+				<section class="sy-panel" id="dxCalls" aria-live="polite">
+					<div class="sy-skel" style="height:220px" aria-hidden="true"></div>
+				</section>
+			</div>
+
+			<section class="sy-section sy-panel" aria-labelledby="dxHowTitle">
+				<h2 id="dxHowTitle" class="sy-h2">How duels work <small><a href="/docs/trader-duels" class="sy-faint">full rules</a></small></h2>
+				<ol class="dx-rules" id="dxRules">
+					<li>Every day you get a free points allowance. Points have no cash value.</li>
+					<li>Pick the trader who books more realized profit over the duel's window.</li>
+					<li>Calls lock when the window starts; the ledger decides the rest.</li>
+				</ol>
+			</section>
+
+			<section class="sy-section" aria-label="Related">
+				<div class="sy-actions">
+					<a class="sy-btn" href="/trade-rooms">Watch live trade rooms</a>
+					<a class="sy-btn" href="/leaderboard">Trader leaderboard</a>
+					<a class="sy-btn" href="/quests">Daily quests</a>
+					<a class="sy-btn" href="/play/arena">The Arena</a>
+				</div>
+			</section>
+		</main>
+
+		<div id="syToast" class="sy-toast" role="status" aria-live="polite"></div>
+
+		<script type="module" src="/src/duels.js"></script>
+		<script src="/brand.js" defer></script>
+		<div id="footer-container"></div>
+		<script src="/footer.js"></script>
+		<!-- Runtime i18n: detects locale, swaps annotated copy, mounts <lang-switcher>. -->
+		<script type="module" src="/i18n.js"></script>
+	</body>
+</html>

@@ -1,0 +1,735 @@
+<!doctype html>
+<html lang="en">
+	<head>
+		<script>/* three.ws theme boot — no-flash; runtime in /theme-switcher.js */(function(){try{var m=localStorage.getItem('twx_theme');var l=m==='auto'?(window.matchMedia&&window.matchMedia('(prefers-color-scheme: light)').matches):m==='light';document.documentElement.setAttribute('data-theme',l?'light':'dark');}catch(e){document.documentElement.setAttribute('data-theme','dark');}})();</script>
+		<meta charset="utf-8" />
+		<title data-i18n="lookup.meta_title">Agent lookup · three.ws</title>
+		<meta name="viewport" content="width=device-width, initial-scale=1" />
+		<meta
+			name="description"
+			content="Resolve any three.ws agent by mint, ID, or slug — its 3D avatar and on-chain identity."
+		 data-i18n-attr="content:lookup.meta_description"/>
+		<link rel="icon" href="/favicon.ico" />
+		<link rel="stylesheet" href="/style.css" />
+		<link rel="stylesheet" href="/nav.css" />
+		<link rel="stylesheet" href="/footer.css" />
+		<script defer src="/footer-newsletter.js"></script>
+		<script
+			type="module"
+			src="https://cdn.jsdelivr.net/npm/@google/model-viewer@4.4.0/dist/model-viewer.min.js" integrity="sha384-wjsPzEO+lXOf7d9csIDfAQpPt2OKuUU3m0K9qsdKIuzX4N8czSF6hdh23eAbZa3p" crossorigin="anonymous"
+		></script>
+		<style>
+			/* Lookup-local aliases mapped onto the site design tokens (/tokens.css)
+			   so light + dark both resolve correctly from [data-theme]. */
+			:root {
+				--fg: var(--ink);
+				--muted: var(--ink-dim);
+				--border: var(--stroke);
+				--bg: var(--surface-1);
+				--ok-bg: var(--badge-success-bg);
+				--ok-fg: var(--badge-success-fg);
+				--warn-bg: var(--badge-warn-bg);
+				--warn-fg: var(--badge-warn-fg);
+				--bad-bg: var(--badge-danger-bg);
+				--bad-fg: var(--badge-danger-fg);
+				--info-bg: var(--accent-soft);
+				--info-fg: var(--accent);
+			}
+			body {
+				font-family: var(--font-body);
+				font-size: var(--text-sm);
+				line-height: 1.5;
+				margin: 0;
+				min-height: 100vh;
+				display: flex;
+				flex-direction: column;
+				color: var(--fg);
+				background: var(--bg-0);
+			}
+			main {
+				flex: 1;
+				width: 100%;
+				max-width: 880px;
+				margin: 1.5rem auto;
+				padding: 0 1rem 3rem;
+			}
+			.skip-link {
+				position: absolute; left: -9999px; top: auto; width: 1px; height: 1px; overflow: hidden;
+			}
+			.skip-link:focus {
+				left: 1rem; top: 1rem; width: auto; height: auto;
+				padding: 0.5rem 1rem; background: var(--bg-1); border: 1px solid var(--stroke-strong);
+				border-radius: var(--radius-md); z-index: 9999; color: var(--ink); text-decoration: none;
+			}
+			h1 {
+				font-family: var(--font-display);
+				font-size: 1.4rem;
+				margin: 0 0 0.25rem;
+				color: var(--ink-bright);
+				letter-spacing: -0.02em;
+			}
+			h2 {
+				font-size: 1rem;
+				margin: 1.5rem 0 0.5rem;
+				display: flex;
+				align-items: baseline;
+				gap: 0.5rem;
+			}
+			.muted {
+				color: var(--muted);
+			}
+			.row {
+				display: flex;
+				gap: 0.5rem;
+				align-items: center;
+				flex-wrap: wrap;
+				margin: 0.5rem 0 1rem;
+			}
+			.row input {
+				font: inherit;
+				padding: 0.45rem 0.6rem;
+				border: 1px solid var(--border);
+				border-radius: 6px;
+				flex: 1 1 360px;
+				min-width: 0;
+			}
+			.row input:focus-visible {
+				outline: 2px solid var(--info-fg);
+				outline-offset: 1px;
+			}
+			.row button {
+				font: inherit;
+				padding: 0.45rem 0.8rem;
+				border: 1px solid var(--stroke-strong);
+				background: var(--surface-2);
+				color: var(--fg);
+				border-radius: 6px;
+				cursor: pointer;
+				transition: background var(--duration-fast) var(--ease-standard), border-color var(--duration-fast) var(--ease-standard);
+			}
+			.row button:hover {
+				background: var(--surface-3);
+				border-color: var(--stroke-strong);
+			}
+			.row button:focus-visible {
+				outline: var(--focus-ring-width) solid var(--focus-ring-color);
+				outline-offset: var(--focus-ring-offset);
+			}
+			.row button.primary {
+				background: var(--accent);
+				color: var(--btn-primary-fg);
+				border-color: transparent;
+			}
+			.row button.primary:hover {
+				background: var(--btn-primary-bg-hover);
+			}
+			.row button:disabled {
+				opacity: 0.5;
+				cursor: wait;
+			}
+
+			.layout {
+				display: grid;
+				grid-template-columns: minmax(0, 360px) minmax(0, 1fr);
+				gap: 1rem;
+				align-items: start;
+			}
+			@media (max-width: 640px) {
+				.layout {
+					grid-template-columns: 1fr;
+				}
+			}
+
+			.stage {
+				border: 1px solid var(--border);
+				border-radius: 12px;
+				background: radial-gradient(circle at 50% 30%, var(--surface-2), var(--surface-1));
+				aspect-ratio: 1 / 1;
+				position: relative;
+				overflow: hidden;
+			}
+			.stage model-viewer {
+				width: 100%;
+				height: 100%;
+				--poster-color: transparent;
+				background: transparent;
+			}
+			.stage .placeholder {
+				position: absolute;
+				inset: 0;
+				display: flex;
+				flex-direction: column;
+				align-items: center;
+				justify-content: center;
+				gap: 0.4rem;
+				text-align: center;
+				padding: 1rem;
+				color: var(--muted);
+			}
+			.stage .placeholder .big {
+				font-size: 2rem;
+				opacity: 0.5;
+			}
+			.stage img.thumb {
+				width: 100%;
+				height: 100%;
+				object-fit: contain;
+				display: block;
+			}
+
+			.identity-card,
+			.panel {
+				border: 1px solid var(--border);
+				border-radius: 10px;
+				padding: 1rem 1.1rem;
+				background: var(--surface-1);
+			}
+			.panel {
+				margin-top: 0.75rem;
+			}
+			.identity-row {
+				display: flex;
+				align-items: center;
+				gap: 0.6rem;
+				flex-wrap: wrap;
+			}
+			.identity-name {
+				font-size: 1.25rem;
+				font-weight: 600;
+				color: var(--ink-bright);
+			}
+			.genesis {
+				display: inline-flex;
+				align-items: center;
+				gap: 0.3rem;
+				padding: 0.15rem 0.6rem;
+				border-radius: 999px;
+				font-size: 0.75rem;
+				font-weight: 600;
+				background: linear-gradient(90deg, #ffd54f, #ff8a65);
+				color: #1a1a1a;
+			}
+			.identity-desc {
+				margin-top: 0.5rem;
+				color: var(--muted);
+			}
+
+			.pill {
+				display: inline-block;
+				padding: 0.12rem 0.6rem;
+				border-radius: 999px;
+				font-size: 0.72rem;
+				line-height: 1.5;
+			}
+			.ok {
+				background: var(--ok-bg);
+				color: var(--ok-fg);
+			}
+			.warn {
+				background: var(--warn-bg);
+				color: var(--warn-fg);
+			}
+			.info {
+				background: var(--info-bg);
+				color: var(--info-fg);
+			}
+			.bad {
+				background: var(--bad-bg);
+				color: var(--bad-fg);
+			}
+
+			.kv {
+				display: grid;
+				grid-template-columns: 92px 1fr;
+				gap: 0.4rem 0.75rem;
+				align-items: baseline;
+				margin-top: 0.6rem;
+			}
+			.kv .k {
+				font-size: 0.75rem;
+				color: var(--muted);
+			}
+			.kv .v {
+				display: flex;
+				align-items: center;
+				gap: 0.4rem;
+				flex-wrap: wrap;
+				min-width: 0;
+			}
+			.kv code {
+				background: var(--surface-2);
+				font-family: var(--font-mono);
+				padding: 0.1rem 0.4rem;
+				border-radius: 4px;
+				font-size: 0.75rem;
+				word-break: break-all;
+			}
+			.copy-btn {
+				padding: 0.1rem 0.4rem;
+				font-size: 0.7rem;
+				line-height: 1.4;
+				cursor: pointer;
+				border: 1px solid var(--border);
+				background: var(--surface-2);
+				color: var(--fg);
+				border-radius: 4px;
+				transition: background var(--duration-fast) var(--ease-standard);
+			}
+			.copy-btn:hover {
+				background: var(--surface-3);
+			}
+			.copy-btn:focus-visible {
+				outline: var(--focus-ring-width) solid var(--focus-ring-color);
+				outline-offset: 1px;
+			}
+			.links {
+				display: flex;
+				gap: 0.4rem;
+				flex-wrap: wrap;
+				margin-top: 0.9rem;
+			}
+			.links a {
+				text-decoration: none;
+				font-size: 0.78rem;
+				padding: 0.35rem 0.7rem;
+				border: 1px solid var(--border);
+				border-radius: 6px;
+				color: var(--fg);
+				background: var(--bg);
+				transition:
+					background var(--duration-fast) var(--ease-standard),
+					border-color var(--duration-fast) var(--ease-standard);
+			}
+			.links a:hover {
+				background: var(--surface-3);
+				border-color: var(--stroke-strong);
+			}
+			.links a:focus-visible {
+				outline: var(--focus-ring-width) solid var(--focus-ring-color);
+				outline-offset: var(--focus-ring-offset);
+			}
+			.links a.primary {
+				background: var(--accent);
+				color: var(--btn-primary-fg);
+				border-color: transparent;
+				font-weight: 600;
+			}
+			.links a.primary:hover {
+				background: var(--btn-primary-bg-hover);
+				border-color: transparent;
+			}
+
+			.pills {
+				display: flex;
+				gap: 0.4rem;
+				flex-wrap: wrap;
+				margin-top: 0.2rem;
+			}
+
+			.skeleton {
+				background: linear-gradient(90deg, var(--skeleton-base) 0%, var(--skeleton-sheen) 50%, var(--skeleton-base) 100%);
+				background-size: 200% 100%;
+				animation: shimmer 1.2s infinite;
+				border-radius: 6px;
+			}
+			@keyframes shimmer {
+				0% {
+					background-position: 200% 0;
+				}
+				100% {
+					background-position: -200% 0;
+				}
+			}
+			.sk-line {
+				height: 1rem;
+				margin: 0.5rem 0;
+			}
+			.sk-line.w60 {
+				width: 60%;
+			}
+			.sk-line.w40 {
+				width: 40%;
+			}
+
+			.notice {
+				border: 1px dashed var(--border);
+				border-radius: 10px;
+				padding: 1.25rem;
+				text-align: center;
+				color: var(--muted);
+			}
+			.notice .big {
+				font-size: 1.6rem;
+				margin-bottom: 0.35rem;
+			}
+			a.link {
+				color: var(--info-fg);
+			}
+			[hidden] {
+				display: none !important;
+			}
+		</style>
+	
+	<link rel="canonical" href="https://three.ws/lookup">
+	<meta property="og:type" content="website">
+	<meta property="og:site_name" content="three.ws">
+	<meta property="og:title" content="Agent Lookup · three.ws" data-i18n-attr="content:lookup.meta_og_title">
+	<meta property="og:description" content="Resolve any three.ws agent by Solana mint, agent ID, avatar ID, or slug — renders its interactive 3D avatar alongside its on-chain identity (collection, owner, agent wallet, Active/x402 status, Metaplex/Solscan/Magic Eden links)." data-i18n-attr="content:lookup.meta_og_description">
+	<meta property="og:url" content="https://three.ws/lookup">
+	<meta property="og:image" content="https://three.ws/api/page-og?s=crypto&amp;t=Agent+Lookup&amp;d=Resolve+any+three.ws+agent+by+Solana+mint%2C+agent+ID%2C+avatar+ID%2C+or+slug%3A+renders+its+interactive+3D+avatar+alongside+its+on-chain+identity+%28collection%2C+owner&amp;p=%2Flookup">
+	<meta property="og:image:width" content="1200">
+	<meta property="og:image:height" content="630">
+	<meta name="twitter:card" content="summary_large_image">
+	<meta name="twitter:title" content="Agent Lookup · three.ws" data-i18n-attr="content:lookup.meta_twitter_title">
+	<meta name="twitter:description" content="Resolve any three.ws agent by Solana mint, agent ID, avatar ID, or slug — renders its interactive 3D avatar alongside its on-chain identity (collection, owner, agent wallet, Active/x402 status, Metaplex/Solscan/Magic Eden links)." data-i18n-attr="content:lookup.meta_twitter_description">
+	<meta name="twitter:image" content="https://three.ws/api/page-og?s=crypto&amp;t=Agent+Lookup&amp;d=Resolve+any+three.ws+agent+by+Solana+mint%2C+agent+ID%2C+avatar+ID%2C+or+slug%3A+renders+its+interactive+3D+avatar+alongside+its+on-chain+identity+%28collection%2C+owner&amp;p=%2Flookup">
+	<script type="application/ld+json">{"@context":"https://schema.org","@type":"WebPage","name":"Agent Lookup","description":"Resolve any three.ws agent by Solana mint, agent ID, avatar ID, or slug — renders its interactive 3D avatar alongside its on-chain identity (collection, owner, agent wallet, Active/x402 status, Metaplex/Solscan/Magic Eden links).","url":"https://three.ws/lookup","isPartOf":{"@type":"WebSite","name":"three.ws","url":"https://three.ws"}}</script>
+
+	<meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1">
+	<meta property="og:locale" content="en_US">
+	<meta property="og:image:alt" content="Agent Lookup — three.ws">
+	<meta name="twitter:site" content="@trythreews">
+	<script src="/model-viewer-meshopt.js"></script>
+</head>
+	<body>
+		<a href="#main-content" class="skip-link" data-i18n="lookup.skip_to_main_content">Skip to main content</a>
+		<header>
+			<div id="nav-container"></div>
+		</header>
+		<script src="/nav.js"></script>
+
+		<main id="main-content">
+			<h1 data-i18n="lookup.agent_lookup">Agent lookup</h1>
+			<p class="muted" data-i18n="lookup.resolve_any_three_ws_agent_by_mint">
+				Resolve any three.ws agent by mint, agent ID, avatar ID, or slug — see its 3D body and
+				on-chain identity.
+			</p>
+
+			<div class="row">
+				<input
+					id="q"
+					placeholder="Paste a Solana mint, agent ID, avatar ID, or slug…"
+					autocomplete="off"
+					spellcheck="false"
+					aria-label="Agent lookup query"
+				/>
+				<button id="go" class="primary" data-i18n="lookup.look_up">Look up</button>
+				<button id="share" title="Copy shareable link" data-i18n="lookup.share" data-i18n-attr="title:lookup.copy_shareable_link_title">Share</button>
+			</div>
+
+			<div id="result"></div>
+		</main>
+
+		<script type="module">
+			const $ = (id) => document.getElementById(id);
+			const params = new URLSearchParams(location.search);
+			$('q').value = params.get('q') || '';
+
+			function escapeHtml(s) {
+				return String(s ?? '').replace(
+					/[&<>"']/g,
+					(c) =>
+						({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[
+							c
+						],
+				);
+			}
+			function shortKey(k) {
+				return k ? `${k.slice(0, 4)}…${k.slice(-4)}` : '';
+			}
+
+			function showSkeleton() {
+				$('result').innerHTML = `
+					<div class="layout">
+						<div class="stage"><div class="placeholder skeleton"></div></div>
+						<div>
+							<div class="identity-card">
+								<div class="skeleton sk-line w60"></div>
+								<div class="skeleton sk-line w40"></div>
+								<div class="skeleton sk-line"></div>
+							</div>
+							<div class="panel">
+								<div class="skeleton sk-line w40"></div>
+								<div class="skeleton sk-line"></div>
+								<div class="skeleton sk-line w60"></div>
+							</div>
+						</div>
+					</div>`;
+			}
+
+			function showNotFound(q) {
+				$('result').innerHTML = `
+					<div class="notice">
+						<div class="big">🔍</div>
+						<div><strong>No agent found</strong> for ${q ? `“${escapeHtml(q)}”` : 'that input'}.</div>
+						<p class="muted" style="margin:.5rem 0 0">
+							Try a Solana asset mint, an agent ID, an avatar ID, or an avatar slug.
+							Browse the <a class="link" href="/explore">explore feed</a> to find one.
+						</p>
+					</div>`;
+			}
+
+			function copyBtn(value) {
+				return value
+					? `<button class="copy-btn" data-copy="${escapeHtml(value)}">copy</button>`
+					: '';
+			}
+
+			function stageHtml(data) {
+				if (data.modelUrl) {
+					return `
+						<div class="stage">
+							<model-viewer
+								src="${escapeHtml(data.modelUrl)}"
+								camera-controls
+								auto-rotate
+								auto-rotate-delay="1500"
+								rotation-per-second="18deg"
+								interaction-prompt="none"
+								shadow-intensity="0.6"
+								shadow-softness="0.8"
+								exposure="1.0"
+								environment-image="neutral"
+								camera-orbit="0deg 75deg 105%"
+								min-camera-orbit="auto auto 50%"
+								max-camera-orbit="auto auto 200%"
+								field-of-view="auto"
+								bounds="tight"
+								loading="eager"
+								aria-label="3D avatar of ${escapeHtml(data.name || 'agent')}"
+							></model-viewer>
+						</div>`;
+				}
+				if (data.state === 'private') {
+					return `
+						<div class="stage">
+							<div class="placeholder">
+								<div class="big">🔒</div>
+								<div>Model not public</div>
+								<div class="muted" style="font-size:.75rem">
+									This agent's 3D body is private.
+								</div>
+							</div>
+						</div>`;
+				}
+				if (data.imageUrl) {
+					return `<div class="stage"><img class="thumb" src="${escapeHtml(data.imageUrl)}" alt="${escapeHtml(data.name || 'agent')}" /></div>`;
+				}
+				return `
+					<div class="stage">
+						<div class="placeholder">
+							<div class="big">🤖</div>
+							<div>No 3D model yet</div>
+						</div>
+					</div>`;
+			}
+
+			function onchainHtml(oc) {
+				if (!oc) {
+					return `
+						<div class="panel">
+							<h2 style="margin-top:0">On-chain</h2>
+							<p class="muted" style="margin:0">Not deployed on-chain yet.</p>
+						</div>`;
+				}
+				const links = oc.links || {};
+				const linkBtns = [
+					links.metaplex
+						? `<a href="${escapeHtml(links.metaplex)}" target="_blank" rel="noopener">Metaplex ↗</a>`
+						: '',
+					links.solscan
+						? `<a href="${escapeHtml(links.solscan)}" target="_blank" rel="noopener">Solscan ↗</a>`
+						: '',
+					links.magiceden
+						? `<a href="${escapeHtml(links.magiceden)}" target="_blank" rel="noopener">Magic Eden ↗</a>`
+						: '',
+				].join('');
+				return `
+					<div class="panel">
+						<h2 style="margin-top:0">On-chain identity</h2>
+						<div class="pills">
+							<span class="pill ${oc.active ? 'ok' : 'warn'}">${oc.active ? 'Active' : 'Inactive'}</span>
+							<span class="pill ${oc.x402Support ? 'info' : 'warn'}">${oc.x402Support ? 'x402 supported' : 'no x402'}</span>
+						</div>
+						<div class="kv">
+							<span class="k">Mint</span>
+							<span class="v"><code>${escapeHtml(oc.mint)}</code>${copyBtn(oc.mint)}</span>
+							${oc.collection ? `<span class="k">Collection</span><span class="v"><code title="${escapeHtml(oc.collection)}">${escapeHtml(shortKey(oc.collection))}</code>${copyBtn(oc.collection)}</span>` : ''}
+							${oc.owner ? `<span class="k">Owner</span><span class="v"><code title="${escapeHtml(oc.owner)}">${escapeHtml(shortKey(oc.owner))}</code>${copyBtn(oc.owner)}</span>` : ''}
+							${oc.assetSignerWallet ? `<span class="k">Agent wallet</span><span class="v"><code title="${escapeHtml(oc.assetSignerWallet)}">${escapeHtml(shortKey(oc.assetSignerWallet))}</code>${copyBtn(oc.assetSignerWallet)}</span>` : ''}
+						</div>
+						<div class="links">${linkBtns}</div>
+					</div>`;
+			}
+
+			function render(data) {
+				if (data.state === 'not_found') {
+					showNotFound($('q').value.trim());
+					return;
+				}
+				const genesis =
+					typeof data.genesisRank === 'number'
+						? `<span class="genesis" title="Deployment order on-chain">✦ Genesis #${data.genesisRank}</span>`
+						: '';
+				// On-platform onward link to the canonical agent profile (/agents/:id).
+				// Rendered as the primary action so a resolved agent never dead-ends
+				// off-platform on the external explorer links.
+				const profileLink = data.agentId
+					? `<div class="links"><a class="primary" href="/agents/${encodeURIComponent(data.agentId)}">Open agent page →</a></div>`
+					: '';
+				$('result').innerHTML = `
+					<div class="layout">
+						${stageHtml(data)}
+						<div>
+							<div class="identity-card">
+								<div class="identity-row">
+									<span class="identity-name">${escapeHtml(data.name || 'Untitled agent')}</span>
+									${genesis}
+									${data.state === 'private' ? '<span class="pill warn">private</span>' : ''}
+								</div>
+								${data.description ? `<div class="identity-desc">${escapeHtml(data.description)}</div>` : ''}
+								${profileLink}
+							</div>
+							${onchainHtml(data.onchain)}
+						</div>
+					</div>`;
+				$('result')
+					.querySelectorAll('[data-copy]')
+					.forEach((b) => b.addEventListener('click', () => copyText(b.dataset.copy, b)));
+			}
+
+			async function copyText(text, btn) {
+				const prev = btn.textContent;
+				try {
+					await navigator.clipboard.writeText(text);
+					btn.textContent = 'copied';
+				} catch {
+					btn.textContent = 'copy failed';
+				}
+				setTimeout(() => {
+					btn.textContent = prev;
+				}, 1200);
+			}
+
+			async function lookup() {
+				const q = $('q').value.trim();
+				if (!q) {
+					$('result').innerHTML = '';
+					history.replaceState({}, '', location.pathname);
+					return;
+				}
+				history.replaceState({}, '', `?q=${encodeURIComponent(q)}`);
+				$('go').disabled = true;
+				showSkeleton();
+				try {
+					const res = await fetch(`/api/registry/resolve?q=${encodeURIComponent(q)}`);
+					if (!res.ok) throw new Error(`lookup failed (${res.status})`);
+					const data = await res.json();
+					render(data);
+				} catch (e) {
+					$('result').innerHTML = `
+						<div class="notice">
+							<div class="big">⚠️</div>
+							<div><strong>Something went wrong.</strong></div>
+							<p class="muted" style="margin:.5rem 0 0">${escapeHtml(e.message || 'Try again in a moment.')}</p>
+						</div>`;
+				} finally {
+					$('go').disabled = false;
+				}
+			}
+
+			$('go').onclick = lookup;
+			$('q').addEventListener('keydown', (e) => {
+				if (e.key === 'Enter') lookup();
+			});
+			$('share').onclick = () => copyText(location.href, $('share'));
+
+			if ($('q').value.trim()) lookup();
+		</script>
+
+		<footer class="h-footer-horizon">
+			<div class="h-footer-glow-line" aria-hidden="true"></div>
+			<div class="h-footer-floor" aria-hidden="true"></div>
+			<div class="h-footer-haze" aria-hidden="true"></div>
+			<div class="h-footer-watermark" aria-hidden="true">three.ws</div>
+			<div class="h-footer-cta">
+				<div class="h-footer-newsletter">
+					<h3 data-i18n="lookup.stay_in_the_loop">Stay in the loop</h3>
+					<p data-i18n="lookup.get_updates_on_new_features_agent_tooling">Get updates on new features, agent tooling, and protocol changes.</p>
+					<form class="h-footer-newsletter-form" data-newsletter-form novalidate>
+						<input
+							type="email"
+							class="h-footer-newsletter-input"
+							name="email"
+							placeholder="Enter your email"
+							aria-label="Email address"
+							autocomplete="email"
+							required
+						/>
+						<button type="submit" class="h-footer-newsletter-btn" aria-label="Subscribe" data-i18n-attr="aria-label:lookup.subscribe_arialabel">
+							<svg viewBox="0 0 16 16" aria-hidden="true"><path fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" d="M2 8h11m0 0L9 4m4 4l-4 4"/></svg>
+						</button>
+					</form>
+					<p class="h-footer-newsletter-msg" data-newsletter-msg aria-live="polite"></p>
+				</div>
+				<div class="h-footer-community">
+					<h3 data-i18n="lookup.join_the_community">Join the community</h3>
+					<p data-i18n="lookup.follow_along_for_builds_demos_and_conversati">Follow along for builds, demos, and conversations with the team.</p>
+					<a class="h-footer-community-btn" href="https://x.com/trythreews" target="_blank" rel="noopener">
+						<svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/></svg>
+						Follow on X
+					</a>
+				</div>
+			</div>
+			<div class="h-footer-inner">
+				<div class="h-footer-brand-col">
+					<div class="h-footer-brand">
+						<img class="wordmark-logo" src="/three.svg" alt="" aria-hidden="true" />
+						<span class="wordmark-dot" aria-hidden="true"></span>
+						<span data-i18n="lookup.three_ws">three.ws</span>
+					</div>
+					<p class="h-footer-tagline" data-i18n="lookup.give_your_ai_a_body">Give your AI a body.</p>
+					<div class="h-footer-socials">
+						<a class="h-footer-social" href="https://x.com/trythreews" target="_blank" rel="noopener" aria-label="three.ws on X" data-i18n-attr="aria-label:lookup.three_ws_on_x_arialabel">
+							<svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/></svg>
+						</a>
+						<a class="h-footer-social" href="https://github.com/nirholas/three.ws" target="_blank" rel="noopener" aria-label="three.ws on GitHub" data-i18n-attr="aria-label:lookup.three_ws_on_github_arialabel">
+							<svg viewBox="0 0 16 16" aria-hidden="true"><path fill="currentColor" d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0 0 16 8c0-4.42-3.58-8-8-8z"/></svg>
+						</a>
+					</div>
+				</div>
+				<nav class="h-footer-links" aria-label="Footer">
+					<div class="h-footer-link-col">
+						<h4 class="h-footer-link-heading" data-i18n="lookup.product">Product</h4>
+						<a href="/create" data-i18n="lookup.create">Create</a>
+						<a href="/studio" data-i18n="lookup.studio">Studio</a>
+						<a href="/widgets" data-i18n="lookup.widgets">Widgets</a>
+						<a href="/discover" data-i18n="lookup.discover">Discover</a>
+					</div>
+					<div class="h-footer-link-col">
+						<h4 class="h-footer-link-heading" data-i18n="lookup.developers">Developers</h4>
+						<a href="/docs" data-i18n="lookup.docs">Docs</a>
+						<a href="https://github.com/nirholas/three.ws" target="_blank" rel="noopener" data-i18n="lookup.github">GitHub</a>
+					</div>
+					<div class="h-footer-link-col">
+						<h4 class="h-footer-link-heading" data-i18n="lookup.resources">Resources</h4>
+						<a href="/dashboard" data-i18n="lookup.dashboard">Dashboard</a>
+					</div>
+				</nav>
+			</div>
+			<div class="h-footer-bottom">
+				<p class="h-footer-legal" data-i18n="lookup.2026_three_ws_all_rights_reserved">© 2026 three.ws — All rights reserved.</p>
+				<div class="h-footer-legal-links">
+					<a href="/legal/privacy" data-i18n="lookup.privacy_policy">Privacy Policy</a>
+					<a href="/legal/tos" data-i18n="lookup.terms_of_use">Terms of Use</a>
+				</div>
+			</div>
+		</footer>
+
+		<script src="/brand.js" defer></script>
+		<div id="footer-container"></div>
+		<script src="/footer.js"></script>
+		<!-- Runtime i18n: detects locale, swaps annotated copy, mounts <lang-switcher>. -->
+	<script type="module" src="/i18n.js"></script>
+</body>
+</html>

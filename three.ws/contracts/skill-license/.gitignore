@@ -1,0 +1,12 @@
+# Build output
+/target
+.anchor
+test-ledger
+
+# Local deploy keypairs / authority secrets. The program + deploy-authority
+# keypairs live in ~/.config/solana and a secret manager — see DEPLOYMENT.md.
+/.deploy
+*-keypair.json
+*program*.json
+*deployer*.json
+*authority*.json

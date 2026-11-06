@@ -1,0 +1,32 @@
+schema_version = "1.0.0"
+
+id = "three_ws"
+version = "1.0.0"
+name = "three.ws Forge"
+tagline = "Generate 3D models from text or images with three.ws Forge"
+maintainer = "three.ws"
+type = "add-on"
+
+website = "https://github.com/nirholas/three.ws/tree/main/integrations/blender"
+
+tags = ["Import-Export", "Add Mesh"]
+
+blender_version_min = "4.2.0"
+
+license = [
+  "SPDX:GPL-3.0-or-later",
+]
+copyright = [
+  "2026 three.ws",
+]
+
+[permissions]
+network = "Send prompts and images to three.ws Forge and download models"
+files = "Read reference images and import the generated GLB file"
+
+[build]
+paths_exclude_pattern = [
+  "__pycache__/",
+  "/.git/",
+  "/*.zip",
+]

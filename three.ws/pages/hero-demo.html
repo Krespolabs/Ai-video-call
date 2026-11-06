@@ -1,0 +1,504 @@
+<!doctype html>
+<html lang="en">
+	<head>
+		<style>/* three.ws hidden-guard — make the `hidden` attribute authoritative; see scripts/lib/hidden-guard.mjs */[hidden]{display:none!important}</style>
+		<script>/* three.ws theme boot — no-flash; runtime in /theme-switcher.js */(function(){try{var m=localStorage.getItem('twx_theme');var l=m==='auto'?(window.matchMedia&&window.matchMedia('(prefers-color-scheme: light)').matches):m==='light';document.documentElement.setAttribute('data-theme',l?'light':'dark');}catch(e){document.documentElement.setAttribute('data-theme','dark');}})();</script>
+		<meta charset="utf-8" />
+		<link rel="icon" href="/favicon.ico" sizes="any" />
+		<link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+		<link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+		<link rel="manifest" href="/manifest.webmanifest" />
+		<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+		<title data-i18n="hero_demo.meta_title">Hero Stage · three.ws</title>
+		<meta
+			name="description"
+			content="A cinematic 3D hero stage for three.ws agents — a lit avatar centered in deep space over concentric glowing rings, a drifting starfield, and soft bloom. Pointer parallax, motion-safe."
+		 data-i18n-attr="content:hero_demo.meta_description"/>
+		<meta property="og:title" content="Hero Stage · three.ws"  data-i18n-attr="content:hero_demo.meta_og_title"/>
+		<meta property="og:description" content="A cinematic 3D hero stage — a lit agent over concentric glowing rings, starfield, and bloom."  data-i18n-attr="content:hero_demo.meta_og_description"/>
+		<meta property="og:type" content="website" />
+		<meta property="og:site_name" content="three.ws" />
+		<meta property="og:url" content="https://three.ws/hero-demo" />
+		<meta property="og:image" content="https://three.ws/api/page-og?s=crypto&amp;t=Hero+Stage&amp;d=A+cinematic+3D+hero+stage+for+three.ws+agents%3A+a+lit+avatar+centered+in+deep+space+over+concentric+glowing+rings%2C+a+drifting+starfield%2C+and+soft+bloom%2C+with&amp;p=%2Fhero-demo" />
+		<meta property="og:image:width" content="1200" />
+		<meta property="og:image:height" content="630" />
+		<meta name="twitter:card" content="summary_large_image" />
+		<meta name="twitter:site" content="@trythreews" />
+		<meta name="twitter:title" content="Hero Stage · three.ws"  data-i18n-attr="content:hero_demo.meta_twitter_title"/>
+		<meta name="twitter:description" content="A cinematic 3D hero stage for three.ws agents — lit avatar, glowing rings, starfield, bloom."  data-i18n-attr="content:hero_demo.meta_twitter_description"/>
+		<link rel="canonical" href="https://three.ws/hero-demo" />
+		<style>
+			:root {
+				--bg-0: #04040a;
+				--bg-1: #0c0c1c;
+				--fg: #eef1ff;
+				--muted: #98a0c8;
+				--accent: #7c6cff;
+				--accent-2: #36e0ff;
+				--card: rgba(16, 18, 38, 0.62);
+				--border: rgba(124, 108, 255, 0.22);
+				--radius: 16px;
+			}
+			* { box-sizing: border-box; }
+			html, body { margin: 0; }
+			body {
+				font-family: Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+				color: var(--fg);
+				background:
+					radial-gradient(120% 90% at 50% -10%, #1a1640 0%, var(--bg-1) 38%, var(--bg-0) 75%);
+				-webkit-font-smoothing: antialiased;
+				overflow-x: hidden;
+			}
+
+			/* ── Hero ───────────────────────────────────────────────── */
+			.hero {
+				position: relative;
+				min-height: 100svh;
+				display: grid;
+				place-items: center;
+				isolation: isolate;
+				overflow: hidden;
+			}
+			/* Backdrop WebGL canvas — fills the hero, sits behind everything. */
+			#stage {
+				position: absolute;
+				inset: 0;
+				width: 100%;
+				height: 100%;
+				display: block;
+				z-index: 0;
+			}
+			/* Subtle radial vignette to seat the subject. */
+			.hero::after {
+				content: '';
+				position: absolute;
+				inset: 0;
+				z-index: 1;
+				pointer-events: none;
+				background: radial-gradient(60% 60% at 50% 52%, transparent 40%, rgba(4, 4, 10, 0.55) 100%);
+			}
+
+			/* The lit subject: a real <agent-3d>, transparent bg, dead center. */
+			.subject {
+				position: relative;
+				z-index: 2;
+				width: min(82vw, 460px);
+				height: min(64svh, 560px);
+				display: grid;
+				place-items: center;
+			}
+			.subject agent-3d {
+				width: 100%;
+				height: 100%;
+				display: block;
+				opacity: 0;
+				transition: opacity 0.8s ease;
+				filter: drop-shadow(0 24px 60px rgba(124, 108, 255, 0.35));
+			}
+			.subject agent-3d.ready { opacity: 1; }
+
+			/* Avatar loading skeleton — a breathing silhouette, not a spinner. */
+			.subject-skel {
+				position: absolute;
+				inset: 0;
+				display: grid;
+				place-items: center;
+				pointer-events: none;
+			}
+			.subject-skel[hidden] { display: none; }
+			.skel-orb {
+				width: 120px;
+				height: 120px;
+				border-radius: 50%;
+				background: radial-gradient(circle at 50% 40%, rgba(124,108,255,0.35), rgba(54,224,255,0.06) 70%, transparent);
+				animation: breathe 2.2s ease-in-out infinite;
+			}
+			@keyframes breathe {
+				0%, 100% { transform: scale(0.92); opacity: 0.55; }
+				50% { transform: scale(1.08); opacity: 1; }
+			}
+
+			/* Avatar failed → actionable retry. */
+			.subject-error {
+				position: absolute;
+				inset: 0;
+				display: grid;
+				place-items: center;
+				text-align: center;
+				padding: 20px;
+			}
+			.subject-error p { color: var(--muted); font-size: 14px; margin: 0 0 14px; }
+
+			/* Copy overlay — pinned to the lower third, fomo-style. */
+			.hero-copy {
+				position: absolute;
+				left: 50%;
+				bottom: clamp(28px, 8svh, 88px);
+				transform: translateX(-50%);
+				z-index: 3;
+				width: min(92vw, 760px);
+				text-align: center;
+				animation: rise 0.7s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+			}
+			@keyframes rise {
+				from { opacity: 0; transform: translate(-50%, 18px); }
+				to { opacity: 1; transform: translate(-50%, 0); }
+			}
+			.eyebrow {
+				display: inline-flex;
+				align-items: center;
+				gap: 8px;
+				font-size: 12px;
+				font-weight: 600;
+				letter-spacing: 0.14em;
+				text-transform: uppercase;
+				color: var(--accent-2);
+				margin: 0 0 14px;
+			}
+			.eyebrow::before {
+				content: '';
+				width: 6px; height: 6px;
+				border-radius: 50%;
+				background: var(--accent-2);
+				box-shadow: 0 0 12px var(--accent-2);
+			}
+			.hero-copy h1 {
+				margin: 0 0 14px;
+				font-size: clamp(34px, 6.4vw, 68px);
+				line-height: 1.02;
+				letter-spacing: -0.03em;
+				font-weight: 800;
+				background: linear-gradient(180deg, #ffffff 0%, #c8caff 100%);
+				-webkit-background-clip: text;
+				background-clip: text;
+				color: transparent;
+			}
+			.hero-copy p {
+				margin: 0 auto 26px;
+				max-width: 52ch;
+				color: var(--muted);
+				font-size: clamp(15px, 2.1vw, 18px);
+				line-height: 1.5;
+			}
+			.cta-row {
+				display: flex;
+				gap: 12px;
+				justify-content: center;
+				flex-wrap: wrap;
+			}
+			.btn {
+				display: inline-flex;
+				align-items: center;
+				gap: 8px;
+				padding: 12px 22px;
+				border-radius: 12px;
+				font-size: 15px;
+				font-weight: 700;
+				text-decoration: none;
+				cursor: pointer;
+				border: 1px solid transparent;
+				transition: transform 0.14s ease, box-shadow 0.14s ease, background 0.14s ease, border-color 0.14s ease;
+			}
+			.btn--primary {
+				color: #07070f;
+				background: linear-gradient(135deg, var(--accent-2), var(--accent));
+				box-shadow: 0 10px 32px rgba(124, 108, 255, 0.4);
+			}
+			.btn--primary:hover { transform: translateY(-2px); box-shadow: 0 16px 44px rgba(124, 108, 255, 0.55); }
+			.btn--ghost {
+				color: var(--fg);
+				background: rgba(255, 255, 255, 0.04);
+				border-color: var(--border);
+				backdrop-filter: blur(8px);
+				-webkit-backdrop-filter: blur(8px);
+			}
+			.btn--ghost:hover { transform: translateY(-2px); background: rgba(255, 255, 255, 0.08); border-color: var(--accent); }
+			.btn:focus-visible { outline: 2px solid var(--accent-2); outline-offset: 3px; }
+			.btn:active { transform: translateY(0); }
+
+			/* Avatar switcher — top-center chips, drives the live subject. */
+			.switcher {
+				position: absolute;
+				top: clamp(76px, 12svh, 120px);
+				left: 50%;
+				transform: translateX(-50%);
+				z-index: 3;
+				display: flex;
+				gap: 8px;
+				padding: 6px;
+				border-radius: 999px;
+				background: var(--card);
+				border: 1px solid var(--border);
+				backdrop-filter: blur(14px);
+				-webkit-backdrop-filter: blur(14px);
+				box-shadow: 0 8px 30px rgba(0, 0, 0, 0.45);
+				max-width: calc(100vw - 32px);
+				overflow-x: auto;
+				scrollbar-width: none;
+			}
+			.switcher::-webkit-scrollbar { display: none; }
+			.chip {
+				appearance: none;
+				border: 1px solid transparent;
+				background: transparent;
+				color: var(--muted);
+				font: 600 13px Inter, system-ui, sans-serif;
+				padding: 8px 16px;
+				border-radius: 999px;
+				cursor: pointer;
+				white-space: nowrap;
+				transition: color 0.14s ease, background 0.14s ease, border-color 0.14s ease;
+			}
+			.chip:hover { color: var(--fg); background: rgba(255, 255, 255, 0.05); }
+			.chip[aria-pressed='true'] {
+				color: #07070f;
+				background: linear-gradient(135deg, var(--accent-2), var(--accent));
+			}
+			.chip:focus-visible { outline: 2px solid var(--accent-2); outline-offset: 2px; }
+
+			.scroll-cue {
+				position: absolute;
+				bottom: 14px;
+				left: 50%;
+				transform: translateX(-50%);
+				z-index: 3;
+				color: var(--muted);
+				font-size: 11px;
+				letter-spacing: 0.14em;
+				text-transform: uppercase;
+				opacity: 0.7;
+				animation: bob 2.4s ease-in-out infinite;
+			}
+			@keyframes bob { 0%, 100% { transform: translate(-50%, 0); } 50% { transform: translate(-50%, 6px); } }
+
+			/* ── Build notes section ────────────────────────────────── */
+			.notes {
+				position: relative;
+				z-index: 1;
+				max-width: 1080px;
+				margin: 0 auto;
+				padding: clamp(56px, 10vw, 110px) 20px;
+			}
+			.notes-head { text-align: center; margin: 0 0 48px; }
+			.notes-head h2 {
+				font-size: clamp(26px, 4vw, 40px);
+				margin: 0 0 12px;
+				letter-spacing: -0.02em;
+			}
+			.notes-head p { color: var(--muted); margin: 0 auto; max-width: 56ch; line-height: 1.5; }
+			.note-grid {
+				display: grid;
+				grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+				gap: 16px;
+			}
+			.note {
+				background: var(--card);
+				border: 1px solid var(--border);
+				border-radius: var(--radius);
+				padding: 24px;
+				backdrop-filter: blur(10px);
+				-webkit-backdrop-filter: blur(10px);
+				transition: transform 0.18s ease, border-color 0.18s ease;
+			}
+			.note:hover { transform: translateY(-4px); border-color: var(--accent); }
+			.note-num {
+				font-size: 12px;
+				font-weight: 700;
+				color: var(--accent-2);
+				letter-spacing: 0.1em;
+			}
+			.note h3 { margin: 10px 0 8px; font-size: 18px; }
+			.note p { margin: 0; color: var(--muted); font-size: 14px; line-height: 1.55; }
+			.note code {
+				font-family: ui-monospace, 'SF Mono', Menlo, monospace;
+				font-size: 12px;
+				color: var(--accent-2);
+				background: rgba(54, 224, 255, 0.08);
+				padding: 1px 6px;
+				border-radius: 5px;
+			}
+
+			@media (max-width: 600px) {
+				.subject { width: 88vw; height: 56svh; }
+				.hero-copy { bottom: 20px; }
+			}
+			@media (prefers-reduced-motion: reduce) {
+				.skel-orb, .scroll-cue, .hero-copy { animation: none; }
+				.subject agent-3d { transition: none; }
+			}
+		</style>
+	
+	<meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1">
+	<meta property="og:locale" content="en_US">
+	<meta property="og:image:alt" content="Hero Stage — three.ws">
+	<meta name="twitter:image" content="https://three.ws/api/page-og?s=crypto&amp;t=Hero+Stage&amp;d=A+cinematic+3D+hero+stage+for+three.ws+agents%3A+a+lit+avatar+centered+in+deep+space+over+concentric+glowing+rings%2C+a+drifting+starfield%2C+and+soft+bloom%2C+with&amp;p=%2Fhero-demo">
+	<script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"WebPage","name":"Hero Stage","description":"A cinematic 3D hero stage for three.ws agents - a lit avatar centered in deep space over concentric glowing rings, a drifting starfield, and soft bloom, with pointer parallax and a live avatar switcher. Motion-safe.","url":"https://three.ws/hero-demo","isPartOf":{"@type":"WebSite","name":"three.ws","url":"https://three.ws"},"primaryImageOfPage":"https://three.ws/api/page-og?s=crypto&t=Hero+Stage&d=A+cinematic+3D+hero+stage+for+three.ws+agents+-+a+lit+avatar+centered+in+deep+space+over+concentric+glowing+rings%2C+a+drifting+starfield%2C+and+soft+bloom%2C+with+po&p=%2Fhero-demo"}]}</script>
+</head>
+	<body>
+		<div id="nav-container"></div>
+
+		<section class="hero" aria-label="Agent hero stage">
+			<canvas id="stage" aria-hidden="true"></canvas>
+
+			<div class="switcher" role="group" aria-label="Choose an avatar">
+				<button class="chip" type="button" aria-pressed="true" data-glb="/avatars/realistic-female.glb" data-i18n="hero_demo.nova">Nova</button>
+				<button class="chip" type="button" aria-pressed="false" data-glb="/avatars/realistic-male.glb" data-i18n="hero_demo.atlas">Atlas</button>
+				<button class="chip" type="button" aria-pressed="false" data-glb="/avatars/michelle.glb" data-i18n="hero_demo.michelle">Michelle</button>
+				<button class="chip" type="button" aria-pressed="false" data-glb="/avatars/xbot.glb" data-i18n="hero_demo.x_bot">X-Bot</button>
+				<button class="chip" type="button" aria-pressed="false" data-glb="/avatars/fox.glb" data-i18n="hero_demo.fox">Fox</button>
+			</div>
+
+			<div class="subject" id="subject">
+				<div class="subject-skel" id="subject-skel" role="status" aria-label="Loading avatar">
+					<div class="skel-orb"></div>
+				</div>
+			</div>
+
+			<div class="hero-copy">
+				<p class="eyebrow" data-i18n="hero_demo.three_ws_hero_stage">three.ws · hero stage</p>
+				<h1 data-i18n="hero_demo.give_your_agent_a_stage_worth_screenshotting">Give your agent a stage worth screenshotting.</h1>
+				<p data-i18n="hero_demo.a_lit_avatar_centered_in_deep_space">
+					A lit avatar, centered in deep space over concentric glowing rings — bloom,
+					a drifting starfield, and pointer parallax. Drop any GLB in and it just works.
+				</p>
+				<div class="cta-row">
+					<a class="btn btn--primary" href="/create" data-i18n="hero_demo.build_your_agent">Build your agent →</a>
+					<a class="btn btn--ghost" href="/features" data-i18n="hero_demo.see_every_feature">See every feature</a>
+				</div>
+			</div>
+
+			<div class="scroll-cue" aria-hidden="true">scroll · how it's built</div>
+		</section>
+
+		<section class="notes" aria-labelledby="notes-h2">
+			<div class="notes-head">
+				<h2 id="notes-h2" data-i18n="hero_demo.how_the_stage_is_built">How the stage is built</h2>
+				<p data-i18n-html="hero_demo.the_atmosphere_renders_in_its_own_webgl">
+					The atmosphere renders in its own WebGL context so it can be lit aggressively
+					without washing out the subject. The avatar is a standard <code>&lt;agent-3d&gt;</code>
+					on top — animation, voice, and payments included, untouched.
+				</p>
+			</div>
+			<div class="note-grid">
+				<article class="note">
+					<span class="note-num">01</span>
+					<h3 data-i18n="hero_demo.concentric_glow_rings">Concentric glow rings</h3>
+					<p data-i18n-html="hero_demo.five_additive_rings_tilted_into_a_disc">Five additive <code>TorusGeometry</code> rings, tilted into a disc and tinted across the accent gradient. They breathe and counter-spin for depth.</p>
+				</article>
+				<article class="note">
+					<span class="note-num">02</span>
+					<h3 data-i18n="hero_demo.bloom_is_the_look">Bloom is the look</h3>
+					<p data-i18n-html="hero_demo.an_over_the_emissive_rings_and_starfield">An <code>UnrealBloomPass</code> over the emissive rings and starfield carries ~70% of the aesthetic. High threshold so only the bright geometry glows.</p>
+				</article>
+				<article class="note">
+					<span class="note-num">03</span>
+					<h3 data-i18n="hero_demo.calm_motion_safe_drift">Calm, motion-safe drift</h3>
+					<p data-i18n-html="hero_demo.a_golden_angle_starfield_drifts_slowly_while">A golden-angle starfield drifts slowly while the camera eases toward the pointer for parallax. <code>prefers-reduced-motion</code> renders one still frame.</p>
+				</article>
+			</div>
+		</section>
+
+		<div id="footer-container"></div>
+		<script src="/footer.js"></script>
+		<script src="/nav.js"></script>
+
+		<!-- Full agent runtime: animation, transparent compositing, lazy by default. -->
+		<script type="module" src="https://three.ws/agent-3d/latest/agent-3d.js"></script>
+
+		<script type="module">
+			import { HeroStage } from '/src/hero-stage.js';
+
+			// ── Backdrop stage ──────────────────────────────────────
+			// WebGL can be unavailable (headless, blocklisted GPU, lost context).
+			// If the stage can't init, the CSS space gradient + vignette stand in
+			// and the avatar below still loads — never let the backdrop take the
+			// page down with it.
+			const canvas = document.getElementById('stage');
+			let stage = null;
+			try {
+				stage = new HeroStage(canvas, { accent: '#7c6cff', accent2: '#36e0ff' });
+				stage.start();
+				window.addEventListener('pagehide', () => stage?.dispose(), { once: true });
+			} catch (err) {
+				console.warn('[hero-demo] WebGL backdrop unavailable, using CSS fallback', err);
+				canvas.hidden = true;
+			}
+
+			// ── Live subject (avatar) ───────────────────────────────
+			const subject = document.getElementById('subject');
+			const skel = document.getElementById('subject-skel');
+			const chips = [...document.querySelectorAll('.switcher .chip')];
+			let agentEl = null;
+			let revealTimer = 0;
+
+			function showSkeleton() {
+				skel.hidden = false;
+				if (agentEl) agentEl.classList.remove('ready');
+			}
+			function reveal() {
+				clearTimeout(revealTimer);
+				skel.hidden = true;
+				agentEl?.classList.add('ready');
+			}
+			function showError(glb) {
+				clearTimeout(revealTimer);
+				skel.hidden = true;
+				agentEl?.remove();
+				agentEl = null;
+				let err = subject.querySelector('.subject-error');
+				if (!err) {
+					err = document.createElement('div');
+					err.className = 'subject-error';
+					err.setAttribute('role', 'alert');
+					err.innerHTML =
+						'<p>This avatar couldn’t load right now.</p>' +
+						'<button class="btn btn--ghost" type="button">Retry</button>';
+					err.querySelector('button').addEventListener('click', () => {
+						err.remove();
+						loadAvatar(glb);
+					});
+					subject.appendChild(err);
+				}
+			}
+
+			function loadAvatar(glb) {
+				clearTimeout(revealTimer); // drop any pending reveal from a prior load
+				subject.querySelector('.subject-error')?.remove();
+				if (agentEl) agentEl.remove();
+				showSkeleton();
+
+				agentEl = document.createElement('agent-3d');
+				agentEl.setAttribute('body', glb);
+				agentEl.setAttribute('mode', 'inline');
+				agentEl.setAttribute('responsive', '');
+				agentEl.setAttribute('background', 'transparent');
+				agentEl.setAttribute('name-plate', 'off');
+				agentEl.setAttribute('avatar-chat', 'off');
+				agentEl.setAttribute('kiosk', '');
+				agentEl.setAttribute('eager', '');
+
+				agentEl.addEventListener('agent:ready', reveal, { once: true });
+				agentEl.addEventListener('load', reveal, { once: true });
+				agentEl.addEventListener('error', () => showError(glb), { once: true });
+				// Failsafe: never strand the user on the skeleton if no event fires.
+				revealTimer = setTimeout(reveal, 6000);
+
+				subject.appendChild(agentEl);
+			}
+
+			chips.forEach((chip) => {
+				chip.addEventListener('click', () => {
+					if (chip.getAttribute('aria-pressed') === 'true') return;
+					chips.forEach((c) => c.setAttribute('aria-pressed', 'false'));
+					chip.setAttribute('aria-pressed', 'true');
+					loadAvatar(chip.dataset.glb);
+				});
+			});
+
+			const first = chips.find((c) => c.getAttribute('aria-pressed') === 'true') || chips[0];
+			loadAvatar(first.dataset.glb);
+		</script>
+		<!-- Runtime i18n: detects locale, swaps annotated copy, mounts <lang-switcher>. -->
+	<script type="module" src="/i18n.js"></script>
+</body>
+</html>

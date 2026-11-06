@@ -1,0 +1,1943 @@
+<!doctype html>
+<html lang="en">
+	<head>
+		<meta charset="utf-8" />
+		<meta name="viewport" content="width=device-width,initial-scale=1" />
+		<title data-i18n="settings_index.meta_title">Settings · three.ws</title>
+		<meta name="description" content="Account, profile, and notification settings." />
+		<meta name="robots" content="noindex" />
+		<meta property="og:type" content="website" />
+		<meta property="og:site_name" content="three.ws" />
+		<meta property="og:url" content="https://three.ws/settings" />
+		<meta property="og:title" content="Settings · three.ws" />
+		<meta property="og:description" content="Account, profile, and notification settings." />
+		<meta property="og:image" content="https://three.ws/api/page-og?s=account&amp;t=Settings&amp;d=Account%2C+profile%2C+and+notification+settings.&amp;p=%2Fsettings" />
+		<meta property="og:image:width" content="1200" />
+		<meta property="og:image:height" content="630" />
+		<meta name="twitter:card" content="summary_large_image" />
+		<meta name="twitter:site" content="@trythreews" />
+		<meta name="twitter:title" content="Settings · three.ws" />
+		<meta name="twitter:description" content="Account, profile, and notification settings." />
+		<meta name="twitter:image" content="https://three.ws/api/page-og?s=account&amp;t=Settings&amp;d=Account%2C+profile%2C+and+notification+settings.&amp;p=%2Fsettings" />
+		<link rel="icon" href="/favicon.ico" />
+		<link rel="stylesheet" href="/fonts/fonts.css" />
+		<link rel="stylesheet" href="/footer.css" />
+		<style>
+			:root {
+				color-scheme: dark;
+				--accent: #ffffff;
+				--accent2: #cccccc;
+				--border: #222222;
+				--bg: #000;
+				--panel: #141414;
+			}
+			* { box-sizing: border-box; }
+			body {
+				font: 15px/1.55 -apple-system, system-ui, Segoe UI, Roboto, sans-serif;
+				color: #eee;
+				margin: 0;
+				background: var(--bg);
+				min-height: 100vh;
+			}
+			a { color: #cccccc; text-decoration: none; }
+			header {
+				display: flex;
+				align-items: center;
+				gap: 12px;
+				padding: 0 24px;
+				border-bottom: 1px solid var(--border);
+				position: sticky;
+				top: 0;
+				background: rgba(0, 0, 0, 0.92);
+				backdrop-filter: blur(16px);
+				-webkit-backdrop-filter: blur(16px);
+				z-index: 5;
+				height: 60px;
+			}
+			header h1 { margin: 0; font-size: inherit; font-weight: inherit; flex-shrink: 0; }
+			header h1 a { display: flex; align-items: center; }
+			.wordmark-logo { height: 1.55rem; width: auto; display: block; }
+			.dash-header-nav {
+				display: flex;
+				align-items: center;
+				gap: 2px;
+				margin-left: 4px;
+				flex: 1;
+				overflow-x: auto;
+				scrollbar-width: none;
+			}
+			.dash-header-nav::-webkit-scrollbar { display: none; }
+			.dash-header-nav a {
+				padding: 6px 10px;
+				border-radius: 6px;
+				color: #888;
+				font-size: 13px;
+				text-decoration: none;
+				transition: color 0.15s, background 0.15s;
+				white-space: nowrap;
+			}
+			.dash-header-nav a:hover { color: #eee; background: rgba(255,255,255,0.05); }
+			.dash-header-nav a.active { color: #fff; background: rgba(255,255,255,0.06); }
+			.dash-header-user {
+				display: flex;
+				align-items: center;
+				gap: 10px;
+				flex-shrink: 0;
+				margin-left: auto;
+			}
+			.layout {
+				display: grid;
+				grid-template-columns: 220px 1fr;
+				min-height: calc(100vh - 60px);
+			}
+			aside {
+				border-right: 1px solid var(--border);
+				padding: 20px 0;
+			}
+			.aside-section {
+				padding: 8px 20px 4px;
+				font-size: 11px;
+				text-transform: uppercase;
+				letter-spacing: 0.08em;
+				color: #555;
+				font-weight: 600;
+			}
+			aside a {
+				display: block;
+				padding: 9px 20px;
+				color: #aaa;
+				font-size: 14px;
+				border-left: 2px solid transparent;
+				transition: color 0.12s, background 0.12s;
+			}
+			aside a:hover { color: #eee; background: rgba(255,255,255,0.03); }
+			aside a.active {
+				color: #fff;
+				background: rgba(255,255,255,0.05);
+				border-left-color: var(--accent);
+			}
+			main {
+				padding: 32px 36px;
+				max-width: 680px;
+			}
+			.page { display: none; }
+			.page.active { display: block; }
+			h2 { font-size: 20px; margin: 0 0 4px; letter-spacing: -0.01em; }
+			.sub { color: #888; margin: 0 0 28px; font-size: 14px; }
+			.section { margin-bottom: 32px; }
+			.section h3 {
+				font-size: 13px;
+				font-weight: 600;
+				text-transform: uppercase;
+				letter-spacing: 0.07em;
+				color: #666;
+				margin: 0 0 14px;
+			}
+			.field { margin-bottom: 16px; }
+			.field label {
+				display: block;
+				font-size: 13px;
+				color: #aaa;
+				margin-bottom: 6px;
+				font-weight: 500;
+			}
+			.field .hint {
+				font-size: 12px;
+				color: #666;
+				margin-top: 5px;
+			}
+			input, textarea, select {
+				background: #0f0f0f;
+				border: 1px solid var(--border);
+				color: #eee;
+				padding: 9px 11px;
+				border-radius: 8px;
+				font-size: 14px;
+				font-family: inherit;
+				width: 100%;
+				max-width: 400px;
+				display: block;
+			}
+			input:focus, textarea:focus, select:focus {
+				outline: none;
+				border-color: var(--accent);
+			}
+			input[readonly], input:disabled {
+				opacity: 0.5;
+				cursor: not-allowed;
+			}
+			.btn {
+				padding: 9px 18px;
+				border-radius: 9px;
+				border: 0;
+				font-size: 13px;
+				font-weight: 600;
+				cursor: pointer;
+				background: var(--accent);
+				color: #fff;
+				font-family: inherit;
+				transition: filter 0.12s;
+			}
+			.btn:hover { filter: brightness(1.1); }
+			.btn:disabled { opacity: 0.5; cursor: not-allowed; filter: none; }
+			.btn.sec {
+				background: #222222;
+				color: #ddd;
+			}
+			.btn.sec:hover { background: #2a2a2a; filter: none; }
+			.btn.danger { background: #cc4040; }
+			.divider {
+				border: none;
+				border-top: 1px solid var(--border);
+				margin: 28px 0;
+			}
+			.row {
+				display: flex;
+				align-items: center;
+				gap: 10px;
+				flex-wrap: wrap;
+			}
+			.tag {
+				font-size: 11px;
+				padding: 2px 8px;
+				border-radius: 99px;
+				background: #202020;
+				color: #ccc;
+			}
+			.tag.green { background: rgba(74,222,128,0.12); color: #4ade80; }
+			.tag.red { background: rgba(248,113,113,0.12); color: #f87171; }
+			.tag.yellow { background: rgba(251,191,36,0.12); color: #fbbf24; }
+			.inline-msg {
+				font-size: 13px;
+				padding: 9px 12px;
+				border-radius: 8px;
+				margin-top: 10px;
+				display: none;
+			}
+			.inline-msg.ok { background: rgba(74,222,128,0.1); color: #4ade80; border: 1px solid rgba(74,222,128,0.25); }
+			.inline-msg.err { background: rgba(248,113,113,0.1); color: #f87171; border: 1px solid rgba(248,113,113,0.25); }
+			.danger-zone {
+				border: 1px solid rgba(204,64,64,0.4);
+				border-radius: 12px;
+				padding: 18px;
+				background: rgba(204,64,64,0.04);
+			}
+			.danger-zone h3 { color: #ffb3b3; text-transform: none; letter-spacing: 0; font-size: 14px; margin: 0 0 6px; }
+			.danger-zone p { color: #888; font-size: 13px; margin: 0 0 14px; }
+			.confirm-delete { display: none; margin-top: 12px; }
+			.confirm-delete input { margin-bottom: 10px; }
+			.confirm-delete p { font-size: 13px; color: #888; margin: 0 0 10px; }
+			.muted { color: #888; font-size: 13px; }
+			.session-row {
+				display: flex;
+				align-items: center;
+				justify-content: space-between;
+				padding: 12px 14px;
+				background: var(--panel);
+				border: 1px solid var(--border);
+				border-radius: 10px;
+				margin-bottom: 8px;
+				gap: 12px;
+			}
+			.session-row .meta { font-size: 12px; color: #888; margin-top: 2px; }
+			.session-row .current-badge {
+				font-size: 11px;
+				padding: 2px 7px;
+				border-radius: 99px;
+				background: rgba(255,255,255,0.08);
+				color: #cccccc;
+				white-space: nowrap;
+			}
+			.link-row {
+				display: flex;
+				align-items: center;
+				justify-content: space-between;
+				padding: 12px 0;
+				border-bottom: 1px solid var(--border);
+				font-size: 14px;
+			}
+			.link-row:last-child { border-bottom: none; }
+			.link-row .label { color: #ccc; }
+			.link-row .val { color: #888; font-size: 13px; }
+			.link-row a.action {
+				font-size: 13px;
+				color: #cccccc;
+				font-weight: 500;
+			}
+			.link-row a.action:hover { color: #dddddd; }
+			/* Keyboard focus was invisible on every control here except the text
+			   inputs, so a tab-only user could not tell where they were. One ring,
+			   applied to every focusable thing, in the page's accent. */
+			a:focus-visible,
+			button:focus-visible,
+			input:focus-visible,
+			select:focus-visible,
+			textarea:focus-visible,
+			[tabindex]:focus-visible {
+				outline: 2px solid var(--accent);
+				outline-offset: 2px;
+				border-radius: 6px;
+			}
+			.visually-hidden {
+				position: absolute;
+				width: 1px;
+				height: 1px;
+				padding: 0;
+				margin: -1px;
+				overflow: hidden;
+				clip: rect(0 0 0 0);
+				white-space: nowrap;
+				border: 0;
+			}
+			.load-error {
+				border: 1px solid rgba(248,113,113,0.3);
+				background: rgba(248,113,113,0.06);
+				border-radius: 12px;
+				padding: 20px;
+				max-width: 520px;
+			}
+			.load-error h2 { font-size: 16px; margin: 0 0 6px; }
+			.load-error p { color: #999; font-size: 13.5px; margin: 0 0 14px; }
+			.verify-form { margin-top: 12px; }
+			.verify-form .row { margin-top: 10px; }
+			.verify-form input {
+				max-width: 180px;
+				letter-spacing: 0.28em;
+				font-variant-numeric: tabular-nums;
+			}
+			.social-card {
+				display: flex;
+				align-items: center;
+				justify-content: space-between;
+				gap: 12px;
+				padding: 14px 16px;
+				background: var(--panel);
+				border: 1px solid var(--border);
+				border-radius: 10px;
+				margin-bottom: 10px;
+			}
+			.social-card .provider-info { display: flex; align-items: center; gap: 10px; }
+			.social-card .provider-icon {
+				width: 32px; height: 32px; border-radius: 8px;
+				background: #202020; display: flex; align-items: center;
+				justify-content: center; font-size: 16px; flex-shrink: 0;
+			}
+			.social-card .provider-name { font-size: 14px; color: #ddd; font-weight: 500; }
+			.social-card .provider-meta { font-size: 12px; color: #888; margin-top: 2px; }
+			.social-card .actions { display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
+			/* The X card carries a consent disclosure under its header row, so it
+			   stacks instead of laying its children out as one centred row. */
+			#x-card { display: block; }
+			#x-connect-status { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+			#x-connect-status > .provider-info { flex: 1 1 auto; }
+			#x-connect-status > *:not(.provider-info):not(.actions) { flex-basis: 100%; }
+			.btn:focus-visible, input:focus-visible, a.action:focus-visible {
+				outline: 2px solid #6aa9ff; outline-offset: 2px;
+			}
+			.btn[disabled] { opacity: 0.55; cursor: not-allowed; filter: none; }
+			.token-form {
+				margin-top: 10px; padding: 14px 16px;
+				background: var(--panel); border: 1px solid var(--border); border-radius: 10px;
+				animation: tokenFormIn 160ms ease-out;
+			}
+			@keyframes tokenFormIn { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: none; } }
+			@media (prefers-reduced-motion: reduce) { .token-form { animation: none; } }
+			.token-form label {
+				display: block; font-size: 12px; font-weight: 600; color: #aaa;
+				text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 6px;
+			}
+			.token-form input { width: 100%; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+			.token-form .token-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
+			.token-form .token-note { font-size: 12px; color: #888; margin: 10px 0 0; line-height: 1.55; }
+			.token-form code {
+				background: #1c1c1c; border: 1px solid var(--border); border-radius: 4px;
+				padding: 1px 5px; font-size: 11px; color: #ccc;
+			}
+			.agent-seed-area {
+				margin-top: 16px; padding: 14px 16px;
+				background: var(--panel); border: 1px solid var(--border); border-radius: 10px;
+			}
+			.consent-list {
+				margin: 10px 0 0; padding: 0; list-style: none;
+				max-height: 340px; overflow-y: auto;
+				border: 1px solid var(--border); border-radius: 8px;
+			}
+			.consent-item {
+				display: flex; align-items: flex-start; gap: 10px;
+				padding: 10px 12px; border-bottom: 1px solid var(--border);
+				transition: background 0.15s ease;
+			}
+			.consent-item:last-child { border-bottom: none; }
+			.consent-item:hover { background: rgba(255,255,255,0.03); }
+			.consent-item input[type="checkbox"] { margin-top: 3px; width: auto; flex-shrink: 0; accent-color: #ddd; }
+			.consent-item .ci-body { flex: 1 1 auto; min-width: 0; }
+			.consent-item .ci-title {
+				font-size: 13px; color: #ddd; display: flex; align-items: center; gap: 8px;
+				flex-wrap: wrap;
+			}
+			.consent-item .ci-title a { color: inherit; text-decoration: none; border-bottom: 1px solid #333; }
+			.consent-item .ci-title a:hover { border-bottom-color: #888; }
+			.consent-item .ci-meta {
+				font-size: 12px; color: #777; margin-top: 3px;
+				overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+			}
+			.consent-readme {
+				display: inline-flex; align-items: center; gap: 5px;
+				font-size: 11px; color: #888; cursor: pointer; flex-shrink: 0;
+				padding: 2px 7px; border: 1px solid var(--border); border-radius: 999px;
+				transition: border-color 0.15s ease, color 0.15s ease;
+			}
+			.consent-readme:hover { border-color: #555; color: #bbb; }
+			.consent-readme input[disabled] + span { opacity: 0.45; }
+			.consent-readme:has(input[disabled]) { cursor: not-allowed; opacity: 0.55; }
+			.consent-summary {
+				margin-top: 10px; font-size: 12px; color: #888;
+				display: flex; align-items: center; justify-content: space-between; gap: 12px;
+				flex-wrap: wrap;
+			}
+			.consent-skeleton {
+				height: 44px; margin-bottom: 1px; border-radius: 6px;
+				background: linear-gradient(90deg, #161616 25%, #1e1e1e 50%, #161616 75%);
+				background-size: 200% 100%; animation: consent-shimmer 1.3s ease-in-out infinite;
+			}
+			@keyframes consent-shimmer { 0% { background-position: 200% 0; } 100% { background-position: -200% 0; } }
+			@media (prefers-reduced-motion: reduce) { .consent-skeleton { animation: none; } }
+			.seed-facts { margin: 0; padding-left: 18px; color: #ccc; font-size: 13px; }
+			.seed-facts li { margin-bottom: 5px; }
+			@media (max-width: 768px) {
+				.layout { grid-template-columns: 1fr; }
+				aside {
+					border-right: none;
+					border-bottom: 1px solid var(--border);
+					padding: 8px 0;
+					display: flex;
+					flex-wrap: wrap;
+					overflow-x: auto;
+				}
+				aside a {
+					padding: 8px 14px;
+					border-left: none;
+					border-bottom: 2px solid transparent;
+					white-space: nowrap;
+				}
+				aside a.active {
+					border-left: none;
+					border-bottom-color: var(--accent);
+				}
+				.aside-section { display: none; }
+				main { padding: 20px 16px; }
+				input, textarea, select { max-width: 100%; }
+			}
+		</style>
+	</head>
+	<body>
+		<header>
+			<h1>
+				<a href="/"><img src="/three.svg" alt="three.ws" class="wordmark-logo" /></a>
+			</h1>
+			<nav class="dash-header-nav" aria-label="Primary">
+				<a href="/app" data-i18n="settings_index.viewer">Viewer</a>
+				<a href="/create" data-i18n="settings_index.create">Create</a>
+				<a href="/discover" data-i18n="settings_index.discover">Discover</a>
+				<a href="/widgets" data-i18n="settings_index.widgets">Widgets</a>
+				<a href="/studio" data-i18n="settings_index.studio">Studio</a>
+				<a href="/docs" data-i18n="settings_index.docs">Docs</a>
+				<a href="/my-agents" data-i18n="settings_index.my_agents">My Agents</a>
+				<a href="/dashboard" data-i18n="settings_index.dashboard">Dashboard</a>
+				<a href="/settings" class="active" aria-current="page" data-i18n="settings_index.settings">Settings</a>
+			</nav>
+			<div class="dash-header-user" id="header-user-slot"></div>
+		</header>
+
+		<div class="layout">
+			<aside id="sidebar">
+				<div class="aside-section">Account</div>
+				<a href="#profile" data-tab="profile" class="active" data-i18n="settings_index.profile">Profile</a>
+				<a href="#account" data-tab="account" data-i18n="settings_index.account">Account</a>
+				<a href="#connected-accounts" data-tab="connected-accounts" data-i18n="settings_index.connected_accounts">Connected Accounts</a>
+				<a href="#privacy" data-tab="privacy" data-i18n="settings_index.privacy">Privacy</a>
+				<a href="#sessions" data-tab="sessions" data-i18n="settings_index.sessions">Sessions</a>
+				<a href="#connections" data-tab="connections">Connections</a>
+				<div class="aside-section">Workspace</div>
+				<a href="/dashboard#keys" data-i18n="settings_index.api_keys">API Keys ↗</a>
+				<a href="/dashboard#mcp" data-i18n="settings_index.mcp">MCP ↗</a>
+				<a href="/dashboard#billing" data-i18n="settings_index.plan_billing">Plan &amp; Billing ↗</a>
+				<a href="/dashboard/account" data-i18n="settings_index.wallets">Wallets ↗</a>
+				<a href="/dashboard/settings" data-i18n="settings_index.notifications">Notifications ↗</a>
+				<div class="aside-section">More</div>
+				<a href="#danger" data-tab="danger" data-i18n="settings_index.danger_zone">Danger Zone</a>
+			</aside>
+
+			<main>
+				<!-- Shown instead of the tabs when the account itself could not be
+				     loaded. Every panel below is a projection of that one fetch, so a
+				     failure used to leave the whole page sitting on placeholder dashes
+				     with nothing to click. -->
+				<div class="load-error" id="settings-load-error" style="display:none" role="alert">
+					<h2 data-i18n="settings_index.couldnt_load_your_settings">Couldn't load your settings</h2>
+					<p id="settings-load-error-body" data-i18n="settings_index.we_could_not_reach_your_account">We could not reach your account just now. Your settings are safe; this is a connection problem.</p>
+					<div class="row">
+						<button class="btn" id="settings-retry-btn" data-i18n="settings_index.try_again">Try again</button>
+						<a class="btn sec" href="/dashboard" style="text-decoration:none" data-i18n="settings_index.go_to_dashboard">Go to dashboard</a>
+					</div>
+				</div>
+				<!-- ── Profile ───────────────────────────────────────────── -->
+				<div class="page active" id="tab-profile">
+					<h2 data-i18n="settings_index.profile_2">Profile</h2>
+					<p class="sub" data-i18n="settings_index.your_public_facing_identity_on_three_ws">Your public-facing identity on three.ws</p>
+
+					<div class="section">
+						<div class="field">
+							<label for="inp-display-name" data-i18n="settings_index.display_name">Display name</label>
+							<input id="inp-display-name" type="text" placeholder="Your name" maxlength="80" autocomplete="name" />
+							<p class="hint" data-i18n="settings_index.shown_on_your_public_profile_and_agent">Shown on your public profile and agent cards.</p>
+						</div>
+						<div class="field">
+							<label for="inp-username" data-i18n="settings_index.username">Username</label>
+							<div class="row" style="align-items:flex-start;flex-direction:column;gap:6px">
+								<input id="inp-username" type="text" placeholder="yourhandle" maxlength="30" autocomplete="off" pattern="[a-zA-Z0-9_\-]{3,30}" style="max-width:400px" />
+								<p class="hint" style="margin:0" data-i18n-html="settings_index.letters_numbers_and_only_3_30_chars">Letters, numbers, _ and - only, 3–30 chars. Your profile URL: <span id="profile-url-preview" style="color:#cccccc">three.ws/u/yourhandle</span></p>
+							</div>
+						</div>
+						<div class="row">
+							<button class="btn" id="save-profile-btn" data-i18n="settings_index.save_changes">Save changes</button>
+							<span class="inline-msg" id="profile-msg" style="display:none"></span>
+						</div>
+					</div>
+
+					<hr class="divider" />
+
+					<div class="section">
+						<h3 data-i18n="settings_index.public_profile">Public profile</h3>
+						<p class="muted" style="margin-bottom:14px;font-size:14px" data-i18n="settings_index.your_agents_and_public_avatars_are_visible">Your agents and public avatars are visible on your profile page.</p>
+						<a id="view-profile-link" target="_blank" rel="noopener" class="btn sec" style="display:none;text-decoration:none" data-i18n="settings_index.view_public_profile">View public profile ↗</a>
+						<p class="hint" id="view-profile-hint" style="display:none;margin:0" data-i18n="settings_index.choose_a_username_to_publish">Choose a username above and save to publish your public profile.</p>
+					</div>
+				</div>
+
+				<!-- ── Account ───────────────────────────────────────────── -->
+				<div class="page" id="tab-account">
+					<h2 data-i18n="settings_index.account_2">Account</h2>
+					<p class="sub" data-i18n="settings_index.email_password_and_authentication">Email, password, and authentication</p>
+
+					<div class="section">
+						<div class="link-row">
+							<div>
+								<div class="label">Email address</div>
+								<div class="val" id="account-email">Loading…</div>
+							</div>
+							<div class="row" style="gap:8px">
+								<span id="email-verified-badge" class="tag">Checking…</span>
+								<button class="btn sec" id="send-verify-btn" style="display:none;font-size:12px;padding:5px 12px" data-i18n="settings_index.verify_email">Verify email</button>
+							</div>
+						</div>
+						<div class="verify-form" id="verify-form" style="display:none">
+							<label for="inp-verify-code" data-i18n="settings_index.six_digit_code">Six-digit code we emailed you</label>
+							<input id="inp-verify-code" type="text" inputmode="numeric" autocomplete="one-time-code" maxlength="6" placeholder="000000" />
+							<div class="row">
+								<button class="btn" id="confirm-verify-btn" disabled data-i18n="settings_index.confirm_code">Confirm code</button>
+								<button class="btn sec" id="resend-verify-btn" data-i18n="settings_index.send_again">Send again</button>
+								<button class="btn sec" id="cancel-verify-btn" data-i18n="settings_index.cancel_2">Cancel</button>
+							</div>
+						</div>
+						<span class="inline-msg" id="verify-msg" style="display:none"></span>
+						<div class="link-row">
+							<div>
+								<div class="label">Password</div>
+								<div class="val">Change your password</div>
+							</div>
+							<a href="/forgot-password" class="action" data-i18n="settings_index.reset_via_email">Reset via email ↗</a>
+						</div>
+						<div class="link-row">
+							<div>
+								<div class="label">Connected wallets</div>
+								<div class="val" id="wallet-count">Loading…</div>
+							</div>
+							<a href="/dashboard/account" class="action" data-i18n="settings_index.manage">Manage ↗</a>
+						</div>
+						<div class="link-row">
+							<div>
+								<div class="label">Notifications</div>
+								<div class="val" data-i18n="settings_index.choose_which_channels_deliver_each_kind">Choose which channels deliver each kind of notification</div>
+							</div>
+							<a href="/dashboard/settings" class="action" data-i18n="settings_index.manage_3">Manage ↗</a>
+						</div>
+						<div class="link-row">
+							<div>
+								<div class="label">Plan</div>
+								<div class="val" id="account-plan">Loading…</div>
+							</div>
+							<a href="/dashboard#billing" class="action" data-i18n="settings_index.manage_2">Manage ↗</a>
+						</div>
+					</div>
+
+					<hr class="divider" />
+
+					<div class="section">
+						<h3 data-i18n="settings_index.sign_in_methods">Sign-in methods</h3>
+						<p class="muted" style="font-size:14px" data-i18n="settings_index.sign_out_of_all_devices_at_once">Sign out of all devices at once, including any OAuth clients.</p>
+						<button class="btn sec" id="sign-out-everywhere-btn" data-i18n="settings_index.sign_out_everywhere">Sign out everywhere</button>
+						<span class="inline-msg" id="soe-msg" style="display:none"></span>
+					</div>
+				</div>
+
+				<!-- ── Privacy ───────────────────────────────────────────── -->
+				<div class="page" id="tab-privacy">
+					<h2 data-i18n="settings_index.privacy_2">Privacy</h2>
+					<p class="sub" data-i18n="settings_index.control_what_others_can_see_about_you">Control what others can see about you</p>
+
+					<div class="section">
+						<div class="field">
+							<label for="sel-default-vis" data-i18n="settings_index.default_avatar_visibility">Default avatar visibility</label>
+							<select id="sel-default-vis" style="max-width:240px">
+								<option value="private" data-i18n="settings_index.private_only_me">Private — only me</option>
+								<option value="unlisted" data-i18n="settings_index.unlisted_anyone_with_link">Unlisted — anyone with link</option>
+								<option value="public" data-i18n="settings_index.public_listed_on_my_profile">Public — listed on my profile</option>
+							</select>
+							<p class="hint" data-i18n="settings_index.new_avatars_you_upload_will_default_to">New avatars you upload will default to this visibility. Existing avatars are not affected.</p>
+						</div>
+						<button class="btn" id="save-privacy-btn" data-i18n="settings_index.save">Save</button>
+						<span class="inline-msg" id="privacy-msg" style="display:none"></span>
+					</div>
+
+					<hr class="divider" />
+
+					<div class="section">
+						<h3 data-i18n="settings_index.public_profile_2">Public profile</h3>
+						<div class="link-row">
+							<div>
+								<div class="label">Profile visibility</div>
+								<div class="val">Your profile page is always public. Only public avatars and agents appear on it.</div>
+							</div>
+						</div>
+					</div>
+				</div>
+
+				<!-- ── Sessions ──────────────────────────────────────────── -->
+				<div class="page" id="tab-sessions">
+					<h2 data-i18n="settings_index.sessions_2">Sessions</h2>
+					<p class="sub" data-i18n="settings_index.devices_and_browsers_signed_in_to_your">Devices and browsers signed in to your account</p>
+
+					<div id="sessions-list">
+						<p class="muted" data-i18n="settings_index.loading_sessions">Loading sessions…</p>
+					</div>
+
+					<hr class="divider" />
+
+					<div>
+						<p class="muted" style="font-size:14px;margin-bottom:12px" data-i18n="settings_index.this_revokes_all_other_sessions_but_keeps">This revokes all other sessions but keeps your current one active.</p>
+						<button class="btn sec" id="revoke-others-btn" data-i18n="settings_index.revoke_all_other_sessions">Revoke all other sessions</button>
+						<span class="inline-msg" id="sessions-msg" style="display:none"></span>
+					</div>
+				</div>
+
+				<!-- ── Connections (paired chats) ───────────────────────── -->
+				<div class="page" id="tab-connections">
+					<h2>Connections</h2>
+					<p class="sub">Telegram and Discord chats paired with your agents</p>
+					<span class="inline-msg" id="conn-msg" style="display:none;margin-bottom:12px"></span>
+
+					<div class="section" data-slot="redeem" id="conn-redeem" style="display:none"></div>
+
+					<div class="section">
+						<h3>Paired chats</h3>
+						<div data-slot="links-list" id="conn-links" aria-live="polite">
+							<p class="muted">Loading connections…</p>
+						</div>
+					</div>
+
+					<hr class="divider" />
+
+					<div class="section" data-slot="issue" id="conn-issue">
+						<h3>Pair a new chat</h3>
+						<p class="muted" style="font-size:13px;margin:0 0 12px">Generate a code here, then send it to the bot as <code>/link CODE</code> from the chat you want to pair. Or start in the chat: the bot prints a code you can paste back here.</p>
+						<div id="conn-bots" class="muted" style="font-size:13px;margin-bottom:12px"></div>
+						<div class="row">
+							<button class="btn" id="conn-issue-btn">Generate pairing code</button>
+						</div>
+						<div id="conn-issued" style="display:none;margin-top:14px"></div>
+						<div class="row" style="margin-top:18px">
+							<label for="conn-code-input" class="visually-hidden">Code from the bot</label>
+							<input id="conn-code-input" type="text" placeholder="Code from the bot, e.g. ABCD-EFGH" maxlength="16" autocomplete="off" style="max-width:280px" />
+							<button class="btn sec" id="conn-preview-btn">Check code</button>
+						</div>
+					</div>
+
+					<div class="section" id="conn-x" style="display:none;margin-top:18px"></div>
+				</div>
+
+				<!-- ── Connected Accounts ────────────────────────────────── -->
+				<div class="page" id="tab-connected-accounts">
+					<h2 data-i18n="settings_index.connected_accounts_2">Connected Accounts</h2>
+					<p class="sub" data-i18n="settings_index.link_third_party_accounts_to_seed_your">Link third-party accounts to seed your agent's memory</p>
+
+					<div class="section">
+						<h3 data-i18n="settings_index.social_profiles">Social Profiles</h3>
+						<div class="social-card" id="github-card">
+							<div class="provider-info">
+								<div class="provider-icon">⬡</div>
+								<div>
+									<div class="provider-name">GitHub</div>
+									<div class="provider-meta" id="github-status-text">Checking…</div>
+								</div>
+							</div>
+							<div class="actions" id="github-actions">
+								<span class="muted" style="font-size:13px" data-i18n="settings_index.loading">Loading…</span>
+							</div>
+						</div>
+						<div id="github-token-form" style="display:none"></div>
+						<span class="inline-msg" id="github-msg" style="display:none;margin-top:10px"></span>
+
+						<div class="social-card" id="x-card" style="margin-top:14px">
+							<div id="x-connect-status">
+								<div class="provider-info">
+									<div class="provider-icon">𝕏</div>
+									<div>
+										<div class="provider-name">X (Twitter)</div>
+										<div class="provider-meta">Loading…</div>
+									</div>
+								</div>
+							</div>
+						</div>
+						<span class="inline-msg" id="x-msg" style="display:none;margin-top:10px"></span>
+					</div>
+
+					<div class="agent-seed-area" id="seed-area" style="display:none">
+						<h3 style="font-size:13px;font-weight:600;text-transform:uppercase;letter-spacing:0.07em;color:#666;margin:0 0 10px" data-i18n="settings_index.seed_agent_memory">Seed Agent Memory</h3>
+						<p class="muted" style="font-size:13px;margin:0 0 12px" data-i18n="settings_index.pick_exactly_what_your_agent_reads">Pick exactly what your agent reads. Only the items you tick below are fetched and stored, and you can delete every seeded memory at any time.</p>
+
+						<label for="sel-seed-agent" style="display:block;font-size:12px;color:#888;margin-bottom:6px" data-i18n="settings_index.agent">Agent</label>
+						<select id="sel-seed-agent" style="max-width:360px"></select>
+						<div id="seed-agent-fallback" style="display:none;margin-top:8px">
+							<label for="inp-seed-agent-id" style="display:block;font-size:12px;color:#888;margin-bottom:6px" data-i18n="settings_index.agent_id">Agent ID</label>
+							<input id="inp-seed-agent-id" type="text" placeholder="Paste agent UUID…" style="max-width:360px" />
+							<button class="btn sec" id="seed-load-btn" style="font-size:12px;padding:5px 14px;margin-top:8px" data-i18n="settings_index.load">Load</button>
+						</div>
+
+						<div id="seed-catalog" style="margin-top:14px" aria-live="polite"></div>
+
+						<div class="row" style="margin-top:12px">
+							<button class="btn" id="seed-btn" disabled data-i18n="settings_index.seed_memory">Seed memory</button>
+							<button class="btn sec" id="seed-revoke-btn" style="display:none" data-i18n="settings_index.delete_seeded_memories">Delete seeded memories</button>
+							<span class="inline-msg" id="seed-msg" style="display:none"></span>
+						</div>
+						<div id="seed-results" style="display:none;margin-top:12px"></div>
+					</div>
+				</div>
+
+				<!-- ── Danger ────────────────────────────────────────────── -->
+				<div class="page" id="tab-danger">
+					<h2 data-i18n="settings_index.danger_zone_2">Danger Zone</h2>
+					<p class="sub" data-i18n="settings_index.irreversible_actions_proceed_with_care">Irreversible actions — proceed with care</p>
+
+					<div class="danger-zone">
+						<h3 data-i18n="settings_index.delete_account">Delete account</h3>
+						<p data-i18n="settings_index.permanently_deletes_your_account_all_avatars">Permanently deletes your account, all avatars, agents, and API keys. This cannot be undone.</p>
+						<button class="btn danger" id="show-delete-btn" data-i18n="settings_index.delete_my_account">Delete my account…</button>
+						<div class="confirm-delete" id="confirm-delete-wrap">
+							<p id="delete-confirm-help" data-i18n-html="settings_index.type_delete_my_account_to_confirm">Type <strong style="color:#eee">delete my account</strong> to confirm:</p>
+							<label for="delete-confirm-input" class="visually-hidden" data-i18n="settings_index.confirmation_phrase">Confirmation phrase</label>
+							<input id="delete-confirm-input" type="text" placeholder="delete my account" aria-describedby="delete-confirm-help" style="max-width:300px;margin-bottom:12px" />
+							<div class="row">
+								<button class="btn danger" id="confirm-delete-btn" disabled data-i18n="settings_index.permanently_delete">Permanently delete</button>
+								<button class="btn sec" id="cancel-delete-btn" data-i18n="settings_index.cancel">Cancel</button>
+							</div>
+						</div>
+					</div>
+				</div>
+			</main>
+		</div>
+
+		<script type="module">
+			import { renderHeaderUser } from '/src/header-user.js';
+			import { apiFetch as sharedFetch } from '/src/api.js';
+
+			// Every call routes through the shared client so mutations carry a
+			// single-use x-csrf-token. A local raw fetch() used to send none, and
+			// the server's CSRF gate answered 403 csrf_missing to profile saves and
+			// session revokes while this page still reported them as successful.
+			async function apiFetch(path, opts = {}) {
+				const res = await sharedFetch(path, opts);
+				if (!res.ok) throw await apiError(res);
+				return res;
+			}
+
+			async function apiError(res) {
+				const ct = res.headers.get('content-type') || '';
+				const data = ct.includes('application/json') ? await res.json().catch(() => null) : null;
+				return Object.assign(new Error(data?.error_description || res.statusText), { status: res.status, data });
+			}
+
+			async function apiJson(path, opts = {}) {
+				const res = await apiFetch(path, opts);
+				const ct = res.headers.get('content-type') || '';
+				return ct.includes('application/json') ? await res.json() : null;
+			}
+
+			function showMsg(el, type, text) {
+				el.className = 'inline-msg ' + type;
+				el.textContent = text;
+				el.style.display = 'inline-block';
+				setTimeout(() => { el.style.display = 'none'; }, 4000);
+			}
+
+			// ── Auth & user ──────────────────────────────────────────────
+			let user = null;
+
+			async function loadUser() {
+				const data = await apiJson('/api/auth/me');
+				if (!data.user) {
+					location.href = '/login?next=' + encodeURIComponent(location.pathname + location.hash);
+					throw new Error('unauthenticated');
+				}
+				user = data.user;
+				renderHeaderUser(document.getElementById('header-user-slot'), user, { activePath: '/settings' });
+				document.getElementById('inp-display-name').value = user.display_name || '';
+				document.getElementById('inp-username').value = user.username || '';
+				updateProfileUrlPreview();
+
+				document.getElementById('account-email').textContent = user.email || 'No email on this account';
+				renderVerifiedBadge();
+				document.getElementById('account-plan').textContent = user.plan || 'free';
+				// The stored preference, not a local guess: /api/auth/me carries the
+				// column the avatar create paths read, so the control shows what the
+				// server will actually apply.
+				document.getElementById('sel-default-vis').value = user.default_avatar_visibility || 'private';
+
+				// /api/auth/me returns wallet_address, never `address`, so the old
+				// fallback never resolved and a wallet-only account got a button
+				// pointing at '#'. An account with neither handle nor wallet has no
+				// public profile to open at all, so show the one step that creates
+				// one instead of a live-looking control that goes nowhere.
+				const profileSlug = user.username || user.wallet_address || '';
+				const link = document.getElementById('view-profile-link');
+				const hint = document.getElementById('view-profile-hint');
+				if (profileSlug) {
+					link.href = `/u/${profileSlug}`;
+					link.style.display = 'inline-block';
+					hint.style.display = 'none';
+				} else {
+					link.removeAttribute('href');
+					link.style.display = 'none';
+					hint.style.display = 'block';
+				}
+			}
+
+			function updateProfileUrlPreview() {
+				const val = document.getElementById('inp-username').value.trim();
+				const preview = document.getElementById('profile-url-preview');
+				preview.textContent = val ? `three.ws/u/${val}` : 'three.ws/u/yourhandle';
+			}
+			document.getElementById('inp-username').addEventListener('input', updateProfileUrlPreview);
+
+			// ── Email verification ───────────────────────────────────────
+			// /api/auth/verify-email and /api/auth/resend-verification have existed
+			// since registration shipped, but nothing in the product ever called
+			// them: the only place that even mentioned verification was the badge
+			// below, and it read a field /api/auth/me did not return, so every
+			// account read "Unverified" forever with no way to act on it. This is
+			// the flow that closes that loop.
+			function renderVerifiedBadge() {
+				const badge = document.getElementById('email-verified-badge');
+				const sendBtn = document.getElementById('send-verify-btn');
+				const verified = Boolean(user?.email_verified);
+				badge.textContent = verified ? 'Verified' : 'Unverified';
+				badge.className = verified ? 'tag green' : 'tag yellow';
+				// A wallet-only account has a synthetic address it cannot receive mail
+				// at, so offering to send a code there would be a dead end.
+				const mailable = Boolean(user?.email) && !/@users\.three\.ws\.local$/i.test(user.email);
+				sendBtn.style.display = !verified && mailable ? 'inline-flex' : 'none';
+				if (verified) {
+					document.getElementById('verify-form').style.display = 'none';
+				}
+			}
+
+			function showVerifyForm(open) {
+				document.getElementById('verify-form').style.display = open ? 'block' : 'none';
+				document.getElementById('send-verify-btn').style.display = open ? 'none' : 'inline-flex';
+				if (open) document.getElementById('inp-verify-code').focus();
+			}
+
+			async function sendVerificationCode(btn) {
+				const msg = document.getElementById('verify-msg');
+				const label = btn.textContent;
+				btn.disabled = true;
+				btn.textContent = 'Sending…';
+				try {
+					const data = await apiJson('/api/auth/resend-verification', { method: 'POST' });
+					if (data?.already_verified) {
+						if (user) user.email_verified = true;
+						renderVerifiedBadge();
+						showMsg(msg, 'ok', 'This address is already verified.');
+						return true;
+					}
+					showMsg(msg, 'ok', `Code sent to ${user.email}. It expires in 30 minutes.`);
+					return true;
+				} catch (e) {
+					showMsg(msg, 'err', e.data?.error_description || 'Could not send the code. Try again in a moment.');
+					return false;
+				} finally {
+					btn.disabled = false;
+					btn.textContent = label;
+				}
+			}
+
+			document.getElementById('send-verify-btn').addEventListener('click', async (e) => {
+				if (await sendVerificationCode(e.currentTarget) && !user?.email_verified) showVerifyForm(true);
+			});
+			document.getElementById('resend-verify-btn').addEventListener('click', (e) => sendVerificationCode(e.currentTarget));
+			document.getElementById('cancel-verify-btn').addEventListener('click', () => {
+				document.getElementById('inp-verify-code').value = '';
+				document.getElementById('confirm-verify-btn').disabled = true;
+				showVerifyForm(false);
+			});
+			document.getElementById('inp-verify-code').addEventListener('input', (e) => {
+				// The server hashes exactly six digits, so strip anything a paste drags in.
+				e.target.value = e.target.value.replace(/\D/g, '').slice(0, 6);
+				document.getElementById('confirm-verify-btn').disabled = e.target.value.length !== 6;
+			});
+			document.getElementById('inp-verify-code').addEventListener('keydown', (e) => {
+				if (e.key === 'Enter' && e.target.value.length === 6) {
+					e.preventDefault();
+					document.getElementById('confirm-verify-btn').click();
+				}
+			});
+			document.getElementById('confirm-verify-btn').addEventListener('click', async () => {
+				const btn = document.getElementById('confirm-verify-btn');
+				const msg = document.getElementById('verify-msg');
+				const code = document.getElementById('inp-verify-code').value;
+				btn.disabled = true;
+				btn.textContent = 'Confirming…';
+				try {
+					await apiJson('/api/auth/verify-email', {
+						method: 'POST',
+						headers: { 'content-type': 'application/json' },
+						body: JSON.stringify({ code }),
+					});
+					if (user) user.email_verified = true;
+					renderVerifiedBadge();
+					showVerifyForm(false);
+					document.getElementById('inp-verify-code').value = '';
+					showMsg(msg, 'ok', 'Email verified.');
+				} catch (e) {
+					showMsg(msg, 'err', e.data?.error_description || 'That code did not work. Ask for a new one.');
+				} finally {
+					btn.textContent = 'Confirm code';
+					btn.disabled = document.getElementById('inp-verify-code').value.length !== 6;
+				}
+			});
+
+			// ── Wallets count ────────────────────────────────────────────
+			async function loadWallets() {
+				try {
+					const data = await apiJson('/api/auth/wallets');
+					const count = Array.isArray(data?.wallets) ? data.wallets.length : 0;
+					document.getElementById('wallet-count').textContent = count === 0 ? 'None linked' : `${count} wallet${count === 1 ? '' : 's'} linked`;
+				} catch {
+					document.getElementById('wallet-count').textContent = '—';
+				}
+			}
+
+			// ── Save profile ─────────────────────────────────────────────
+			document.getElementById('save-profile-btn').addEventListener('click', async () => {
+				const btn = document.getElementById('save-profile-btn');
+				const msg = document.getElementById('profile-msg');
+				const displayName = document.getElementById('inp-display-name').value.trim();
+				const username = document.getElementById('inp-username').value.trim();
+				if (!displayName && !username) return showMsg(msg, 'err', 'Enter a display name or username.');
+				btn.disabled = true;
+				try {
+					const body = {};
+					if (displayName) body.display_name = displayName;
+					if (username) body.username = username;
+					await apiJson('/api/auth/profile', {
+						method: 'PATCH',
+						headers: { 'content-type': 'application/json' },
+						body: JSON.stringify(body),
+					});
+					showMsg(msg, 'ok', 'Saved!');
+					updateProfileUrlPreview();
+				} catch (e) {
+					showMsg(msg, 'err', e.data?.error_description || 'Failed to save.');
+				} finally {
+					btn.disabled = false;
+				}
+			});
+
+			// ── Privacy ──────────────────────────────────────────────────
+			// The default visibility is stored on the account (users
+			// .default_avatar_visibility) and read back by every avatar create path
+			// that the caller did not give an explicit visibility. It used to live in
+			// localStorage, where nothing ever read it: the control said "saved" and
+			// new avatars kept whatever each endpoint hardcoded.
+			document.getElementById('save-privacy-btn').addEventListener('click', async () => {
+				const btn = document.getElementById('save-privacy-btn');
+				const msg = document.getElementById('privacy-msg');
+				const val = document.getElementById('sel-default-vis').value;
+				btn.disabled = true;
+				try {
+					await apiJson('/api/auth/profile', {
+						method: 'PATCH',
+						headers: { 'content-type': 'application/json' },
+						body: JSON.stringify({ default_avatar_visibility: val }),
+					});
+					if (user) user.default_avatar_visibility = val;
+					showMsg(msg, 'ok', 'Saved. New avatars will default to ' + val + '.');
+				} catch (e) {
+					showMsg(msg, 'err', e.data?.error_description || 'Could not save that preference.');
+				} finally {
+					btn.disabled = false;
+				}
+			});
+
+			// ── Sessions ─────────────────────────────────────────────────
+			async function loadSessions() {
+				const list = document.getElementById('sessions-list');
+				try {
+					const data = await apiJson('/api/auth/sessions');
+					const sessions = data.sessions || [];
+					if (!sessions.length) {
+						list.innerHTML = '<p class="muted">No sessions found.</p>';
+						return;
+					}
+					list.innerHTML = sessions.map(s => {
+						const date = new Date(s.created_at).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
+						const ua = s.user_agent ? s.user_agent.slice(0, 60) : 'Unknown device';
+						const current = s.is_current ? '<span class="current-badge">Current</span>' : `<button class="btn sec" style="font-size:12px;padding:5px 10px" data-revoke="${s.id}">Revoke</button>`;
+						return `<div class="session-row">
+							<div>
+								<div style="font-size:13px;color:#ddd">${ua}</div>
+								<div class="meta">${s.ip || ''} · Signed in ${date}</div>
+							</div>
+							${current}
+						</div>`;
+					}).join('');
+
+					list.querySelectorAll('[data-revoke]').forEach(btn => {
+						btn.addEventListener('click', async () => {
+							btn.disabled = true;
+							try {
+								await apiFetch(`/api/auth/sessions/${btn.dataset.revoke}`, { method: 'DELETE' });
+								btn.closest('.session-row').remove();
+							} catch (e) {
+								btn.disabled = false;
+								showMsg(document.getElementById('sessions-msg'), 'err', e.data?.error_description || 'Failed to revoke that session.');
+							}
+						});
+					});
+				} catch {
+					list.innerHTML = '<p class="muted">Could not load sessions.</p>';
+				}
+			}
+
+			document.getElementById('revoke-others-btn').addEventListener('click', async () => {
+				const btn = document.getElementById('revoke-others-btn');
+				const msg = document.getElementById('sessions-msg');
+				btn.disabled = true;
+				try {
+					await apiFetch('/api/auth/sessions', { method: 'DELETE' });
+					showMsg(msg, 'ok', 'All other sessions revoked.');
+					loadSessions();
+				} catch {
+					showMsg(msg, 'err', 'Failed to revoke sessions.');
+				} finally {
+					btn.disabled = false;
+				}
+			});
+
+			document.getElementById('sign-out-everywhere-btn').addEventListener('click', async () => {
+				const btn = document.getElementById('sign-out-everywhere-btn');
+				btn.disabled = true;
+				await apiFetch('/api/auth/logout-everywhere', { method: 'POST' })
+					.catch(() => {})
+					.finally(() => {
+						try { localStorage.removeItem('3dagent:auth-hint'); } catch {}
+						location.href = '/login';
+					});
+			});
+
+			// ── Delete account ────────────────────────────────────────────
+			document.getElementById('show-delete-btn').addEventListener('click', () => {
+				document.getElementById('confirm-delete-wrap').style.display = 'block';
+				document.getElementById('show-delete-btn').style.display = 'none';
+			});
+			document.getElementById('cancel-delete-btn').addEventListener('click', () => {
+				document.getElementById('confirm-delete-wrap').style.display = 'none';
+				document.getElementById('show-delete-btn').style.display = 'inline-block';
+				document.getElementById('delete-confirm-input').value = '';
+				document.getElementById('confirm-delete-btn').disabled = true;
+			});
+			document.getElementById('delete-confirm-input').addEventListener('input', (e) => {
+				document.getElementById('confirm-delete-btn').disabled = e.target.value !== 'delete my account';
+			});
+			document.getElementById('confirm-delete-btn').addEventListener('click', async () => {
+				const btn = document.getElementById('confirm-delete-btn');
+				btn.disabled = true;
+				btn.textContent = 'Deleting…';
+				try {
+					// The typed phrase is echoed to the server, which refuses the
+					// delete without it. CSRF alone shouldn't be able to wipe an
+					// account from a stray request in an authenticated tab.
+					await apiFetch('/api/auth/me', {
+						method: 'DELETE',
+						headers: { 'content-type': 'application/json' },
+						body: JSON.stringify({ confirm: 'delete my account' }),
+					});
+					try { localStorage.removeItem('3dagent:auth-hint'); } catch {}
+					location.href = '/?deleted=1';
+				} catch (e) {
+					btn.textContent = 'Permanently delete';
+					btn.disabled = false;
+					alert(e.data?.error_description || 'Failed to delete account. Please contact support.');
+				}
+			});
+
+			// ── Connected Accounts ────────────────────────────────────────
+			const _urlP = new URLSearchParams(location.search);
+			const _xAgentId = _urlP.get('agent_id') || '';
+
+			// GitHub section
+			//
+			// Disconnecting is the account-wide revoke: the server deletes every
+			// GitHub-seeded memory across all of this user's agents in the same
+			// transaction that drops the connection, then asks GitHub to revoke the
+			// grant. The confirm says so, because the deletion cannot be undone.
+			async function disconnectGitHub() {
+				const btn = document.getElementById('github-disconnect-btn');
+				const msg = document.getElementById('github-msg');
+				if (!confirm('Disconnect GitHub? Every memory your agents learned from GitHub is deleted, and the stored access is destroyed.')) return;
+				if (btn) {
+					btn.disabled = true;
+					btn.textContent = 'Disconnecting…';
+				}
+				try {
+					const data = await apiJson('/api/auth/github/disconnect', { method: 'POST' });
+					const n = data?.memories_deleted ?? 0;
+					const deleted = n
+						? `GitHub disconnected. ${n} seeded ${n === 1 ? 'memory' : 'memories'} deleted.`
+						: 'GitHub disconnected.';
+					// A pasted token is gone from our side but still exists on GitHub
+					// until its owner deletes it, so say that instead of implying we
+					// revoked something we cannot.
+					showMsg(msg, 'ok', data?.connect_method === 'token'
+						? `${deleted} Delete the token on GitHub to finish revoking it.`
+						: deleted);
+				} catch (e) {
+					showMsg(msg, 'err', e.data?.error_description || 'Could not disconnect GitHub.');
+					if (btn) {
+						btn.disabled = false;
+						btn.textContent = 'Disconnect';
+					}
+					return;
+				}
+				loadGitHubStatus();
+			}
+
+			function hideTokenForm() {
+				const host = document.getElementById('github-token-form');
+				if (host) {
+					host.style.display = 'none';
+					host.innerHTML = '';
+				}
+			}
+
+			// The token path. The user mints the token on GitHub with the scopes we
+			// ask for, so consent happens on GitHub's own screen exactly as it does
+			// for OAuth; this form only carries it across.
+			function renderTokenForm(tokenConnect, { open } = {}) {
+				const host = document.getElementById('github-token-form');
+				const toggle = document.getElementById('github-token-toggle');
+				if (!host || !tokenConnect?.available) return;
+
+				const createUrl = tokenConnect.create_url || 'https://github.com/settings/tokens/new';
+				const scopes = (tokenConnect.recommended_scopes || ['read:user']).map((s) => `<code>${escHtml(s)}</code>`).join(' ');
+
+				host.innerHTML = `
+					<div class="token-form">
+						<label for="inp-github-token">GitHub personal access token</label>
+						<input type="password" id="inp-github-token" autocomplete="off" autocapitalize="off" spellcheck="false"
+							placeholder="ghp_…" aria-describedby="github-token-note" />
+						<div class="token-actions">
+							<button class="btn" id="github-token-submit" style="font-size:12px;padding:6px 16px">Connect</button>
+							<a class="btn sec" href="${escHtml(createUrl)}" target="_blank" rel="noopener noreferrer" style="font-size:12px;padding:6px 16px;text-decoration:none">Create one on GitHub</a>
+							<a class="btn sec" href="/docs/github-memory-seeding" style="font-size:12px;padding:6px 16px;text-decoration:none">How this works</a>
+						</div>
+						<p class="token-note" id="github-token-note">Tick only ${scopes} when you create it. The token is encrypted before it is stored, is used only to read the public profile, repositories and READMEs you tick, and is deleted the moment you disconnect. A token carrying more access than that is refused.</p>
+					</div>`;
+				host.style.display = open ? 'block' : 'none';
+				if (toggle) toggle.setAttribute('aria-expanded', open ? 'true' : 'false');
+
+				document.getElementById('github-token-submit')?.addEventListener('click', submitGitHubToken);
+				document.getElementById('inp-github-token')?.addEventListener('keydown', (e) => {
+					if (e.key === 'Enter') { e.preventDefault(); submitGitHubToken(); }
+				});
+				if (open) document.getElementById('inp-github-token')?.focus();
+			}
+
+			async function submitGitHubToken() {
+				const input = document.getElementById('inp-github-token');
+				const btn = document.getElementById('github-token-submit');
+				const msg = document.getElementById('github-msg');
+				const token = (input?.value || '').trim();
+				if (!token) {
+					showMsg(msg, 'err', 'Paste your GitHub token first.');
+					input?.focus();
+					return;
+				}
+				btn.disabled = true;
+				btn.textContent = 'Connecting…';
+				try {
+					const data = await apiJson('/api/auth/github/token', {
+						method: 'POST',
+						headers: { 'content-type': 'application/json' },
+						body: JSON.stringify({ token }),
+					});
+					// The token never needs to sit in the DOM after a successful post.
+					if (input) input.value = '';
+					showMsg(msg, 'ok', `GitHub connected as @${data.username}.`);
+					loadGitHubStatus();
+				} catch (e) {
+					showMsg(msg, 'err', e.data?.error_description || 'Could not connect that token.');
+					btn.disabled = false;
+					btn.textContent = 'Connect';
+				}
+			}
+
+			async function loadGitHubStatus() {
+				const statusEl = document.getElementById('github-status-text');
+				const actionsEl = document.getElementById('github-actions');
+				const seedArea = document.getElementById('seed-area');
+				if (!statusEl) return;
+				try {
+					const data = await apiJson('/api/auth/github/status');
+					if (data.connected) {
+						const when = new Date(data.connected_at).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
+						const seeded = data.seeded_fact_count
+							? ` · ${data.seeded_fact_count} seeded ${data.seeded_fact_count === 1 ? 'memory' : 'memories'}`
+							: '';
+						const via = data.connect_method === 'token' ? ' · via personal access token' : '';
+						statusEl.textContent = `@${data.username} · connected ${when}${via}${seeded}`;
+						actionsEl.innerHTML = '<span class="tag green">Connected</span><button class="btn sec" id="github-disconnect-btn" style="font-size:12px;padding:5px 14px">Disconnect</button>';
+						document.getElementById('github-disconnect-btn')?.addEventListener('click', disconnectGitHub);
+						hideTokenForm();
+						if (seedArea) {
+							seedArea.style.display = 'block';
+							mountSeedPanel();
+						}
+					} else {
+						// Two ways in. OAuth is the one-click path, but it only exists
+						// where an operator registered a GitHub OAuth app; the token path
+						// needs nothing provisioned, so an unconfigured deployment offers
+						// it up front instead of a dead "Unavailable" tag.
+						const oauth = data.configured !== false;
+						statusEl.textContent = oauth
+							? 'Not connected'
+							: 'Not connected. Connect with a personal access token.';
+						const agentId = _urlP.get('agent_id') || '';
+						const connectUrl = `/api/auth/github/connect${agentId ? `?agent_id=${encodeURIComponent(agentId)}` : ''}`;
+						actionsEl.innerHTML =
+							(oauth ? `<a href="${connectUrl}" class="btn" style="font-size:12px;padding:5px 14px;text-decoration:none">Connect GitHub</a>` : '')
+							+ `<button class="btn${oauth ? ' sec' : ''}" id="github-token-toggle" style="font-size:12px;padding:5px 14px" aria-expanded="${oauth ? 'false' : 'true'}" aria-controls="github-token-form">${oauth ? 'Use a token' : 'Connect with a token'}</button>`;
+						renderTokenForm(data.token_connect, { open: !oauth });
+						document.getElementById('github-token-toggle')?.addEventListener('click', (e) => {
+							e.preventDefault();
+							const host = document.getElementById('github-token-form');
+							const nowOpen = host.style.display === 'none';
+							host.style.display = nowOpen ? 'block' : 'none';
+							e.currentTarget.setAttribute('aria-expanded', nowOpen ? 'true' : 'false');
+							if (nowOpen) document.getElementById('inp-github-token')?.focus();
+						});
+						if (seedArea) seedArea.style.display = 'none';
+					}
+				} catch {
+					if (statusEl) statusEl.textContent = 'Could not load status';
+				}
+				const ghResult = _urlP.get('github');
+				const ghMsg = document.getElementById('github-msg');
+				if (ghMsg && ghResult) {
+					if (ghResult === 'connected') showMsg(ghMsg, 'ok', 'GitHub connected successfully.');
+					else if (ghResult === 'denied') showMsg(ghMsg, 'err', 'GitHub connection was cancelled.');
+					else if (ghResult === 'error') showMsg(ghMsg, 'err', 'GitHub connection failed. Please try again.');
+				}
+			}
+
+			// ── GitHub memory seeding (consent-first) ─────────────────────
+				// The catalog the user is shown IS the permission boundary: the seed POST
+				// sends only ticked keys, and the server refuses anything not in it.
+				let seedAgentId = '';
+				let seedMounted = false;
+
+				const esc = (s) => String(s ?? '').replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+
+				// Every seeding panel needs the account's agents. /api/agents returns the
+				// full list; /api/agents/me returns one agent and creates it on first
+				// call, so it is the fallback that guarantees a brand-new account still
+				// has something to seed instead of an empty picker.
+				async function loadMyAgents() {
+					try {
+						const list = (await apiJson('/api/agents'))?.agents;
+						if (Array.isArray(list) && list.length) return list;
+					} catch {}
+					try {
+						const one = (await apiJson('/api/agents/me'))?.agent;
+						return one ? [one] : [];
+					} catch {}
+					return [];
+				}
+
+				function seedSelection() {
+					const root = document.getElementById('seed-catalog');
+					if (!root) return { include_profile: false, repos: [], readmes: [] };
+					const repos = [...root.querySelectorAll('input[data-repo]:checked')].map((i) => i.dataset.repo);
+					const readmes = [...root.querySelectorAll('input[data-readme]:checked')].map((i) => i.dataset.readme);
+					return {
+						include_profile: Boolean(root.querySelector('#consent-profile')?.checked),
+						repos,
+						readmes: readmes.filter((k) => repos.includes(k)),
+					};
+				}
+
+				function refreshSeedControls() {
+					const root = document.getElementById('seed-catalog');
+					const btn = document.getElementById('seed-btn');
+					const summary = document.getElementById('consent-summary-text');
+					if (!root || !btn) return;
+					// A README can only be read for a repo that is itself selected, which is
+					// also what the server enforces, and keeping the checkbox in lockstep means
+					// the user never assembles a selection the API will reject.
+					const chosen = new Set([...root.querySelectorAll('input[data-repo]:checked')].map((i) => i.dataset.repo));
+					for (const box of root.querySelectorAll('input[data-readme]')) {
+						const allowed = chosen.has(box.dataset.readme);
+						box.disabled = !allowed;
+						if (!allowed) box.checked = false;
+					}
+					const sel = seedSelection();
+					const count = (sel.include_profile ? 1 : 0) + sel.repos.length;
+					btn.disabled = count === 0;
+					if (summary) {
+						summary.textContent = count === 0
+							? 'Nothing selected: your agent will read nothing.'
+							: `${count} item${count === 1 ? '' : 's'} selected${sel.readmes.length ? `, ${sel.readmes.length} README${sel.readmes.length === 1 ? '' : 's'}` : ''}. Nothing else is read or stored.`;
+					}
+				}
+
+				function renderSeedCatalog(data) {
+					const root = document.getElementById('seed-catalog');
+					const revokeBtn = document.getElementById('seed-revoke-btn');
+					if (!root) return;
+
+					if (revokeBtn) {
+						revokeBtn.style.display = data.fact_count > 0 ? 'inline-flex' : 'none';
+						revokeBtn.textContent = `Delete ${data.fact_count} seeded ${data.fact_count === 1 ? 'memory' : 'memories'}`;
+					}
+
+					if (!data.catalog) {
+						root.innerHTML = '<p class="muted" style="font-size:13px;margin:0">Connect GitHub to choose what your agent reads.</p>';
+						refreshSeedControls();
+						return;
+					}
+
+					const p = data.catalog.profile;
+					const repos = data.catalog.repos || [];
+					const seededNote = data.seeded_at
+						? `<p class="muted" style="font-size:12px;margin:0 0 8px">Last seeded ${new Date(data.seeded_at).toLocaleString()}, ${data.fact_count} ${data.fact_count === 1 ? 'memory' : 'memories'} stored. Seeding again replaces them.</p>`
+						: '';
+
+					const profileRow = p ? `
+						<li class="consent-item">
+							<input type="checkbox" id="consent-profile" checked />
+							<div class="ci-body">
+								<label class="ci-title" for="consent-profile">Public profile <span class="tag">@${esc(p.login)}</span></label>
+								<div class="ci-meta">${esc([p.name, p.bio, p.company, p.location].filter(Boolean).join(' · ') || 'Name, bio, company, location, follower count')}</div>
+							</div>
+						</li>` : '';
+
+					const repoRows = repos.map((r) => `
+						<li class="consent-item">
+							<input type="checkbox" data-repo="${esc(r.key)}" id="consent-repo-${esc(r.key)}" ${r.pinned ? 'checked' : ''} />
+							<div class="ci-body">
+								<label class="ci-title" for="consent-repo-${esc(r.key)}">
+									<a href="${esc(r.url)}" target="_blank" rel="noopener noreferrer">${esc(r.key)}</a>
+									${r.pinned ? '<span class="tag">pinned</span>' : ''}
+									${r.language ? `<span class="tag">${esc(r.language)}</span>` : ''}
+								</label>
+								<div class="ci-meta">${esc(r.description || 'No description')}${r.stars ? ` · ★ ${r.stars}` : ''}</div>
+							</div>
+							<label class="consent-readme">
+								<input type="checkbox" data-readme="${esc(r.key)}" />
+								<span>README</span>
+							</label>
+						</li>`).join('');
+
+					const emptyState = !p && repos.length === 0
+						? '<p class="muted" style="font-size:13px;margin:0">This GitHub account has no public profile or public repositories yet. Push a public repo, then reload this page.</p>'
+						: '';
+
+					root.innerHTML = emptyState || `
+						${seededNote}
+						<ul class="consent-list">${profileRow}${repoRows}</ul>
+						<div class="consent-summary"><span id="consent-summary-text"></span><span class="muted">Pinned repositories are ticked by default.</span></div>`;
+
+					for (const box of root.querySelectorAll('input[type="checkbox"]')) {
+						box.addEventListener('change', refreshSeedControls);
+					}
+					refreshSeedControls();
+				}
+
+				async function loadSeedCatalog(agentId) {
+					const root = document.getElementById('seed-catalog');
+					const btn = document.getElementById('seed-btn');
+					seedAgentId = agentId;
+					if (!root) return;
+					if (btn) btn.disabled = true;
+					root.innerHTML = '<div class="consent-list">' + '<div class="consent-skeleton"></div>'.repeat(4) + '</div>';
+					try {
+						renderSeedCatalog(await apiJson(`/api/agents/${encodeURIComponent(agentId)}/memory/seed/github`));
+					} catch (e) {
+						root.innerHTML = `<p class="muted" style="font-size:13px;margin:0">Could not load your GitHub catalog: ${esc(e.data?.error_description || e.message || 'unknown error')}. <button class="btn sec" id="seed-retry-btn" style="font-size:12px;padding:4px 12px;margin-left:6px">Retry</button></p>`;
+						document.getElementById('seed-retry-btn')?.addEventListener('click', () => loadSeedCatalog(agentId));
+					}
+				}
+
+				async function mountSeedPanel() {
+					if (seedMounted) return;
+					seedMounted = true;
+					const select = document.getElementById('sel-seed-agent');
+					const fallback = document.getElementById('seed-agent-fallback');
+					const preset = _urlP.get('agent_id') || '';
+
+					const agents = await loadMyAgents();
+
+					if (agents.length) {
+						select.innerHTML = agents.map((a) => `<option value="${esc(a.id)}">${esc(a.name || a.id)}</option>`).join('');
+						if (preset && agents.some((a) => a.id === preset)) select.value = preset;
+						select.addEventListener('change', () => loadSeedCatalog(select.value));
+						loadSeedCatalog(select.value);
+					} else {
+						// No agents on this account yet, or the list call failed: fall back to
+						// an explicit id so the panel is still usable rather than dead.
+						select.style.display = 'none';
+						fallback.style.display = 'block';
+						const input = document.getElementById('inp-seed-agent-id');
+						if (preset) input.value = preset;
+						document.getElementById('seed-load-btn')?.addEventListener('click', () => {
+							const id = input.value.trim();
+							if (!id) return showMsg(document.getElementById('seed-msg'), 'err', 'Enter an agent ID.');
+							loadSeedCatalog(id);
+						});
+						if (preset) loadSeedCatalog(preset);
+					}
+				}
+
+				document.getElementById('seed-btn')?.addEventListener('click', async () => {
+					const btn = document.getElementById('seed-btn');
+					const msg = document.getElementById('seed-msg');
+					const resultsEl = document.getElementById('seed-results');
+					if (!seedAgentId) return showMsg(msg, 'err', 'Pick an agent first.');
+					const selection = seedSelection();
+					btn.disabled = true;
+					btn.textContent = 'Seeding…';
+					if (resultsEl) resultsEl.style.display = 'none';
+					try {
+						const data = await apiJson(`/api/agents/${encodeURIComponent(seedAgentId)}/memory/seed/github`, {
+							method: 'POST',
+							headers: { 'content-type': 'application/json' },
+							body: JSON.stringify(selection),
+						});
+						showMsg(msg, 'ok', `Seeded ${data.seeded} fact${data.seeded === 1 ? '' : 's'}.`);
+						if (resultsEl && data.facts?.length) {
+							resultsEl.style.display = 'block';
+							resultsEl.innerHTML =
+								`<p class="muted" style="font-size:12px;margin:0 0 8px">Stored from ${data.selection.repos.length} ${data.selection.repos.length === 1 ? 'repository' : 'repositories'}${data.selection.profile ? ' and your public profile' : ''}:</p>` +
+								`<ul class="seed-facts">${data.facts.map((f) => `<li>${esc(f)}</li>`).join('')}</ul>`;
+						}
+						loadSeedCatalog(seedAgentId);
+					} catch (e) {
+						showMsg(msg, 'err', e.data?.error_description || 'Seed failed.');
+					} finally {
+						btn.textContent = 'Seed memory';
+						refreshSeedControls();
+					}
+				});
+
+				document.getElementById('seed-revoke-btn')?.addEventListener('click', async () => {
+					const btn = document.getElementById('seed-revoke-btn');
+					const msg = document.getElementById('seed-msg');
+					if (!seedAgentId) return;
+					if (!confirm('Delete every memory this agent seeded from GitHub? This cannot be undone.')) return;
+					btn.disabled = true;
+					btn.textContent = 'Deleting…';
+					try {
+						const data = await apiJson(`/api/agents/${encodeURIComponent(seedAgentId)}/memory/seed/github`, { method: 'DELETE' });
+						showMsg(msg, 'ok', `Deleted ${data.deleted} seeded ${data.deleted === 1 ? 'memory' : 'memories'}.`);
+						document.getElementById('seed-results').style.display = 'none';
+						loadSeedCatalog(seedAgentId);
+						loadGitHubStatus();
+					} catch (e) {
+						showMsg(msg, 'err', e.data?.error_description || 'Delete failed.');
+					} finally {
+						btn.disabled = false;
+					}
+				});
+
+			async function loadConnectedAccounts() {
+				loadGitHubStatus();
+				const el = document.getElementById('x-connect-status');
+				const msg = document.getElementById('x-msg');
+				try {
+					if (!_xAgentId) {
+						el.innerHTML = xCardHeader('Loading…');
+						// Seeding always targets one agent. With no ?agent_id= in the
+						// URL, fall back to the account's first agent so the card is
+						// usable from a bare /settings visit.
+						const agentId = (await loadMyAgents())[0]?.id ?? null;
+						if (agentId) {
+							renderXStatus(el, agentId);
+						} else {
+							el.innerHTML = xCardHeader('Create an agent to seed its memory from X')
+								+ '<div class="actions"><a href="/create" class="btn sec" style="font-size:12px;padding:5px 14px;text-decoration:none">Create an agent</a></div>';
+						}
+					} else {
+						renderXStatus(el, _xAgentId);
+					}
+				} catch {
+					el.innerHTML = '<p class="muted" style="font-size:14px">Could not load connection status.</p>';
+				}
+
+				// Show toast from redirect
+				const xResult = _urlP.get('x');
+				if (xResult === 'connected') showMsg(msg, 'ok', 'X account connected successfully.');
+				else if (xResult === 'denied') showMsg(msg, 'err', 'X connection cancelled.');
+				else if (xResult === 'unconfigured') showMsg(msg, 'err', 'X connections are not enabled on this deployment, so the connect could not start.');
+				else if (xResult === 'error') showMsg(msg, 'err', 'X connection failed. Try again.');
+			}
+
+			function escHtml(s) {
+				return String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
+			}
+
+			function xConnectUrl(agentId, scope) {
+				const q = new URLSearchParams({ scope });
+				if (agentId) q.set('agent_id', agentId);
+				return `/api/auth/x/connect?${q.toString()}`;
+			}
+
+			function xCardHeader(meta) {
+				return `
+					<div class="provider-info">
+						<div class="provider-icon">𝕏</div>
+						<div>
+							<div class="provider-name">X (Twitter)</div>
+							<div class="provider-meta">${meta}</div>
+						</div>
+					</div>`;
+			}
+
+			// The consent screen is rendered from the server's own disclosure, never
+			// from copy kept here. What the seeder reads and stores is declared once
+			// (api/_lib/x-memory-seed.js) and shown verbatim, so the two can't drift.
+			function xConsentPanel(disclosure) {
+				const list = (items, color) => (items || [])
+					.map(i => `<li style="margin:0 0 5px;color:${color}">${escHtml(i)}</li>`).join('');
+				return `
+					<div style="margin-top:14px;padding:14px;border:1px solid #2a2a2a;border-radius:8px;background:#131313">
+						<div style="font-size:13px;font-weight:600;color:#eee;margin-bottom:4px">${escHtml(disclosure.title)}</div>
+						<p class="muted" style="font-size:13px;margin:0 0 12px">${escHtml(disclosure.summary)}</p>
+						<div style="display:grid;gap:12px;grid-template-columns:repeat(auto-fit,minmax(220px,1fr))">
+							<div>
+								<div style="font-size:11px;text-transform:uppercase;letter-spacing:.07em;color:#666;margin-bottom:5px">Read from X</div>
+								<ul style="margin:0;padding-left:16px;font-size:12.5px;line-height:1.45">${list(disclosure.reads, '#ccc')}${list(disclosure.skips, '#8a8a8a')}</ul>
+							</div>
+							<div>
+								<div style="font-size:11px;text-transform:uppercase;letter-spacing:.07em;color:#666;margin-bottom:5px">Stored on this agent</div>
+								<ul style="margin:0;padding-left:16px;font-size:12.5px;line-height:1.45">${list(disclosure.stores, '#ccc')}</ul>
+							</div>
+							<div>
+								<div style="font-size:11px;text-transform:uppercase;letter-spacing:.07em;color:#666;margin-bottom:5px">Never stored</div>
+								<ul style="margin:0;padding-left:16px;font-size:12.5px;line-height:1.45">${list(disclosure.never, '#8a8a8a')}</ul>
+							</div>
+						</div>
+						<p class="muted" style="font-size:12px;margin:12px 0 0">${escHtml(disclosure.retention)} ${escHtml(disclosure.revocation)}</p>
+						<label for="x-consent-check" style="display:flex;gap:8px;align-items:flex-start;margin-top:12px;cursor:pointer;font-size:13px;color:#ddd">
+							<input type="checkbox" id="x-consent-check" style="margin-top:3px;cursor:pointer" />
+							<span>I have read the above and consent to seeding this agent's memory from my X account.</span>
+						</label>
+						<div class="row" style="margin-top:12px;align-items:center;gap:10px">
+							<button class="btn" id="x-consent-btn" disabled>Grant consent and seed</button>
+							<span class="muted" style="font-size:11.5px">Disclosure version ${escHtml(disclosure.version)}</span>
+						</div>
+					</div>`;
+			}
+
+			function xSeedSummary(data) {
+				if (!data.seeded_at) return 'Consent granted. No memories seeded yet.';
+				const hours = Math.round((Date.now() - new Date(data.seeded_at)) / 3600000);
+				const when = hours < 1 ? 'just now' : hours < 24 ? `${hours}h ago` : `${Math.round(hours / 24)}d ago`;
+				return `${data.fact_count} seeded ${data.fact_count === 1 ? 'memory' : 'memories'}, last refreshed ${when}.`;
+			}
+
+			async function renderXStatus(el, agentId) {
+				const msg = document.getElementById('x-msg');
+				// Seeding reads; it never posts. This card asks X for the read-only
+				// scope set, so consenting to a memory seed never costs the owner
+				// permission to post as them.
+				const connectUrl = xConnectUrl(agentId, 'read');
+				let data;
+				try {
+					data = await apiJson(`/api/agents/${agentId}/memory/seed/x`);
+				} catch (e) {
+					el.innerHTML = xCardHeader('Could not load status')
+						+ `<div class="actions"><button class="btn sec" id="x-retry-btn">Retry</button></div>`;
+					document.getElementById('x-retry-btn')?.addEventListener('click', () => renderXStatus(el, agentId));
+					return;
+				}
+
+				if (!data.configured) {
+					el.innerHTML = xCardHeader('X connections are not enabled on this deployment')
+						+ `<div class="actions"><span class="muted" style="font-size:12.5px">Ask an operator to configure X OAuth.</span></div>`;
+					return;
+				}
+
+				if (!data.connected) {
+					el.innerHTML = xCardHeader('Not connected')
+						+ `<div class="actions" style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+								<a href="${connectUrl}" class="btn" style="font-size:12px;padding:5px 14px;text-decoration:none">Connect X (read-only)</a>
+								<span class="muted" style="font-size:11.5px">Asks X only for read access to your profile and posts. It cannot post as you.</span>
+							</div>
+							<p class="muted" style="font-size:11.5px;margin:10px 0 0">Want this agent to post to X as well? <a href="${xConnectUrl(agentId, 'full')}" class="action">Connect with posting access</a>.</p>`;
+					return;
+				}
+
+				const consent = data.consent || {};
+				const scopes = data.connection_scopes
+					? `<p class="muted" style="font-size:11.5px;margin:10px 0 0">This connection holds the X permissions: ${escHtml(data.connection_scopes)}. Seeding only uses the read permissions listed above.</p>`
+					: '';
+
+				// A connection whose scopes cannot cover the read the disclosure
+				// describes can never produce a seed. Say so before the consent panel,
+				// so nobody agrees to something that would then fail at X.
+				if (data.scopes_ok === false) {
+					el.innerHTML = xCardHeader(`@${escHtml(data.username)} &middot; This connection cannot read your posts`)
+						+ `<p class="muted" style="font-size:12.5px;margin:10px 0 0">Seeding needs the X permissions ${escHtml((data.required_scopes || []).join(', '))}, and this connection is missing ${escHtml((data.missing_scopes || []).join(', '))}. Reconnect to grant them. Nothing is read until you consent afterwards.</p>
+							<div class="actions" style="margin-top:10px"><a href="${connectUrl}" class="btn" style="font-size:12px;padding:5px 14px;text-decoration:none">Reconnect X (read-only)</a></div>${scopes}`;
+					return;
+				}
+
+				// Reconnecting keeps the shape of the grant the owner already made: a
+				// read-only connection stays read-only, rather than being quietly
+				// widened to posting access by a link labelled "Reconnect".
+				const reconnectUrl = xConnectUrl(
+					agentId,
+					String(data.connection_scopes || '').split(/\s+/).includes('tweet.write') ? 'full' : 'read',
+				);
+
+				if (!consent.granted) {
+					const why = consent.reason === 'scope_version_changed'
+						? 'What gets read and stored has changed since you last agreed. Review it again to keep seeding.'
+						: consent.reason === 'account_changed'
+							? 'You reconnected a different X account. Its posts need their own consent.'
+							: 'Connected. Seeding is off until you consent.';
+					el.innerHTML = xCardHeader(`@${escHtml(data.username)} &middot; ${escHtml(why)}`)
+						+ xConsentPanel(data.disclosure) + scopes;
+
+					const check = document.getElementById('x-consent-check');
+					const grant = document.getElementById('x-consent-btn');
+					check.addEventListener('change', () => { grant.disabled = !check.checked; });
+					grant.addEventListener('click', async () => {
+						grant.disabled = true;
+						grant.textContent = 'Reading X and seeding…';
+						try {
+							const res = await apiJson(`/api/agents/${agentId}/memory/seed/x`, {
+								method: 'POST',
+								headers: { 'content-type': 'application/json' },
+								body: JSON.stringify({ consent: { accepted: true, scope_version: data.scope_version } }),
+							});
+							showMsg(msg, 'ok', `Seeded ${res.seeded} ${res.seeded === 1 ? 'memory' : 'memories'} from ${res.posts_read} posts by @${res.username}. ${res.in_context} stay in the agent's live context.`);
+							renderXStatus(el, agentId);
+						} catch (e) {
+							showMsg(msg, 'err', e.data?.error_description || 'Seeding failed.');
+							grant.disabled = false;
+							grant.textContent = 'Grant consent and seed';
+						}
+					});
+					return;
+				}
+
+				el.innerHTML = xCardHeader(`@${escHtml(consent.username || data.username)} &middot; ${escHtml(xSeedSummary(data))}`)
+					+ `<div class="actions" style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+							<button class="btn sec" id="x-seed-btn">Re-seed</button>
+							<button class="btn danger" id="x-revoke-btn">Revoke and delete</button>
+							<a href="${reconnectUrl}" class="action" style="font-size:12.5px">Reconnect</a>
+						</div>
+						<p class="muted" style="font-size:11.5px;margin:10px 0 0">Consented ${escHtml(new Date(consent.granted_at).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' }))} to disclosure ${escHtml(consent.scope_version)}. Re-seeding replaces the previous batch; revoking deletes every one of them.</p>${scopes}`;
+
+				document.getElementById('x-seed-btn').addEventListener('click', async () => {
+					const btn = document.getElementById('x-seed-btn');
+					btn.disabled = true;
+					btn.textContent = 'Re-seeding…';
+					try {
+						const res = await apiJson(`/api/agents/${agentId}/memory/seed/x`, {
+							method: 'POST', headers: { 'content-type': 'application/json' }, body: '{}',
+						});
+						showMsg(msg, 'ok', `Re-seeded ${res.seeded} ${res.seeded === 1 ? 'memory' : 'memories'} from ${res.posts_read} posts by @${res.username}.`);
+						renderXStatus(el, agentId);
+					} catch (e) {
+						showMsg(msg, 'err', e.data?.error_description || 'Seeding failed.');
+						btn.disabled = false;
+						btn.textContent = 'Re-seed';
+					}
+				});
+
+				document.getElementById('x-revoke-btn').addEventListener('click', async () => {
+					if (!confirm(`Revoke consent and delete the ${data.fact_count} memories seeded from @${consent.username || data.username}? This cannot be undone.`)) return;
+					const btn = document.getElementById('x-revoke-btn');
+					btn.disabled = true;
+					btn.textContent = 'Deleting…';
+					try {
+						const res = await apiJson(`/api/agents/${agentId}/memory/seed/x`, { method: 'DELETE' });
+						showMsg(msg, 'ok', `Consent revoked. ${res.deleted} seeded ${res.deleted === 1 ? 'memory' : 'memories'} deleted.`);
+						renderXStatus(el, agentId);
+					} catch (e) {
+						showMsg(msg, 'err', e.data?.error_description || 'Revoke failed.');
+						btn.disabled = false;
+						btn.textContent = 'Revoke and delete';
+					}
+				});
+			}
+
+			// ── Connections (paired chats) ────────────────────────────────
+			const JSON_HDR = { 'content-type': 'application/json' };
+			const CONN_PLATFORM = { telegram: 'Telegram', discord: 'Discord' };
+			const X_OUTCOMES = {
+				connected: ['ok', 'X account connected successfully.'],
+				denied: ['err', 'X connection cancelled.'],
+				unconfigured: ['err', 'X connections are not enabled on this deployment, so the connect could not start.'],
+				error: ['err', 'X connection failed. Try again.'],
+			};
+			let connState = { agents: [], bots: {} };
+			let connIntroDone = false;
+
+			function connMsg(type, text) {
+				showMsg(document.getElementById('conn-msg'), type, text);
+			}
+
+			function renderConnBots(bots) {
+				const parts = [];
+				if (bots.telegram?.available) parts.push(`<a href="${escHtml(bots.telegram.url)}" target="_blank" rel="noopener">@${escHtml(bots.telegram.username)} on Telegram</a>`);
+				if (bots.discord?.available) parts.push(`<a href="${escHtml(bots.discord.dm_url)}" target="_blank" rel="noopener">Message the Discord bot</a> or <a href="${escHtml(bots.discord.invite_url)}" target="_blank" rel="noopener">add it to a server</a>`);
+				document.getElementById('conn-bots').innerHTML = parts.length
+					? 'Bots: ' + parts.join(' &middot; ')
+					: 'No chat bots are enabled on this deployment yet.';
+			}
+
+			function renderConnLinks(links) {
+				const el = document.getElementById('conn-links');
+				if (!links.length) {
+					el.innerHTML = '<p class="muted">No chats are paired yet. Generate a code below and send it to the bot with <code>/link CODE</code>.</p>';
+					return;
+				}
+				el.innerHTML = links.map(l => {
+					const opts = ['<option value="">Default agent</option>']
+						.concat(connState.agents.map(a => `<option value="${escHtml(a.id)}"${a.id === l.default_agent_id ? ' selected' : ''}>${escHtml(a.name)}</option>`)).join('');
+					const title = l.chat_title || l.platform_username || 'Direct chat';
+					return `
+						<div class="social-card" data-link-id="${escHtml(l.id)}" style="margin-bottom:10px;flex-wrap:wrap">
+							<div class="provider-info">
+								<div>
+									<div class="provider-name">${escHtml(CONN_PLATFORM[l.platform] || l.platform)}: ${escHtml(title)}</div>
+									<div class="provider-meta">Paired ${escHtml(new Date(l.created_at).toLocaleDateString())}${l.default_agent_name ? ' &middot; ' + escHtml(l.default_agent_name) : ''}</div>
+								</div>
+							</div>
+							<div class="actions" style="flex-wrap:wrap">
+								<label class="visually-hidden" for="conn-agent-${escHtml(l.id)}">Agent for this chat</label>
+								<select id="conn-agent-${escHtml(l.id)}" data-act="agent" style="max-width:200px">${opts}</select>
+								<label style="display:flex;align-items:center;gap:6px;font-size:13px;color:#ccc;cursor:pointer">
+									<input type="checkbox" data-act="notify"${l.notify ? ' checked' : ''} /> Notify
+								</label>
+								<button class="btn sec" data-act="unpair" style="font-size:12px;padding:5px 14px">Unpair</button>
+							</div>
+						</div>`;
+				}).join('');
+			}
+
+			async function connPatch(id, body, undo) {
+				try {
+					await apiJson('/api/gateway/connections', { method: 'PATCH', headers: JSON_HDR, body: JSON.stringify({ id, ...body }) });
+					connMsg('ok', 'Saved.');
+				} catch (e) {
+					undo();
+					connMsg('err', e.data?.error_description || 'Could not save that change.');
+				}
+			}
+
+			document.getElementById('conn-links').addEventListener('change', (e) => {
+				const card = e.target.closest('[data-link-id]');
+				if (!card) return;
+				const id = card.dataset.linkId;
+				if (e.target.dataset.act === 'notify') {
+					const box = e.target;
+					connPatch(id, { notify: box.checked }, () => { box.checked = !box.checked; });
+				} else if (e.target.dataset.act === 'agent') {
+					const sel = e.target;
+					const prev = sel.dataset.prev ?? [...sel.options].find(o => o.defaultSelected)?.value ?? '';
+					connPatch(id, { default_agent_id: sel.value || null }, () => { sel.value = prev; });
+					sel.dataset.prev = sel.value;
+				}
+			});
+
+			document.getElementById('conn-links').addEventListener('click', async (e) => {
+				const btn = e.target.closest('[data-act="unpair"]');
+				if (!btn) return;
+				const card = btn.closest('[data-link-id]');
+				if (!confirm('Unpair this chat? It will stop receiving replies and notifications until you pair it again.')) return;
+				btn.disabled = true;
+				try {
+					await apiJson('/api/gateway/connections?id=' + encodeURIComponent(card.dataset.linkId), { method: 'DELETE' });
+					card.remove();
+					if (!document.querySelector('#conn-links [data-link-id]')) renderConnLinks([]);
+					connMsg('ok', 'Chat unpaired.');
+				} catch (err) {
+					btn.disabled = false;
+					connMsg('err', err.data?.error_description || 'Could not unpair that chat.');
+				}
+			});
+
+			document.getElementById('conn-issue-btn').addEventListener('click', async () => {
+				const btn = document.getElementById('conn-issue-btn');
+				const out = document.getElementById('conn-issued');
+				btn.disabled = true;
+				try {
+					const r = await apiJson('/api/gateway/connections', { method: 'POST', headers: JSON_HDR, body: JSON.stringify({ action: 'issue' }) });
+					const mins = Math.max(1, Math.round((new Date(r.expires_at) - Date.now()) / 60000));
+					out.style.display = 'block';
+					out.innerHTML = `<div style="font-size:22px;font-weight:700;letter-spacing:.12em;font-family:monospace;color:#eee">${escHtml(r.code)}</div>
+						<p class="muted" style="font-size:13px;margin:6px 0 0">Send <code>/link ${escHtml(r.code)}</code> to the bot from the chat to pair. Expires in about ${mins} minute${mins === 1 ? '' : 's'}.</p>`;
+				} catch (e) {
+					connMsg('err', e.data?.error_description || 'Could not create a pairing code.');
+				} finally {
+					btn.disabled = false;
+				}
+			});
+
+			// Redeem is two steps on the server: preview shows which chat printed the
+			// code and mints a confirmation, redeem pairs that exact chat.
+			async function previewConnCode(rawCode) {
+				const box = document.getElementById('conn-redeem');
+				box.style.display = 'block';
+				box.innerHTML = '<p class="muted">Checking code…</p>';
+				try {
+					const r = await apiJson('/api/gateway/connections', { method: 'POST', headers: JSON_HDR, body: JSON.stringify({ action: 'preview', code: rawCode }) });
+					const c = r.chat;
+					const name = c.chat_title || c.platform_username || 'a direct chat';
+					box.innerHTML = `
+						<h3>Pair this chat?</h3>
+						<p style="font-size:14px;color:#ddd;margin:0 0 12px">${escHtml(CONN_PLATFORM[c.platform] || c.platform)}: <strong>${escHtml(name)}</strong>${c.already_linked ? ' (already paired to your account)' : ''}. Anyone in this chat will be able to talk to your agents and approve actions they request.</p>
+						<div class="row">
+							<button class="btn" id="conn-redeem-btn">Pair this chat</button>
+							<button class="btn sec" id="conn-redeem-cancel">Cancel</button>
+						</div>`;
+					document.getElementById('conn-redeem-cancel').addEventListener('click', () => { box.style.display = 'none'; });
+					document.getElementById('conn-redeem-btn').addEventListener('click', async (ev) => {
+						ev.target.disabled = true;
+						try {
+							await apiJson('/api/gateway/connections', { method: 'POST', headers: JSON_HDR, body: JSON.stringify({ action: 'redeem', code: rawCode, confirm: r.confirm }) });
+							box.style.display = 'none';
+							document.getElementById('conn-code-input').value = '';
+							connMsg('ok', 'Chat paired.');
+							loadConnections();
+						} catch (e) {
+							ev.target.disabled = false;
+							connMsg('err', e.data?.error_description || 'Could not pair that chat.');
+						}
+					});
+				} catch (e) {
+					box.innerHTML = `<p class="inline-msg err" style="display:inline-block">${escHtml(e.data?.error_description || 'That code did not work. Ask the bot for a new one.')}</p>`;
+				}
+			}
+
+			document.getElementById('conn-preview-btn').addEventListener('click', () => {
+				const v = document.getElementById('conn-code-input').value.trim();
+				if (v) previewConnCode(v);
+				else connMsg('err', 'Enter the code the bot gave you.');
+			});
+
+			async function loadConnections() {
+				const el = document.getElementById('conn-links');
+				try {
+					const data = await apiJson('/api/gateway/connections');
+					connState = { agents: data.agents || [], bots: data.bots || {} };
+					renderConnBots(connState.bots);
+					renderConnLinks(data.links || []);
+				} catch (e) {
+					el.innerHTML = `<p class="muted">${escHtml(e.data?.error_description || 'Could not load your connections.')} <button class="btn sec" id="conn-retry" style="font-size:12px;padding:5px 14px">Retry</button></p>`;
+					document.getElementById('conn-retry').addEventListener('click', loadConnections);
+				}
+				if (connIntroDone) return;
+				connIntroDone = true;
+				// Query params from the flows that land here: ?code= from the bot's
+				// pairing prompt, ?x=&agent= from the X connect return.
+				const code = _urlP.get('code');
+				if (code) {
+					document.getElementById('conn-code-input').value = code;
+					previewConnCode(code);
+				}
+				const xOutcome = _urlP.get('x');
+				if (xOutcome && X_OUTCOMES[xOutcome]) {
+					const agent = _urlP.get('agent');
+					connMsg(...X_OUTCOMES[xOutcome]);
+					const box = document.getElementById('conn-x');
+					box.style.display = 'block';
+					box.innerHTML = '<a class="btn sec" style="text-decoration:none;display:inline-block" href="/settings?tab=connected-accounts'
+						+ (agent ? '&agent_id=' + encodeURIComponent(agent) : '') + '">Manage your X connection</a>';
+				}
+			}
+
+			// /settings/connections serves this same shell. Its trailing hash can be an
+			// outcome marker (#x) rather than a tab, so the path wins over the hash.
+			function startingTab() {
+				const hash = location.hash.slice(1);
+				if (/^\/settings\/connections\/?$/.test(location.pathname) && !document.getElementById('tab-' + hash)) return 'connections';
+				// Support ?tab= from OAuth redirects as well as #hash
+				return _urlP.get('tab') || hash || 'profile';
+			}
+
+			// ── Tab routing ───────────────────────────────────────────────
+			function navigate(tab) {
+				document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+				document.querySelectorAll('aside a[data-tab]').forEach(a => a.classList.remove('active'));
+				const page = document.getElementById('tab-' + tab);
+				if (!page) return;
+				page.classList.add('active');
+				const link = document.querySelector(`aside a[data-tab="${tab}"]`);
+				if (link) link.classList.add('active');
+				if (tab === 'sessions') loadSessions();
+				if (tab === 'connected-accounts') loadConnectedAccounts();
+				if (tab === 'connections') loadConnections();
+			}
+
+			document.querySelectorAll('aside a[data-tab]').forEach(a => {
+				a.addEventListener('click', (e) => {
+					e.preventDefault();
+					history.pushState(null, '', '/settings#' + a.dataset.tab);
+					navigate(a.dataset.tab);
+				});
+			});
+
+			window.addEventListener('popstate', () => navigate(startingTab()));
+
+			// ── Init ──────────────────────────────────────────────────────
+			(async () => {
+				try {
+					await loadUser();
+					loadWallets();
+				} catch {
+					return; // redirect already fired
+				}
+				navigate(startingTab());
+			})();
+		</script>
+		<script src="/brand.js" defer></script>
+	<!-- Runtime i18n: detects locale, swaps annotated copy, mounts <lang-switcher>. -->
+	<script type="module" src="/i18n.js"></script>
+</body>
+</html>

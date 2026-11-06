@@ -1,0 +1,21 @@
+HTTP/2 402 
+access-control-allow-headers: authorization, content-type, mcp-session-id, mcp-protocol-version, x-payment, payment-signature, idempotency-key, x-irl-device, x-irl-fix, x-forge-client, x-forge-seed
+access-control-allow-methods: GET,HEAD,POST,DELETE,OPTIONS
+access-control-allow-origin: *
+access-control-expose-headers: PAYMENT-REQUIRED, PAYMENT-RESPONSE
+access-control-max-age: 86400
+cache-control: no-store
+content-security-policy: base-uri 'self'; object-src 'none'; script-src 'self' 'unsafe-inline' 'unsafe-eval' blob: https://cdn.jsdelivr.net https://cdnjs.cloudflare.com https://unpkg.com https://esm.sh https://ajax.googleapis.com https://s3.tradingview.com https://platform.twitter.com https://3d-agent.vercel.app https://three.ws; worker-src 'self' blob:; frame-ancestors 'self' https://ibm.com https://*.ibm.com https://*.seismic.com; report-uri /api/client-errors
+content-type: application/json; charset=utf-8
+date: Tue, 07 Jul 2026 11:23:06 GMT
+payment-required: eyJ4NDAyVmVyc2lvbiI6MiwicmVzb3VyY2UiOnsidXJsIjoiaHR0cHM6Ly90aHJlZS53cy9hcGkvb2t4LzNkL3RleHQtdG8tM2QiLCJtaW1lVHlwZSI6ImFwcGxpY2F0aW9uL2pzb24ifSwiYWNjZXB0cyI6W3sic2NoZW1lIjoiZXhhY3QiLCJuZXR3b3JrIjoiZWlwMTU1OjE5NiIsImFtb3VudCI6IjEwMDAwIiwicGF5VG8iOiIweDc1ZDAwYTI3MTM1NjUxNzFmMzMyMTZlNWFhMmEzNzVlMDc2ZWNmNjkiLCJtYXhUaW1lb3V0U2Vjb25kcyI6ODY0MDAsImFzc2V0IjoiMHg3NzlkZWQwYzllMTAyMjIyNWY4ZTA2MzBiMzVhOWI1NGJlNzEzNzM2IiwicmVzb3VyY2UiOiJodHRwczovL3RocmVlLndzL2FwaS9va3gvM2QvdGV4dC10by0zZCIsImV4dHJhIjp7InN5bWJvbCI6IlVTRFQiLCJuYW1lIjoiVVNE4oKuMCIsInZlcnNpb24iOiIxIiwidHJhbnNmZXJNZXRob2QiOiJlaXAzMDA5IiwiZGVjaW1hbHMiOjZ9fSx7InNjaGVtZSI6ImV4YWN0IiwibmV0d29yayI6InNvbGFuYTo1ZXlrdDRVc0Z2OFA4TkpkVFJFcFkxdnpxS3FaS3ZkcCIsImFtb3VudCI6IjEwMDAwIiwicGF5VG8iOiJ3d3d3d0R4RldSbjdncmdyM0VzcnNnNUM2TnZEb0RIU0E0Z2FDZmZjY3JVIiwiYXNzZXQiOiJFUGpGV2RkNUF1ZnFTU3FlTTJxTjF4enliYXBDOEc0d0VHR2tad3lURHQxdiIsIm1heFRpbWVvdXRTZWNvbmRzIjo2MCwicmVzb3VyY2UiOiJodHRwczovL3RocmVlLndzL2FwaS9va3gvM2QvdGV4dC10by0zZCIsImV4dHJhIjp7Im5hbWUiOiJVU0RDIiwiZGVjaW1hbHMiOjYsImZlZVBheWVyIjoiUGF5ZVJOQ2lwY2VyUEhDc1lNVHJYOXBBWURtMUxuUEd6Z2I2Nk5VREc1YSJ9fV19
+permissions-policy: accelerometer=(), autoplay=(self), bluetooth=(), camera=(), display-capture=(), encrypted-media=(self), geolocation=(), gyroscope=(), magnetometer=(), microphone=(), midi=(), payment=(self), serial=(), usb=(), xr-spatial-tracking=(self)
+referrer-policy: strict-origin-when-cross-origin
+server: Vercel
+strict-transport-security: max-age=63072000; includeSubDomains; preload
+x-content-type-options: nosniff
+x-vercel-cache: MISS
+x-vercel-id: sfo1::iad1::kk96v-1783423386709-0abe6a1b83a9
+content-length: 825
+
+{"x402Version":2,"resource":{"url":"https://three.ws/api/okx/3d/text-to-3d","mimeType":"application/json"},"accepts":[{"scheme":"exact","network":"eip155:196","amount":"10000","payTo":"0x75d00a2713565171f33216e5aa2a375e076ecf69","maxTimeoutSeconds":86400,"asset":"0x779ded0c9e1022225f8e0630b35a9b54be713736","resource":"https://three.ws/api/okx/3d/text-to-3d","extra":{"symbol":"USDT","name":"USD₮0","version":"1","transferMethod":"eip3009","decimals":6}},{"scheme":"exact","network":"solana:5eykt4UsFv8P8NJdTREpY1vzqKqZKvdp","amount":"10000","payTo":"wwwwwDxFWRn7grgr3Esrsg5C6NvDoDHSA4gaCffccrU","asset":"EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v","maxTimeoutSeconds":60,"resource":"https://three.ws/api/okx/3d/text-to-3d","extra":{"name":"USDC","decimals":6,"feePayer":"PayeRNCipcerPHCsYMTrX9pAYDm1LnPGzgb66NUDG5a"}}]}

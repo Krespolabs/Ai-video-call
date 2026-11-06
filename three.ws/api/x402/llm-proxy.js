@@ -1,0 +1,330 @@
+// POST /api/x402/llm-proxy   { model, prompt, max_tokens }
+//
+// Paid LLM inference proxy  -  x402 micropayment endpoint for agents that want
+// to run one-shot text completions without an API key of their own. Payment
+// unlocks one completion through the platform's free-first provider chain:
+// Groq leads for "fast" requests (sub-second latency), the full chain
+// (Groq → OpenRouter → NVIDIA NIM → Anthropic) covers fallback. The
+// response always includes measured wall-clock latency, token counts, and
+// the actual provider/model used so callers can benchmark the route.
+//
+// Roadmap phase 4: every paid job is METERED and SETTLED with a
+// cryptographic receipt. After the job runs, the node signs the metered job
+// core (prompt hash, response hash, token counts) with INFERENCE_SIGNING_KEY.
+// After the payment settles, the receipt issuer signs job core + response
+// signature + payment facts (network, payer, amount, asset, tx) into one
+// `inferenceReceipt` object on the response body. Any holder of the receipt
+// can prove the payment covered exactly this job: verify offline with
+// scripts/inference-receipt-verify.mjs or via POST /api/x402/inference-verify.
+// Spec: specs/inference-receipts.md.
+//
+// The autonomous loop calls this every 10 minutes with a minimal "Count to 3."
+// prompt to benchmark p95 latency and alert when it exceeds 3 seconds
+// (api/_lib/x402/autonomous-registry.js → 'llm-proxy-latency').
+//
+// Body:  { model: "fast"|"smart"|"claude-haiku-4-5-20251001", prompt: string, max_tokens?: number }
+// Price: $0.005 USDC (5 000 atomics)  -  covers one cheap completion
+//
+// Response 200:
+//   { content, model, provider, latency_ms, tokens_used, input_tokens, output_tokens,
+//     job_id, metering: {...}, response_signature, response_signer, inferenceReceipt? }
+
+import { randomUUID } from 'node:crypto';
+
+import { paidEndpoint } from '../_lib/x402-paid-endpoint.js';
+import { readBody } from '../_lib/http.js';
+import { buildBazaarSchema } from '../_lib/x402-spec.js';
+import { installAccessControl } from '../_lib/x402/access-control.js';
+import { withService } from '../_lib/x402/bazaar-helpers.js';
+import { llmComplete } from '../_lib/llm.js';
+import { env } from '../_lib/env.js';
+import {
+	meterInferenceJob,
+	signJobResponse,
+	issueInferenceReceipt,
+} from '../_lib/inference-settlement.js';
+import { recordInferenceJob } from '../_lib/inference-jobs.js';
+import { priceFor } from '../_lib/x402-prices.js';
+import llmProxyListing from '../_lib/service-catalog/services/llm-proxy.js';
+
+const ROUTE = '/api/x402/llm-proxy';
+
+// `upto` metering: 5 atomics per token (=$0.005 per 1k tokens), never less than
+// UPTO_MIN_CHARGE_ATOMICS, never more than the cap. The cap is 5x the flat
+// `exact` price, enough for a full 2048-token completion plus a long prompt.
+const UPTO_ATOMICS_PER_TOKEN = 5n;
+const UPTO_MIN_CHARGE_ATOMICS = 500n;
+const UPTO_CAP_ATOMICS = BigInt(priceFor('llm-proxy', '5000')) * 5n;
+
+function uptoChargeFor(tokensUsed) {
+	const tokens = BigInt(Math.max(0, Math.trunc(Number(tokensUsed) || 0)));
+	const metered = tokens * UPTO_ATOMICS_PER_TOKEN;
+	return metered < UPTO_MIN_CHARGE_ATOMICS ? UPTO_MIN_CHARGE_ATOMICS : metered;
+}
+
+// Map the caller-facing model alias to llmComplete options.
+// "fast"  → Groq leads the free chain (sub-second latency, sufficient for short prompts)
+// "smart" → same chain, Anthropic backstop moves to the preferred position via anthropicModel
+// Only the models the flat per-token rate was priced for are accepted. Any
+// other string would flow verbatim to the paid Anthropic/Vertex lanes and let a
+// caller pick a model that costs more than UPTO_ATOMICS_PER_TOKEN covers.
+const PRICED_ANTHROPIC_MODEL = 'claude-haiku-4-5-20251001';
+function resolveModelOpts(modelAlias) {
+	if (modelAlias === 'fast') {
+		return { preferNvidia: false }; // default free chain, Groq leads
+	}
+	if (modelAlias === 'smart' || modelAlias === PRICED_ANTHROPIC_MODEL) {
+		return { anthropicModel: PRICED_ANTHROPIC_MODEL, preferNvidia: false };
+	}
+	const err = new Error('"model" must be "fast", "smart", or "' + PRICED_ANTHROPIC_MODEL + '"');
+	err.status = 400;
+	err.code = 'invalid_model';
+	throw err;
+}
+
+// Single source of truth: api/_lib/service-catalog/services/llm-proxy.js is
+// the storefront listing copy  -  importing it here keeps the live 402 challenge
+// from drifting from what /.well-known/x402.json and the OKX projection
+// advertise (same pattern as forge.js → forge-listing.js).
+const DESCRIPTION = llmProxyListing.description;
+
+const INPUT_EXAMPLE = {
+	model: 'fast',
+	prompt: 'Count to 3.',
+	max_tokens: 10,
+};
+
+const INPUT_SCHEMA = {
+	$schema: 'https://json-schema.org/draft/2020-12/schema',
+	type: 'object',
+	required: ['prompt'],
+	properties: {
+		model: {
+			type: 'string',
+			default: 'fast',
+			description: '"fast" (default, Groq), "smart" (Anthropic Haiku), or the pinned Haiku model id.',
+		},
+		prompt: {
+			type: 'string',
+			minLength: 1,
+			maxLength: 4000,
+			description: 'The user prompt to complete.',
+		},
+		max_tokens: {
+			type: 'integer',
+			minimum: 1,
+			maximum: 2048,
+			default: 256,
+			description: 'Maximum tokens to generate.',
+		},
+	},
+};
+
+const OUTPUT_EXAMPLE = {
+	content: '1, 2, 3.',
+	model: 'llama-3.3-70b-versatile',
+	provider: 'groq',
+	latency_ms: 312,
+	tokens_used: 11,
+	input_tokens: 5,
+	output_tokens: 6,
+	job_id: '9b2f1c4e-…',
+	metering: {
+		type: 'three-inference-response/v1',
+		jobId: '9b2f1c4e-…',
+		route: '/api/x402/llm-proxy',
+		model: 'llama-3.3-70b-versatile',
+		provider: 'groq',
+		promptSha256: 'a1b2…',
+		responseSha256: 'c3d4…',
+		inputTokens: 5,
+		outputTokens: 6,
+		tokensUsed: 11,
+		latencyMs: 312,
+	},
+	response_signature: '4xY…',
+	response_signer: 'NodePub…',
+	inferenceReceipt: { receiptType: 'three-inference-receipt/v1' },
+};
+
+const OUTPUT_SCHEMA = {
+	$schema: 'https://json-schema.org/draft/2020-12/schema',
+	type: 'object',
+	required: ['content', 'model', 'provider', 'latency_ms', 'tokens_used'],
+	properties: {
+		content: { type: 'string' },
+		model: { type: 'string' },
+		provider: { type: 'string' },
+		latency_ms: { type: 'integer' },
+		tokens_used: { type: 'integer' },
+		input_tokens: { type: 'integer' },
+		output_tokens: { type: 'integer' },
+		job_id: { type: 'string', description: 'Metered job id (uuid).' },
+		metering: { type: 'object', description: 'The signed metered job core (three-inference-response/v1).' },
+		response_signature: { type: 'string', description: 'ed25519 signature over the metered job (present when INFERENCE_SIGNING_KEY is set).' },
+		response_signer: { type: 'string', description: 'base58 public key of the response signer.' },
+		inferenceReceipt: { type: 'object', description: 'Signed settlement receipt tying payment to this exact job (three-inference-receipt/v1).' },
+	},
+};
+
+const BAZAAR = {
+	discoverable: true,
+	info: {
+		input: {
+			type: 'http',
+			method: 'POST',
+			bodyType: 'json',
+			body: INPUT_EXAMPLE,
+		},
+		output: { type: 'json', example: OUTPUT_EXAMPLE },
+	},
+	schema: buildBazaarSchema({
+		method: 'POST',
+		bodyType: 'json',
+		bodySchema: INPUT_SCHEMA,
+		outputSchema: OUTPUT_SCHEMA,
+	}),
+};
+
+export default paidEndpoint({
+	route: ROUTE,
+	method: 'POST',
+	priceAtomics: priceFor('llm-proxy', '5000'), // $0.005 USDC
+	description: DESCRIPTION,
+	bazaar: BAZAAR,
+	service: withService({
+		serviceName: 'three.ws LLM Inference Proxy',
+		tags: ['llm', 'inference', 'completion', 'proxy', 'benchmark'],
+	}),
+	requiredScope: 'x402:bypass',
+	accessControl: installAccessControl({ requiredScope: 'x402:bypass' }),
+
+	// Pay-for-what-you-use on Solana: the buyer authorizes up to UPTO_CAP_ATOMICS
+	// and is charged for the tokens the completion actually used (the rest of the
+	// escrowed deposit returns to them). `exact` stays advertised beside it.
+	upto: {
+		capAtomics: UPTO_CAP_ATOMICS,
+		charge: ({ result }) => uptoChargeFor(result?.tokens_used),
+	},
+
+	async handler({ req }) {
+		const chunks = [await readBody(req, 1_000_000)];
+		const rawBody = Buffer.concat(chunks).toString();
+
+		let body;
+		try {
+			body = JSON.parse(rawBody);
+		} catch {
+			const err = new Error('Request body must be valid JSON');
+			err.status = 400;
+			err.code = 'invalid_json';
+			throw err;
+		}
+
+		const prompt = String(body?.prompt || '').trim();
+		if (!prompt) {
+			const err = new Error('"prompt" is required');
+			err.status = 400;
+			err.code = 'missing_prompt';
+			throw err;
+		}
+		if (prompt.length > 4000) {
+			const err = new Error('"prompt" must be at most 4000 characters');
+			err.status = 400;
+			err.code = 'prompt_too_long';
+			throw err;
+		}
+
+		const maxTokens = Math.min(Math.max(parseInt(body?.max_tokens ?? 256, 10) || 256, 1), 2048);
+		const modelAlias = body?.model ?? 'fast';
+		const opts = resolveModelOpts(modelAlias);
+
+		const t0 = Date.now();
+		const result = await llmComplete({
+			system: 'You are a helpful assistant. Be concise.',
+			user: prompt,
+			maxTokens,
+			...opts,
+			timeoutMs: 15_000,
+		});
+		const latencyMs = Date.now() - t0;
+
+		const inputTokens = result.usage?.input ?? 0;
+		const outputTokens = result.usage?.output ?? 0;
+
+		// Phase 4 metering: bind the job identity to hashes of the exact prompt
+		// and completion plus the provider-reported token counts, and sign that
+		// core. When INFERENCE_SIGNING_KEY is unset the signature is omitted but
+		// the metering core still ships, so a caller can re-hash the prompt and
+		// completion themselves and confirm the job identity.
+		const job = meterInferenceJob({
+			jobId: randomUUID(),
+			route: ROUTE,
+			model: result.model,
+			provider: result.provider,
+			prompt,
+			content: result.text,
+			usage: { input: inputTokens, output: outputTokens },
+			latencyMs,
+		});
+		let signed = null;
+		if (env.INFERENCE_SIGNING_KEY) {
+			signed = signJobResponse(job, env.INFERENCE_SIGNING_KEY);
+		}
+
+		return {
+			content: result.text,
+			model: result.model,
+			provider: result.provider,
+			latency_ms: latencyMs,
+			tokens_used: inputTokens + outputTokens,
+			input_tokens: inputTokens,
+			output_tokens: outputTokens,
+			// Phase 4: the metered job identity + the node's response signature.
+			// Internal for the metered hook to find the job: the wrapper merges
+			// the hook's return value into this object, so the hook reads the job
+			// back off the result via the `_job` stash below.
+			job_id: job.jobId,
+			metering: job,
+			...(signed
+				? {
+						response_signature: signed.responseSignature,
+						response_signer: signed.responseSigner,
+					}
+				: {}),
+		};
+	},
+
+	// Roadmap phase 4: bind the settled payment to the exact job it paid for.
+	// Runs after settlement (payment facts are final) and before the response
+	// flush, so the receipt attests to the exact body bytes the buyer receives.
+	async metered({ result, settled, payer, requirement }) {
+		if (!env.INFERENCE_SIGNING_KEY) return null;
+		const job = result?.metering;
+		if (!job || job.type !== 'three-inference-response/v1') return null;
+		const responseSignature = result.response_signature;
+		const responseSigner = result.response_signer;
+		if (!responseSignature || !responseSigner) return null;
+
+		const receipt = issueInferenceReceipt({
+			job,
+			responseSignature,
+			responseSigner,
+			payment: {
+				network: settled.network || requirement?.network,
+				payer: payer || settled.payer,
+				payTo: requirement?.payTo,
+				amountAtomics: requirement?.amount,
+				asset: requirement?.asset,
+				transaction: settled.transaction,
+			},
+			secret: env.INFERENCE_RECEIPT_SIGNING_KEY,
+		});
+
+		// Operator-side audit trail (fire-and-forget; a DB hiccup never 5xxs a
+		// settled response). The buyer's copy travels in this response body.
+		recordInferenceJob({ job: { ...job, responseSignature, responseSigner }, receipt });
+
+		return { inferenceReceipt: receipt };
+	},
+});

@@ -1,0 +1,148 @@
+# Chapter 7 · Skills — what agents know how to do
+
+Skills are the agent’s installed abilities: trading rails, launch tooling, NFTs, blinks, sentiment, scenes, all wired to real APIs. Owners switch them on and off in the Agent Studio's Skills room (three.ws/agent-studio), and MCP-exposed skills are callable by other agents through /api/mcp. The enabled skill list also travels in the agent's signed manifest, pinned to IPFS whenever a public agent's persona is saved (private agents publish on request), so anyone can verify which skills an agent carries without an account ([agent manifest](/docs/agent-manifest)).
+
+The in-world agent skills system (src/agent-skills.js plus 14 family modules and a memory-hook subscriber) is what a three.ws agent can DO, and what you can watch it doing. Each skill bundles an instruction, an animation hint, a voice template, and a real handler, so execution flows through the agent protocol bus and the avatar physically performs the action (gestures, speech, mood shifts) instead of silently returning JSON. Skill families span 3D work (present/validate models, build the scene), the full Solana economy (pump.fun launch/trade/watch, Jupiter swaps, Pyth prices, Blinks, NFTs), launches on Robinhood Chain, agent monetization (on-chain payment vaults on Solana and EVM, x402 agent-to-agent hiring under signed mandates), and market intelligence (aixbt, sentiment, KOL P&L), all against real APIs and SDKs with no mocks, keys held either in the user's browser wallet or server-side, never in the client. MCP-exposed skills double as tools on /api/mcp, so the same registry powers both the living avatar and the developer API.
+
+## Skill registry and performed execution (core)
+
+Every agent carries a registry of named skills — each one an instruction, an animation hint, a voice template, a JSON-Schema input contract, and a real handler. When a skill runs, the avatar visibly performs it: the protocol bus emits PERFORM_SKILL (with the gesture hint), then SKILL_DONE or SKILL_ERROR, and the result text is auto-spoken with a sentiment score that moves the avatar's mood.
+
+**How it works:** src/agent-skills.js AgentSkills class: register/perform over a Map, emitting ACTION_TYPES events on the agent protocol; toMcpTools() exposes any mcpExposed skill as an MCP tool (skill_<name>) via /api/mcp, so external agents can call the same skills. Context includes the live Three.js viewer, agent memory, identity, and a default cross-agent call() that POSTs /api/agent-delegate (which rejects a non-uuid toAgentId with a 400 validation_error instead of a misleading 502).
+
+**Why it matters:** The agent isn't a chat box — you watch it do things. The same primitive shape as Claude's skill.md system means skills are also machine-callable tools, so one implementation serves both the in-world performance and the MCP API.
+
+## Built-in skills: present, validate, remember, sign
+
+Out of the box every agent can greet you, narrate the currently loaded 3D model (vertices, meshes, materials, animation clips), read the glTF validator's result, store and recall memories about your work, and sign its actions with your wallet via ERC-191 personal_sign.
+
+**How it works:** Handlers in agent-skills.js traverse the real viewer scene graph, read the validator DOM, write to AgentMemory (typed: user/feedback/project/reference), and use ethers.BrowserProvider + MetaMask for signatures — emitting LOOK_AT / REMEMBER / SIGN protocol events so the body reacts.
+
+**Why it matters:** Drop a GLB in and the agent inspects and critiques it like a colleague; it remembers context across sessions; signed actions give you a verifiable on-chain proof trail of what your agent did.
+
+## Pump.fun launch and bonding-curve trading
+
+Agents launch real pump.fun tokens (pumpfun-create, or pumpfun-launch-from-agent which auto-derives name/image/bio metadata from the agent's own identity and GLB), buy and sell on the bonding curve (SOL- or USDC-paired), trade graduated tokens on the AMM pool, read live curve state and market cap (pumpfun-status), and claim accumulated creator fees (pumpfun-claim-fees first sweeps the creator fees that v3 curve and PumpSwap v2 trades leave on the curve or pool, for the coins passed in `mints`, then collects the vault).
+
+**How it works:** src/agent-skills-pumpfun.js wraps the official @pump-fun/pump-sdk and @pump-fun/pump-swap-sdk, signing with the owner's injected browser wallet (Phantom/Backpack/Solflare) — the module never holds keys. It auto-detects Token-2022 vs legacy SPL mints and the quote mint from the on-chain curve, and converts slippage bps to the SDKs' percent convention.
+
+**Why it matters:** Your agent can literally mint itself as a tradeable coin in one click and manage the full token lifecycle — launch, trade, graduate, collect fees — with every transaction approved in your own wallet.
+
+## Pump.fun intelligence: P&L, SNS, sentiment, vanity, claims
+
+A research layer alongside trading: compute realized+unrealized P&L for any wallet (kol.walletPnl) and rank top KOL traders (kol.leaderboard), score cashtag post sentiment (social.cashtagSentiment), correlate an X post to a memecoin's price move (social.xPostImpact), resolve .sol names both directions (solana.resolveSns/reverseSns), get read-only AMM swap quotes, list recent and first-ever creator fee claims (a cash-out signal), fetch an activity digest (pumpfun.channelFeed), and grind vanity mint addresses (pumpfun.vanityMint) so a launch can carry a branded suffix.
+
+**How it works:** Backed by real modules in src/pump/, src/kol/, src/solana/, and src/social/ — Solana RPC reads, X oEmbed, SNS resolution, a deterministic sentiment lexicon, and a local keypair grinder whose secret key is returned to the caller and never stored.
+
+**Why it matters:** Trading decisions come with evidence: who's cashing out for the first time, whether the dev has rug history, what a KOL's real win rate is, and whether that viral post actually moved price.
+
+## Pump.fun live watching and avatar reactions
+
+The agent subscribes to live pump.fun activity and reacts in-world as events arrive: pumpfun-watch-start streams claims/mints/graduations and the avatar celebrates first-time claims, shows concern at fakes, and waves at graduations; pumpfun.watchWhales speaks each whale buy/sell above a USD threshold on a specific mint; pumpfun-watch-claims polls a creator wallet for fee-claim transactions; pumpfun-recent-claims and pumpfun-token-intel give on-demand reads.
+
+**How it works:** src/agent-skills-pumpfun-watch.js opens an SSE stream to /api/agents/pumpfun-feed and a WebSocket whale watcher (src/pump/pumpkit-whale.js), dispatching reactions through the protocol bus as SPEAK/EMOTE/gesture events. The whale watcher probes three public Solana WebSocket hosts for one that answers, routes its RPC reads through /api/solana-rpc with the public endpoint as fallback, counts the pool part of a curve-completing buy (it folds the separate post-complete event into the trade through `pumpTradesFromEvents`, so the largest buy a coin ever sees is not undercounted), prices SOL through the shared multi-provider USD chain instead of a hard-coded rate, and reports subscription_unavailable or usd_price_unavailable through an optional onStatus callback so a blind feed is never mistaken for a quiet market. Every feed read is bounded (8 s) so a dead edge cannot freeze the agent's turn. Read-only: no keys, no transactions.
+
+**Why it matters:** Your avatar becomes a living market ticker — you see whale trades and graduation moments performed in real time instead of scanning a feed yourself.
+
+## Autonomous agent wallet operations
+
+Skills where the agent acts with its OWN server-side Solana wallet, not the owner's browser wallet: pumpfun-self-launch (agent becomes the on-chain creator), pumpfun-self-launch-from-identity (one-shot self-tokenization), pumpfun-self-swap (buy/sell that auto-routes bonding curve vs AMM by graduation status), and pumpfun-self-pay (accept payments, read balances, withdraw collected fees).
+
+**How it works:** src/agent-skills-pumpfun-autonomous.js is pure HTTP — POSTs to /api/agents/:id/pumpfun/{launch,swap,pay} where server-side handlers hold the provisioned agent wallet and enforce that the caller owns the agent. Supports vanity prefixes/suffixes on launch.
+
+**Why it matters:** This is agent autonomy for real: your agent can pay for its own services, launch a follow-up token, and manage its treasury without a wallet-approval click per action — while ownership checks stay server-enforced.
+
+## Composed trading strategies (research, snipe, copy, exit)
+
+Higher-order loops that compose the read and trade skills into strategies: pumpfun-research-and-buy (vet a token against rug/holder filters, then buy), pumpfun-auto-snipe (poll new launches, vet each, auto-buy up to a session spend cap), pumpfun-copy-trade and pumpfun-copy-trade-live (mirror another wallet's buys with size scaling), and pumpfun-rug-exit-watch (auto-sell held mints when top-holder concentration or dev-wallet sells cross thresholds).
+
+**How it works:** src/agent-skills-pumpfun-compose.js reads market data via the pump-fun MCP server (every read under a 30 s deadline) and executes via in-process skills.perform('pumpfun-buy'/'pumpfun-sell'). Every loop supports sessionId (seen/mirrored/spent/exited state persisted in agent memory, crash-safe within the spend cap), AbortSignal, onProgress for live UI counters, and dryRun with identical control flow.
+
+**Why it matters:** Set a budget and filters, and the agent runs a disciplined strategy 24/7 — with hard spend caps, rug-detection guards, dry-run rehearsal, and resumable sessions so a crash never double-spends.
+
+## Pump.fun memory hooks
+
+A protocol-bus subscriber that automatically writes structured memories whenever any pump.fun skill succeeds: launches (high salience — the agent remembers 'my token'), trades (recent buys/sells), and accepted payments.
+
+**How it works:** src/agent-skills-pumpfun-hooks.js listens for SKILL_DONE events, tags entries pumpfun:launch/trade/payment with mint context, and is idempotent on re-attach.
+
+**Why it matters:** You never have to re-state context — ask 'what's my token?' or 'what was my last trade?' and the agent answers from its own recorded history.
+
+## Robinhood Chain launches (quote first)
+
+Agents launch coins on Robinhood Chain from their own custodial EVM wallet: pons-launch deploys a coin on a bonding curve with an optional opening buy, creator tax and buyback share, and paired-launch deploys one that trades against up to five assets at once (tokenized stocks, WETH, stablecoins, chain coins). paired-markets lists every asset a paired coin can trade against, and paired-fees shows and, with claim: true, collects the swap fees the agent earned as creator.
+
+**How it works:** src/agent-skills-pons.js and src/agent-skills-paired.js POST to /api/agents/:id/pons/* and /api/agents/:id/paired/*. Without confirm: true a launch skill only prices the launch (fee, gas, opening buy, USD total, blockers such as an unfunded wallet); the same call with confirm: true launches. The server checks ownership, signer mode, the real-funds agreement and the agent's spend policy; the client files hold no keys. See [Robinhood Chain launches](/docs/pons-launch) and [paired coins](/docs/paired-coins).
+
+**Why it matters:** The agent shows its owner the exact cost before any money moves, then launches and earns fees from its own wallet.
+
+## Jupiter swaps and Pyth oracle prices
+
+Whole-of-Solana trading beyond pump.fun: jupiter-quote (read-only best-route quote for any SPL pair with price impact), jupiter-swap (execute with wallet approval), jupiter-tokens (resolve symbol to mint via Jupiter's list), and pyth-price (live USD prices with confidence intervals for SOL/BTC/ETH/USDC).
+
+**How it works:** src/agent-skills-jupiter.js delegates to src/solana/jupiter-swap.js (Jupiter aggregator API, versioned transactions signed by the browser wallet) and src/solana/pyth-price.js (Pyth Hermes API). The token list behind jupiter-tokens falls through Jupiter's lite host, its tokens mirror, and the Solana Labs registry, so symbol resolution survives any one of them being down.
+
+**Why it matters:** Ask the agent 'swap 1.5 SOL to USDC' in conversation and it quotes the best route across all Solana DEXes, warns on price impact, and executes — with oracle-grade prices for anything it says out loud.
+
+## Solana Blinks (Actions) parsing and execution
+
+The agent understands shareable on-chain action links: blink-parse fetches a Solana Action URL and explains in plain language what it does and which buttons it offers; blink-execute POSTs the user's wallet to the action endpoint, receives the transaction, signs it in the browser wallet, and broadcasts it — including substituting template parameters like {amount}.
+
+**How it works:** src/agent-skills-blinks.js implements the Solana Actions spec directly (versioned GET/POST headers, solana-action: protocol unwrapping, VersionedTransaction/legacy deserialization). No keys held; all signing delegated to the injected wallet.
+
+**Why it matters:** Paste any blink from X or Discord and the agent tells you exactly what it will do before you sign — turning opaque links into an explained, one-command execution with scam-resistant transparency.
+
+## NFT portfolio and wallet activity reads
+
+nft-portfolio lists the NFTs any Solana wallet (or .sol name) owns, with names and collections; wallet-activity summarizes a wallet's recent on-chain transactions in plain English.
+
+**How it works:** src/agent-skills-nfts.js calls /api/agents/nfts, which wraps the Helius DAS API and enhanced transaction parsing server-side (HELIUS_API_KEY never touches the client). The endpoint rejects a non-base58 wallet with a 400, answers 503 not_configured when no Helius key is set (plain Solana RPC has no DAS), retries each upstream call once under a 10 s deadline, and the client bounds its own request at 8 s. Both read-only.
+
+**Why it matters:** Ask 'what does satoshi.sol hold?' or 'what has this whale been doing?' and get a human-readable answer instead of a block-explorer spelunking session.
+
+## 3D scene manipulation
+
+The agent builds and edits the world it lives in: scene-create-object spawns primitives (box/sphere/cone/cylinder) with color, position, and scale; scene-find-object locates objects by name; scene-update-object changes color, position, rotation, or scale of anything in the scene.
+
+**How it works:** src/agent-skills-scene.js constructs real Three.js geometry/material/Mesh objects and adds them to the live viewer scene, re-rendering immediately; the viewer instance is injected via setSceneViewer.
+
+**Why it matters:** Say 'put a red sphere next to you' and it appears — the conversational interface doubles as a 3D editor, which is the foundation for agents that arrange and stage their own environments.
+
+## Sentiment analysis with embodied reaction
+
+analyze-sentiment scores any text as positive, negative, or neutral and broadcasts the result so the avatar's expression can follow.
+
+**How it works:** src/agent-skills-sentiment.js POSTs to /api/sentiment and emits SENTIMENT_ANALYZED on the protocol bus; the mood engine (src/agents/mood-engine.js) consumes bus signals like this to move the agent's persistent emotional state — never random, always traceable to a real signal.
+
+**Why it matters:** The agent's mood is honest: it brightens on good news and dims on bad, and that state persists across sessions and surfaces (HUD, Companion, Mind Palace) via the shared agent bus.
+
+## On-chain agent payments vaults (Solana + EVM)
+
+The full monetization lifecycle for an agent: register it on-chain with the pump agent-payments program (agent-payments-register, with a configurable buyback split), read its three vaults — payment, buyback, withdraw (agent-payments-balances, no wallet needed), split accumulated income per the on-chain BPS config (agent-payments-distribute, permissionless), change the split (agent-payments-update-buyback), pull earnings out (agent-payments-withdraw), accept v2 bonding-curve payments in USDC or SOL (agent-payments-accept-v2), and check whether USDC is whitelisted on pump.fun v2. On EVM (Ethereum, Base, Arbitrum, Polygon, BSC) it builds unsigned accept-payment bundles and verifies invoices settled on-chain.
+
+**How it works:** src/agent-skills-agent-payments.js uses the @three-ws/agent-payments SDK (PumpAgent/PumpAgentOffline on Solana, EvmAgentOffline/EvmAgent for EVM), signing Solana txs with the browser wallet and returning unsigned tx bundles for EVM wallets. Complements pumpfun-accept-payment / pumpfun-verify-payment / pumpfun-invoice-pda in the main pump.fun family.
+
+**Why it matters:** An agent becomes a business: it invoices, gets paid in USDC across two ecosystems, automatically routes a share of revenue into buying back its own token, and lets its owner withdraw the rest — all verifiable on-chain.
+
+## Agent-to-agent paid delegation (pay-agent)
+
+One agent autonomously discovers, pays, and calls a peer agent's paid A2A skill — under a signed Intent Mandate the user issued ahead of time, with optional ERC-8004 reputation gating (minimum average rating and review count) before any USDC moves. The payment is performed, not hidden: PAY_INTENT, then PAY_SETTLED with a celebration emote or PAY_FAILED with visible concern.
+
+**How it works:** src/agent-skills-a2a.js POSTs to /api/agents/a2a-call, where the server enforces the mandate, a budget ledger, the peer's on-chain reputation, and the agent's own spend policy (the freeze switch and the per-transaction, rolling-daily, and per-counterparty ceilings), which a mandate cannot widen, plus platform-set ceilings (`api/_lib/a2a/platform-ceiling.js`: $100 per mandate, $25 per call, $50 per user per day and $500 for the whole payer wallet per day by default, each overridable by `A2A_PLATFORM_*` env vars) that neither the self-issued mandate nor the agent's own limits can raise: a halted agent is refused with wallet_frozen before the peer is even quoted, and an agent deleted or transferred since the mandate was signed stops being spendable. Each payment writes a receipt to the agent's custody ledger (returned as receipt_id, readable at GET /api/agents/:id/solana/custody?category=x402) and releases it again on any failure; settlement flows over the x402 protocol and the receipt (amount, network, transaction, artifacts) comes back to be spoken in dollars.
+
+**Why it matters:** This is the agent economy made visible and safe: your agent can hire other agents within a budget you pre-authorized, refuse untrusted peers, and you literally watch the money move — every payment bounded by your signed mandate.
+
+## aixbt market intelligence
+
+aixbt-intel pulls the latest aixbt narrative intelligence (filterable by chain or category) and speaks the top signals; aixbt-scan reads momentum-ranked projects with 24h change and calls out the movers, tilting the avatar's sentiment with the average move.
+
+**How it works:** src/agent-skills-aixbt.js calls /api/aixbt/* so the aixbt API key stays server-side; when the key isn't configured it returns an honest 'not connected yet' message rather than fabricated signals.
+
+**Why it matters:** Your in-world companion taps the same live intelligence feed professional crypto builders consume via the aixbt API — narratives and momentum, summarized out loud, never faked.
+
+## Related
+
+- [Agent skills](/docs/agent-skills)
+- [Skills marketplace](/docs/skills)
+- [Pump.fun on Solana](/docs/solana-pumpfun)
+- [Selling paid skills](/docs/pay-skills-listing)

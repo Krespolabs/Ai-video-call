@@ -1,0 +1,82 @@
+<!doctype html>
+<html lang="en">
+	<head>
+		<meta charset="utf-8" />
+		<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+		<title data-i18n="embed_v1_gated.meta_title">Token-gated 3D embed · three.ws</title>
+		<meta name="description" content="A holder-only interactive 3D embed on three.ws."  data-i18n-attr="content:embed_v1_gated.meta_description"/>
+		<meta name="theme-color" content="#000000" />
+		<meta name="robots" content="noindex" />
+		<style>
+			:root { color-scheme: dark; }
+			* { box-sizing: border-box; }
+			html, body {
+				margin: 0;
+				padding: 0;
+				height: 100%;
+				width: 100%;
+				background: #070707;
+				overflow: hidden;
+				font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Inter, sans-serif;
+			}
+			three-d, three-agent, three-ws {
+				display: block;
+				width: 100%;
+				height: 100%;
+				border-radius: 0;
+			}
+			#empty {
+				position: absolute;
+				inset: 0;
+				display: flex;
+				align-items: center;
+				justify-content: center;
+				flex-direction: column;
+				gap: 8px;
+				color: rgba(255, 255, 255, 0.55);
+				font-size: 13px;
+				padding: 24px;
+				text-align: center;
+			}
+			#empty a { color: #fff; }
+		</style>
+	</head>
+	<body>
+		<!--
+			Standalone iframe-friendly host for a token-gated <three-d> embed — for
+			platforms that only accept a URL (Notion, Claude artifacts, Discord
+			embeds) rather than a script tag. The gating flow (locked teaser →
+			connect wallet → server-verified balance → unlocked scene) lives
+			entirely in /embed/v1.js, so this page is otherwise a thin shell: read
+			?asset=, mount <three-d>, done. See docs/token-gated-3d-embeds.md.
+
+			Usage:  /embed/v1/gated.html?asset=avatar:<uuid>
+			        /embed/v1/gated.html?asset=8453:42
+		-->
+		<script src="/embed/v1.js" async></script>
+		<div id="stage"></div>
+		<script>
+			(function () {
+				var params = new URLSearchParams(location.search);
+				var asset = params.get('asset');
+				if (!asset) {
+					var empty = document.createElement('div');
+					empty.id = 'empty';
+					empty.innerHTML =
+						'<span>Missing <code>?asset=</code> — pass the gated embed\'s asset id.</span>' +
+						'<a href="/embed/v1/preview" target="_blank" rel="noopener">See embed v1 docs →</a>';
+					document.body.appendChild(empty);
+					return;
+				}
+				var el = document.createElement('three-d');
+				el.setAttribute('agent', asset);
+				el.setAttribute('interactive', '');
+				el.setAttribute('theme', params.get('theme') === 'light' ? 'light' : 'dark');
+				if (params.get('hide-chrome') === '1') el.setAttribute('hide-chrome', '');
+				document.getElementById('stage').replaceWith(el);
+			})();
+		</script>
+		<!-- Runtime i18n: detects locale, swaps annotated copy, mounts <lang-switcher>. -->
+	<script type="module" src="/i18n.js"></script>
+</body>
+</html>

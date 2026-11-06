@@ -1,0 +1,505 @@
+<!doctype html>
+<html lang="en">
+<head>
+	<script>/* three.ws theme boot — no-flash; runtime in /theme-switcher.js */(function(){try{var m=localStorage.getItem('twx_theme');var l=m==='auto'?(window.matchMedia&&window.matchMedia('(prefers-color-scheme: light)').matches):m==='light';document.documentElement.setAttribute('data-theme',l?'light':'dark');}catch(e){document.documentElement.setAttribute('data-theme','dark');}})();</script>
+	<meta charset="utf-8" />
+	<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+	<title data-i18n="labs.meta_title">Labs — three.ws</title>
+	<meta name="description" content="A curated gallery of three.ws's most powerful — and most hidden — features. Find and try things you didn't know existed."  data-i18n-attr="content:labs.meta_description"/>
+	<meta property="og:type" content="website" />
+	<meta property="og:site_name" content="three.ws" />
+	<meta property="og:title" content="Labs · Hidden Gems — three.ws"  data-i18n-attr="content:labs.meta_og_title"/>
+	<meta property="og:description" content="Fact checker, AI tutor, lipsync, Bitcoin inscription, and more. All live. Most people have never found them."  data-i18n-attr="content:labs.meta_og_description"/>
+	<meta property="og:url" content="https://three.ws/labs" />
+	<meta property="og:image" content="https://three.ws/og-image.png" />
+	<meta property="og:image:width" content="1200" />
+	<meta property="og:image:height" content="630" />
+	<meta name="twitter:card" content="summary_large_image" />
+	<meta name="twitter:title" content="Labs · Hidden Gems — three.ws"  data-i18n-attr="content:labs.meta_twitter_title"/>
+	<meta name="twitter:description" content="Fact checker, AI tutor, lipsync, Bitcoin inscription. All live, most undiscovered."  data-i18n-attr="content:labs.meta_twitter_description"/>
+	<meta name="twitter:image" content="https://three.ws/og-image.png" />
+	<link rel="canonical" href="https://three.ws/labs" />
+		<link rel="icon" href="/favicon.ico" sizes="any" />
+		<link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+		<link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png" />
+		<link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png" />
+		<link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+		<link rel="manifest" href="/manifest.webmanifest" />
+	<link rel="stylesheet" href="/style.css" />
+	<link rel="stylesheet" href="/nav.css" />
+	<link rel="stylesheet" href="/footer.css" />
+	<style>
+		:root { color-scheme: dark; }
+		* { box-sizing: border-box; }
+		body {
+			margin: 0;
+			background: #070707;
+			color: var(--ink, #e8e8e8);
+			font-family: var(--font-body, 'Inter', system-ui, sans-serif);
+			-webkit-font-smoothing: antialiased;
+		}
+		a { color: inherit; text-decoration: none; }
+
+		/* ── Layout ─────────────────────────────────────────────── */
+		.labs-wrap { max-width: 1200px; margin: 0 auto; padding: 0 24px; }
+		@media (max-width: 600px) { .labs-wrap { padding: 0 16px; } }
+
+		/* ── Hero ───────────────────────────────────────────────── */
+		.labs-hero {
+			padding: 80px 0 48px;
+			border-bottom: 1px solid var(--stroke, rgba(255,255,255,.08));
+		}
+		.labs-hero-inner {
+			max-width: 640px;
+		}
+		.labs-eyebrow {
+			font-size: 12px;
+			font-weight: 600;
+			letter-spacing: 0.1em;
+			text-transform: uppercase;
+			color: var(--ink-dim, #888);
+			margin: 0 0 16px;
+		}
+		.labs-hero h1 {
+			font-family: var(--font-display, 'Space Grotesk', system-ui, sans-serif);
+			font-size: clamp(36px, 6vw, 64px);
+			font-weight: 700;
+			letter-spacing: -0.03em;
+			line-height: 1.05;
+			margin: 0 0 20px;
+		}
+		.labs-hero p {
+			font-size: 17px;
+			line-height: 1.65;
+			color: var(--ink-dim, #888);
+			margin: 0 0 32px;
+			max-width: 52ch;
+		}
+		.labs-stats {
+			display: flex;
+			align-items: center;
+			gap: 24px;
+			flex-wrap: wrap;
+		}
+		.labs-stat {
+			display: flex;
+			align-items: center;
+			gap: 8px;
+			font-size: 14px;
+			color: var(--ink-dim, #888);
+		}
+		.labs-stat strong {
+			color: var(--ink, #e8e8e8);
+			font-weight: 600;
+		}
+
+		/* ── Filter bar ─────────────────────────────────────────── */
+		.labs-filters {
+			display: flex;
+			align-items: center;
+			gap: 8px;
+			padding: 28px 0 32px;
+			flex-wrap: wrap;
+		}
+		.labs-filter {
+			padding: 6px 14px;
+			border: 1px solid var(--stroke, rgba(255,255,255,.08));
+			border-radius: 999px;
+			background: transparent;
+			color: var(--ink-dim, #888);
+			font-family: inherit;
+			font-size: 13px;
+			cursor: pointer;
+			transition: background var(--duration-fast), border-color var(--duration-fast), color var(--duration-fast);
+		}
+		.labs-filter:hover {
+			background: var(--surface-2, rgba(255,255,255,.05));
+			border-color: var(--stroke-strong, rgba(255,255,255,.14));
+			color: var(--ink, #e8e8e8);
+		}
+		.labs-filter:active {
+			background: var(--surface-3, rgba(255,255,255,.08));
+			transform: translateY(1px);
+		}
+		.labs-filter.active {
+			background: var(--surface-3, rgba(255,255,255,.08));
+			border-color: var(--stroke-strong, rgba(255,255,255,.14));
+			color: var(--ink, #e8e8e8);
+			font-weight: 500;
+		}
+		.labs-filter:focus-visible {
+			outline: 2px solid rgba(255,255,255,.4);
+			outline-offset: 2px;
+		}
+		.labs-result-count {
+			margin-left: auto;
+			font-size: 13px;
+			color: var(--ink-dim, #888);
+		}
+
+		/* ── Grid ───────────────────────────────────────────────── */
+		.labs-grid {
+			display: grid;
+			grid-template-columns: repeat(3, 1fr);
+			gap: 20px;
+			padding-bottom: 80px;
+		}
+		@media (max-width: 960px) { .labs-grid { grid-template-columns: repeat(2, 1fr); } }
+		@media (max-width: 580px) { .labs-grid { grid-template-columns: 1fr; } }
+
+		/* ── Gem card ───────────────────────────────────────────── */
+		.gem-card {
+			display: flex;
+			flex-direction: column;
+			border: 1px solid var(--stroke, rgba(255,255,255,.08));
+			border-radius: var(--radius-card, 14px);
+			background: var(--surface-1, rgba(255,255,255,.03));
+			overflow: hidden;
+			transition: border-color var(--duration-fast), transform var(--duration-fast), box-shadow var(--duration-fast);
+		}
+		.gem-card:hover {
+			border-color: var(--stroke-strong, rgba(255,255,255,.14));
+			transform: translateY(-2px);
+			box-shadow: 0 12px 40px rgba(0,0,0,.4);
+		}
+		.gem-card:focus-within {
+			border-color: rgba(255,255,255,.3);
+			outline: none;
+		}
+
+		/* Preview area */
+		.gem-preview {
+			position: relative;
+			width: 100%;
+			aspect-ratio: 16 / 9;
+			overflow: hidden;
+			background: var(--surface-2, rgba(255,255,255,.05));
+			border-bottom: 1px solid var(--stroke, rgba(255,255,255,.08));
+		}
+		.gem-preview iframe {
+			position: absolute;
+			top: 0;
+			left: 0;
+			width: 200%;
+			height: 200%;
+			transform: scale(0.5);
+			transform-origin: 0 0;
+			border: none;
+			pointer-events: none;
+		}
+		.gem-preview-fallback {
+			position: absolute;
+			inset: 0;
+			display: flex;
+			align-items: flex-end;
+			justify-content: flex-start;
+			padding: 14px 16px;
+			background: linear-gradient(135deg,
+				var(--gem-cat-bg-1, rgba(255,255,255,.04)) 0%,
+				var(--gem-cat-bg-2, rgba(255,255,255,.02)) 100%);
+		}
+		.gem-preview-path {
+			font-family: var(--font-mono, ui-monospace, monospace);
+			font-size: 12px;
+			color: var(--gem-cat-color, var(--ink-dim, #888));
+			opacity: 0.7;
+		}
+		/* Category gradient overlaid on the preview */
+		.gem-preview::after {
+			content: '';
+			position: absolute;
+			inset: 0;
+			background: linear-gradient(to bottom, transparent 55%, rgba(6,6,16,.9));
+			pointer-events: none;
+		}
+		.gem-cat-badge {
+			position: absolute;
+			bottom: 10px;
+			left: 12px;
+			z-index: 2;
+			padding: 3px 9px;
+			border-radius: 999px;
+			font-size: 11px;
+			font-weight: 600;
+			letter-spacing: 0.05em;
+			text-transform: uppercase;
+			border: 1px solid transparent;
+		}
+
+		/* Card body */
+		.gem-body {
+			display: flex;
+			flex-direction: column;
+			flex: 1;
+			padding: 18px 20px 20px;
+			gap: 10px;
+		}
+		.gem-header {
+			display: flex;
+			align-items: center;
+			justify-content: space-between;
+			gap: 8px;
+		}
+		.gem-title {
+			font-family: var(--font-display, 'Space Grotesk', system-ui, sans-serif);
+			font-size: 16px;
+			font-weight: 600;
+			letter-spacing: -0.01em;
+			margin: 0;
+			line-height: 1.3;
+		}
+		.gem-status {
+			display: inline-flex;
+			align-items: center;
+			gap: 5px;
+			font-size: 11px;
+			font-weight: 500;
+			padding: 3px 8px;
+			border-radius: 999px;
+			white-space: nowrap;
+			flex-shrink: 0;
+		}
+		.gem-status::before {
+			content: '';
+			width: 6px;
+			height: 6px;
+			border-radius: 50%;
+			flex-shrink: 0;
+		}
+		.gem-status[data-state="live"] {
+			background: rgba(74,222,128,.1);
+			color: var(--success, var(--success));
+			border: 1px solid rgba(74,222,128,.2);
+		}
+		.gem-status[data-state="live"]::before { background: var(--success, var(--success)); }
+		.gem-status[data-state="offline"] {
+			background: rgba(248,113,113,.1);
+			color: var(--danger, var(--danger));
+			border: 1px solid rgba(248,113,113,.2);
+		}
+		.gem-status[data-state="offline"]::before { background: var(--danger, var(--danger)); }
+		.gem-status[data-state="checking"] {
+			background: var(--surface-2, rgba(255,255,255,.05));
+			color: var(--ink-dim, #888);
+			border: 1px solid var(--stroke, rgba(255,255,255,.08));
+			animation: labs-pulse 1.8s ease-in-out infinite;
+		}
+		.gem-status[data-state="checking"]::before {
+			background: var(--ink-dim, #888);
+			animation: labs-pulse 1.8s ease-in-out infinite;
+		}
+		@keyframes labs-pulse {
+			0%, 100% { opacity: 1; }
+			50% { opacity: 0.4; }
+		}
+
+		.gem-desc {
+			font-size: 13.5px;
+			line-height: 1.6;
+			color: var(--ink-dim, #888);
+			margin: 0;
+			flex: 1;
+		}
+		.gem-cta {
+			display: inline-flex;
+			align-items: center;
+			gap: 6px;
+			padding: 9px 16px;
+			border-radius: var(--radius-control, 10px);
+			background: var(--surface-3, rgba(255,255,255,.08));
+			border: 1px solid var(--stroke-strong, rgba(255,255,255,.14));
+			color: var(--ink, #e8e8e8);
+			font-size: 13px;
+			font-weight: 500;
+			transition: background var(--duration-fast), border-color var(--duration-fast);
+			align-self: flex-start;
+		}
+		.gem-cta:hover {
+			background: rgba(255,255,255,.12);
+			border-color: rgba(255,255,255,.22);
+		}
+		.gem-cta:active {
+			background: rgba(255,255,255,.16);
+			transform: translateY(1px);
+		}
+		.gem-cta:focus-visible {
+			outline: 2px solid rgba(255,255,255,.4);
+			outline-offset: 2px;
+		}
+
+		/* ── Skeleton state ─────────────────────────────────────── */
+		.gem-skeleton {
+			border: 1px solid var(--stroke, rgba(255,255,255,.08));
+			border-radius: var(--radius-card, 14px);
+			background: var(--surface-1, rgba(255,255,255,.03));
+			overflow: hidden;
+		}
+		.sk-preview {
+			aspect-ratio: 16 / 9;
+			background: var(--surface-2, rgba(255,255,255,.05));
+			animation: sk-shimmer 1.5s ease-in-out infinite;
+		}
+		.sk-body { padding: 18px 20px 20px; display: flex; flex-direction: column; gap: 10px; }
+		.sk-line {
+			height: 12px;
+			border-radius: 6px;
+			background: var(--surface-2, rgba(255,255,255,.05));
+			animation: sk-shimmer 1.5s ease-in-out infinite;
+		}
+		.sk-line.wide  { width: 72%; }
+		.sk-line.short { width: 44%; }
+		.sk-line.title { height: 18px; width: 60%; }
+		@keyframes sk-shimmer {
+			0%, 100% { opacity: 0.6; }
+			50% { opacity: 1; }
+		}
+
+		/* ── Empty state ─────────────────────────────────────────── */
+		.labs-empty {
+			grid-column: 1 / -1;
+			padding: 64px 24px;
+			text-align: center;
+			display: none;
+		}
+		.labs-empty[aria-hidden="false"] { display: block; }
+		.labs-empty h2 { font-size: 20px; margin: 0 0 12px; }
+		.labs-empty p { color: var(--ink-dim, #888); font-size: 14px; max-width: 44ch; margin: 0 auto; }
+		.labs-empty code { font-family: var(--font-mono, ui-monospace, monospace); background: var(--surface-2); padding: 1px 5px; border-radius: 4px; font-size: 12px; }
+
+		/* ── Error state ─────────────────────────────────────────── */
+		.labs-error {
+			grid-column: 1 / -1;
+			padding: 48px 24px;
+			text-align: center;
+			display: none;
+		}
+		.labs-error[aria-hidden="false"] { display: block; }
+		.labs-error p { color: var(--ink-dim, #888); font-size: 14px; margin: 0 0 16px; }
+		.labs-retry {
+			padding: 9px 20px;
+			border-radius: var(--radius-control, 10px);
+			border: 1px solid var(--stroke-strong, rgba(255,255,255,.14));
+			background: var(--surface-2, rgba(255,255,255,.05));
+			color: var(--ink, #e8e8e8);
+			font-family: inherit;
+			font-size: 13px;
+			cursor: pointer;
+			transition: background var(--duration-fast);
+		}
+		.labs-retry:hover { background: rgba(255,255,255,.1); }
+		.labs-retry:active { background: rgba(255,255,255,.14); transform: translateY(1px); }
+		.labs-retry:focus-visible { outline: 2px solid rgba(255,255,255,.4); outline-offset: 2px; }
+	</style>
+</head>
+<body>
+	<header><div id="nav-container"></div></header>
+	<script src="/nav.js" defer></script>
+
+	<main id="main-content">
+		<div class="labs-wrap">
+			<!-- Hero -->
+			<section class="labs-hero" aria-labelledby="labs-heading">
+				<div class="labs-hero-inner">
+					<p class="labs-eyebrow" data-i18n="labs.labs">Labs</p>
+					<h1 id="labs-heading" data-i18n-html="labs.hidden_gems_now_front_and_center">Hidden gems, now<br/>front and center.</h1>
+					<p data-i18n="labs.these_features_already_exist_most_people_hav">These features already exist. Most people have never found them. Fact-checker, AI tutor, Bitcoin inscription, lipsync demo, self-funding agent — all live, all real, all wired to on-chain payments.</p>
+					<div class="labs-stats">
+						<div class="labs-stat">
+							<strong id="labs-gem-count">—</strong>
+							<span data-i18n="labs.features">features</span>
+						</div>
+						<div class="labs-stat">
+							<strong id="labs-live-count">—</strong>
+							<span data-i18n="labs.verified_live">verified live</span>
+						</div>
+					</div>
+				</div>
+			</section>
+
+			<!-- Filter bar -->
+			<div class="labs-filters" role="group" aria-label="Filter by category">
+				<button class="labs-filter active" data-cat="all" type="button" data-i18n="labs.all">All</button>
+				<button class="labs-filter" data-cat="x402" type="button" data-i18n="labs.x402">x402</button>
+				<button class="labs-filter" data-cat="voice" type="button" data-i18n="labs.voice">Voice</button>
+				<button class="labs-filter" data-cat="ai" type="button" data-i18n="labs.ai">AI</button>
+				<button class="labs-filter" data-cat="3d" type="button" data-i18n="labs.3d_live">3D Live</button>
+				<button class="labs-filter" data-cat="crypto" type="button" data-i18n="labs.crypto">Crypto</button>
+				<span class="labs-result-count" aria-live="polite" id="labs-result-count"></span>
+			</div>
+
+			<!-- Grid -->
+			<section aria-label="Labs features">
+				<div class="labs-grid" id="labs-grid" aria-live="polite" aria-busy="true">
+					<!-- Skeleton placeholders shown while loading -->
+					<div class="gem-skeleton" aria-hidden="true">
+						<div class="sk-preview"></div>
+						<div class="sk-body">
+							<div class="sk-line title"></div>
+							<div class="sk-line wide"></div>
+							<div class="sk-line short"></div>
+						</div>
+					</div>
+					<div class="gem-skeleton" aria-hidden="true">
+						<div class="sk-preview"></div>
+						<div class="sk-body">
+							<div class="sk-line title"></div>
+							<div class="sk-line wide"></div>
+							<div class="sk-line short"></div>
+						</div>
+					</div>
+					<div class="gem-skeleton" aria-hidden="true">
+						<div class="sk-preview"></div>
+						<div class="sk-body">
+							<div class="sk-line title"></div>
+							<div class="sk-line wide"></div>
+							<div class="sk-line short"></div>
+						</div>
+					</div>
+					<div class="gem-skeleton" aria-hidden="true">
+						<div class="sk-preview"></div>
+						<div class="sk-body">
+							<div class="sk-line title"></div>
+							<div class="sk-line wide"></div>
+							<div class="sk-line short"></div>
+						</div>
+					</div>
+					<div class="gem-skeleton" aria-hidden="true">
+						<div class="sk-preview"></div>
+						<div class="sk-body">
+							<div class="sk-line title"></div>
+							<div class="sk-line wide"></div>
+							<div class="sk-line short"></div>
+						</div>
+					</div>
+					<div class="gem-skeleton" aria-hidden="true">
+						<div class="sk-preview"></div>
+						<div class="sk-body">
+							<div class="sk-line title"></div>
+							<div class="sk-line wide"></div>
+							<div class="sk-line short"></div>
+						</div>
+					</div>
+
+					<!-- Empty state (shown when no gems match filter) -->
+					<div class="labs-empty" id="labs-empty" aria-hidden="true" role="status">
+						<h2 data-i18n="labs.no_features_match_this_filter">No features match this filter</h2>
+						<p data-i18n-html="labs.try_all_to_see_everything_or_flag">Try "All" to see everything, or flag more pages with <code>"showcase": true</code> in data/pages.json.</p>
+					</div>
+
+					<!-- Error state -->
+					<div class="labs-error" id="labs-error" aria-hidden="true" role="alert">
+						<p data-i18n="labs.couldn_t_load_the_feature_registry">Couldn't load the feature registry.</p>
+						<button class="labs-retry" id="labs-retry" type="button" data-i18n="labs.retry">Retry</button>
+					</div>
+				</div>
+			</section>
+		</div>
+	</main>
+
+	<div id="footer-container"></div>
+	<script type="module" src="/src/labs.js"></script>
+	<script src="/footer.js" defer></script>
+	<!-- Runtime i18n: detects locale, swaps annotated copy, mounts <lang-switcher>. -->
+	<script type="module" src="/i18n.js"></script>
+</body>
+</html>

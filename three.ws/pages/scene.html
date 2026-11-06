@@ -1,0 +1,92 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+	<head>
+		<script>/* three.ws theme boot — no-flash; runtime in /theme-switcher.js */(function(){try{var m=localStorage.getItem('twx_theme');var l=m==='auto'?(window.matchMedia&&window.matchMedia('(prefers-color-scheme: light)').matches):m==='light';document.documentElement.setAttribute('data-theme',l?'light':'dark');}catch(e){document.documentElement.setAttribute('data-theme','dark');}})();</script>
+		<!-- Scene Studio is dark-locked (the entry module re-pins data-theme="dark"
+		     after the site theme boot): the editor chrome only ships dark. -->
+		<meta charset="UTF-8" />
+		<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+		<title data-i18n="scene.meta_title">Scene Studio · Assemble 3D worlds · three.ws</title>
+		<meta
+			name="description"
+			content="A full 3D scene editor in the browser. Import GLB models, arrange them with transform gizmos, edit materials and lights, and export complete scenes."
+		 data-i18n-attr="content:scene.meta_description"/>
+		<meta property="og:title" content="Scene Studio — Assemble 3D worlds · three.ws"  data-i18n-attr="content:scene.meta_og_title"/>
+		<meta
+			property="og:description"
+			content="A full 3D scene editor in the browser. Import models, compose scenes, edit materials and lights, export GLB."
+		 data-i18n-attr="content:scene.meta_og_description"/>
+		<meta property="og:type" content="website" />
+		<meta property="og:site_name" content="three.ws" />
+		<meta property="og:url" content="https://three.ws/scene" />
+		<meta property="og:image" content="https://three.ws/api/page-og?s=build&amp;t=Scene+Studio&amp;d=Full+3D+scene+editor+in+the+browser%3A+import+GLB+models%2C+arrange+them+with+transform+gizmos%2C+edit+materials+and+lights%2C+and+export+complete+scenes.&amp;p=%2Fscene" />
+		<meta property="og:image:width" content="1200" />
+		<meta property="og:image:height" content="630" />
+		<meta name="twitter:card" content="summary_large_image" />
+		<meta name="twitter:site" content="@trythreews" />
+		<meta name="twitter:title" content="Scene Studio · Assemble 3D worlds · three.ws"  data-i18n-attr="content:scene.meta_twitter_title"/>
+		<meta
+			name="twitter:description"
+			content="A full 3D scene editor in the browser. Import models, compose scenes, edit materials and lights, export GLB."
+		 data-i18n-attr="content:scene.meta_twitter_description"/>
+		<meta name="twitter:image" content="https://three.ws/api/page-og?s=build&amp;t=Scene+Studio&amp;d=Full+3D+scene+editor+in+the+browser%3A+import+GLB+models%2C+arrange+them+with+transform+gizmos%2C+edit+materials+and+lights%2C+and+export+complete+scenes.&amp;p=%2Fscene" />
+		<meta name="theme-color" content="#080814" />
+		<link rel="icon" href="/favicon.ico" sizes="any" />
+		<link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+		<link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png" />
+		<link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png" />
+		<link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+		<link rel="manifest" href="/manifest.webmanifest" />
+		<link rel="stylesheet" href="/style.css" />
+
+		<!-- Editor script-panel toolchain (vendored from three.js r184, MIT —
+		     /scene-studio/LICENSE). Classic globals consumed by the editor:
+		     CodeMirror, esprima, jsonlint, tern, acorn, signals, DracoEncoderModule. -->
+		<link rel="stylesheet" href="/scene-studio/libs/codemirror/codemirror.css" />
+		<link rel="stylesheet" href="/scene-studio/libs/codemirror/theme/monokai.css" />
+		<link rel="stylesheet" href="/scene-studio/libs/codemirror/addon/dialog.css" />
+		<link rel="stylesheet" href="/scene-studio/libs/codemirror/addon/show-hint.css" />
+		<link rel="stylesheet" href="/scene-studio/libs/codemirror/addon/tern.css" />
+		<script src="/scene-studio/libs/codemirror/codemirror.js"></script>
+		<script src="/scene-studio/libs/codemirror/mode/javascript.js"></script>
+		<script src="/scene-studio/libs/codemirror/mode/glsl.js"></script>
+		<script src="/scene-studio/libs/esprima.js"></script>
+		<script src="/scene-studio/libs/jsonlint.js"></script>
+		<script src="/scene-studio/libs/codemirror/addon/dialog.js"></script>
+		<script src="/scene-studio/libs/codemirror/addon/show-hint.js"></script>
+		<script src="/scene-studio/libs/codemirror/addon/tern.js"></script>
+		<script src="/scene-studio/libs/acorn/acorn.js"></script>
+		<script src="/scene-studio/libs/acorn/acorn_loose.js"></script>
+		<script src="/scene-studio/libs/acorn/walk.js"></script>
+		<script src="/scene-studio/libs/ternjs/polyfill.js"></script>
+		<script src="/scene-studio/libs/ternjs/signal.js"></script>
+		<script src="/scene-studio/libs/ternjs/tern.js"></script>
+		<script src="/scene-studio/libs/ternjs/def.js"></script>
+		<script src="/scene-studio/libs/ternjs/comment.js"></script>
+		<script src="/scene-studio/libs/ternjs/infer.js"></script>
+		<script src="/scene-studio/libs/ternjs/doc_comment.js"></script>
+		<script src="/scene-studio/libs/tern-threejs/threejs.js"></script>
+		<script src="/scene-studio/libs/signals.min.js"></script>
+		<script src="/three/draco/draco_encoder.js"></script>
+	
+	<link rel="canonical" href="https://three.ws/scene">
+	<script type="application/ld+json">{"@context":"https://schema.org","@type":"WebPage","name":"Scene Studio","description":"Full 3D scene editor in the browser — import GLB models, arrange them with transform gizmos, edit materials and lights, and export complete scenes.","url":"https://three.ws/scene","isPartOf":{"@type":"WebSite","name":"three.ws","url":"https://three.ws"}}</script>
+
+	<meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1">
+	<meta property="og:locale" content="en_US">
+	<meta property="og:image:alt" content="Scene Studio — three.ws">
+</head>
+	<body class="scene-studio">
+		<div id="nav-container"></div>
+		<!-- The editor fills the window and has no visible heading of its own, so
+		     the page's document title lives here for screen readers and for the
+		     one-h1-per-page contract every other three.ws route keeps. -->
+		<h1 class="sr-only" data-i18n="scene.h1">Scene Studio</h1>
+		<div id="studio-app" role="application" aria-label="Scene Studio 3D editor"></div>
+
+		<script src="/nav.js" defer></script>
+		<script type="module" src="/src/scene-studio/main.js"></script>
+		<!-- Runtime i18n: detects locale, swaps annotated copy, mounts <lang-switcher>. -->
+	<script type="module" src="/i18n.js"></script>
+</body>
+</html>

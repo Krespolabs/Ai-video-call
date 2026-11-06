@@ -1,0 +1,16 @@
+{
+  "name": "@three-ws/agent-mm",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Launch Copilot — autonomous fair-launch market-maker. Defends a floor, recycles profit, and manages the curve→AMM graduation from a launched coin's own audited agent wallet, within a published non-manipulative policy.",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js",
+    "simulate": "MM_MODE=simulate node index.js",
+    "live": "MM_MODE=live node index.js"
+  },
+  "engines": {
+    "node": ">=22"
+  }
+}

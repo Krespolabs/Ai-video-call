@@ -1,0 +1,18 @@
+{
+  "spatialMcpVersion": "0.1",
+  "kind": "model",
+  "scene": {
+    "glbUrl": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/models/gltf/DamagedHelmet/glTF-Binary/DamagedHelmet.glb",
+    "format": "glb"
+  },
+  "camera": {
+    "autoRotate": true
+  },
+  "affordances": {
+    "orbit": true,
+    "zoom": true
+  },
+  "meta": {
+    "title": "A helmet from another server"
+  }
+}

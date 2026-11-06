@@ -1,0 +1,206 @@
+{
+	"id": "agent-spotlight",
+	"scenarioHash": "9308eeec9a51d14cbdf78bc969eddac174f235ddaa2a2a48ca24b1d66c817b48",
+	"ranAt": "2026-10-01T08:58:28.748Z",
+	"target": {
+		"commit": "b4eb6de7a",
+		"revision": "three-ws-api-00473-tkb"
+	},
+	"passed": true,
+	"steps": [
+		{
+			"index": 1,
+			"kind": "goto",
+			"target": "https://three.ws/spotlight",
+			"detail": "loaded https://three.ws/spotlight",
+			"ok": true,
+			"ms": 8833,
+			"frames": 0
+		},
+		{
+			"index": 2,
+			"kind": "read",
+			"target": "showcased",
+			"detail": "showcased = \"15\"",
+			"ok": true,
+			"ms": 2,
+			"frames": 0
+		},
+		{
+			"index": 3,
+			"kind": "scroll",
+			"target": "870",
+			"detail": "scrolled 870 px",
+			"ok": true,
+			"ms": 6296,
+			"frames": 30
+		},
+		{
+			"index": 4,
+			"kind": "hold",
+			"target": "900",
+			"detail": "900 ms",
+			"ok": true,
+			"ms": 4533,
+			"frames": 27
+		},
+		{
+			"index": 5,
+			"kind": "type",
+			"target": "translator",
+			"detail": "typed 10 characters; GET /api/spotlight/list answered 200 in 3.8 s",
+			"ok": true,
+			"ms": 6840,
+			"frames": 36
+		},
+		{
+			"index": 6,
+			"kind": "hold",
+			"target": "600",
+			"detail": "600 ms",
+			"ok": true,
+			"ms": 2976,
+			"frames": 18
+		},
+		{
+			"index": 7,
+			"kind": "scroll",
+			"target": "500",
+			"detail": "scrolled 500 px",
+			"ok": true,
+			"ms": 4833,
+			"frames": 33
+		},
+		{
+			"index": 8,
+			"kind": "hold",
+			"target": "1100",
+			"detail": "1100 ms",
+			"ok": true,
+			"ms": 4266,
+			"frames": 33
+		},
+		{
+			"index": 9,
+			"kind": "click",
+			"target": "The translator that refuses to flatten your voice",
+			"detail": "clicked",
+			"ok": true,
+			"ms": 5627,
+			"frames": 21
+		},
+		{
+			"index": 10,
+			"kind": "expect",
+			"target": "Machine translation solved meaning years ago",
+			"detail": "appeared after 0.1 s",
+			"ok": true,
+			"ms": 96,
+			"frames": 0
+		},
+		{
+			"index": 11,
+			"kind": "wait",
+			"target": "5000",
+			"detail": "5000 ms, not filmed",
+			"ok": true,
+			"ms": 5193,
+			"frames": 0
+		},
+		{
+			"index": 12,
+			"kind": "hold",
+			"target": "1200",
+			"detail": "1200 ms",
+			"ok": true,
+			"ms": 8871,
+			"frames": 36
+		},
+		{
+			"index": 13,
+			"kind": "drag",
+			"target": "0.3,0.55,0.62,0.55",
+			"detail": "dragged over 60 frames",
+			"ok": true,
+			"ms": 20217,
+			"frames": 78
+		},
+		{
+			"index": 14,
+			"kind": "hover",
+			"target": "Agent Spotlight",
+			"detail": "hovered",
+			"ok": true,
+			"ms": 4782,
+			"frames": 18
+		},
+		{
+			"index": 15,
+			"kind": "scroll",
+			"target": "560",
+			"detail": "scrolled 560 px",
+			"ok": true,
+			"ms": 9095,
+			"frames": 36
+		},
+		{
+			"index": 16,
+			"kind": "hold",
+			"target": "1400",
+			"detail": "1400 ms",
+			"ok": true,
+			"ms": 9733,
+			"frames": 42
+		},
+		{
+			"index": 17,
+			"kind": "scroll",
+			"target": "480",
+			"detail": "scrolled 480 px",
+			"ok": true,
+			"ms": 4103,
+			"frames": 33
+		},
+		{
+			"index": 18,
+			"kind": "hold",
+			"target": "2600",
+			"detail": "2600 ms",
+			"ok": true,
+			"ms": 8312,
+			"frames": 78
+		}
+	],
+	"facts": {
+		"showcased": "15"
+	},
+	"saw": [
+		"Machine translation solved meaning years ago"
+	],
+	"responses": [
+		{
+			"method": "GET",
+			"path": "/api/spotlight/list",
+			"status": 200,
+			"seconds": 3.8
+		}
+	],
+	"cuts": [
+		{
+			"afterStep": 11,
+			"seconds": 5
+		}
+	],
+	"video": {
+		"path": "public/x-media/agent-spotlight/reel.mp4",
+		"sha256": "bf9a00b51f9b7c4d679352e7b967638b7d937236831565912da9401e43f82945",
+		"frames": 519,
+		"motion": 0.78,
+		"durationSec": 17.3,
+		"width": 1080,
+		"height": 1080,
+		"fps": 30,
+		"videoCodec": "h264",
+		"pixFmt": "yuv420p"
+	}
+}

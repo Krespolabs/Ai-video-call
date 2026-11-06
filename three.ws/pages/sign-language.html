@@ -1,0 +1,458 @@
+<!doctype html>
+<html lang="en">
+	<head>
+		<meta charset="utf-8" />
+		<script>/* three.ws theme boot — no-flash */(function(){try{var m=localStorage.getItem('twx_theme');var l=m==='auto'?(window.matchMedia&&window.matchMedia('(prefers-color-scheme: light)').matches):m==='light';document.documentElement.setAttribute('data-theme',l?'light':'dark');}catch(e){document.documentElement.setAttribute('data-theme','dark');}})();</script>
+		<meta http-equiv="X-UA-Compatible" content="IE=edge" />
+		<title data-i18n="sign_language.meta_title">Sign Language Avatars · three.ws</title>
+		<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+		<meta
+			name="description"
+			content="three.ws avatars sign in American Sign Language. Fingerspell any word or number, get signed chat replies, and sign back to the AI with your webcam: the whole loop, live in 3D."
+		 data-i18n-attr="content:sign_language.meta_description"/>
+		<meta name="theme-color" content="#000000" />
+		<link rel="canonical" href="https://three.ws/sign-language" />
+
+		<meta property="og:type" content="website" />
+		<meta property="og:title" content="Sign Language Avatars · three.ws"  data-i18n-attr="content:sign_language.meta_og_title"/>
+		<meta property="og:description" content="Avatars that sign in ASL. Fingerspell anything, get signed chat replies, and sign back with your webcam, live in 3D."  data-i18n-attr="content:sign_language.meta_og_description"/>
+		<meta property="og:url" content="https://three.ws/sign-language" />
+		<meta property="og:site_name" content="three.ws" />
+		<meta property="og:image" content="https://three.ws/api/page-og?s=main&amp;t=Sign+Language+Avatars&amp;d=three.ws+avatars+sign+in+American+Sign+Language%3A+fingerspell+any+word+or+number%2C+get+signed+chat+replies%2C+and+sign+back+with+your+webcam.+The+whole+loop%2C+live&amp;p=%2Fsign-language" />
+		<meta name="twitter:card" content="summary_large_image" />
+		<meta name="twitter:title" content="Sign Language Avatars · three.ws"  data-i18n-attr="content:sign_language.meta_twitter_title"/>
+		<meta name="twitter:description" content="Avatars that sign in ASL: fingerspelling, signed chat replies, and webcam sign input, live in 3D."  data-i18n-attr="content:sign_language.meta_twitter_description"/>
+		<meta name="twitter:image" content="https://three.ws/api/page-og?s=main&amp;t=Sign+Language+Avatars&amp;d=three.ws+avatars+sign+in+American+Sign+Language%3A+fingerspell+any+word+or+number%2C+get+signed+chat+replies%2C+and+sign+back+with+your+webcam.+The+whole+loop%2C+live&amp;p=%2Fsign-language" />
+		<meta name="twitter:site" content="@trythreews" />
+		<meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1" />
+		<meta property="og:locale" content="en_US" />
+
+		<link rel="shortcut icon" href="/favicon.ico" />
+		<link rel="stylesheet" href="/style.css" />
+		<link rel="stylesheet" href="/nav.css" />
+		<link rel="stylesheet" href="/footer.css" />
+		<link rel="stylesheet" href="/fonts/fonts.css" />
+		<script type="application/ld+json">{"@context":"https://schema.org","@type":"WebPage","name":"Sign Language Avatars","description":"three.ws avatars sign in American Sign Language: fingerspelling for any word or number, signed chat replies, and webcam sign-to-text recognition: the full loop, live in 3D.","url":"https://three.ws/sign-language","isPartOf":{"@type":"WebSite","name":"three.ws","url":"https://three.ws"}}</script>
+
+		<style>
+			/* `margin: 0 auto` is an auto cross-axis margin on a flex item of the
+			   column-flex body, which cancels the stretch: without a definite width the
+			   main box shrink-to-fits to its own min-content (456px with the API
+			   console populated) and mobile.css's overflow-x: clip then amputates the
+			   right side of every section on a 320px screen instead of scrolling. */
+			.sl-main { width: 100%; max-width: 1240px; min-width: 0; box-sizing: border-box; margin: 0 auto; padding: 0 clamp(16px, 4vw, 40px) 96px; }
+
+			/* Hero: live avatar left, pitch + input right */
+			.sl-hero {
+				display: grid; grid-template-columns: 1.05fr 1fr; gap: clamp(24px, 4vw, 56px);
+				align-items: center; padding: clamp(28px, 5vw, 64px) 0 clamp(20px, 3vw, 40px);
+			}
+			.sl-chip {
+				display: inline-flex; align-items: center; gap: 8px;
+				padding: 5px 12px; border: 1px solid var(--stroke); border-radius: 999px;
+				background: var(--surface-1); font-size: 12px; letter-spacing: .04em;
+				text-transform: uppercase; color: var(--ink-dim); font-family: var(--font-mono);
+			}
+			.sl-chip-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--accent-violet-strong); box-shadow: 0 0 0 3px rgba(167,139,250,.18); }
+			.sl-hero h1 { font-size: clamp(32px, 5.2vw, 58px); line-height: 1.03; margin: 18px 0 14px; letter-spacing: -.02em; }
+			.sl-hero-lede { max-width: 54ch; color: var(--ink-dim); font-size: clamp(15px, 1.4vw, 18px); line-height: 1.6; margin: 0; }
+
+			.sl-stage-wrap { position: relative; border: 1px solid var(--stroke); border-radius: 20px; overflow: hidden; background: radial-gradient(120% 120% at 50% 0%, rgba(167,139,250,.10), transparent 60%), var(--surface-1); aspect-ratio: 4 / 5; min-height: 380px; }
+			#sl-stage { position: absolute; inset: 0; width: 100%; height: 100%; }
+
+			/* Loading: the GLB is several MB, so the stage is empty for a beat.
+			   A silhouette that breathes says "an avatar is coming" where an empty
+			   gradient box says "this is broken". Both children are removed from
+			   the a11y tree; #sl-status carries the same news to a screen reader. */
+			.sl-stage-skeleton { position: absolute; inset: 0; display: none; flex-direction: column; align-items: center; justify-content: center; gap: 14px; pointer-events: none; }
+			.sl-stage-wrap[data-state='loading'] .sl-stage-skeleton { display: flex; }
+			.sl-stage-skeleton-head, .sl-stage-skeleton-body { background: rgba(167,139,250,.14); border-radius: 999px; animation: sl-stage-breathe 1.6s ease-in-out infinite; }
+			.sl-stage-skeleton-head { width: 78px; height: 78px; }
+			.sl-stage-skeleton-body { width: 128px; height: 176px; border-radius: 64px 64px 28px 28px; animation-delay: .18s; }
+			@keyframes sl-stage-breathe { 0%, 100% { opacity: .35; } 50% { opacity: .85; } }
+
+			/* Error: a failed mount used to be a permanent dead stage. It is a
+			   network failure like any other, so it gets a real way back. */
+			.sl-stage-fallback[hidden] { display: none; }
+			.sl-stage-fallback { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 14px; padding: 24px; text-align: center; }
+			.sl-stage-fallback-msg { margin: 0; max-width: 34ch; color: var(--ink-dim); font-size: 14px; line-height: 1.6; }
+			.sl-stage-fallback a { color: var(--ink); }
+
+			@media (prefers-reduced-motion: reduce) {
+				.sl-stage-skeleton-head, .sl-stage-skeleton-body { animation: none; opacity: .6; }
+			}
+			.sl-status { position: absolute; left: 0; right: 0; bottom: 0; padding: 12px 16px; font-family: var(--font-mono); font-size: 13px; color: var(--ink); background: linear-gradient(to top, rgba(0,0,0,.55), transparent); pointer-events: none; min-height: 20px; }
+			:root[data-theme='light'] .sl-status { color: #fff; }
+
+			/* Spell input */
+			.sl-try { margin-top: 26px; }
+			.sl-try-label { font-size: 13px; color: var(--ink-dim); font-family: var(--font-mono); text-transform: uppercase; letter-spacing: .05em; margin-bottom: 10px; }
+			.sl-input-row { display: flex; flex-wrap: wrap; gap: 8px; }
+			.sl-input {
+				flex: 1 1 0; min-width: 0; box-sizing: border-box;
+				background: rgba(167,139,250,.06); border: 1px solid rgba(167,139,250,.4);
+				color: var(--ink); font: inherit; font-size: 15px; padding: 12px 14px; border-radius: 12px;
+			}
+			.sl-input::placeholder { color: var(--ink-dim); }
+			.sl-input:focus { outline: none; border-color: rgba(167,139,250,.8); box-shadow: 0 0 0 3px rgba(167,139,250,.2); }
+			.sl-btn {
+				flex: 0 0 auto; appearance: none; border: 1px solid rgba(167,139,250,.5);
+				background: rgba(167,139,250,.16); color: var(--ink); font: inherit; font-weight: 600;
+				font-size: 15px; padding: 12px 20px; border-radius: 12px; cursor: pointer;
+				transition: background var(--duration-fast) var(--ease-standard), border-color var(--duration-fast) var(--ease-standard);
+			}
+			.sl-btn:hover:not(:disabled) { background: rgba(167,139,250,.28); border-color: rgba(167,139,250,.75); }
+			.sl-btn:active:not(:disabled) { transform: scale(.98); background: rgba(167,139,250,.34); }
+			.sl-btn:focus-visible { outline: 2px solid rgba(167,139,250,.9); outline-offset: 1px; }
+			.sl-btn:disabled { opacity: .6; cursor: default; }
+			.sl-chips { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
+			.sl-phrase-chip {
+				appearance: none; border: 1px solid var(--stroke); background: var(--surface-2);
+				color: var(--ink-dim); font: inherit; font-size: 13px; padding: 6px 12px; border-radius: 999px; cursor: pointer;
+				transition: border-color var(--duration-fast) var(--ease-standard), color var(--duration-fast) var(--ease-standard);
+			}
+			.sl-phrase-chip:hover { border-color: rgba(167,139,250,.6); color: var(--ink); }
+			.sl-phrase-chip:active { transform: scale(.97); background: rgba(167,139,250,.14); }
+			.sl-phrase-chip:focus-visible { outline: 2px solid rgba(167,139,250,.9); outline-offset: 1px; }
+
+			/* Capability cards */
+			.sl-caps { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; margin-top: clamp(40px, 6vw, 72px); }
+			.sl-cap { border: 1px solid var(--stroke); border-radius: 16px; padding: 24px; background: var(--surface-1); display: flex; flex-direction: column; }
+			.sl-cap-icon { font-size: 26px; line-height: 1; }
+			.sl-cap h3 { font-size: 18px; margin: 14px 0 8px; letter-spacing: -.01em; }
+			.sl-cap p { color: var(--ink-dim); font-size: 14px; line-height: 1.6; margin: 0 0 16px; flex: 1 1 auto; }
+			.sl-cap-link { color: var(--ink); font-size: 14px; font-weight: 600; text-decoration: none; border-bottom: 1px solid rgba(167,139,250,.5); align-self: flex-start; padding-bottom: 1px; }
+			.sl-cap-link:hover { border-bottom-color: rgba(167,139,250,.9); }
+			.sl-cap-link:active { color: var(--ink-dim); }
+			.sl-cap-link:focus-visible { outline: 2px solid rgba(167,139,250,.9); outline-offset: 2px; border-radius: 4px; }
+
+			/* Webcam demo */
+			.sl-webcam { margin-top: clamp(40px, 6vw, 72px); border: 1px solid var(--stroke); border-radius: 20px; padding: clamp(24px, 4vw, 40px); background: var(--surface-1); }
+			.sl-webcam h2 { font-size: clamp(22px, 3vw, 30px); margin: 0 0 10px; letter-spacing: -.02em; }
+			.sl-webcam p { color: var(--ink-dim); font-size: 15px; line-height: 1.6; max-width: 64ch; margin: 0 0 20px; }
+			.sl-webcam-grid { display: grid; grid-template-columns: 320px 1fr; gap: 24px; align-items: start; }
+			#sl-cam-preview { border: 1px solid var(--stroke); border-radius: 14px; overflow: hidden; aspect-ratio: 4 / 3; background: #000; }
+			.sl-cam-video { width: 100%; height: 100%; object-fit: cover; transform: scaleX(-1); display: block; }
+			.sl-cam-side { display: flex; flex-direction: column; gap: 14px; }
+			#sl-cam-btn.is-live { background: rgba(239,68,68,.16); border-color: rgba(239,68,68,.6); }
+			.sl-cam-result { min-height: 48px; border: 1px dashed var(--stroke); border-radius: 12px; padding: 14px; font-size: 17px; color: var(--ink); background: var(--surface-2); }
+			.sl-cam-result[data-state='low'] { border-color: rgba(239,68,68,.5); }
+			.sl-cam-result[data-state='ok'] { border-color: rgba(56,211,159,.5); }
+			.sl-cam-hint { font-size: 13px; color: var(--ink-dim); line-height: 1.5; }
+
+			/* Speed + dominant hand */
+			.sl-settings { display: flex; flex-wrap: wrap; gap: 18px; margin-top: 16px; }
+			.sl-setting { display: flex; flex-wrap: wrap; align-items: center; gap: 9px; }
+			.sl-setting-label { font-size: 11px; letter-spacing: .08em; text-transform: uppercase; color: var(--ink-dim); }
+			.sl-opts { display: inline-flex; gap: 4px; padding: 3px; border: 1px solid var(--stroke); border-radius: 999px; background: var(--surface-2); }
+			.sl-opt {
+				appearance: none; border: 0; background: transparent; color: var(--ink-dim);
+				font: inherit; font-size: 12px; font-weight: 600; padding: 5px 12px; border-radius: 999px;
+				cursor: pointer; transition: color var(--duration-fast) var(--ease-standard), background var(--duration-fast) var(--ease-standard);
+			}
+			.sl-opt:hover { color: var(--ink); }
+			.sl-opt:focus-visible { outline: 2px solid rgba(167,139,250,.9); outline-offset: 1px; }
+			.sl-opt:active { transform: scale(.96); }
+			.sl-opt[aria-pressed='true'] { color: var(--ink); background: rgba(167,139,250,.2); }
+
+			/* Vocabulary */
+			.sl-vocab { margin-top: clamp(48px, 6vw, 76px); }
+			.sl-vocab h2 { font-size: clamp(22px, 2.4vw, 30px); letter-spacing: -.02em; margin: 0 0 10px; }
+			.sl-vocab > p { color: var(--ink-dim); font-size: 15px; line-height: 1.65; max-width: 70ch; margin: 0 0 20px; }
+			.sl-vocab-chips { display: flex; flex-wrap: wrap; gap: 8px; }
+			.sl-vocab-chip {
+				display: inline-flex; align-items: center; gap: 7px;
+				border: 1px solid var(--stroke); border-radius: 999px;
+				background: var(--surface-2); color: var(--ink-dim);
+				padding: 7px 14px; font-size: 13px; font-weight: 600; letter-spacing: .01em;
+				cursor: pointer; transition: color var(--duration-fast) var(--ease-standard), border-color var(--duration-fast) var(--ease-standard), transform var(--duration-fast) var(--ease-standard), background var(--duration-fast) var(--ease-standard);
+			}
+			.sl-vocab-chip::before { content: '🤟'; font-size: 12px; opacity: .65; }
+			.sl-vocab-chip:hover { color: var(--ink); border-color: rgba(167,139,250,.6); transform: translateY(-1px); }
+			.sl-vocab-chip:active { transform: translateY(0) scale(.97); }
+			.sl-vocab-chip:focus-visible { outline: 2px solid rgba(167,139,250,.9); outline-offset: 2px; }
+			.sl-vocab-chip[aria-pressed='true'] { color: var(--ink); background: rgba(167,139,250,.16); border-color: rgba(167,139,250,.7); }
+			@media (prefers-reduced-motion: reduce) {
+				.sl-vocab-chip:hover, .sl-vocab-chip:active, .sl-opt:active,
+				.sl-btn:active:not(:disabled), .sl-phrase-chip:active { transform: none; }
+			}
+
+			/* The sign API console */
+			.sl-api { margin-top: clamp(48px, 6vw, 76px); border: 1px solid var(--stroke); border-radius: 20px; padding: clamp(24px, 4vw, 40px); background: var(--surface-1); }
+			.sl-api-head h2 { font-size: clamp(22px, 3vw, 30px); margin: 0 0 10px; letter-spacing: -.02em; }
+			.sl-api-head p { color: var(--ink-dim); font-size: 15px; line-height: 1.65; max-width: 68ch; margin: 0 0 24px; }
+			.sl-api-form .sl-input-row { max-width: 640px; }
+			.sl-api-form .sl-settings { margin-top: 14px; }
+			.sl-api-form .sl-chips { margin-top: 12px; }
+
+			.sl-api-out { margin-top: 26px; }
+			/* The action row and the request/response block describe a finished call,
+			   so they stay hidden until there is one. `loading` counts: the console
+			   auto-runs on load, and showing last call's body under the 55% dim below
+			   put a summary control on screen at a contrast no reader can meet (axe
+			   scores it serious) next to buttons that would act on stale output. */
+			.sl-api-out[data-state='idle'] .sl-api-actions,
+			.sl-api-out[data-state='idle'] .sl-api-code,
+			.sl-api-out[data-state='loading'] .sl-api-actions,
+			.sl-api-out[data-state='loading'] .sl-api-code,
+			.sl-api-out[data-state='error'] .sl-api-actions,
+			.sl-api-out[data-state='error'] .sl-api-code { display: none; }
+			.sl-api-out[data-state='loading'] { opacity: .55; }
+			.sl-api-out[data-state='loading'] .sl-api-timeline-wrap { animation: sl-api-pulse 1.1s ease-in-out infinite; }
+			@keyframes sl-api-pulse { 0%, 100% { opacity: .5 } 50% { opacity: .85 } }
+
+			.sl-api-stats { display: flex; flex-wrap: wrap; gap: 10px; margin: 0 0 18px; padding: 0; }
+			.sl-api-stat { border: 1px solid var(--stroke); border-radius: 12px; padding: 10px 14px; background: var(--surface-2); min-width: 92px; }
+			.sl-api-stat dt { font-size: 10px; letter-spacing: .09em; text-transform: uppercase; color: var(--ink-dim); }
+			.sl-api-stat dd { margin: 3px 0 0; font-family: var(--font-mono); font-size: 16px; color: var(--ink); }
+
+			.sl-api-timeline-wrap { position: relative; }
+			.sl-api-timeline { display: flex; gap: 3px; align-items: stretch; min-height: 74px; }
+			.sl-api-timeline:empty { border: 1px dashed var(--stroke); border-radius: 12px; }
+			.sl-api-seg {
+				position: relative; flex: 1 1 0; min-width: 0; appearance: none; cursor: pointer;
+				display: flex; flex-direction: column; justify-content: space-between; gap: 6px;
+				border: 1px solid rgba(167,139,250,.35); border-radius: 10px; padding: 9px 8px 7px;
+				background: rgba(167,139,250,.10); color: var(--ink); font: inherit; text-align: left;
+				transition: background var(--duration-fast) var(--ease-standard), border-color var(--duration-fast) var(--ease-standard), transform var(--duration-fast) var(--ease-standard);
+			}
+			.sl-api-seg[data-kind='spelled'] { border-color: var(--stroke); background: var(--surface-2); }
+			.sl-api-seg:hover { transform: translateY(-2px); border-color: rgba(167,139,250,.75); }
+			.sl-api-seg:focus-visible { outline: 2px solid rgba(167,139,250,.9); outline-offset: 2px; }
+			.sl-api-seg[data-active] { background: rgba(167,139,250,.32); border-color: rgba(167,139,250,.95); }
+			.sl-api-seg-word { font-family: var(--font-mono); font-size: 12px; letter-spacing: .02em; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+			.sl-api-seg[data-kind='spelled'] .sl-api-seg-word { color: var(--ink-dim); }
+			.sl-api-seg-letters { display: flex; gap: 2px; }
+			.sl-api-letter {
+				flex: 1 1 0; min-width: 0; text-align: center; border-radius: 4px; padding: 3px 0;
+				background: rgba(127,127,127,.16); font-family: var(--font-mono); font-size: 10px; color: var(--ink-dim);
+				overflow: hidden;
+			}
+			.sl-api-letter[data-active] { background: rgba(167,139,250,.55); color: var(--ink); }
+
+			.sl-api-playhead { position: absolute; top: -4px; bottom: 20px; width: 2px; background: var(--accent-violet-strong); box-shadow: 0 0 8px rgba(167,139,250,.9); pointer-events: none; border-radius: 2px; }
+			.sl-api-ruler { position: relative; height: 18px; margin-top: 4px; }
+			.sl-api-tick { position: absolute; top: 0; transform: translateX(-50%); font-family: var(--font-mono); font-size: 10px; color: var(--ink-dim); }
+
+			.sl-api-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 18px; }
+			.sl-btn-quiet { font-size: 13px; padding: 8px 14px; background: var(--surface-2); border-color: var(--stroke); text-decoration: none; }
+			.sl-btn-quiet:hover:not(:disabled) { background: rgba(167,139,250,.16); border-color: rgba(167,139,250,.6); }
+			.sl-api-note { margin: 14px 0 0; color: var(--ink-dim); font-size: 14px; line-height: 1.6; min-height: 22px; }
+
+			.sl-api-code { margin-top: 18px; border-top: 1px solid var(--stroke); padding-top: 14px; }
+			.sl-api-code summary { cursor: pointer; font-size: 14px; color: var(--ink-dim); }
+			.sl-api-code summary:hover { color: var(--ink); }
+			.sl-api-code summary:focus-visible { outline: 2px solid rgba(167,139,250,.9); outline-offset: 2px; border-radius: 4px; }
+			.sl-api-code-h { font-size: 11px; letter-spacing: .09em; text-transform: uppercase; color: var(--ink-dim); margin: 16px 0 6px; }
+			.sl-api-pre { margin: 0; padding: 14px; border: 1px solid var(--stroke); border-radius: 12px; background: var(--surface-2); overflow-x: auto; max-height: 340px; }
+			.sl-api-pre code { font-family: var(--font-mono); font-size: 12px; line-height: 1.6; color: var(--ink); white-space: pre; }
+			.sl-api-foot { margin: 22px 0 0; color: var(--ink-dim); font-size: 13px; line-height: 1.7; overflow-wrap: anywhere; }
+			.sl-api-foot a { color: var(--ink); }
+			.sl-api-foot code { font-family: var(--font-mono); font-size: 12px; }
+
+			@media (max-width: 700px) {
+				/* Below this the blocks stop being readable side by side, so the
+				   timeline becomes a scrollable strip rather than a row of slivers. */
+				.sl-api-timeline { overflow-x: auto; }
+				.sl-api-seg { min-width: 76px; flex-basis: 76px; }
+			}
+			@media (prefers-reduced-motion: reduce) {
+				.sl-api-seg:hover { transform: none; }
+				.sl-api-out[data-state='loading'] .sl-api-timeline-wrap { animation: none; }
+			}
+
+			/* Honest scope note */
+			.sl-note { margin-top: clamp(36px, 5vw, 56px); border-left: 2px solid rgba(167,139,250,.5); padding: 4px 0 4px 18px; color: var(--ink-dim); font-size: 14px; line-height: 1.65; max-width: 72ch; }
+
+			@media (max-width: 900px) {
+				.sl-hero { grid-template-columns: 1fr; }
+				.sl-caps { grid-template-columns: 1fr; }
+				.sl-webcam-grid { grid-template-columns: 1fr; }
+				#sl-cam-preview { max-width: 360px; }
+			}
+			@media (max-width: 420px) {
+				/* A 380px floor on a 4:5 stage is wider than the screen: below this
+				   the aspect ratio alone frames the avatar. */
+				.sl-stage-wrap { min-height: 0; }
+			}
+		</style>
+	
+	<meta property="og:image:alt" content="Sign Language Avatars · three.ws">
+</head>
+	<body>
+		<header>
+			<div id="nav-container"></div>
+		</header>
+		<script src="/nav.js"></script>
+
+		<main class="sl-main">
+			<section class="sl-hero">
+				<div class="sl-stage-wrap" id="sl-stage-wrap" data-state="loading">
+					<div id="sl-stage"></div>
+					<div class="sl-stage-skeleton" aria-hidden="true">
+						<span class="sl-stage-skeleton-head"></span>
+						<span class="sl-stage-skeleton-body"></span>
+					</div>
+					<div class="sl-stage-fallback" id="sl-stage-fallback" hidden>
+						<p class="sl-stage-fallback-msg" id="sl-stage-msg" role="status"></p>
+						<button id="sl-stage-retry" class="sl-btn" type="button" data-i18n="sign_language.retry_the_avatar">Retry the avatar</button>
+						<a class="sl-cap-link" href="#sl-api" data-i18n="sign_language.compile_signing_over_http_instead">Compile signing over HTTP instead ↓</a>
+					</div>
+					<div class="sl-status" id="sl-status" aria-live="polite"></div>
+				</div>
+
+				<div class="sl-hero-copy">
+					<span class="sl-chip" data-i18n-html="sign_language.american_sign_language_live_in_3d"><span class="sl-chip-dot"></span> American Sign Language · live in 3D</span>
+					<h1 data-i18n="sign_language.your_avatar_speaks_sign_language">Your avatar speaks sign language.</h1>
+					<p class="sl-hero-lede" data-i18n="sign_language.three_ws_avatars_fingerspell_any_word_or">
+						three.ws avatars fingerspell any word or number in ASL, sign every chat reply,
+						and read your own signing back from a webcam. The whole conversation, both
+						directions, in 3D that runs in the browser.
+					</p>
+
+					<div class="sl-try">
+						<div class="sl-try-label">Try it: type anything</div>
+						<div class="sl-input-row">
+							<input
+								id="sl-spell-input"
+								class="sl-input"
+								type="text"
+								maxlength="48"
+								placeholder="your name, a word, a number…"
+								aria-label="Text for the avatar to sign"
+								autocomplete="off"
+							/>
+							<button id="sl-spell-btn" class="sl-btn" type="button" data-i18n="sign_language.sign_it">🤟 Sign it</button>
+						</div>
+						<div class="sl-chips">
+							<button class="sl-phrase-chip" type="button" data-sl-phrase="THANK YOU" data-i18n="sign_language.thank_you">thank you</button>
+							<button class="sl-phrase-chip" type="button" data-sl-phrase="I LOVE THREE WS" data-i18n="sign_language.i_love_three_ws">i love three.ws</button>
+							<button class="sl-phrase-chip" type="button" data-sl-phrase="42">42</button>
+							<button class="sl-phrase-chip" type="button" data-sl-phrase="GM" data-i18n="sign_language.gm">gm</button>
+							<button
+								id="sl-share-btn"
+								class="sl-phrase-chip"
+								type="button"
+								hidden
+								title="Copy a link that signs this phrase for whoever opens it"
+								data-i18n="sign_language.share_this_phrase"
+							>🔗 Share this phrase</button>
+						</div>
+
+						<div class="sl-settings">
+							<div class="sl-setting">
+								<span class="sl-setting-label" id="sl-speed-label" data-i18n="sign_language.speed">Speed</span>
+								<div class="sl-opts" id="sl-speed" role="group" aria-labelledby="sl-speed-label"></div>
+							</div>
+							<div class="sl-setting">
+								<span class="sl-setting-label" id="sl-hand-label" data-i18n="sign_language.signing_hand">Signing hand</span>
+								<div class="sl-opts" id="sl-hand" role="group" aria-labelledby="sl-hand-label"></div>
+							</div>
+							<div class="sl-setting">
+								<span class="sl-setting-label" id="sl-rig-label" data-i18n="sign_language.avatar">Avatar</span>
+								<div class="sl-opts" id="sl-rig" role="group" aria-labelledby="sl-rig-label"></div>
+							</div>
+						</div>
+					</div>
+				</div>
+			</section>
+
+			<section class="sl-caps" aria-label="What sign language avatars can do">
+				<article class="sl-cap">
+					<span class="sl-cap-icon">🤟</span>
+					<h3 data-i18n="sign_language.fingerspell_anything">Fingerspell anything</h3>
+					<p data-i18n="sign_language.all_26_asl_letter_handshapes_plus_the">
+						All 26 ASL letter handshapes plus the numbers 0-9, with the traced J and Z
+						and the double-letter bounce. Type a word in the Animation Studio and export
+						the signing as an animated GLB, or share it as a link.
+					</p>
+					<a class="sl-cap-link" href="/pose" data-i18n="sign_language.open_the_animation_studio">Open the Animation Studio →</a>
+				</article>
+				<article class="sl-cap">
+					<span class="sl-cap-icon">💬</span>
+					<h3 data-i18n="sign_language.signed_chat_replies">Signed chat replies</h3>
+					<p data-i18n-html="sign_language.turn_on_sign_mode_in_the_agent">
+						Turn on sign mode in the agent chat and the avatar signs every answer:
+						library signs where they exist, fingerspelling for the rest. Any embedded
+						avatar gets it with one <code>sign-language</code> attribute.
+					</p>
+					<a class="sl-cap-link" href="/app" data-i18n="sign_language.chat_with_an_agent">Chat with an agent →</a>
+				</article>
+				<article class="sl-cap">
+					<span class="sl-cap-icon">🎥</span>
+					<h3 data-i18n="sign_language.sign_back_with_your_camera">Sign back with your camera</h3>
+					<p data-i18n="sign_language.fingerspell_into_your_webcam_and_the_ai">
+						Fingerspell into your webcam and the AI reads it to text: landmarks are
+						extracted on your device, so the video never leaves your machine. The demo
+						below runs the same recognizer.
+					</p>
+					<a class="sl-cap-link" href="#sl-webcam" data-i18n="sign_language.try_the_webcam_demo">Try the webcam demo ↓</a>
+				</article>
+			</section>
+
+			<section class="sl-vocab" id="sl-vocab" aria-label="Words the avatar signs rather than spells">
+				<h2 data-i18n="sign_language.it_signs_these_it_doesn_t_spell">It signs these. It doesn’t spell them.</h2>
+				<p data-i18n-html="sign_language.a_signer_spells_names_and_loanwords_and">
+					A signer spells names and loanwords and <em>signs</em> everything else. These
+					words have real signs in the avatar’s vocabulary: a handshape, a place on the
+					body, and a movement, on one or both hands. Pick one to watch it. Everything
+					else in a sentence still fingerspells.
+				</p>
+				<div class="sl-vocab-chips" id="sl-vocab-chips" role="group" aria-label="Vocabulary"></div>
+			</section>
+
+			<section class="sl-webcam" id="sl-webcam" aria-label="Webcam sign recognition demo">
+				<h2 data-i18n="sign_language.sign_to_us_and_we_ll_read">Sign to us and we’ll read it</h2>
+				<p data-i18n="sign_language.click_start_fingerspell_a_word_at_your">
+					Click start, fingerspell a word at your camera, then stop. Your browser turns
+					the video into hand and body landmarks locally; only those coordinates are sent
+					for recognition. Webcam fingerspelling is imperfect (expect the odd wrong
+					letter), so review the text before you trust it.
+				</p>
+				<div class="sl-webcam-grid">
+					<div id="sl-cam-preview" hidden></div>
+					<div class="sl-cam-side">
+						<button id="sl-cam-btn" class="sl-btn" type="button" data-i18n="sign_language.start_signing">🎥 Start signing</button>
+						<div id="sl-cam-result" class="sl-cam-result" aria-live="polite"></div>
+						<p class="sl-cam-hint" data-i18n="sign_language.best_results_good_light_hand_in_frame">
+							Best results: good light, hand in frame, one letter at a time. Numbers and
+							the full A-Z alphabet are supported.
+						</p>
+					</div>
+				</div>
+			</section>
+
+			<section class="sl-api" id="sl-api" aria-label="The sign API, live">
+				<div class="sl-api-head">
+					<h2 data-i18n="sign_language.the_same_signing_over_http">The same signing, over HTTP</h2>
+					<p data-i18n="sign_language.api_lede">
+						Everything above compiles in the browser. The same compiler runs on the server,
+						so any app, agent or engine can ask for a signed utterance and get one back:
+						a three.js animation clip keyed to a canonical humanoid skeleton, plus the
+						timeline it performs on. No account, no key, no SDK. Type below and watch the
+						real endpoint answer.
+					</p>
+				</div>
+				<div id="sl-api-console"></div>
+				<p class="sl-api-foot" data-i18n-html="sign_language.api_foot">
+					Full reference: <a href="/docs/sign-language#the-sign-api">the sign API</a> ·
+					<a href="/docs/api-reference"><code>/api/sign</code> in the API reference</a> ·
+					the reverse direction is <a href="/docs/sign-language#reading-signing-the-recognition-api"><code>/api/asl-recognition</code></a>.
+					Agents can call it as the <code>sign_text</code> tool on the
+					<a href="/mcp-tools">three.ws MCP server</a>.
+				</p>
+			</section>
+
+			<p class="sl-note" data-i18n-html="sign_language.honest_scope_words_with_a_sign_are">
+				Honest scope: words with a sign are signed, everything else is fingerspelled letter by letter. Signs are strung together in English word order, which is signed English,
+				not ASL grammar: real ASL reorders sentences, inflects verbs through space, and
+				carries grammar on the face. The vocabulary above is a starting set and is meant to
+				grow. Read the <a href="/docs/sign-language">full breakdown</a>.
+			</p>
+		</main>
+
+		<script src="/footer.js" defer></script>
+		<script type="module" src="/src/sign-language-page.js"></script>
+		<script type="module" src="/i18n.js"></script>
+	</body>
+</html>

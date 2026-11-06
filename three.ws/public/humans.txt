@@ -1,0 +1,22 @@
+/* TEAM */
+
+  three.ws — 3D AI agents on-chain
+  Contact: support@three.ws
+  Partnerships: partnerships@three.ws
+  Security: security@three.ws
+  Site: https://three.ws
+  GitHub: https://github.com/nirholas/three.ws
+  X: https://x.com/trythreews
+
+/* THANKS */
+
+  The open-source community behind Three.js, the Model Context Protocol,
+  Solana, and the x402 payment standard.
+
+/* SITE */
+
+  Standards: HTML5, ES modules, WebGL, glTF/GLB
+  Components: Three.js, Vite, Solana web3.js, Model Context Protocol
+  Payments: x402 (USDC on Base + Solana)
+  Token: $THREE
+  MCP: 14 servers in the official registry (registry.modelcontextprotocol.io)

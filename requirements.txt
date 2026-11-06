@@ -1,0 +1,6 @@
+livekit-api
+livekit-agents
+flask
+flask-cors
+python-dotenv
+pipecat-ai[deepgram,cartesia,openai,deepseek,livekit,mem0]

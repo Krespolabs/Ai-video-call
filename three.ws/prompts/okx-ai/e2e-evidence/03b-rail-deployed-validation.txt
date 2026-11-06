@@ -1,0 +1,28 @@
+# WO-03 follow-up — X Layer rail deployed & OKX-validated live (2026-07-07)
+# Session set X402_PAY_TO_XLAYER + X402_XLAYER_RELAYER_KEY (fresh keypair) in Vercel prod+preview,
+# redeployed, and confirmed all 8 paid services now advertise+validate the eip155:196 rail.
+
+## health payment-rail probe (real X Layer RPC + on-chain USD₮0 read)
+{
+  "name": "payment-rail",
+  "ok": true,
+  "latency_ms": 504,
+  "settleable": true,
+  "block": "64654400",
+  "token": "USD₮0",
+  "facilitator_configured": false
+}
+
+## onchainos agent x402-check --chain xlayer (per service): network + amount + valid
+  text-to-3d       valid=true net=eip155:196 amount=10000 ($0.01) payTo=0x75d00a2713565171f33216e5aa2a375e076ecf69
+  text-to-3d-pro   valid=true net=eip155:196 amount=300000 ($0.3) payTo=0x75d00a2713565171f33216e5aa2a375e076ecf69
+  image-to-3d      valid=true net=eip155:196 amount=300000 ($0.3) payTo=0x75d00a2713565171f33216e5aa2a375e076ecf69
+  rig              valid=true net=eip155:196 amount=250000 ($0.25) payTo=0x75d00a2713565171f33216e5aa2a375e076ecf69
+  avatar           valid=true net=eip155:196 amount=500000 ($0.5) payTo=0x75d00a2713565171f33216e5aa2a375e076ecf69
+  retarget         valid=true net=eip155:196 amount=100000 ($0.1) payTo=0x75d00a2713565171f33216e5aa2a375e076ecf69
+  pose-seed        valid=true net=eip155:196 amount=20000 ($0.02) payTo=0x75d00a2713565171f33216e5aa2a375e076ecf69
+  fbx-export       valid=true net=eip155:196 amount=100000 ($0.1) payTo=0x75d00a2713565171f33216e5aa2a375e076ecf69
+
+## free-lane real artifact — TRELLIS engine behind text-to-3d produced a valid GLB
+  glbUrl: https://pub-2534e921bf9c4314addcd4d8a6e98b7b.r2.dev/forge/anon/f8a246eb-3b7c-4db9-8acb-6b1fa8d0aeb6.glb
+  parsed: magic=glTF version=2 bytes=1514680 meshes=1 materials=1 images=1  (VALID)

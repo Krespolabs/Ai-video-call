@@ -1,0 +1,129 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Deploy On-chain v1</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=block" rel="stylesheet">
+<style>
+	:root {
+		--bg: #000;
+		--ink: #f5f5f5;
+		--muted: #8a8a8a;
+		--faint: #2a2a2a;
+		--line: #1c1c1c;
+		--accent: #14f195;
+		--warn: #ff6b5b;
+	}
+	* { box-sizing: border-box; margin: 0; padding: 0; }
+	html, body { width: 1600px; height: 900px; background: var(--bg); }
+	body {
+		color: var(--ink);
+		font-family: Inter, system-ui, sans-serif;
+		padding: 88px 104px;
+		display: flex;
+		flex-direction: column;
+		-webkit-font-smoothing: antialiased;
+	}
+	.eyebrow {
+		font-family: 'JetBrains Mono', monospace;
+		font-size: 22px;
+		color: var(--muted);
+		letter-spacing: 0.02em;
+	}
+	h1 {
+		margin-top: 22px;
+		font-size: 76px;
+		font-weight: 700;
+		letter-spacing: -0.035em;
+		line-height: 1.02;
+	}
+	h1 span { color: var(--muted); }
+	.rows { margin-top: 112px; display: grid; gap: 30px; }
+	.row { display: grid; grid-template-columns: 120px 1fr; align-items: center; gap: 28px; }
+	.label {
+		font-family: 'JetBrains Mono', monospace;
+		font-size: 20px;
+		color: var(--muted);
+		text-transform: uppercase;
+		letter-spacing: 0.08em;
+	}
+	.track { display: flex; align-items: center; gap: 0; }
+	.tx {
+		height: 84px;
+		border-radius: 14px;
+		display: flex;
+		align-items: center;
+		justify-content: space-between;
+		padding: 0 30px;
+		font-size: 26px;
+		font-weight: 500;
+	}
+	.tx small {
+		font-family: 'JetBrains Mono', monospace;
+		font-size: 18px;
+		font-weight: 400;
+		color: var(--muted);
+	}
+	.old { border: 1.5px solid var(--faint); color: #bdbdbd; flex: 1; }
+	.gap {
+		width: 168px;
+		display: flex;
+		flex-direction: column;
+		align-items: center;
+		gap: 8px;
+		font-family: 'JetBrains Mono', monospace;
+		font-size: 16px;
+		color: var(--warn);
+	}
+	.gap i { display: block; width: 100%; border-top: 2px dashed #5a2a25; }
+	.new {
+		flex: 1;
+		border: 1.5px solid var(--accent);
+		background: rgba(20, 241, 149, 0.06);
+	}
+	.new small { color: var(--accent); }
+	.foot {
+		margin-top: auto;
+		display: flex;
+		justify-content: space-between;
+		align-items: flex-end;
+		border-top: 1px solid var(--line);
+		padding-top: 30px;
+	}
+	.facts { display: flex; gap: 40px; font-size: 21px; color: var(--muted); }
+	.facts b { color: var(--ink); font-weight: 500; }
+	.brand { font-size: 26px; font-weight: 600; letter-spacing: -0.02em; }
+</style>
+</head>
+<body>
+	<div class="eyebrow">three.ws/deploy-onchain</div>
+	<h1>Deploy an agent on Solana.<br><span>One transaction, not two.</span></h1>
+
+	<div class="rows">
+		<div class="row">
+			<div class="label">Before</div>
+			<div class="track">
+				<div class="tx old">Create asset <small>tx 1</small></div>
+				<div class="gap"><span>can fail here</span><i></i></div>
+				<div class="tx old">Register agent <small>tx 2</small></div>
+			</div>
+		</div>
+		<div class="row">
+			<div class="label">Now</div>
+			<div class="track">
+				<div class="tx new">Create asset + register agent, atomically <small>transaction v1</small></div>
+			</div>
+		</div>
+	</div>
+
+	<div class="foot">
+		<div class="facts">
+			<span><b>Explicit</b> compute, data, and fee limits</span>
+			<span><b>Verified</b> landed version before recording</span>
+			<span><b>Fallback</b> for wallets without v1</span>
+		</div>
+		<div class="brand">three.ws</div>
+	</div>
+</body>
+</html>

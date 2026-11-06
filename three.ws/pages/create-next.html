@@ -1,0 +1,707 @@
+<!doctype html>
+<html lang="en">
+<head>
+	<style>/* three.ws hidden-guard — make the `hidden` attribute authoritative; see scripts/lib/hidden-guard.mjs */[hidden]{display:none!important}</style>
+	<script>/* three.ws theme boot — no-flash */(function(){try{var m=localStorage.getItem('twx_theme');var l=m==='auto'?(window.matchMedia&&window.matchMedia('(prefers-color-scheme: light)').matches):m==='light';document.documentElement.setAttribute('data-theme',l?'light':'dark');}catch(e){document.documentElement.setAttribute('data-theme','dark');}})();</script>
+	<meta charset="utf-8" />
+	<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+	<title data-i18n="create_next.meta_title">Your avatar is ready · three.ws</title>
+	<meta name="robots" content="noindex" />
+	<link rel="icon" href="/favicon.ico" sizes="any" />
+	<link rel="stylesheet" href="/fonts/fonts.css" />
+	<style>
+		*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+		html, body {
+			height: 100%;
+			background: #050508;
+			color: #e5e7eb;
+			font-family: Inter, system-ui, sans-serif;
+		}
+
+		/* ── layout ── */
+		.cn-shell {
+			display: grid;
+			grid-template-columns: 1fr 1fr;
+			min-height: 100vh;
+		}
+
+		/* ── left: avatar panel ── */
+		.cn-left {
+			display: flex;
+			flex-direction: column;
+			align-items: center;
+			justify-content: center;
+			padding: 40px 32px;
+			position: relative;
+			background: radial-gradient(ellipse 80% 60% at 50% 60%, rgba(99,102,241,.1) 0%, transparent 70%);
+			border-right: 1px solid rgba(255,255,255,.06);
+			overflow: hidden;
+		}
+
+		.cn-confetti {
+			position: absolute; inset: 0;
+			pointer-events: none; z-index: 3;
+		}
+
+		.cn-avatar-wrap {
+			position: relative;
+			width: clamp(200px, 40vw, 320px);
+			height: clamp(220px, 44vw, 360px);
+			animation: cn-fade-scale .8s ease-out .08s both;
+		}
+
+		.cn-avatar-glow {
+			position: absolute; inset: -24px;
+			border-radius: 50%;
+			background: radial-gradient(circle at center, rgba(99,102,241,.22) 0%, transparent 70%);
+			animation: glow-pulse 3s ease-in-out infinite;
+		}
+
+		.cn-stage, .cn-initial {
+			position: absolute; inset: 0;
+			width: 100%; height: 100%;
+			border: 0; background: transparent;
+		}
+		.cn-stage {
+			opacity: 0; transition: opacity .6s ease-out;
+			z-index: 2;
+		}
+		.cn-stage.show { opacity: 1; }
+		.cn-initial {
+			display: flex; align-items: center; justify-content: center;
+			border-radius: 50%;
+			background: linear-gradient(135deg, #312e81, #4f46e5);
+			font-size: 4rem; font-weight: 800;
+			color: rgba(255,255,255,.9);
+			z-index: 1;
+		}
+
+		.cn-avatar-label {
+			margin-top: 20px;
+			font-size: 1.1rem; font-weight: 700; color: #f9fafb;
+			letter-spacing: -.01em; text-align: center;
+			animation: cn-fade .6s ease-out .6s both;
+		}
+
+		.cn-avatar-tag {
+			margin-top: 8px;
+			font-size: 11px; font-weight: 600; letter-spacing: .1em;
+			text-transform: uppercase; color: #a5b4fc;
+			animation: cn-fade .6s ease-out .7s both;
+		}
+
+		.cn-back {
+			position: absolute; bottom: 24px;
+			font-size: 12px; color: #6b7280;
+			text-decoration: none;
+			transition: color .15s;
+			z-index: 4;
+		}
+		.cn-back:hover { color: #9ca3af; }
+
+		/* ── right: next steps ── */
+		.cn-right {
+			display: flex;
+			flex-direction: column;
+			justify-content: center;
+			padding: 48px 40px;
+			gap: 0;
+		}
+
+		.cn-header {
+			animation: cn-fade-up .6s ease-out both;
+		}
+
+		.cn-kicker {
+			font-size: 11px; font-weight: 700;
+			letter-spacing: .14em; text-transform: uppercase;
+			color: #6366f1; margin-bottom: 8px;
+		}
+
+		.cn-headline {
+			font-size: clamp(1.4rem, 2.5vw, 2rem);
+			font-weight: 800; line-height: 1.15;
+			color: #f9fafb;
+		}
+
+		.cn-steps {
+			margin-top: 32px;
+			display: flex; flex-direction: column; gap: 0;
+		}
+
+		.cn-step {
+			display: flex; gap: 18px;
+			padding: 20px 24px;
+			border-radius: 14px;
+			border: 1px solid rgba(255,255,255,.07);
+			background: rgba(255,255,255,.03);
+			cursor: pointer;
+			transition: border-color .2s, background .2s, transform .15s;
+			text-decoration: none; color: inherit;
+			position: relative;
+			margin-bottom: 10px;
+			animation: cn-fade-x .5s ease-out both;
+		}
+		.cn-step:last-child { margin-bottom: 0; }
+		.cn-step:hover {
+			border-color: rgba(99,102,241,.5);
+			background: rgba(99,102,241,.07);
+			transform: translateX(3px);
+		}
+		.cn-step:focus-visible {
+			outline: 2px solid #818cf8;
+			outline-offset: 2px;
+		}
+		.cn-step.primary {
+			border-color: rgba(99,102,241,.4);
+			background: rgba(99,102,241,.1);
+		}
+		.cn-step.primary:hover {
+			border-color: rgba(99,102,241,.7);
+			background: rgba(99,102,241,.16);
+		}
+		.cn-step.optional {
+			border-style: dashed;
+			border-color: rgba(255,255,255,.1);
+		}
+		.cn-step.done {
+			border-color: rgba(52,211,153,.32);
+			background: rgba(16,185,129,.06);
+		}
+		.cn-step.done:hover {
+			border-color: rgba(52,211,153,.5);
+			background: rgba(16,185,129,.1);
+		}
+
+		.cn-step-num {
+			width: 32px; height: 32px;
+			border-radius: 50%;
+			display: flex; align-items: center; justify-content: center;
+			flex-shrink: 0;
+			font-size: 13px; font-weight: 700;
+			background: rgba(99,102,241,.15); color: #a5b4fc;
+		}
+		.cn-step.primary .cn-step-num {
+			background: rgba(99,102,241,.4); color: #e0e7ff;
+		}
+		.cn-step.optional .cn-step-num {
+			background: rgba(255,255,255,.06); color: #6b7280;
+		}
+		.cn-step.done .cn-step-num {
+			background: rgba(16,185,129,.22); color: #6ee7b7;
+		}
+
+		.cn-step-body { flex: 1; min-width: 0; }
+
+		.cn-step-title {
+			font-size: 14px; font-weight: 700;
+			color: #e5e7eb;
+			display: flex; align-items: center; gap: 8px;
+		}
+		.cn-step.optional .cn-step-title { color: #9ca3af; }
+
+		.cn-opt-pill {
+			font-size: 9px; font-weight: 700; letter-spacing: .1em;
+			text-transform: uppercase; color: #4b5563;
+			border: 1px solid rgba(255,255,255,.1);
+			padding: 1px 6px; border-radius: 4px;
+		}
+		.cn-done-pill {
+			font-size: 9px; font-weight: 700; letter-spacing: .1em;
+			text-transform: uppercase; color: #6ee7b7;
+			border: 1px solid rgba(52,211,153,.3);
+			padding: 1px 6px; border-radius: 4px;
+		}
+
+		.cn-step-desc {
+			margin-top: 3px;
+			font-size: 12.5px; color: #6b7280; line-height: 1.5;
+		}
+		.cn-step.primary .cn-step-desc { color: #9ca3af; }
+
+		.cn-step-arrow {
+			align-self: center;
+			font-size: 16px; color: #4b5563;
+			transition: transform .15s;
+			flex-shrink: 0;
+		}
+		.cn-step:hover .cn-step-arrow { transform: translateX(3px); color: #a5b4fc; }
+		.cn-step.optional:hover .cn-step-arrow { transform: translateX(3px); color: #6b7280; }
+
+		/* ── inline embed snippet ── */
+		.cn-embed {
+			margin: -2px 0 10px;
+			padding: 14px 16px;
+			border-radius: 12px;
+			border: 1px solid rgba(255,255,255,.07);
+			background: rgba(255,255,255,.02);
+			animation: cn-fade .5s ease-out .28s both;
+		}
+		.cn-embed-head {
+			display: flex; align-items: center; justify-content: space-between;
+			gap: 12px; margin-bottom: 10px;
+		}
+		.cn-embed-head span {
+			font-size: 11px; font-weight: 600; letter-spacing: .04em;
+			text-transform: uppercase; color: #9ca3af;
+		}
+		.cn-embed-copy {
+			font-family: inherit; font-size: 11.5px; font-weight: 600;
+			color: #c7d2fe; cursor: pointer;
+			background: rgba(99,102,241,.16);
+			border: 1px solid rgba(99,102,241,.35);
+			padding: 5px 12px; border-radius: 7px;
+			transition: background .15s, border-color .15s, color .15s;
+		}
+		.cn-embed-copy:hover { background: rgba(99,102,241,.28); border-color: rgba(99,102,241,.6); }
+		.cn-embed-copy:focus-visible { outline: 2px solid #818cf8; outline-offset: 2px; }
+		.cn-embed-copy.copied { color: #6ee7b7; border-color: rgba(52,211,153,.5); background: rgba(16,185,129,.14); }
+		.cn-embed-code {
+			margin: 0;
+			font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+			font-size: 11px; line-height: 1.55; color: #cbd5e1;
+			background: #0a0a12; border-radius: 8px;
+			padding: 12px 14px;
+			overflow-x: auto; white-space: pre;
+			border: 1px solid rgba(255,255,255,.05);
+		}
+
+		/* ── footer: share + later ── */
+		.cn-footer {
+			margin-top: 22px;
+			display: flex; align-items: center; gap: 12px;
+			flex-wrap: wrap;
+			animation: cn-fade .5s ease-out .36s both;
+		}
+		.cn-share-btn {
+			display: inline-flex; align-items: center; gap: 7px;
+			font-family: inherit; font-size: 12.5px; font-weight: 600;
+			color: #e5e7eb; cursor: pointer;
+			background: rgba(255,255,255,.04);
+			border: 1px solid rgba(255,255,255,.1);
+			padding: 8px 14px; border-radius: 9px;
+			transition: background .15s, border-color .15s, color .15s;
+			text-decoration: none;
+		}
+		.cn-share-btn:hover { background: rgba(255,255,255,.08); border-color: rgba(255,255,255,.2); }
+		.cn-share-btn:focus-visible { outline: 2px solid #818cf8; outline-offset: 2px; }
+		.cn-share-btn svg { width: 14px; height: 14px; }
+		.cn-share-btn.copied { color: #6ee7b7; border-color: rgba(52,211,153,.45); }
+		.cn-later {
+			margin-left: auto;
+			font-size: 12px; color: #6b7280; text-decoration: none;
+			transition: color .15s;
+		}
+		.cn-later:hover { color: #9ca3af; }
+
+		/* toast */
+		.cn-toast {
+			position: fixed; left: 50%; bottom: 28px;
+			transform: translateX(-50%) translateY(12px);
+			background: #11131c; color: #e5e7eb;
+			border: 1px solid rgba(255,255,255,.12);
+			padding: 10px 18px; border-radius: 10px;
+			font-size: 13px; font-weight: 500;
+			box-shadow: 0 12px 40px rgba(0,0,0,.5);
+			opacity: 0; pointer-events: none;
+			transition: opacity .2s, transform .2s;
+			z-index: 50;
+		}
+		.cn-toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+
+		/* ── animations ── */
+		@keyframes glow-pulse {
+			0%,100% { opacity: .5; transform: scale(1); }
+			50%      { opacity: 1; transform: scale(1.06); }
+		}
+		@keyframes cn-fade { from { opacity: 0; } to { opacity: 1; } }
+		@keyframes cn-fade-up { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
+		@keyframes cn-fade-scale { from { opacity: 0; transform: scale(.92); } to { opacity: 1; transform: none; } }
+		@keyframes cn-fade-x { from { opacity: 0; transform: translateX(14px); } to { opacity: 1; transform: none; } }
+
+		@media (prefers-reduced-motion: reduce) {
+			.cn-avatar-wrap, .cn-avatar-glow, .cn-avatar-label, .cn-avatar-tag,
+			.cn-header, .cn-step, .cn-embed, .cn-footer {
+				animation: none !important;
+			}
+			.cn-stage { transition: none; }
+		}
+
+		/* ── mobile ── */
+		@media (max-width: 700px) {
+			.cn-shell {
+				grid-template-columns: 1fr;
+				grid-template-rows: auto 1fr;
+			}
+			.cn-left {
+				border-right: none;
+				border-bottom: 1px solid rgba(255,255,255,.06);
+				padding: 32px 24px 24px;
+				background: radial-gradient(ellipse 120% 100% at 50% 80%, rgba(99,102,241,.09) 0%, transparent 70%);
+			}
+			.cn-avatar-wrap {
+				width: clamp(150px, 52vw, 220px);
+				height: clamp(165px, 56vw, 250px);
+			}
+			.cn-right { padding: 28px 20px 40px; }
+			.cn-step { padding: 16px 18px; }
+		}
+	</style>
+</head>
+<body>
+	<div class="cn-shell">
+		<div class="cn-left">
+			<canvas class="cn-confetti" id="cnConfetti" aria-hidden="true"></canvas>
+			<div class="cn-avatar-wrap" id="cnAvatarWrap">
+				<div class="cn-avatar-glow" id="cnAvatarGlow"></div>
+				<div class="cn-initial" id="cnInitial">?</div>
+			</div>
+			<div class="cn-avatar-label" id="cnAvatarLabel">Loading…</div>
+			<div class="cn-avatar-tag" id="cnAvatarTag">3D AI Agent</div>
+			<a class="cn-back" href="/dashboard/avatars" data-i18n="create_next.back_to_avatars">← Back to avatars</a>
+		</div>
+
+		<div class="cn-right">
+			<div class="cn-header" id="cnHeader">
+				<div class="cn-kicker">What's next?</div>
+				<h1 class="cn-headline" id="cnHeadline" data-i18n-html="create_next.your_avatar_is_ready_here_s_where">Your avatar is ready.<br>Here's where it gets powerful.</h1>
+			</div>
+
+			<div class="cn-steps" id="cnSteps">
+				<a class="cn-step primary" id="cnStep1" href="/create-agent" style="animation-delay:.05s">
+					<div class="cn-step-num" id="cnStep1Num">1</div>
+					<div class="cn-step-body">
+						<div class="cn-step-title" id="cnStep1Title">Give it a brain</div>
+						<div class="cn-step-desc" id="cnStep1Desc">Set its personality, system prompt, and voice. Your avatar becomes a real AI agent in minutes.</div>
+					</div>
+					<div class="cn-step-arrow">→</div>
+				</a>
+				<a class="cn-step" id="cnStep2" href="/embed.html" style="animation-delay:.12s">
+					<div class="cn-step-num">2</div>
+					<div class="cn-step-body">
+						<div class="cn-step-title">Embed it anywhere</div>
+						<div class="cn-step-desc">Drop a live talking 3D widget on any website in 2 minutes. Copy one snippet.</div>
+					</div>
+					<div class="cn-step-arrow">→</div>
+				</a>
+				<div class="cn-embed" id="cnEmbed" hidden>
+					<div class="cn-embed-head">
+						<span data-i18n="create_next.or_grab_the_snippet_now">Or grab the snippet now</span>
+						<button class="cn-embed-copy" id="cnEmbedCopy" type="button" aria-label="Copy embed snippet" data-i18n="create_next.copy" data-i18n-attr="aria-label:create_next.copy_embed_snippet_arialabel">Copy</button>
+					</div>
+					<pre class="cn-embed-code"><code id="cnEmbedCode"></code></pre>
+				</div>
+				<a class="cn-step optional" id="cnStep3" href="/launchpad" style="animation-delay:.2s">
+					<div class="cn-step-num" id="cnStep3Num">3</div>
+					<div class="cn-step-body">
+						<div class="cn-step-title" id="cnStep3Title">Deploy on-chain <span class="cn-opt-pill" data-i18n="create_next.optional">Optional</span></div>
+						<div class="cn-step-desc">Mint your agent as a collectible. Make it discoverable and tradeable.</div>
+					</div>
+					<div class="cn-step-arrow">→</div>
+				</a>
+				<a class="cn-step optional" id="cnStep4" href="/diorama" style="animation-delay:.27s">
+					<div class="cn-step-num">4</div>
+					<div class="cn-step-body">
+						<div class="cn-step-title">Put it in a world <span class="cn-opt-pill" data-i18n="create_next.optional_2">Optional</span></div>
+						<div class="cn-step-desc">Turn one sentence into a 3D scene and drop your new avatar into it.</div>
+					</div>
+					<div class="cn-step-arrow">→</div>
+				</a>
+				<a class="cn-step" id="cnStep5" href="/profile" style="animation-delay:.34s">
+					<div class="cn-step-num">5</div>
+					<div class="cn-step-body">
+						<div class="cn-step-title">See your profile</div>
+						<div class="cn-step-desc">Your creator portfolio — everything you make from here shows up here.</div>
+					</div>
+					<div class="cn-step-arrow">→</div>
+				</a>
+			</div>
+
+			<div class="cn-footer">
+				<button class="cn-share-btn" id="cnShareCopy" type="button" hidden aria-label="Copy public link to your agent" data-i18n-attr="aria-label:create_next.copy_public_link_to_your_age_arialabel">
+					<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>
+					Copy link
+				</button>
+				<a class="cn-share-btn" id="cnShareX" target="_blank" rel="noopener" hidden aria-label="Share your agent on X" data-i18n-attr="aria-label:create_next.share_your_agent_on_x_arialabel">
+					<svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231 5.45-6.231Zm-1.161 17.52h1.833L7.084 4.126H5.117L17.083 19.77Z"/></svg>
+					Share on X
+				</a>
+				<a class="cn-later" id="cnLater" href="/dashboard" data-i18n="create_next.i_ll_do_this_later">I'll do this later →</a>
+			</div>
+		</div>
+	</div>
+
+	<div class="cn-toast" id="cnToast" role="status" aria-live="polite"></div>
+
+	<script type="module">
+		const p = new URLSearchParams(location.search);
+		const avatarId = p.get('avatarId') || '';
+		const agentId  = p.get('agentId')  || '';
+		const origin   = location.origin;
+
+		// If this is an agent save (has agentId), step 1 goes to /app (AI chat).
+		// If avatar-only, step 1 goes to /create-agent (build an agent from the avatar).
+		const step1Href   = agentId ? `/app?agent=${encodeURIComponent(agentId)}` : (avatarId ? `/create-agent?avatar=${encodeURIComponent(avatarId)}` : '/create-agent');
+		const step1Label  = agentId ? 'Chat with your agent' : 'Give it a brain';
+		const step1Desc   = agentId
+			? 'Talk to your agent, customize its personality, and set a system prompt.'
+			: 'Set its personality, system prompt, and voice. Your avatar becomes a real AI agent in minutes.';
+		const step2Href   = avatarId ? `/embed.html?avatar=${encodeURIComponent(avatarId)}` : (agentId ? `/embed.html?agent=${encodeURIComponent(agentId)}` : '/embed.html');
+		const step3Href   = agentId ? `/deploy?agent=${encodeURIComponent(agentId)}` : (avatarId ? `/create-agent?avatar=${encodeURIComponent(avatarId)}&then=deploy` : '/launchpad');
+		const headline    = agentId ? 'Your agent is ready.<br>Here\'s where it gets powerful.' : 'Your avatar is ready.<br>Here\'s where it gets powerful.';
+		const backHref    = agentId ? `/app?agent=${encodeURIComponent(agentId)}` : '/dashboard/avatars';
+		const avatarTag   = agentId ? '3D AI Agent' : '3D Avatar';
+
+		document.getElementById('cnStep1').href = step1Href;
+		document.getElementById('cnStep1Title').textContent = step1Label;
+		document.getElementById('cnStep1Desc').textContent = step1Desc;
+		document.getElementById('cnStep2').href = step2Href;
+		document.getElementById('cnStep3').href = step3Href;
+		document.getElementById('cnHeadline').innerHTML = headline;
+		document.querySelector('.cn-back').href = backHref;
+		document.getElementById('cnAvatarTag').textContent = avatarTag;
+		document.getElementById('cnLater').href = agentId ? '/dashboard/agents' : '/dashboard/avatars';
+
+		// ── Live, idle-animated avatar stage ──────────────────────────────────
+		// /walk-embed is the production renderer: it retargets the canonical idle
+		// clip onto any rig, so the figure breathes here instead of standing in a
+		// dead T-pose. `controls=none&click=false` makes it a non-interactive
+		// portrait; `orbit` stays on so the visitor can spin it. The initial-letter
+		// placeholder shows until the stage's first frame loads (or forever, if the
+		// avatar can't be resolved — a graceful fallback, never a broken void).
+		function mountStage() {
+			if (!agentId && !avatarId) return; // no model to show — keep the initial placeholder
+			const reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+			const q = new URLSearchParams({
+				controls: 'none',
+				click: 'false',
+				ground: 'false',
+				badge: 'false',
+				bg: 'transparent',
+				env: 'studio',
+				orbit: reduce ? 'false' : 'true',
+			});
+			if (agentId) q.set('agent', agentId);
+			else q.set('avatar', avatarId);
+			const wrap = document.getElementById('cnAvatarWrap');
+			const ph   = document.getElementById('cnInitial');
+			const frame = document.createElement('iframe');
+			frame.className = 'cn-stage';
+			frame.src = `/walk-embed?${q.toString()}`;
+			frame.title = 'Your live 3D avatar';
+			frame.setAttribute('allow', 'autoplay; xr-spatial-tracking');
+			frame.setAttribute('loading', 'eager');
+			frame.addEventListener('load', () => {
+				frame.classList.add('show');
+				setTimeout(() => { ph.style.display = 'none'; }, 650);
+			});
+			wrap.appendChild(frame);
+		}
+
+		// ── Inline embed snippet (agents only) ────────────────────────────────
+		function wireEmbedSnippet() {
+			if (!agentId) return;
+			const snippet =
+				`<iframe\n` +
+				`  src="${origin}/agents/${agentId}/embed"\n` +
+				`  width="420" height="640"\n` +
+				`  title="three.ws agent"\n` +
+				`  style="border:0;border-radius:12px"\n` +
+				`  allow="autoplay; xr-spatial-tracking"\n` +
+				`  sandbox="allow-scripts allow-same-origin allow-popups"\n` +
+				`  loading="lazy"\n` +
+				`></iframe>`;
+			document.getElementById('cnEmbedCode').textContent = snippet;
+			document.getElementById('cnEmbed').hidden = false;
+			const btn = document.getElementById('cnEmbedCopy');
+			btn.addEventListener('click', async () => {
+				const ok = await copyText(snippet);
+				btn.textContent = ok ? 'Copied' : 'Press ⌘C';
+				btn.classList.toggle('copied', ok);
+				toast(ok ? 'Snippet copied — paste it on any site.' : 'Copy failed — select and copy manually.');
+				setTimeout(() => { btn.textContent = 'Copy'; btn.classList.remove('copied'); }, 2200);
+			});
+		}
+
+		// ── Share (agents only) ───────────────────────────────────────────────
+		function wireShare() {
+			if (!agentId) return;
+			const publicUrl = `${origin}/agents/${agentId}`;
+			const copyBtn = document.getElementById('cnShareCopy');
+			const xLink   = document.getElementById('cnShareX');
+			copyBtn.hidden = false;
+			xLink.hidden = false;
+
+			copyBtn.addEventListener('click', async () => {
+				const ok = await copyText(publicUrl);
+				copyBtn.classList.toggle('copied', ok);
+				toast(ok ? 'Public link copied.' : 'Copy failed.');
+				setTimeout(() => copyBtn.classList.remove('copied'), 2000);
+			});
+
+			const update = (name) => {
+				const text = `I just built ${name ? name : 'a 3D AI agent'} on three.ws — a live, talking 3D agent you can embed anywhere.`;
+				xLink.href = `https://twitter.com/intent/tweet?text=${encodeURIComponent(text)}&url=${encodeURIComponent(publicUrl)}`;
+			};
+			update('');
+			return update;
+		}
+
+		// ── Completion state ──────────────────────────────────────────────────
+		function markDone(stepEl, numEl, label) {
+			stepEl.classList.add('done');
+			numEl.textContent = '✓';
+			const title = stepEl.querySelector('.cn-step-title');
+			if (title && !title.querySelector('.cn-done-pill')) {
+				const pill = document.createElement('span');
+				pill.className = 'cn-done-pill';
+				pill.textContent = label;
+				title.appendChild(pill);
+			}
+		}
+
+		async function loadAgent(updateShare) {
+			let name = '';
+			if (agentId) {
+				try {
+					const r = await fetch(`/api/agents/${encodeURIComponent(agentId)}`, { credentials: 'include' });
+					if (r.ok) {
+						const a = await r.json();
+						name = a.name || '';
+						if (a.system_prompt || a.persona_prompt) {
+							markDone(document.getElementById('cnStep1'), document.getElementById('cnStep1Num'), 'Done');
+						}
+						if (a.onchain || a.is_registered) {
+							markDone(document.getElementById('cnStep3'), document.getElementById('cnStep3Num'), 'Live');
+						}
+					}
+				} catch { /* non-fatal — the screen still works without it */ }
+			} else if (avatarId) {
+				try {
+					const r = await fetch(`/api/avatars/${encodeURIComponent(avatarId)}`, { credentials: 'include' });
+					if (r.ok) {
+						const d = await r.json();
+						name = (d.avatar || d).name || '';
+					}
+				} catch { /* non-fatal */ }
+			}
+
+			if (!name) name = p.get('name') || (agentId ? 'Your agent' : 'Your avatar');
+			document.getElementById('cnAvatarLabel').textContent = name;
+			document.getElementById('cnInitial').textContent = (name[0] || 'A').toUpperCase();
+			document.title = `${name} · three.ws`;
+			if (updateShare) updateShare(name);
+		}
+
+		// ── Helpers ───────────────────────────────────────────────────────────
+		async function copyText(text) {
+			try {
+				if (navigator.clipboard && window.isSecureContext) {
+					await navigator.clipboard.writeText(text);
+					return true;
+				}
+			} catch { /* fall through to legacy path */ }
+			try {
+				const ta = document.createElement('textarea');
+				ta.value = text;
+				ta.style.position = 'fixed';
+				ta.style.opacity = '0';
+				document.body.appendChild(ta);
+				ta.select();
+				const ok = document.execCommand('copy');
+				ta.remove();
+				return ok;
+			} catch { return false; }
+		}
+
+		let toastTimer = null;
+		function toast(msg) {
+			const t = document.getElementById('cnToast');
+			t.textContent = msg;
+			t.classList.add('show');
+			clearTimeout(toastTimer);
+			toastTimer = setTimeout(() => t.classList.remove('show'), 2600);
+		}
+
+		// ── One-shot celebration burst ────────────────────────────────────────
+		// A single confetti pop anchored to the avatar — sells the "it's done"
+		// moment, then gets out of the way. Skipped entirely under reduced-motion.
+		function celebrate() {
+			if (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+			const canvas = document.getElementById('cnConfetti');
+			const left = document.querySelector('.cn-left');
+			const ctx = canvas.getContext('2d');
+			const dpr = Math.min(window.devicePixelRatio || 1, 2);
+			let raf = 0;
+
+			function size() {
+				const r = left.getBoundingClientRect();
+				canvas.width = r.width * dpr;
+				canvas.height = r.height * dpr;
+				ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+				return r;
+			}
+			const rect = size();
+			const colors = ['#6366f1', '#818cf8', '#a5b4fc', '#34d399', '#f9fafb', '#c7d2fe'];
+			const cx = rect.width / 2;
+			const cy = rect.height * 0.46;
+			const N = Math.min(120, Math.round(rect.width / 6));
+			const parts = [];
+			for (let i = 0; i < N; i++) {
+				const ang = (Math.PI * 2 * i) / N + (i % 2 ? 0.18 : 0);
+				const spd = 5 + (i % 7);
+				parts.push({
+					x: cx, y: cy,
+					vx: Math.cos(ang) * spd * (0.6 + (i % 5) / 8),
+					vy: Math.sin(ang) * spd * (0.6 + (i % 4) / 7) - 3,
+					w: 5 + (i % 4) * 2, h: 3 + (i % 3) * 2,
+					rot: i, vr: (i % 2 ? 0.3 : -0.25),
+					color: colors[i % colors.length],
+				});
+			}
+
+			let frames = 0;
+			const total = 90;
+			function tick() {
+				frames++;
+				ctx.clearRect(0, 0, canvas.width, canvas.height);
+				const fade = Math.max(0, 1 - frames / total);
+				for (const pt of parts) {
+					pt.vy += 0.32;        // gravity
+					pt.vx *= 0.985;       // drag
+					pt.x += pt.vx;
+					pt.y += pt.vy;
+					pt.rot += pt.vr;
+					ctx.save();
+					ctx.globalAlpha = fade;
+					ctx.translate(pt.x, pt.y);
+					ctx.rotate(pt.rot);
+					ctx.fillStyle = pt.color;
+					ctx.fillRect(-pt.w / 2, -pt.h / 2, pt.w, pt.h);
+					ctx.restore();
+				}
+				if (frames < total) {
+					raf = requestAnimationFrame(tick);
+				} else {
+					ctx.clearRect(0, 0, canvas.width, canvas.height);
+				}
+			}
+			cancelAnimationFrame(raf);
+			tick();
+		}
+
+		// ── Boot ──────────────────────────────────────────────────────────────
+		mountStage();
+		wireEmbedSnippet();
+		const updateShare = wireShare();
+		loadAgent(updateShare);
+		// Let the avatar finish its scale-in before the burst (matches the .08s
+		// stage delay + a beat), then celebrate once.
+		requestAnimationFrame(() => setTimeout(celebrate, 450));
+	</script>
+	<script src="/getting-started.js" defer></script>
+	<!-- Runtime i18n: detects locale, swaps annotated copy, mounts <lang-switcher>. -->
+	<script type="module" src="/i18n.js"></script>
+</body>
+</html>

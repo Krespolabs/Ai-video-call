@@ -1,0 +1,17 @@
+diff --git a/src/server/index.js b/src/server/index.js
+index 67d7345..8730fc8 100644
+--- a/src/server/index.js
++++ b/src/server/index.js
+@@ -128,9 +128,11 @@ if (world.assetsDir) {
+     },
+   })
+ }
++const maxUploadBytes = (parseInt(process.env.PUBLIC_MAX_UPLOAD_SIZE, 10) || 16) * 1024 * 1024
+ fastify.register(multipart, {
+   limits: {
+-    fileSize: 200 * 1024 * 1024, // 200MB
++    fileSize: maxUploadBytes,
++    files: 1,
+   },
+ })
+ fastify.register(ws)

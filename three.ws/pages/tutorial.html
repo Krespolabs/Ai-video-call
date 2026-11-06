@@ -1,0 +1,1569 @@
+<!doctype html>
+<html lang="en" class="tutorial-page">
+	<head>
+		<script>/* three.ws theme boot — no-flash; runtime in /theme-switcher.js */(function(){try{var m=localStorage.getItem('twx_theme');var l=m==='auto'?(window.matchMedia&&window.matchMedia('(prefers-color-scheme: light)').matches):m==='light';document.documentElement.setAttribute('data-theme',l?'light':'dark');}catch(e){document.documentElement.setAttribute('data-theme','dark');}})();</script>
+		<meta charset="utf-8" />
+		<meta http-equiv="X-UA-Compatible" content="IE=edge" />
+		<!-- Head copy on this shell is per-slug, not static: server/seo-head.mjs
+		     rewrites it for the tutorial actually requested, and setHeroFromManifest
+		     re-stamps it client-side from the manifest entry. Both would be undone by
+		     a translation pass over the shell's placeholder strings, so every tag the
+		     two of them own carries data-no-i18n and scripts/i18n-annotate.mjs skips
+		     it. The values below are only what a crawler sees on the bare shell. -->
+		<title data-no-i18n>Tutorials · three.ws</title>
+		<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+		<meta name="author" content="nirholas" />
+		<meta
+			name="description"
+			data-no-i18n
+			content="Step-by-step tutorials for building, embedding, and shipping 3D agents with three.ws."
+		/>
+		<meta name="theme-color" content="#000000" />
+
+		<meta property="og:type" content="article" />
+		<meta property="og:site_name" content="three.ws" />
+		<meta property="og:title" content="Tutorials · three.ws" data-no-i18n />
+		<meta
+			property="og:description"
+			data-no-i18n
+			content="Step-by-step tutorials for building, embedding, and shipping 3D agents with three.ws."
+		/>
+		<meta property="og:image" content="https://three.ws/api/page-og?s=learn&amp;t=Tutorials&amp;d=Step-by-step+build+guides.&amp;p=%2Ftutorials" />
+		<meta property="og:image:width" content="1200" />
+		<meta property="og:image:height" content="630" />
+
+		<meta name="twitter:card" content="summary_large_image" />
+		<meta name="twitter:title" content="Tutorials · three.ws" data-no-i18n />
+		<meta name="twitter:image" content="https://three.ws/api/page-og?s=learn&amp;t=Tutorials&amp;d=Step-by-step+build+guides.&amp;p=%2Ftutorials" />
+
+		<link rel="icon" href="/favicon.ico" sizes="any" />
+		<link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+		<link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png" />
+		<link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png" />
+		<link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+		<link rel="manifest" href="/manifest.webmanifest" />
+		<link rel="stylesheet" href="/style.css" />
+		<link rel="stylesheet" href="/nav.css" />
+		<link rel="stylesheet" href="/home.css" />
+		<link rel="stylesheet" href="/footer.css" />
+		<link rel="stylesheet" href="/fonts/fonts.css" />
+		<link
+			rel="stylesheet"
+			href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/atom-one-dark.min.css"
+		/>
+		<link rel="stylesheet" href="/mobile.css" />
+		<!-- Runnable ```live blocks: real API calls rendered inline. See /docs/live-steps. -->
+		<link rel="stylesheet" href="/live-steps.css" />
+		<script
+			src="https://cdn.jsdelivr.net/npm/marked@9.1.6/marked.min.js"
+			integrity="sha384-odPBjvtXVM/5hOYIr3A1dB+flh0c3wAT3bSesIOqEGmyUA4JoKf/YTWy0XKOYAY7"
+			crossorigin="anonymous"
+		></script>
+		<script
+			src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"
+			integrity="sha384-F/bZzf7p3Joyp5psL90p/p89AZJsndkSoGwRpXcZhleCWhd8SnRuoYo4d0yirjJp"
+			crossorigin="anonymous"
+		></script>
+		<script defer src="/nav.js"></script>
+		<script defer src="/footer-newsletter.js"></script>
+		<script defer src="/tutorials-manifest.js"></script>
+		<script defer src="/live-steps.js"></script>
+		<script
+			type="module"
+			src="https://cdn.jsdelivr.net/npm/@google/model-viewer@4.4.0/dist/model-viewer.min.js"
+			integrity="sha384-wjsPzEO+lXOf7d9csIDfAQpPt2OKuUU3m0K9qsdKIuzX4N8czSF6hdh23eAbZa3p"
+			crossorigin="anonymous"
+		></script>
+
+		<style>
+			html.tutorial-page,
+			html.tutorial-page body {
+				overflow: auto !important;
+				height: auto !important;
+			}
+
+			.tutorial-page body {
+				display: block;
+				background: #070707;
+				color: rgba(224, 224, 224, 0.88);
+			}
+
+			/* ── Page shell ──────────────────────────────────────────────── */
+
+			.tut-doc-page {
+				min-height: 100vh;
+				display: flex;
+				flex-direction: column;
+			}
+
+			.tut-doc-page header {
+				position: sticky;
+				top: 0;
+				z-index: 200;
+				flex-shrink: 0;
+			}
+
+			/* ── Hero ────────────────────────────────────────────────────── */
+
+			.tdoc-hero {
+				background: linear-gradient(180deg, #0a0608 0%, #070707 60%, #070707 100%);
+				border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+				padding: clamp(2.5rem, 7vh, 4.5rem) clamp(1.25rem, 4vw, 2rem) clamp(2rem, 5vh, 3rem);
+				position: relative;
+				overflow: hidden;
+			}
+
+			.tdoc-hero::before {
+				content: '';
+				position: absolute;
+				inset: 0;
+				background:
+					radial-gradient(
+						ellipse 60% 80% at 15% 50%,
+						var(--tdoc-glow, rgba(255, 255, 255, 0.12)) 0%,
+						transparent 60%
+					),
+					radial-gradient(
+						ellipse 50% 60% at 85% 20%,
+						rgba(255, 255, 255, 0.05) 0%,
+						transparent 55%
+					);
+				pointer-events: none;
+			}
+
+			.tdoc-hero-inner {
+				position: relative;
+				max-width: 980px;
+				margin: 0 auto;
+				display: grid;
+				grid-template-columns: 1fr 280px;
+				gap: 2rem;
+				align-items: center;
+			}
+
+			.tdoc-back-link {
+				display: inline-flex;
+				align-items: center;
+				gap: 0.4rem;
+				font-family: 'Inter', sans-serif;
+				font-size: 0.78rem;
+				font-weight: 500;
+				color: rgba(255, 255, 255, 0.5);
+				text-decoration: none;
+				margin-bottom: 1.1rem;
+				transition: color var(--duration-fast) var(--ease-standard);
+			}
+
+			.tdoc-back-link:hover {
+				color: rgba(255, 255, 255, 0.85);
+			}
+			.tdoc-back-link svg {
+				width: 12px;
+				height: 12px;
+				transition: transform var(--duration-fast) var(--ease-standard);
+			}
+			.tdoc-back-link:hover svg {
+				transform: translateX(-2px);
+			}
+
+			.tdoc-tier-row {
+				display: flex;
+				align-items: center;
+				gap: 0.6rem;
+				margin-bottom: 1.1rem;
+				flex-wrap: wrap;
+			}
+
+			.tdoc-tier-chip {
+				display: inline-flex;
+				align-items: center;
+				gap: 0.4rem;
+				padding: 0.28rem 0.65rem;
+				border-radius: 999px;
+				background: var(--tdoc-accent-soft, rgba(255, 255, 255, 0.16));
+				border: 1px solid var(--tdoc-accent-border, rgba(255, 255, 255, 0.32));
+				font-family: var(--font-display);
+				font-size: 0.68rem;
+				font-weight: 700;
+				color: var(--tdoc-accent, #ffffff);
+				letter-spacing: 0.06em;
+				text-transform: uppercase;
+			}
+
+			.tdoc-tier-chip::before {
+				content: '';
+				width: 6px;
+				height: 6px;
+				border-radius: 50%;
+				background: currentColor;
+			}
+
+			.tdoc-meta-chip {
+				display: inline-flex;
+				align-items: center;
+				gap: 0.35rem;
+				padding: 0.28rem 0.6rem;
+				border-radius: 999px;
+				background: rgba(255, 255, 255, 0.04);
+				border: 1px solid rgba(255, 255, 255, 0.08);
+				font-family: 'Inter', sans-serif;
+				font-size: 0.72rem;
+				font-weight: 500;
+				color: rgba(255, 255, 255, 0.6);
+			}
+
+			.tdoc-meta-chip svg {
+				width: 11px;
+				height: 11px;
+				opacity: 0.7;
+			}
+
+			.tdoc-hero h1 {
+				font-family: var(--font-display);
+				font-size: clamp(1.8rem, 4.4vw, 2.9rem);
+				font-weight: 700;
+				letter-spacing: -0.025em;
+				color: #fff;
+				margin: 0 0 0.7rem;
+				line-height: 1.12;
+			}
+
+			.tdoc-hero-blurb {
+				font-size: 1.02rem;
+				color: rgba(255, 255, 255, 0.55);
+				line-height: 1.6;
+				margin: 0 0 1.25rem;
+				max-width: 60ch;
+			}
+
+			.tdoc-builds {
+				display: flex;
+				align-items: flex-start;
+				gap: 0.6rem;
+				padding: 0.85rem 1rem;
+				background: rgba(255, 255, 255, 0.025);
+				border: 1px solid rgba(255, 255, 255, 0.06);
+				border-left: 2px solid var(--tdoc-accent, #ffffff);
+				border-radius: 6px;
+				max-width: 60ch;
+			}
+
+			.tdoc-builds-label {
+				flex-shrink: 0;
+				font-family: var(--font-display);
+				font-size: 0.66rem;
+				font-weight: 700;
+				color: rgba(255, 255, 255, 0.4);
+				letter-spacing: 0.1em;
+				text-transform: uppercase;
+				padding-top: 2px;
+			}
+
+			.tdoc-builds-text {
+				font-size: 0.88rem;
+				color: rgba(255, 255, 255, 0.78);
+				line-height: 1.55;
+			}
+
+			.tdoc-hero-viewer {
+				background: rgba(255, 255, 255, 0.02);
+				border: 1px solid rgba(255, 255, 255, 0.07);
+				border-radius: 12px;
+				overflow: hidden;
+				display: flex;
+				align-items: center;
+				justify-content: center;
+			}
+
+			.tdoc-hero-viewer model-viewer {
+				width: 100%;
+				height: 240px;
+				background: transparent;
+				--poster-color: transparent;
+			}
+
+			/* ── Body layout ─────────────────────────────────────────────── */
+
+			.tdoc-body {
+				flex: 1;
+				padding: clamp(2rem, 5vh, 3rem) clamp(1.25rem, 4vw, 2rem);
+			}
+
+			.tdoc-body-inner {
+				max-width: 980px;
+				margin: 0 auto;
+				display: grid;
+				grid-template-columns: 1fr 220px;
+				gap: 2.5rem;
+				align-items: start;
+			}
+
+			/* ── Article (markdown content) ──────────────────────────────── */
+
+			.tdoc-article {
+				min-width: 0;
+				font-family:
+					'Inter',
+					system-ui,
+					-apple-system,
+					sans-serif;
+				font-size: 1rem;
+				line-height: 1.72;
+				color: rgba(224, 224, 224, 0.86);
+			}
+
+			.tdoc-loading {
+				display: inline-flex;
+				align-items: center;
+				gap: 0.5rem;
+				color: rgba(255, 255, 255, 0.4);
+				font-size: 0.9rem;
+			}
+
+			.tdoc-loading-dot {
+				display: inline-block;
+				width: 6px;
+				height: 6px;
+				border-radius: 50%;
+				background: currentColor;
+				animation: tdoc-pulse 1s ease-in-out infinite;
+			}
+
+			@keyframes tdoc-pulse {
+				0%,
+				100% {
+					opacity: 0.3;
+					transform: scale(0.8);
+				}
+				50% {
+					opacity: 1;
+					transform: scale(1.1);
+				}
+			}
+
+			.tdoc-article h1 {
+				display: none; /* the hero already shows the title */
+			}
+
+			.tdoc-article h2 {
+				font-family: var(--font-display);
+				font-size: 1.5rem;
+				font-weight: 700;
+				color: #fff;
+				letter-spacing: -0.015em;
+				margin: 2.5rem 0 1rem;
+				padding-top: 1rem;
+				border-top: 1px solid rgba(255, 255, 255, 0.06);
+				line-height: 1.3;
+				scroll-margin-top: 80px;
+			}
+
+			.tdoc-article h2:first-of-type {
+				border-top: none;
+				padding-top: 0;
+				margin-top: 0;
+			}
+
+			.tdoc-article h3 {
+				font-family: var(--font-display);
+				font-size: 1.15rem;
+				font-weight: 700;
+				color: rgba(255, 255, 255, 0.92);
+				margin: 2rem 0 0.8rem;
+				letter-spacing: -0.01em;
+				line-height: 1.35;
+				scroll-margin-top: 80px;
+			}
+
+			.tdoc-article h4 {
+				font-family: var(--font-display);
+				font-size: 1rem;
+				font-weight: 700;
+				color: rgba(255, 255, 255, 0.85);
+				margin: 1.5rem 0 0.6rem;
+				scroll-margin-top: 80px;
+			}
+
+			.tdoc-article p {
+				margin: 0 0 1.1rem;
+			}
+
+			.tdoc-article a {
+				color: var(--tdoc-accent, #ffffff);
+				text-decoration: none;
+				border-bottom: 1px solid transparent;
+				transition: border-color var(--duration-fast) var(--ease-standard);
+			}
+
+			.tdoc-article a:hover {
+				border-bottom-color: currentColor;
+			}
+
+			.tdoc-article strong {
+				color: #fff;
+				font-weight: 600;
+			}
+
+			.tdoc-article ul,
+			.tdoc-article ol {
+				margin: 0 0 1.2rem;
+				padding-left: 1.4rem;
+			}
+
+			.tdoc-article li {
+				margin-bottom: 0.4rem;
+			}
+			.tdoc-article li > p {
+				margin-bottom: 0.4rem;
+			}
+
+			.tdoc-article hr {
+				border: none;
+				border-top: 1px solid rgba(255, 255, 255, 0.08);
+				margin: 2.5rem 0;
+			}
+
+			.tdoc-article blockquote {
+				margin: 1.2rem 0;
+				padding: 0.9rem 1.1rem;
+				border-left: 3px solid var(--tdoc-accent, #ffffff);
+				background: rgba(255, 255, 255, 0.025);
+				border-radius: 0 6px 6px 0;
+				color: rgba(255, 255, 255, 0.78);
+			}
+
+			.tdoc-article blockquote p:last-child {
+				margin-bottom: 0;
+			}
+
+			.tdoc-article code {
+				font-family: var(--font-mono);
+				font-size: 0.86em;
+				padding: 0.12em 0.4em;
+				background: rgba(255, 255, 255, 0.06);
+				border: 1px solid rgba(255, 255, 255, 0.07);
+				border-radius: 4px;
+				color: #e4d4ff;
+			}
+
+			.tdoc-article pre {
+				margin: 1.25rem 0;
+				padding: 1.1rem 1.25rem;
+				background: #0c0c0c;
+				border: 1px solid rgba(255, 255, 255, 0.07);
+				border-radius: 8px;
+				overflow-x: auto;
+				font-size: 0.85rem;
+				line-height: 1.65;
+				scrollbar-width: thin;
+				scrollbar-color: rgba(255, 255, 255, 0.1) transparent;
+			}
+
+			.tdoc-article pre::-webkit-scrollbar {
+				height: 6px;
+			}
+			.tdoc-article pre::-webkit-scrollbar-thumb {
+				background: rgba(255, 255, 255, 0.1);
+				border-radius: 3px;
+			}
+
+			.tdoc-article pre code {
+				padding: 0;
+				background: none;
+				border: none;
+				font-size: inherit;
+				color: var(--ink-dim);
+			}
+
+			.tdoc-article table {
+				width: 100%;
+				border-collapse: collapse;
+				margin: 1.25rem 0;
+				font-size: 0.92rem;
+			}
+
+			.tdoc-article th,
+			.tdoc-article td {
+				padding: 0.6rem 0.85rem;
+				border-bottom: 1px solid rgba(255, 255, 255, 0.07);
+				text-align: left;
+			}
+
+			.tdoc-article th {
+				font-family: var(--font-display);
+				font-weight: 700;
+				color: rgba(255, 255, 255, 0.85);
+				font-size: 0.85rem;
+				letter-spacing: 0.02em;
+			}
+
+			.tdoc-article img {
+				max-width: 100%;
+				height: auto;
+				border-radius: 8px;
+				border: 1px solid rgba(255, 255, 255, 0.06);
+				margin: 1.25rem 0;
+			}
+
+			/* ── Right rail TOC ──────────────────────────────────────────── */
+
+			.tdoc-toc {
+				position: sticky;
+				top: 78px;
+				align-self: start;
+				font-family: 'Inter', sans-serif;
+				border-left: 1px solid rgba(255, 255, 255, 0.06);
+				padding-left: 1.1rem;
+				max-height: calc(100vh - 100px);
+				overflow-y: auto;
+				scrollbar-width: thin;
+				scrollbar-color: rgba(255, 255, 255, 0.08) transparent;
+			}
+
+			.tdoc-toc-heading {
+				font-family: var(--font-display);
+				font-size: 0.68rem;
+				font-weight: 700;
+				color: rgba(255, 255, 255, 0.42);
+				letter-spacing: 0.12em;
+				text-transform: uppercase;
+				margin: 0 0 0.85rem;
+			}
+
+			.tdoc-toc ol {
+				list-style: none;
+				padding: 0;
+				margin: 0;
+				display: flex;
+				flex-direction: column;
+				gap: 0.35rem;
+			}
+
+			.tdoc-toc a {
+				display: block;
+				padding: 0.3rem 0;
+				font-size: 0.82rem;
+				color: rgba(255, 255, 255, 0.52);
+				text-decoration: none;
+				line-height: 1.4;
+				transition: color var(--duration-fast) var(--ease-standard);
+				border-left: 2px solid transparent;
+				margin-left: -2px;
+				padding-left: 0.7rem;
+			}
+
+			.tdoc-toc a:hover {
+				color: rgba(255, 255, 255, 0.95);
+			}
+
+			.tdoc-toc a.is-active {
+				color: var(--tdoc-accent, #ffffff);
+				border-left-color: var(--tdoc-accent, #ffffff);
+			}
+
+			.tdoc-toc a.is-h3 {
+				padding-left: 1.4rem;
+				font-size: 0.78rem;
+				color: rgba(255, 255, 255, 0.42);
+			}
+
+			/* ── Pager (prev / next) ─────────────────────────────────────── */
+
+			.tdoc-pager {
+				display: grid;
+				grid-template-columns: 1fr 1fr;
+				gap: 0.85rem;
+				margin-top: 3rem;
+				padding-top: 2rem;
+				border-top: 1px solid rgba(255, 255, 255, 0.08);
+			}
+
+			.tdoc-pager-btn {
+				display: flex;
+				flex-direction: column;
+				gap: 0.25rem;
+				padding: 1rem 1.2rem;
+				background: rgba(255, 255, 255, 0.018);
+				border: 1px solid rgba(255, 255, 255, 0.07);
+				border-radius: 10px;
+				text-decoration: none;
+				transition:
+					border-color var(--duration-base) var(--ease-standard),
+					transform var(--duration-base) var(--ease-standard);
+				min-height: 70px;
+			}
+
+			.tdoc-pager-btn:hover {
+				border-color: rgba(255, 255, 255, 0.18);
+				transform: translateY(-1px);
+			}
+
+			.tdoc-pager-btn.next {
+				text-align: right;
+			}
+
+			.tdoc-pager-btn.placeholder {
+				background: transparent;
+				border: 1px dashed rgba(255, 255, 255, 0.05);
+				pointer-events: none;
+			}
+
+			.tdoc-pager-dir {
+				font-family: var(--font-display);
+				font-size: 0.68rem;
+				font-weight: 600;
+				color: rgba(255, 255, 255, 0.4);
+				letter-spacing: 0.1em;
+				text-transform: uppercase;
+			}
+
+			.tdoc-pager-title {
+				font-family: var(--font-display);
+				font-size: 0.95rem;
+				font-weight: 700;
+				color: #fff;
+				letter-spacing: -0.01em;
+				line-height: 1.3;
+			}
+
+			/* ── Responsive ──────────────────────────────────────────────── */
+
+			@media (max-width: 880px) {
+				.tdoc-hero-inner {
+					grid-template-columns: 1fr;
+				}
+				.tdoc-hero-viewer model-viewer {
+					height: 200px;
+				}
+				.tdoc-body-inner {
+					grid-template-columns: 1fr;
+					gap: 1.5rem;
+				}
+				.tdoc-toc {
+					position: static;
+					max-height: none;
+					border-left: none;
+					border-top: 1px solid rgba(255, 255, 255, 0.06);
+					padding-left: 0;
+					padding-top: 1.5rem;
+					order: 99;
+				}
+				.tdoc-toc ol {
+					flex-direction: row;
+					flex-wrap: wrap;
+					gap: 0.5rem 1rem;
+				}
+				.tdoc-toc a {
+					padding-left: 0;
+					border-left: none;
+				}
+				.tdoc-toc a.is-h3 {
+					display: none;
+				}
+				.tdoc-pager {
+					grid-template-columns: 1fr;
+				}
+			}
+
+			@media (max-width: 540px) {
+				.tdoc-article {
+					font-size: 0.95rem;
+				}
+				.tdoc-article h2 {
+					font-size: 1.25rem;
+				}
+				.tdoc-article pre {
+					font-size: 0.78rem;
+					padding: 0.9rem 1rem;
+				}
+			}
+
+			/* ── Reading experience ──────────────────────────────────────────
+			   Progress rail, hero CTA, copy-code, heading anchors, back-to-top.
+			   All tier-accent themed via the --tdoc-accent custom properties. */
+			.tdoc-progress {
+				position: fixed;
+				top: 0;
+				left: 0;
+				right: 0;
+				height: 2px;
+				z-index: 60;
+				background: transparent;
+				pointer-events: none;
+			}
+			.tdoc-progress-fill {
+				height: 100%;
+				width: 0;
+				background: var(--tdoc-accent, #ffffff);
+				box-shadow: 0 0 10px var(--tdoc-accent, #ffffff);
+				transition: width var(--duration-instant) var(--ease-standard);
+			}
+
+			/* Hero CTA — the manifest's primary action, themed to the tier. */
+			.tdoc-hero-cta {
+				display: inline-flex;
+				align-items: center;
+				gap: 0.5rem;
+				margin-top: 1.5rem;
+				padding: 0.72rem 1.3rem;
+				border-radius: 8px;
+				background: var(--tdoc-accent, #ffffff);
+				color: #070707;
+				font-family: var(--font-display);
+				font-weight: 600;
+				font-size: 0.92rem;
+				text-decoration: none;
+				border: 1px solid var(--tdoc-accent, #ffffff);
+				transition:
+					transform var(--duration-fast) var(--ease-standard),
+					box-shadow var(--duration-fast) var(--ease-standard),
+					filter var(--duration-fast) var(--ease-standard);
+			}
+			.tdoc-hero-cta:hover {
+				transform: translateY(-1px);
+				box-shadow: 0 14px 32px -12px var(--tdoc-glow, rgba(255, 255, 255, 0.4));
+				filter: brightness(1.06);
+			}
+			.tdoc-hero-cta:active {
+				transform: translateY(0);
+			}
+			.tdoc-hero-cta:focus-visible {
+				outline: 2px solid var(--tdoc-accent, #ffffff);
+				outline-offset: 3px;
+			}
+			.tdoc-hero-cta svg {
+				width: 15px;
+				height: 15px;
+			}
+
+			/* Copy-code button — floats top-right of every code block. */
+			.tdoc-article pre {
+				position: relative;
+			}
+			.tdoc-copy-btn {
+				position: absolute;
+				top: 8px;
+				right: 8px;
+				display: inline-flex;
+				align-items: center;
+				gap: 0.35rem;
+				padding: 0.3rem 0.55rem;
+				border-radius: 6px;
+				background: rgba(255, 255, 255, 0.06);
+				border: 1px solid rgba(255, 255, 255, 0.12);
+				color: rgba(255, 255, 255, 0.62);
+				font-family: 'JetBrains Mono', monospace;
+				font-size: 0.68rem;
+				letter-spacing: 0.02em;
+				cursor: pointer;
+				opacity: 0;
+				transform: translateY(-2px);
+				transition:
+					opacity var(--duration-fast) var(--ease-standard),
+					transform var(--duration-fast) var(--ease-standard),
+					color var(--duration-fast),
+					border-color var(--duration-fast),
+					background var(--duration-fast);
+			}
+			.tdoc-article pre:hover .tdoc-copy-btn,
+			.tdoc-copy-btn:focus-visible {
+				opacity: 1;
+				transform: none;
+			}
+			.tdoc-copy-btn:hover {
+				color: #fff;
+				border-color: rgba(255, 255, 255, 0.28);
+				background: rgba(255, 255, 255, 0.1);
+			}
+			.tdoc-copy-btn:focus-visible {
+				outline: 2px solid var(--tdoc-accent, #ffffff);
+				outline-offset: 2px;
+			}
+			.tdoc-copy-btn.is-copied {
+				color: var(--success, var(--success));
+				border-color: color-mix(in srgb, var(--success, var(--success)) 50%, transparent);
+			}
+			.tdoc-copy-btn svg {
+				width: 12px;
+				height: 12px;
+			}
+			@media (hover: none) {
+				.tdoc-copy-btn {
+					opacity: 1;
+					transform: none;
+				}
+			}
+
+			/* Heading anchor — hover-revealed deep link in the left margin. */
+			.tdoc-article h2,
+			.tdoc-article h3 {
+				position: relative;
+			}
+			.tdoc-anchor {
+				position: absolute;
+				left: -1.35em;
+				top: 0.1em;
+				display: inline-flex;
+				color: var(--tdoc-accent, #ffffff);
+				opacity: 0;
+				text-decoration: none;
+				transition: opacity var(--duration-fast) var(--ease-standard);
+			}
+			.tdoc-anchor svg {
+				width: 0.78em;
+				height: 0.78em;
+			}
+			.tdoc-article h2:hover .tdoc-anchor,
+			.tdoc-article h3:hover .tdoc-anchor,
+			.tdoc-anchor:focus-visible {
+				opacity: 0.75;
+			}
+			@media (max-width: 900px) {
+				.tdoc-anchor {
+					display: none;
+				}
+			}
+
+			/* Back to top — fades in once you've scrolled past the hero. */
+			.tdoc-top {
+				position: fixed;
+				bottom: 1.5rem;
+				right: 1.5rem;
+				z-index: 55;
+				width: 42px;
+				height: 42px;
+				display: grid;
+				place-items: center;
+				border-radius: 50%;
+				background: rgba(20, 20, 20, 0.85);
+				border: 1px solid rgba(255, 255, 255, 0.12);
+				color: rgba(255, 255, 255, 0.7);
+				backdrop-filter: blur(8px);
+				-webkit-backdrop-filter: blur(8px);
+				cursor: pointer;
+				opacity: 0;
+				transform: translateY(8px);
+				pointer-events: none;
+				transition:
+					opacity var(--duration-base) var(--ease-standard),
+					transform var(--duration-base) var(--ease-standard),
+					color var(--duration-fast),
+					border-color var(--duration-fast);
+			}
+			.tdoc-top.is-visible {
+				opacity: 1;
+				transform: none;
+				pointer-events: auto;
+			}
+			.tdoc-top:hover {
+				color: #fff;
+				border-color: var(--tdoc-accent, #ffffff);
+			}
+			.tdoc-top:focus-visible {
+				outline: 2px solid var(--tdoc-accent, #ffffff);
+				outline-offset: 2px;
+			}
+			.tdoc-top svg {
+				width: 18px;
+				height: 18px;
+			}
+
+
+			@media (prefers-reduced-motion: reduce) {
+				.tdoc-progress-fill,
+				.tdoc-copy-btn,
+				.tdoc-hero-cta,
+				.tdoc-top,
+				.tdoc-anchor {
+					transition: none;
+				}
+			}
+		</style>
+	
+	<link rel="canonical" href="https://three.ws/tutorials">
+	<meta property="og:url" content="https://three.ws/tutorials">
+	<meta name="twitter:description" content="Step-by-step tutorials for building, embedding, and shipping 3D agents with three.ws." data-no-i18n>
+	<script type="application/ld+json">{"@context":"https://schema.org","@type":"WebPage","name":"Tutorials","description":"Step-by-step tutorials for building, embedding, and shipping 3D agents with three.ws.","url":"https://three.ws/tutorials","isPartOf":{"@type":"WebSite","name":"three.ws","url":"https://three.ws"}}</script>
+
+	<meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1">
+	<meta property="og:locale" content="en_US">
+	<meta property="og:image:alt" content="Tutorials on three.ws">
+	<meta name="twitter:site" content="@trythreews">
+	<script src="/model-viewer-meshopt.js"></script>
+	<!-- Resolves the `figure:` directives in tutorial markdown into real captured
+	     media, live 3D viewers, and a keyboard-navigable lightbox. The stylesheet
+	     is shared with the cookbook recipe viewer, so both render figures alike. -->
+	<link rel="stylesheet" href="/tutorial-figures.css">
+	<script src="/tutorial-figures.js"></script>
+</head>
+	<body class="home-page tutorial-page tut-doc-page">
+		<div class="cursor" id="cursor" aria-hidden="true"></div>
+		<div class="tdoc-progress" aria-hidden="true">
+			<div class="tdoc-progress-fill" id="tdoc-progress-fill"></div>
+		</div>
+		<a href="#main-content" class="h-skip-link" data-i18n="tutorial.skip_to_main_content">Skip to main content</a>
+
+		<header><div id="nav-container"></div></header>
+
+		<main id="main-content">
+			<div class="tdoc-hero" id="tdoc-hero" hidden>
+				<div class="tdoc-hero-inner">
+					<div>
+						<a href="/tutorials" class="tdoc-back-link">
+							<svg
+								viewBox="0 0 12 12"
+								fill="none"
+								stroke="currentColor"
+								stroke-width="1.6"
+								aria-hidden="true"
+							>
+								<path d="M10 6H2M6 2 2 6l4 4" />
+							</svg>
+							All tutorials
+						</a>
+						<div class="tdoc-tier-row">
+							<span class="tdoc-tier-chip" id="tdoc-tier-chip"></span>
+							<span class="tdoc-meta-chip">
+								<svg
+									viewBox="0 0 12 12"
+									fill="none"
+									stroke="currentColor"
+									stroke-width="1.4"
+									aria-hidden="true"
+								>
+									<circle cx="6" cy="6" r="4.5" />
+									<path d="M6 3v3l2 1.5" />
+								</svg>
+								<span id="tdoc-time"></span>
+							</span>
+						</div>
+						<h1 id="tdoc-title"></h1>
+						<p class="tdoc-hero-blurb" id="tdoc-blurb"></p>
+						<div class="tdoc-builds">
+							<span class="tdoc-builds-label" data-i18n="tutorial.you_ll_build">You'll build</span>
+							<span class="tdoc-builds-text" id="tdoc-builds"></span>
+						</div>
+						<div id="tdoc-hero-cta-host"></div>
+					</div>
+					<div class="tdoc-hero-viewer" id="tdoc-hero-viewer"></div>
+				</div>
+			</div>
+
+			<div class="tdoc-body">
+				<div class="tdoc-body-inner">
+					<article class="tdoc-article" id="tdoc-article">
+						<span class="tdoc-loading"
+							 data-i18n-html="tutorial.loading_tutorial"><span class="tdoc-loading-dot"></span> Loading tutorial…</span
+						>
+					</article>
+					<aside class="tdoc-toc" id="tdoc-toc" hidden>
+						<p class="tdoc-toc-heading" data-i18n="tutorial.on_this_page">On this page</p>
+						<ol id="tdoc-toc-list"></ol>
+					</aside>
+				</div>
+			</div>
+		</main>
+
+		<button class="tdoc-top" id="tdoc-top" type="button" aria-label="Back to top" data-i18n-attr="aria-label:tutorial.back_to_top_arialabel">
+			<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+				<path d="M12 19V5M5 12l7-7 7 7" />
+			</svg>
+		</button>
+
+		<footer class="h-footer h-footer-horizon">
+			<div class="h-footer-glow-line" aria-hidden="true"></div>
+			<div class="h-footer-floor" aria-hidden="true"></div>
+			<div class="h-footer-haze" aria-hidden="true"></div>
+			<div class="h-footer-watermark" aria-hidden="true">three.ws</div>
+			<div class="h-footer-avatar" aria-hidden="true">
+				<model-viewer
+					src="/animations/robotexpressive.glb"
+					auto-rotate
+					auto-rotate-delay="0"
+					rotation-per-second="20deg"
+					interaction-prompt="none"
+					camera-controls="false"
+					disable-zoom
+					shadow-intensity="0"
+					exposure="0.7"
+					environment-image="neutral"
+					camera-orbit="0deg 80deg 9m"
+					field-of-view="45deg"
+					loading="lazy"
+				></model-viewer>
+			</div>
+			<div class="h-footer-cta">
+				<div class="h-footer-newsletter">
+					<h3 data-i18n="tutorial.stay_in_the_loop">Stay in the loop</h3>
+					<p data-i18n="tutorial.get_updates_on_new_features_agent_tooling">Get updates on new features, agent tooling, and protocol changes.</p>
+					<form class="h-footer-newsletter-form" data-newsletter-form novalidate>
+						<input
+							type="email"
+							class="h-footer-newsletter-input"
+							name="email"
+							placeholder="Enter your email"
+							aria-label="Email address"
+							autocomplete="email"
+							required
+						/>
+						<button
+							type="submit"
+							class="h-footer-newsletter-btn"
+							aria-label="Subscribe"
+						 data-i18n-attr="aria-label:tutorial.subscribe_arialabel">
+							<svg viewBox="0 0 16 16" aria-hidden="true">
+								<path
+									fill="none"
+									stroke="currentColor"
+									stroke-width="1.6"
+									stroke-linecap="round"
+									stroke-linejoin="round"
+									d="M2 8h11m0 0L9 4m4 4l-4 4"
+								/>
+							</svg>
+						</button>
+					</form>
+					<p class="h-footer-newsletter-msg" data-newsletter-msg aria-live="polite"></p>
+				</div>
+				<div class="h-footer-community">
+					<h3 data-i18n="tutorial.join_the_community">Join the community</h3>
+					<p data-i18n="tutorial.follow_along_for_builds_demos_and_conversati">Follow along for builds, demos, and conversations with the team.</p>
+					<a
+						class="h-footer-community-btn"
+						href="https://x.com/trythreews"
+						target="_blank"
+						rel="noopener"
+					>
+						<svg viewBox="0 0 24 24" aria-hidden="true">
+							<path
+								fill="currentColor"
+								d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"
+							/>
+						</svg>
+						Follow on X
+					</a>
+				</div>
+			</div>
+			<div class="h-footer-inner">
+				<div class="h-footer-brand-col">
+					<div class="h-footer-brand">
+						<img class="wordmark-logo" src="/three.svg" alt="" aria-hidden="true" />
+						<span class="wordmark-dot" aria-hidden="true"></span>
+						<span data-i18n="tutorial.three_ws">three.ws</span>
+					</div>
+					<p class="h-footer-tagline" data-i18n="tutorial.give_your_ai_a_body">Give your AI a body.</p>
+					<div class="h-footer-socials">
+						<a
+							class="h-footer-social"
+							href="https://x.com/trythreews"
+							target="_blank"
+							rel="noopener"
+							aria-label="three.ws on X"
+						 data-i18n-attr="aria-label:tutorial.three_ws_on_x_arialabel">
+							<svg viewBox="0 0 24 24" aria-hidden="true">
+								<path
+									fill="currentColor"
+									d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"
+								/>
+							</svg>
+						</a>
+						<a
+							class="h-footer-social"
+							href="https://github.com/nirholas/three.ws"
+							target="_blank"
+							rel="noopener"
+							aria-label="three.ws on GitHub"
+						 data-i18n-attr="aria-label:tutorial.three_ws_on_github_arialabel">
+							<svg viewBox="0 0 16 16" aria-hidden="true">
+								<path
+									fill="currentColor"
+									d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0 0 16 8c0-4.42-3.58-8-8-8z"
+								/>
+							</svg>
+						</a>
+					</div>
+				</div>
+				<nav class="h-footer-links" aria-label="Footer">
+					<div class="h-footer-link-col">
+						<h4 class="h-footer-link-heading" data-i18n="tutorial.product">Product</h4>
+						<a href="/create" data-i18n="tutorial.create">Create</a>
+						<a href="/studio" data-i18n="tutorial.studio">Studio</a>
+						<a href="/widgets" data-i18n="tutorial.widgets">Widgets</a>
+						<a href="/discover" data-i18n="tutorial.discover">Discover</a>
+					</div>
+					<div class="h-footer-link-col">
+						<h4 class="h-footer-link-heading" data-i18n="tutorial.developers">Developers</h4>
+						<a href="/docs" data-i18n="tutorial.docs">Docs</a>
+						<a
+							href="https://github.com/nirholas/three.ws"
+							target="_blank"
+							rel="noopener"
+							 data-i18n="tutorial.github">GitHub</a
+						>
+						<a
+							href="https://eips.ethereum.org/EIPS/eip-8004"
+							target="_blank"
+							rel="noopener"
+							 data-i18n="tutorial.erc_8004">ERC-8004</a
+						>
+					</div>
+					<div class="h-footer-link-col">
+						<h4 class="h-footer-link-heading" data-i18n="tutorial.resources">Resources</h4>
+						<a href="/blog" data-i18n="tutorial.blog">Blog</a>
+						<a href="/tutorials" aria-current="page" data-i18n="tutorial.tutorials">Tutorials</a>
+						<a href="/dashboard" data-i18n="tutorial.dashboard">Dashboard</a>
+					</div>
+				</nav>
+			</div>
+			<div class="h-footer-bottom">
+				<p class="h-footer-legal" data-i18n="tutorial.2026_three_ws_all_rights_reserved">© 2026 three.ws — All rights reserved.</p>
+				<div class="h-footer-legal-links">
+					<a href="/legal/privacy" data-i18n="tutorial.privacy_policy">Privacy Policy</a>
+					<a href="/legal/tos" data-i18n="tutorial.terms_of_use">Terms of Use</a>
+				</div>
+			</div>
+		</footer>
+
+		<script>
+			// Custom cursor (matches the rest of the site)
+			(function () {
+				const cursor = document.getElementById('cursor');
+				if (!cursor || !window.matchMedia('(hover: hover)').matches) return;
+				let x = 0,
+					y = 0,
+					tx = 0,
+					ty = 0;
+				document.addEventListener('mousemove', (e) => {
+					tx = e.clientX;
+					ty = e.clientY;
+				});
+				(function loop() {
+					x += (tx - x) * 0.18;
+					y += (ty - y) * 0.18;
+					cursor.style.transform = `translate(${x - 5}px,${y - 5}px)`;
+					requestAnimationFrame(loop);
+				})();
+				document.querySelectorAll('a,button').forEach((el) => {
+					el.addEventListener('mouseenter', () => cursor.classList.add('cursor--hover'));
+					el.addEventListener('mouseleave', () =>
+						cursor.classList.remove('cursor--hover'),
+					);
+				});
+			})();
+
+			// ── Tutorial viewer ──────────────────────────────────────────
+			function currentSlug() {
+				const m = location.pathname.match(/^\/tutorials\/([a-z0-9-]+)\/?$/);
+				return m ? m[1] : null;
+			}
+
+			function escapeHtml(s) {
+				return String(s).replace(
+					/[&<>"']/g,
+					(c) =>
+						({
+							'&': '&amp;',
+							'<': '&lt;',
+							'>': '&gt;',
+							'"': '&quot;',
+							"'": '&#39;',
+						})[c],
+				);
+			}
+
+			function renderMissing() {
+				document.title = 'Tutorial not found — three.ws';
+				const article = document.getElementById('tdoc-article');
+				article.innerHTML = `
+					<h2 style="display:block !important;border-top:none !important;padding-top:0 !important;margin-top:0 !important">Tutorial not found</h2>
+					<p>We couldn't find a tutorial at <code>${escapeHtml(location.pathname)}</code>.</p>
+					<p><a href="/tutorials">← Browse all tutorials</a></p>
+				`;
+			}
+
+			// Inline icons (no external fetch, theme-tinted via currentColor).
+			const ICON_ARROW =
+				'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg>';
+			const ICON_COPY =
+				'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg>';
+			const ICON_CHECK =
+				'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg>';
+			const ICON_LINK =
+				'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10 13a5 5 0 0 0 7.07 0l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.07 0l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>';
+
+			// This shell serves every tutorial, so its static head names none of them.
+			// Stamp the requested tutorial's own title, description and social copy
+			// from the manifest entry, matching what server/seo-head.mjs writes for a
+			// crawler, so the tab, the history entry, and anything reading the live
+			// DOM (in-app share, a headless renderer) all name the right page.
+			function setHead(entry) {
+				const title = `${entry.title} · three.ws`;
+				document.title = title;
+				const set = (selector, value) => {
+					const el = document.querySelector(selector);
+					if (el) el.setAttribute('content', value);
+				};
+				set('meta[name="description"]', entry.blurb);
+				set('meta[property="og:title"]', title);
+				set('meta[property="og:description"]', entry.blurb);
+				set('meta[name="twitter:title"]', title);
+				set('meta[name="twitter:description"]', entry.blurb);
+				// Fixed origin, never location.origin: the canonical names the public
+				// URL even when the page is served from a preview host or localhost.
+				const canonical = `https://three.ws/tutorials/${entry.slug}`;
+				set('meta[property="og:url"]', canonical);
+				const link = document.querySelector('link[rel="canonical"]');
+				if (link) link.setAttribute('href', canonical);
+			}
+
+			function setHeroFromManifest(entry) {
+				const tier = window.TUTORIAL_TIERS[entry.tier];
+				const root = document.documentElement;
+				root.style.setProperty('--tdoc-accent', tier.accent);
+				root.style.setProperty('--tdoc-accent-soft', tier.accentSoft);
+				root.style.setProperty('--tdoc-accent-border', tier.accentBorder);
+				root.style.setProperty('--tdoc-glow', tier.accentSoft);
+
+				document.getElementById('tdoc-tier-chip').textContent = tier.label;
+				document.getElementById('tdoc-time').textContent = entry.time;
+				document.getElementById('tdoc-title').textContent = entry.title;
+				document.getElementById('tdoc-blurb').textContent = entry.blurb;
+				document.getElementById('tdoc-builds').textContent = entry.builds;
+				setHead(entry);
+
+				const viewerHost = document.getElementById('tdoc-hero-viewer');
+				viewerHost.innerHTML = `
+					<model-viewer
+						src="${escapeHtml(entry.previewModel)}"
+						camera-controls
+						auto-rotate
+						auto-rotate-delay="1000"
+						rotation-per-second="18deg"
+						interaction-prompt="none"
+						shadow-intensity="0"
+						exposure="0.85"
+						environment-image="neutral"
+						camera-orbit="0deg 75deg 5m"
+						field-of-view="35deg"
+						loading="lazy"
+					></model-viewer>
+				`;
+
+				// Primary call-to-action from the manifest (e.g. "Open the Forge").
+				const ctaHost = document.getElementById('tdoc-hero-cta-host');
+				if (ctaHost) {
+					ctaHost.innerHTML = '';
+					const cta = entry.ctaPrimary;
+					if (cta?.href && cta?.label) {
+						const a = document.createElement('a');
+						a.className = 'tdoc-hero-cta';
+						a.href = cta.href;
+						a.innerHTML = `<span>${escapeHtml(cta.label)}</span>${ICON_ARROW}`;
+						ctaHost.appendChild(a);
+					}
+				}
+
+				document.getElementById('tdoc-hero').hidden = false;
+			}
+
+			// Same rule as slugifyHeading() in docs/index.html (and its mirror in
+			// public/docs-search.js): drop punctuation, then turn spaces into
+			// hyphens. Tutorial authors write in-page links against that convention
+			// because it is what the docs surface and GitHub both use, so a viewer
+			// that instead collapsed every punctuation run into one hyphen answered
+			// with dead anchors: #whats-next, #step-5--animations-exact-name-vs-hint.
+			function slugifyHeading(text) {
+				return String(text)
+					.trim()
+					.toLowerCase()
+					.replace(/[^\w\- ]+/g, '')
+					.replace(/ /g, '-');
+			}
+
+			function buildToc(article) {
+				const headings = article.querySelectorAll('h2, h3');
+				if (!headings.length) return;
+				const list = document.getElementById('tdoc-toc-list');
+				const seen = new Map();
+				headings.forEach((h) => {
+					let id = slugifyHeading(h.textContent);
+					if (seen.has(id)) {
+						const n = seen.get(id) + 1;
+						seen.set(id, n);
+						id = `${id}-${n}`;
+					} else {
+						seen.set(id, 1);
+					}
+					h.id = id;
+					// Hover-revealed deep-link anchor in the heading's left margin.
+					const anchor = document.createElement('a');
+					anchor.className = 'tdoc-anchor';
+					anchor.href = `#${id}`;
+					anchor.setAttribute('aria-label', `Link to “${h.textContent}”`);
+					anchor.innerHTML = ICON_LINK;
+					h.insertBefore(anchor, h.firstChild);
+					const li = document.createElement('li');
+					const a = document.createElement('a');
+					a.href = `#${id}`;
+					a.textContent = h.textContent;
+					if (h.tagName === 'H3') a.classList.add('is-h3');
+					a.dataset.target = id;
+					li.appendChild(a);
+					list.appendChild(li);
+				});
+				document.getElementById('tdoc-toc').hidden = false;
+
+				// Scroll-spy
+				const links = list.querySelectorAll('a');
+				const linkByTarget = new Map(Array.from(links).map((a) => [a.dataset.target, a]));
+				const observer = new IntersectionObserver(
+					(entries) => {
+						entries.forEach((entry) => {
+							if (entry.isIntersecting) {
+								links.forEach((a) => a.classList.remove('is-active'));
+								linkByTarget.get(entry.target.id)?.classList.add('is-active');
+							}
+						});
+					},
+					{ rootMargin: '-25% 0px -65% 0px', threshold: 0 },
+				);
+				headings.forEach((h) => observer.observe(h));
+			}
+
+			function appendPager(article, slug) {
+				const idx = window.tutorialIndex(slug);
+				if (idx === -1) return;
+				const prev = idx > 0 ? window.TUTORIALS[idx - 1] : null;
+				const next = idx < window.TUTORIALS.length - 1 ? window.TUTORIALS[idx + 1] : null;
+
+				const pager = document.createElement('div');
+				pager.className = 'tdoc-pager';
+				pager.innerHTML = `
+					${
+						prev
+							? `<a href="/tutorials/${prev.slug}" class="tdoc-pager-btn prev"><span class="tdoc-pager-dir">← Previous</span><span class="tdoc-pager-title">${escapeHtml(prev.title)}</span></a>`
+							: '<div class="tdoc-pager-btn placeholder"></div>'
+					}
+					${
+						next
+							? `<a href="/tutorials/${next.slug}" class="tdoc-pager-btn next"><span class="tdoc-pager-dir">Next →</span><span class="tdoc-pager-title">${escapeHtml(next.title)}</span></a>`
+							: '<div class="tdoc-pager-btn placeholder"></div>'
+					}
+				`;
+				article.appendChild(pager);
+			}
+
+			async function loadTutorial() {
+				const slug = currentSlug();
+				if (!slug) {
+					renderMissing();
+					return;
+				}
+				const entry = window.tutorialBySlug(slug);
+				if (!entry) {
+					renderMissing();
+					return;
+				}
+
+				setHeroFromManifest(entry);
+
+				const article = document.getElementById('tdoc-article');
+				try {
+					const res = await fetch(`/docs/tutorials/${slug}.md`);
+					if (!res.ok) throw new Error(`HTTP ${res.status}`);
+					const md = await res.text();
+
+					marked.setOptions({
+						highlight: (code, lang) => {
+							if (lang && hljs.getLanguage(lang)) {
+								return hljs.highlight(code, { language: lang }).value;
+							}
+							return hljs.highlightAuto(code).value;
+						},
+						gfm: true,
+						breaks: false,
+					});
+
+					// Turn `figure:` directives into inert slots BEFORE parsing. Left as
+					// <img src="figure:…">, the browser fires a request the moment the
+					// markup lands and logs ERR_UNKNOWN_URL_SCHEME for every figure.
+					// Drop the markdown's own `# Title`: the hero above already renders
+					// it as the page's <h1>, so parsing it again gives the document
+					// two competing top-level headings. server/crawler-body.mjs
+					// strips the same line, so the crawler and the reader agree.
+					const mdBody = md.replace(/^\s*#\s+.+?[ \t]*(?:\r?\n|$)/, '');
+					article.innerHTML = marked.parse(
+						window.tutorialFigures ? window.tutorialFigures.preprocess(mdBody) : mdBody,
+					);
+
+					// Freshness: a tutorial is a promise that these steps still work,
+					// so say plainly whether the code behind them has moved since the
+					// steps were written. Fails silently; the tutorial is the point.
+					const freshHost = document.createElement('div');
+					article.prepend(freshHost);
+					import('/doc-freshness.js')
+						.then((m) => m.mountBadge(freshHost, m.docPathForSlug(slug, { tutorial: true })))
+						.catch(() => freshHost.remove());
+
+					// Swap every ```live block for a card that calls the real API.
+					// Runs before the highlight pass so those blocks are already
+					// gone by the time hljs walks the remaining code samples.
+					window.LiveSteps?.mount(article);
+
+					article.querySelectorAll('pre code').forEach((b) => hljs.highlightElement(b));
+
+					// Figures collect their placeholders synchronously, so this is
+					// safe to leave unawaited: the media arrives into boxes that
+					// were already reserved, and nothing below them moves.
+					window.tutorialFigures?.mount(article);
+
+					// Rewrite the links a tutorial's markdown carries so they navigate
+					// cleanly from /tutorials/<slug>. Every relative href in the file was
+					// written against its real location, docs/tutorials/<slug>.md, so it
+					// has to be resolved against that path and not against the page URL:
+					// "../web-component.md" means docs/web-component.md, and reading it as
+					// a site path sends the reader nowhere. Three destinations exist.
+					const REPO = 'https://github.com/nirholas/three.ws/blob/main';
+					// docs/internal, docs/ops and docs/security stay in the repo and are
+					// filtered out of dist/docs by the copy-static-docs plugin in
+					// vite.config.js, so a tutorial citing one is citing source: send it to
+					// GitHub. Routing it to /docs/ would 404 in production only, because dev
+					// serves the whole docs/ tree off disk.
+					const REPO_ONLY_DOCS = new Set(['internal', 'ops', 'security']);
+					const isRepoOnlyDoc = (abs) =>
+						REPO_ONLY_DOCS.has(abs.slice('/docs/'.length).split('/')[0]);
+					const toRepo = (a, abs, section) => {
+						a.href = REPO + abs + (section ? '#' + section : '');
+						a.target = '_blank';
+						a.rel = 'noopener';
+					};
+					article.querySelectorAll('a[href]').forEach((a) => {
+						const h = a.getAttribute('href');
+						if (
+							!h ||
+							h.startsWith('http') ||
+							h.startsWith('#') ||
+							h.startsWith('mailto:')
+						)
+							return;
+						// "guide.md#section" is one link, not two: split the heading off so a
+						// cross-doc link that also targets a section reaches the doc AND
+						// scrolls, instead of failing the .md test and rendering unrewritten.
+						const hashAt = h.indexOf('#');
+						const target = hashAt === -1 ? h : h.slice(0, hashAt);
+						const section = hashAt === -1 ? '' : h.slice(hashAt + 1);
+						const base = location.origin + '/docs/tutorials/' + slug;
+						if (target.endsWith('.md')) {
+							const abs = new URL(target, base).pathname;
+							if (!abs.startsWith('/docs/') || isRepoOnlyDoc(abs)) {
+								toRepo(a, abs, section);
+								return;
+							}
+							const doc = abs.slice('/docs/'.length).replace(/\.md$/, '');
+							const path = doc.startsWith('tutorials/')
+								? '/' + doc
+								: '/docs/' + doc;
+							a.href = path + (section ? '#' + section : '');
+							return;
+						}
+						// A relative link to repo source (../../src/agent-avatar.js,
+						// ../../public/animations/clips). Tutorials cite code constantly and
+						// this page serves tutorials, not the tree, so these resolve into
+						// site paths that do not exist. Send them to the file on GitHub.
+						// Site-absolute links (/pose, /docs/img/x.webp) are real routes and
+						// are left alone.
+						if (target.startsWith('.')) {
+							const abs = new URL(target, base).pathname;
+							if (!abs.startsWith('/docs/') || isRepoOnlyDoc(abs)) {
+								toRepo(a, abs, section);
+							}
+						}
+					});
+
+					addCopyButtons(article);
+					buildToc(article);
+					appendPager(article, slug);
+				} catch (e) {
+					article.innerHTML = `
+						<h2 style="display:block !important;border-top:none !important;padding-top:0 !important;margin-top:0 !important">Couldn't load tutorial</h2>
+						<p>We had trouble fetching <code>/docs/tutorials/${escapeHtml(slug)}.md</code>.</p>
+						<p style="color:rgba(255,255,255,0.4);font-size:0.85rem;font-family:'JetBrains Mono',monospace">${escapeHtml(String(e))}</p>
+						<p><a href="/tutorials">← Browse all tutorials</a></p>
+					`;
+				}
+			}
+
+			// One-click copy on every code block. Copies the raw code text (not the
+			// highlight markup) and confirms inline before reverting.
+			function addCopyButtons(article) {
+				article.querySelectorAll('pre').forEach((pre) => {
+					const code = pre.querySelector('code');
+					if (!code) return;
+					const btn = document.createElement('button');
+					btn.type = 'button';
+					btn.className = 'tdoc-copy-btn';
+					btn.setAttribute('aria-label', 'Copy code to clipboard');
+					btn.innerHTML = `${ICON_COPY}<span>Copy</span>`;
+					let resetTimer = null;
+					btn.addEventListener('click', async () => {
+						try {
+							await navigator.clipboard.writeText(code.innerText);
+							btn.classList.add('is-copied');
+							btn.innerHTML = `${ICON_CHECK}<span>Copied</span>`;
+						} catch {
+							btn.innerHTML = `${ICON_COPY}<span>Press ⌘C</span>`;
+						}
+						clearTimeout(resetTimer);
+						resetTimer = setTimeout(() => {
+							btn.classList.remove('is-copied');
+							btn.innerHTML = `${ICON_COPY}<span>Copy</span>`;
+						}, 1700);
+					});
+					pre.appendChild(btn);
+				});
+			}
+
+			// Reading-progress rail + back-to-top, driven by real scroll position.
+			(function readingChrome() {
+				const fill = document.getElementById('tdoc-progress-fill');
+				const topBtn = document.getElementById('tdoc-top');
+				const root = document.documentElement;
+				let ticking = false;
+				function update() {
+					ticking = false;
+					const max = root.scrollHeight - root.clientHeight;
+					const pct = max > 0 ? Math.min(100, (root.scrollTop / max) * 100) : 0;
+					if (fill) fill.style.width = `${pct}%`;
+					if (topBtn) topBtn.classList.toggle('is-visible', root.scrollTop > 600);
+				}
+				window.addEventListener(
+					'scroll',
+					() => {
+						if (!ticking) {
+							ticking = true;
+							requestAnimationFrame(update);
+						}
+					},
+					{ passive: true },
+				);
+				topBtn?.addEventListener('click', () => {
+					const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+					window.scrollTo({ top: 0, behavior: reduce ? 'auto' : 'smooth' });
+				});
+				update();
+			})();
+
+			// Wait for the manifest script (deferred) to expose TUTORIALS, then render.
+			if (window.TUTORIALS) {
+				loadTutorial();
+			} else {
+				window.addEventListener('DOMContentLoaded', loadTutorial);
+			}
+		</script>
+		<script src="/brand.js" defer></script>
+		<div id="footer-container"></div>
+		<script src="/footer.js"></script>
+		<!-- Runtime i18n: detects locale, swaps annotated copy, mounts <lang-switcher>. -->
+	<script type="module" src="/i18n.js"></script>
+</body>
+</html>

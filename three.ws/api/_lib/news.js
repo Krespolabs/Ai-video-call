@@ -1,0 +1,802 @@
+// Native crypto-news aggregation — the engine behind /api/news/feed, the
+// related-news rail on /coin/:id, the Oracle's narrative pillar, pump-intel's
+// news-meme matcher, and the /markets surfaces. three.ws fetches the source
+// RSS/Atom feeds directly. The only third-party news API in this path is the
+// failover rung (news-failover.js), asked solely when the native merge is empty.
+//
+// Design, at the scale of the full publisher registry (news-sources.js):
+//
+//   * Per-source in-memory cache (5 min TTL) with serve-stale-on-error, so one
+//     slow or dead feed never blanks the page and repeat requests inside the
+//     TTL cost zero upstream calls.
+//   * A bounded worker pool (GLOBAL_CONCURRENCY) fronted by a per-domain
+//     semaphore (DOMAIN_CONCURRENCY). Shared hosts carry many feeds — a naive
+//     Promise.all over the registry earns an instant 429 from them and starves
+//     slow feeds of their timeout budget.
+//   * A refresh deadline: a request never blocks on a cold registry. It awaits
+//     refreshes for REFRESH_DEADLINE_MS, returns whatever is cached, and lets
+//     the stragglers land in cache for the next caller. Sources are refreshed
+//     in tier order, so the highest-credibility outlets land first.
+//   * Exponential backoff per source: a feed that 404s is not re-fetched every
+//     five minutes forever. Failures push nextRetryAt out to MAX_BACKOFF_MS.
+//
+// Every article is real, parsed from the publisher's own feed; nothing is
+// fabricated.
+
+import { createHash } from 'node:crypto';
+import { XMLParser } from 'fast-xml-parser';
+import { NEWS_SOURCES, sourcesForCategory, sourcesForLanguage, sourcePriority, isFeaturedSource, sourceKeyForLink } from './news-sources.js';
+import { isSuppressed, excerptText } from './news-rights.js';
+import { isDisplayable } from './news-curation.js';
+import { truncateChars } from './safe-text.js';
+import { fetchHostedNews } from './news-failover.js';
+
+const FEED_TIMEOUT_MS = 7000;
+const FRESH_MS = 300_000; // refetch a source after 5 min
+const STALE_OK_MS = 24 * 3600_000; // serve a failed source's last-good copy up to 24h
+const MAX_BACKOFF_MS = 6 * 3600_000; // a persistently dead feed (404/410) retries at most every 6h
+const SOFT_BACKOFF_MS = 30 * 60_000; // a rate-limited or 5xx feed retries at most every 30 min
+const REFRESH_DEADLINE_MS = 2500; // how long a request will wait on cold sources
+const GLOBAL_CONCURRENCY = 16; // outbound feed fetches in flight, all domains
+const DOMAIN_CONCURRENCY = 3; // outbound feed fetches in flight, per domain
+const MAX_ARTICLES_PER_SOURCE = 40; // newest-N per feed keeps the working set bounded
+const NARROW_QUERY_SOURCES = 8; // at or below this, wait for the feeds rather than return an empty page
+
+// key → { articles, fetchedAt, ok, failures, nextRetryAt }
+const sourceCache = new Map();
+// de-duplicated in-flight refreshes so concurrent requests share one fetch
+const inflight = new Map();
+
+const str = (v) => (typeof v === 'string' && v.trim() ? v.trim() : null);
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+
+export function stripHtml(s) {
+	return String(s || '')
+		.replace(/<[^>]+>/g, ' ')
+		.replace(/&nbsp;/g, ' ')
+		.replace(/&amp;/g, '&')
+		.replace(/&lt;/g, '<')
+		.replace(/&gt;/g, '>')
+		.replace(/&quot;/g, '"')
+		.replace(/&#0?39;|&apos;/g, "'")
+		.replace(/&#8217;|&rsquo;/g, "'")
+		.replace(/&#8220;|&#8221;|&ldquo;|&rdquo;/g, '"')
+		.replace(/&#8211;|&ndash;|&#8212;|&mdash;/g, '—')
+		.replace(/\s+/g, ' ')
+		.trim();
+}
+
+// Same 16-hex content-addressed ID scheme as the historical archive, so live
+// and archived records share an identity space.
+export function articleId(link) {
+	return createHash('sha256').update(String(link)).digest('hex').slice(0, 16);
+}
+
+// A publisher-stamped date meaningfully in the future is bogus (CoinPaper has
+// shipped stories dated seven weeks ahead) and poisons everything keyed on the
+// publication month: the permalink month the browser mints, the archive month
+// file the cron writes, and the story-page lookup — a future-dated article got
+// a permalink that 404'd while the story was live on the feed. Clamp to fetch
+// time; honest timezone skew stays inside the 24h allowance.
+export function clampFuturePubDate(iso) {
+	if (!iso) return iso;
+	const t = Date.parse(iso);
+	if (!Number.isFinite(t) || t <= Date.now() + 24 * 3_600_000) return iso;
+	return new Date().toISOString();
+}
+
+// WordPress and its plugins append syndication boilerplate to every excerpt:
+// "The post <title> appeared first on <site>.", "Continue reading…",
+// "Read more on …", trailing "[…]". None of it is article text — strip it
+// before the excerpt reaches a card, a digest summary, or an LLM prompt.
+export function stripFeedBoilerplate(text) {
+	return String(text || '')
+		.replace(/\bThe post .*?appeared first on .*$/is, '')
+		.replace(/\bThis (?:post|article) (?:was )?(?:first )?(?:published|appeared).*$/is, '')
+		.replace(/\b(?:Continue reading|Read more|Read the full (?:story|article)|The post)\b[^.]*$/i, '')
+		.replace(/\[[…\.]+\]\s*$/, '')
+		.replace(/\s*(?:…|\.\.\.)\s*$/, '')
+		.replace(/\s+/g, ' ')
+		.trim();
+}
+
+// Cut at a word boundary and mark the elision, so an excerpt never ends
+// mid-word ("…the game appeared f").
+export function truncateWords(text, max) {
+	const t = String(text || '').trim();
+	if (!t) return null;
+	if (t.length <= max) return t;
+	const cut = truncateChars(t, max);
+	const lastSpace = cut.lastIndexOf(' ');
+	return `${(lastSpace > max * 0.6 ? cut.slice(0, lastSpace) : cut).replace(/[\s,;:—–-]+$/, '')}…`;
+}
+
+// Models on the free tiers often wrap JSON in a ```json fence despite being
+// told not to. Unwrap before JSON.parse rather than failing the completion.
+export function stripJsonFence(text) {
+	const t = String(text || '').trim();
+	const fenced = t.match(/^```(?:json)?\s*([\s\S]*?)\s*```$/);
+	return (fenced ? fenced[1] : t).trim();
+}
+
+// ── Sentiment (lexicon) ──────────────────────────────────────────────────────
+// Fast keyword sentiment matching the archive's { score, label, confidence }
+// shape. Used for live articles, which arrive without the offline enrichment
+// the 662k archived records carry.
+
+const POSITIVE = [
+	'surge', 'surges', 'soar', 'soars', 'rally', 'rallies', 'jump', 'jumps', 'gain', 'gains',
+	'all-time high', 'ath', 'record high', 'breakout', 'bullish', 'adoption', 'approval',
+	'approve', 'approved', 'partnership', 'integration', 'launch', 'launches', 'upgrade',
+	'milestone', 'inflow', 'inflows', 'accumulate', 'accumulation', 'outperform', 'recovery',
+	'rebound', 'green', 'wins', 'settle', 'settlement approved',
+];
+const NEGATIVE = [
+	'crash', 'crashes', 'plunge', 'plunges', 'dump', 'dumps', 'selloff', 'sell-off', 'slump',
+	'hack', 'hacked', 'exploit', 'exploited', 'breach', 'stolen', 'scam', 'fraud', 'lawsuit',
+	'sues', 'sued', 'charges', 'ban', 'bans', 'banned', 'crackdown', 'bearish', 'liquidation',
+	'liquidations', 'outflow', 'outflows', 'bankruptcy', 'insolvent', 'collapse', 'warning',
+	'red', 'drop', 'drops', 'falls', 'tumble', 'tumbles', 'rug pull', 'delist', 'delisting',
+];
+
+export function lexiconSentiment(text) {
+	const t = ` ${String(text || '').toLowerCase()} `;
+	let pos = 0;
+	let neg = 0;
+	for (const w of POSITIVE) if (t.includes(w)) pos++;
+	for (const w of NEGATIVE) if (t.includes(w)) neg++;
+	const hits = pos + neg;
+	if (!hits) return { score: 0, label: 'neutral', confidence: 0.5 };
+	const score = Math.max(-1, Math.min(1, (pos - neg) / Math.max(2, hits)));
+	const label =
+		score > 0.5 ? 'very_positive' : score > 0.1 ? 'positive' : score < -0.5 ? 'very_negative' : score < -0.1 ? 'negative' : 'neutral';
+	return { score: Number(score.toFixed(2)), label, confidence: Math.min(0.9, 0.5 + hits * 0.1) };
+}
+
+// ── Ticker extraction ────────────────────────────────────────────────────────
+// $SYMBOL mentions plus a wordlist of majors whose bare names/symbols are
+// unambiguous in crypto headlines.
+
+const TICKER_WORDS = new Map([
+	['bitcoin', 'BTC'], ['btc', 'BTC'], ['ethereum', 'ETH'], ['eth', 'ETH'], ['ether', 'ETH'],
+	['solana', 'SOL'], ['sol', 'SOL'], ['xrp', 'XRP'], ['ripple', 'XRP'], ['bnb', 'BNB'],
+	['dogecoin', 'DOGE'], ['doge', 'DOGE'], ['cardano', 'ADA'], ['ada', 'ADA'],
+	['tether', 'USDT'], ['usdt', 'USDT'], ['usdc', 'USDC'], ['avalanche', 'AVAX'],
+	['avax', 'AVAX'], ['polkadot', 'DOT'], ['chainlink', 'LINK'], ['litecoin', 'LTC'],
+	['polygon', 'MATIC'], ['tron', 'TRX'], ['shiba inu', 'SHIB'], ['shib', 'SHIB'],
+	['sui', 'SUI'], ['aptos', 'APT'], ['arbitrum', 'ARB'],
+	['pepe', 'PEPE'], ['bonk', 'BONK'], ['aave', 'AAVE'], ['uniswap', 'UNI'],
+	['stellar', 'XLM'], ['monero', 'XMR'], ['cosmos', 'ATOM'], ['filecoin', 'FIL'],
+	['hedera', 'HBAR'], ['injective', 'INJ'], ['celestia', 'TIA'], ['jito', 'JTO'],
+	['jupiter', 'JUP'], ['worldcoin', 'WLD'], ['toncoin', 'TON'], ['hyperliquid', 'HYPE'],
+]);
+
+// Projects whose bare name is ALSO an ordinary English or finance word. They
+// were in the wordlist above and tagged the language, not the coin: "near"
+// turned every "near-term profit booking" note into NEAR Protocol (the archive's
+// trending strip ranked NEAR third on the strength of it), "optimism" tagged
+// every hopeful Fed headline as OP, and "maker" tagged every market maker as
+// MKR. A false ticker is expensive here: it pins a price widget to an unrelated
+// story, skews trending, and lets a non-crypto article through the display gate
+// on the strength of a detected ticker, so these count only when the text names
+// the project rather than uses the word. A cashtag ($NEAR) still matches via the
+// pass above, and crypto-native coverage of these three reliably qualifies them.
+const QUALIFIED_TICKER_PHRASES = new Map([
+	['near protocol', 'NEAR'], ['near foundation', 'NEAR'],
+	['optimism network', 'OP'], ['optimism mainnet', 'OP'], ['op mainnet', 'OP'],
+	['op token', 'OP'], ['optimism collective', 'OP'],
+	['makerdao', 'MKR'], ['maker dao', 'MKR'], ['maker protocol', 'MKR'], ['mkr', 'MKR'],
+]);
+
+export function extractTickers(text) {
+	const found = new Set();
+	const t = String(text || '');
+	for (const m of t.matchAll(/\$([A-Z][A-Z0-9]{1,9})\b/g)) found.add(m[1]);
+	const lower = ` ${t.toLowerCase().replace(/[^a-z0-9$ ]/g, ' ').replace(/\s+/g, ' ')} `;
+	for (const [word, sym] of TICKER_WORDS) {
+		if (lower.includes(` ${word} `)) found.add(sym);
+	}
+	for (const [phrase, sym] of QUALIFIED_TICKER_PHRASES) {
+		if (lower.includes(` ${phrase} `)) found.add(sym);
+	}
+	return [...found].slice(0, 8);
+}
+
+// ── Feed parsing ─────────────────────────────────────────────────────────────
+
+function firstImage(html) {
+	const m = String(html || '').match(/<img[^>]+src=["']([^"']+)["']/i);
+	return m ? m[1] : null;
+}
+
+/**
+ * Feeds ship junk in their image slots: data:-URI placeholders (ZeroHedge sends
+ * an inline SVG icon as media:content), 1×1 tracking pixels, protocol-relative
+ * links, and plain-http URLs that an https page can't render (mixed content is
+ * blocked, not downgraded). Only a real, loadable https URL survives this —
+ * anything else becomes null so the card falls back cleanly instead of showing
+ * a broken or junk preview.
+ */
+export function cleanImageUrl(raw) {
+	let url = str(raw);
+	if (!url) return null;
+	if (url.startsWith('//')) url = `https:${url}`;
+	if (/^http:\/\//i.test(url)) url = `https://${url.slice(7)}`;
+	if (!/^https:\/\//i.test(url)) return null; // data:, blob:, ftp:, relative paths
+	if (/(?:^|[/_.-])(?:1x1|pixel|spacer|blank|transparent)(?:[/_.-]|\.(?:gif|png)\b)/i.test(url)) return null;
+	if (/feeds\.feedburner\.com\/~/i.test(url)) return null; // FeedBurner impression beacons
+	return url;
+}
+
+/** First <meta property|name="…" content="…"> match, attribute order agnostic. */
+export function metaContent(html, patterns) {
+	for (const name of patterns) {
+		const re = new RegExp(
+			`<meta[^>]+(?:property|name)=["']${name}["'][^>]+content=["']([^"']+)["']|<meta[^>]+content=["']([^"']+)["'][^>]+(?:property|name)=["']${name}["']`,
+			'i',
+		);
+		const m = String(html || '').match(re);
+		if (m) return (m[1] || m[2] || '').trim() || null;
+	}
+	return null;
+}
+
+/**
+ * The article page's own preview image — what the publisher would show on a
+ * social share. Backs /api/news/image for articles whose feed carries no image.
+ */
+export function extractOgImage(html) {
+	return cleanImageUrl(
+		metaContent(html, ['og:image:secure_url', 'og:image', 'twitter:image', 'twitter:image:src']),
+	);
+}
+
+function normalizeLink(it) {
+	// RSS: <link>url</link>. Atom: <link href="..."/> possibly an array with
+	// rel variants — prefer rel="alternate", else the first href.
+	if (typeof it?.link === 'string') return str(it.link);
+	if (it?.link?.['@href']) return str(it.link['@href']);
+	if (Array.isArray(it?.link)) {
+		const alt = it.link.find((l) => l?.['@rel'] === 'alternate' && l?.['@href']);
+		const any = it.link.find((l) => l?.['@href']);
+		return str(alt?.['@href']) || str(any?.['@href']);
+	}
+	return null;
+}
+
+export function parseFeed(xml, sourceKey) {
+	const src = NEWS_SOURCES[sourceKey];
+	const parser = new XMLParser({ ignoreAttributes: false, attributeNamePrefix: '@' });
+	const doc = parser.parse(xml);
+	const items = doc?.rss?.channel?.item || doc?.feed?.entry || doc?.['rdf:RDF']?.item || [];
+	return (Array.isArray(items) ? items : [items])
+		.map((it) => {
+			const link = normalizeLink(it);
+			const title = stripHtml(str(it?.title?.['#text']) || str(it?.title) || '');
+			if (!link || !title) return null;
+			const rawDesc =
+				str(it?.description) ||
+				str(it?.summary?.['#text']) ||
+				str(it?.summary) ||
+				str(it?.['content:encoded']) ||
+				str(it?.content?.['#text']) ||
+				'';
+			// First candidate that survives hygiene wins — a junk media:content
+			// (ZeroHedge ships a data:-URI icon there) must not mask a real
+			// thumbnail further down the chain.
+			const image =
+				[
+					str(it?.['media:content']?.['@url']),
+					Array.isArray(it?.['media:content']) ? str(it['media:content'][0]?.['@url']) : null,
+					str(it?.['media:thumbnail']?.['@url']),
+					str(it?.enclosure?.['@url']),
+					firstImage(it?.['content:encoded'] || rawDesc),
+				]
+					.map(cleanImageUrl)
+					.find(Boolean) || null;
+			const pubDate = str(it?.pubDate) || str(it?.published) || str(it?.updated) || str(it?.['dc:date']);
+			const iso = clampFuturePubDate(
+				pubDate && !Number.isNaN(Date.parse(pubDate)) ? new Date(pubDate).toISOString() : null,
+			);
+			const author =
+				stripHtml(str(it?.['dc:creator']) || str(it?.author?.name) || str(it?.author) || '') || null;
+			// Some feeds (e.g. Bitcoin Magazine) prefix descriptions with their own
+			// name and/or repeat the headline verbatim — strip the echo so cards
+			// don't read "Source Title Title …".
+			let descText = stripHtml(rawDesc);
+			const srcName = src?.name || '';
+			if (srcName && descText.toLowerCase().startsWith(srcName.toLowerCase())) {
+				descText = descText.slice(srcName.length).trimStart();
+			}
+			if (title && descText.toLowerCase().startsWith(title.toLowerCase())) {
+				descText = descText.slice(title.length).replace(/^[\s—–:-]+/, '');
+			}
+			const description = truncateWords(stripFeedBoilerplate(descText), 320);
+			// Full body many feeds ship (WordPress content:encoded, Atom content).
+			// Server-side only — the reader uses it when the publisher's site
+			// blocks direct fetches; the feed API strips it from list payloads.
+			const fullText = stripHtml(str(it?.['content:encoded']) || str(it?.content?.['#text']) || '');
+			return {
+				id: articleId(link),
+				title,
+				link,
+				description,
+				image,
+				author,
+				source: src?.name || sourceKey,
+				source_key: sourceKey,
+				category: src?.category || 'general',
+				pub_date: iso,
+				tickers: extractTickers(`${title} ${description || ''}`),
+				sentiment: lexiconSentiment(`${title} ${description || ''}`),
+				content_text: fullText.length > (description || '').length + 80 ? fullText.slice(0, 8000) : null,
+			};
+		})
+		.filter(Boolean);
+}
+
+// ── Non-RSS sources ──────────────────────────────────────────────────────────
+// A source with `kind: 'json'` is shaped by an adapter here instead of by
+// parseFeed. The bar for adding one is high: free, keyless, and serviceable
+// from a datacenter IP (which is what Cloud Run is). Two of cryptocurrency.cv's
+// four JSON sources no longer clear it and are deliberately absent:
+// CryptoCompare now answers 401 and DeFiLlama's /raises answers 402. Reddit's
+// keyless JSON listings also answer a constant 403 to datacenter egress, which
+// is why they were excluded for a long time; they ship now because Reddit
+// serves the SAME hot listing as an Atom feed (hot.rss) to a polite bot UA
+// (verified with paced probes, 2026-08-05/06), and the reddit_* sources declare
+// that mirror as `fallback_url`. fetchSource retries the mirror whenever the
+// JSON rung fails, so the source degrades to Atom instead of failing forever.
+
+// Reddit listing shaping (r/<sub>/hot.json, keyless, no OAuth). Community
+// feeds are noisy, so the adapter drops what the JSON payload lets it see:
+// pinned/stickied posts, NSFW posts, recurring megathreads, and anything under
+// a small score floor.
+const REDDIT_MIN_SCORE = 5;
+const REDDIT_NOISE_TITLE = /\b(?:daily (?:discussion|general|thread)|weekly (?:discussion|thread|roundup)|megathread|open discussion)\b/i;
+// Reddit's Atom mirror wraps every entry body in "submitted by /u/x [link]
+// [comments]" boilerplate; none of it is post text.
+const REDDIT_ATOM_BOILERPLATE = /submitted by\s+\/?u\/\S+.*$/i;
+
+function redditListing(data, key) {
+	const src = NEWS_SOURCES[key];
+	const children = data?.data?.children;
+	if (!Array.isArray(children)) throw new Error(`${key} unexpected payload`);
+	return children
+		.map((c) => {
+			const d = c?.data;
+			if (!d || d.stickied || d.over_18) return null;
+			if ((Number(d.score) || 0) < REDDIT_MIN_SCORE) return null;
+			const title = stripHtml(str(d.title) || '');
+			if (!title || !str(d.permalink)) return null;
+			if (REDDIT_NOISE_TITLE.test(title)) return null;
+			// The permalink (the discussion thread) is the canonical link: d.url on
+			// a link post can be a bare image or video, and the thread is where the
+			// score and the community context live.
+			const link = `https://www.reddit.com${d.permalink}`;
+			const iso = clampFuturePubDate(
+				Number.isFinite(d.created_utc) ? new Date(d.created_utc * 1000).toISOString() : null,
+			);
+			const selftext = stripHtml(str(d.selftext) || '');
+			const description = truncateWords(selftext, 320);
+			// raw_json=1 in the source URL keeps preview URLs unescaped; thumbnail
+			// placeholders ('self', 'default', 'nsfw') are not https and fall out in
+			// cleanImageUrl.
+			const image =
+				[str(d.preview?.images?.[0]?.source?.url), str(d.thumbnail)].map(cleanImageUrl).find(Boolean) || null;
+			return {
+				id: articleId(link),
+				title,
+				link,
+				description,
+				image,
+				author: str(d.author) ? `u/${d.author}` : null,
+				source: src.name,
+				source_key: key,
+				category: src.category,
+				pub_date: iso,
+				score: Number(d.score) || 0,
+				tickers: extractTickers(`${title} ${selftext}`),
+				sentiment: lexiconSentiment(`${title} ${selftext}`),
+				content_text: selftext.length > (description || '').length + 80 ? selftext.slice(0, 8000) : null,
+			};
+		})
+		.filter(Boolean);
+}
+
+// The Atom mirror carries no score/stickied metadata, so the noise gates are
+// re-applied from the only signal it has (the title), and the "submitted by"
+// wrapper is stripped from body text. Non-reddit fallbacks pass through as-is.
+function shapeFallbackArticles(key, articles) {
+	if (!key.startsWith('reddit_')) return articles;
+	const clean = (s) => stripHtml(String(s || '').replace(REDDIT_ATOM_BOILERPLATE, ''));
+	return articles
+		.filter((a) => !REDDIT_NOISE_TITLE.test(a.title))
+		.map((a) => ({
+			...a,
+			description: truncateWords(clean(a.description), 320),
+			content_text: a.content_text ? clean(a.content_text) || null : null,
+		}));
+}
+
+const JSON_ADAPTERS = {
+	// Exchange listing/delisting notices. Market-moving, and published to no RSS
+	// feed anywhere. The list endpoint returns title + code + releaseDate only;
+	// the canonical permalink is /support/announcement/detail/<code>.
+	binance_announcements(data, key) {
+		const src = NEWS_SOURCES[key];
+		const articles = data?.data?.catalogs?.[0]?.articles;
+		if (!Array.isArray(articles)) throw new Error(`${key} unexpected payload`);
+		return articles
+			.map((a) => {
+				const title = stripHtml(a?.title);
+				if (!title || !a?.code) return null;
+				const link = `https://www.binance.com/en/support/announcement/detail/${a.code}`;
+				const iso = clampFuturePubDate(Number.isFinite(a.releaseDate) ? new Date(a.releaseDate).toISOString() : null);
+				return {
+					id: articleId(link),
+					title,
+					link,
+					description: null,
+					image: null,
+					author: null,
+					source: src.name,
+					source_key: key,
+					category: src.category,
+					pub_date: iso,
+					tickers: extractTickers(title),
+					sentiment: lexiconSentiment(title),
+					content_text: null,
+				};
+			})
+			.filter(Boolean);
+	},
+
+	// Reddit community listings, one adapter per subreddit source (the registry
+	// guard in tests/news-sources.test.js requires a named adapter per key);
+	// the shaping lives in redditListing above.
+	reddit_solana(data, key) { return redditListing(data, key); },
+	reddit_cryptocurrency(data, key) { return redditListing(data, key); },
+	reddit_cryptomarkets(data, key) { return redditListing(data, key); },
+	reddit_defi(data, key) { return redditListing(data, key); },
+	reddit_bitcoin(data, key) { return redditListing(data, key); },
+	reddit_ethereum(data, key) { return redditListing(data, key); },
+};
+
+// ── Concurrency control ──────────────────────────────────────────────────────
+// Feeds cluster on shared hosts, so cap outbound fetches globally *and* per
+// domain: a naive Promise.all over the registry earns an instant 429 from
+// exactly those hosts and starves slow feeds of their timeout budget.
+
+function feedDomain(url) {
+	try {
+		return new URL(url).hostname;
+	} catch {
+		return 'invalid';
+	}
+}
+
+/**
+ * Counting semaphore. `release()` hands the slot directly to the next waiter
+ * rather than decrementing, so a slot is never double-issued.
+ */
+function semaphore(limit) {
+	let active = 0;
+	const waiters = [];
+	return {
+		async acquire() {
+			if (active < limit) {
+				active++;
+				return;
+			}
+			await new Promise((resolve) => waiters.push(resolve));
+		},
+		release() {
+			const next = waiters.shift();
+			if (next) next();
+			else active--;
+		},
+	};
+}
+
+const globalGate = semaphore(GLOBAL_CONCURRENCY);
+const domainGates = new Map();
+
+// Hosts stricter than the default per-domain cap. reddit.com rate-limits
+// keyless clients aggressively (a burst of six requests spaced 1s apart earned
+// a blanket 429, probed 2026-08-05), so its six listings fetch strictly one at
+// a time; the 5-minute source TTL keeps the steady state at about one request
+// per subreddit per 5 minutes.
+const DOMAIN_CONCURRENCY_OVERRIDES = { 'www.reddit.com': 1 };
+
+function domainGate(domain) {
+	if (!domainGates.has(domain)) {
+		domainGates.set(domain, semaphore(DOMAIN_CONCURRENCY_OVERRIDES[domain] || DOMAIN_CONCURRENCY));
+	}
+	return domainGates.get(domain);
+}
+
+// ── Per-source fetch ─────────────────────────────────────────────────────────
+
+function requestFeed(url, json) {
+	return fetch(url, {
+		headers: {
+			accept: json
+				? 'application/json'
+				: 'application/rss+xml, application/atom+xml, application/xml, text/xml;q=0.9, */*;q=0.8',
+			// A polite, identifying bot UA gets through more publisher WAFs than a
+			// spoofed browser UA does: a fake Chrome string without the matching
+			// TLS/header fingerprint reads as a scraper and earns a 403. Reddit in
+			// particular rejects default library UAs outright; this descriptive one
+			// is what its keyless endpoints expect.
+			'user-agent': 'Mozilla/5.0 (compatible; three.ws-news/1.0; +https://three.ws)',
+			'accept-language': 'en-US,en;q=0.9',
+		},
+		signal: AbortSignal.timeout(FEED_TIMEOUT_MS),
+		redirect: 'follow',
+	});
+}
+
+async function fetchSource(key) {
+	const src = NEWS_SOURCES[key];
+	const gate = domainGate(feedDomain(src.url));
+	// Domain gate first, then the global gate: a request queued behind a busy
+	// domain must not occupy a global slot that another domain's feed could use.
+	await gate.acquire();
+	await globalGate.acquire();
+	try {
+		const json = src.kind === 'json';
+		const resp = await requestFeed(src.url, json);
+		if (resp.ok) {
+			if (json) return JSON_ADAPTERS[key](await resp.json(), key);
+			return parseFeed(await resp.text(), key);
+		}
+		const err = new Error(`${key} ${resp.status}`);
+		err.status = resp.status;
+		// Failover rung: a source may declare an alternate feed representation of
+		// the same listing (reddit's Atom mirror of its datacenter-blocked JSON
+		// API). Fetched sequentially under the same domain + global slots, so the
+		// per-domain pacing still holds.
+		if (src.fallback_url) {
+			let fb = null;
+			try {
+				fb = await requestFeed(src.fallback_url, false);
+			} catch {
+				// transport failure on the fallback: the primary error stands
+			}
+			if (fb?.ok) return shapeFallbackArticles(key, parseFeed(await fb.text(), key));
+			if (fb) {
+				// The fallback's verdict drives the backoff: reddit's JSON answers a
+				// constant 403 while its Atom mirror 429s transiently, and letting the
+				// 403 pick the 6h hard ceiling would mute a source whose fallback
+				// recovers within minutes.
+				err.status = fb.status;
+				err.message = `${key} ${resp.status} (fallback ${fb.status})`;
+			}
+		}
+		throw err;
+	} finally {
+		globalGate.release();
+		gate.release();
+	}
+}
+
+/** Exponential backoff so a permanently dead feed stops costing us a request every 5 min. */
+function backoffFor(failures, status) {
+	// A 429/408/5xx (or a timeout, which arrives with no status) means "later",
+	// not "gone" — park those under a soft ceiling so a rate-limited publisher
+	// recovers within the hour. A 404/410/403 is a real verdict: hard ceiling.
+	const transient = !status || status === 429 || status === 408 || (status >= 500 && status < 600);
+	const ceiling = transient ? SOFT_BACKOFF_MS : MAX_BACKOFF_MS;
+	return Math.min(FRESH_MS * 2 ** Math.max(0, failures - 1), ceiling);
+}
+
+function refreshSource(key) {
+	if (inflight.has(key)) return inflight.get(key);
+	const p = fetchSource(key)
+		.then((articles) => {
+			const trimmed = articles
+				.sort((a, b) => new Date(b.pub_date || 0) - new Date(a.pub_date || 0))
+				.slice(0, MAX_ARTICLES_PER_SOURCE);
+			sourceCache.set(key, {
+				articles: trimmed,
+				fetchedAt: Date.now(),
+				ok: true,
+				failures: 0,
+				nextRetryAt: Date.now() + FRESH_MS,
+			});
+			return trimmed;
+		})
+		.catch((err) => {
+			const prev = sourceCache.get(key);
+			const failures = (prev?.failures || 0) + 1;
+			// keep the last-good copy; push the next attempt out exponentially
+			sourceCache.set(key, {
+				articles: prev?.articles || [],
+				fetchedAt: prev?.ok ? prev.fetchedAt : Date.now(),
+				lastFailAt: Date.now(),
+				lastStatus: err?.status || null,
+				ok: false,
+				failures,
+				nextRetryAt: Date.now() + backoffFor(failures, err?.status),
+			});
+			return prev?.articles || [];
+		})
+		.finally(() => inflight.delete(key));
+	inflight.set(key, p);
+	return p;
+}
+
+/**
+ * Bring `keys` as close to fresh as `deadlineMs` allows, then return every
+ * article currently cached for them. Refreshes that miss the deadline keep
+ * running and populate the cache for the next request — a cold start degrades
+ * to "fewer sources this round", never to a hung request.
+ */
+async function ensureSources(keys, deadlineMs = REFRESH_DEADLINE_MS) {
+	const now = Date.now();
+	const stale = keys
+		.filter((key) => {
+			if (inflight.has(key)) return false;
+			const hit = sourceCache.get(key);
+			if (!hit) return true;
+			if (now < (hit.nextRetryAt || 0)) return false; // backing off
+			return now - hit.fetchedAt >= FRESH_MS;
+		})
+		// highest-credibility sources first, so a deadline-truncated round still
+		// returns the outlets that matter most
+		.sort((a, b) => sourcePriority(a) - sourcePriority(b));
+
+	if (stale.length) {
+		// refreshSource never rejects and self-throttles on the domain + global
+		// gates, so kicking them all off here queues rather than stampedes.
+		const started = stale.map((key) => refreshSource(key));
+		await Promise.race([Promise.all(started), sleep(deadlineMs)]);
+	}
+
+	return keys.flatMap((key) => {
+		const hit = sourceCache.get(key);
+		if (!hit) return [];
+		// drop sources whose last-good copy is ancient — stale beyond 24h reads as fake-live
+		const age = Date.now() - hit.fetchedAt;
+		if (!hit.ok && age > STALE_OK_MS) return [];
+		return hit.articles;
+	});
+}
+
+function dedupe(articles) {
+	const seen = new Set();
+	const out = [];
+	for (const a of articles) {
+		const titleKey = a.title.toLowerCase().replace(/[^a-z0-9]/g, '').slice(0, 80);
+		if (seen.has(a.id) || (titleKey && seen.has(titleKey))) continue;
+		seen.add(a.id);
+		if (titleKey) seen.add(titleKey);
+		out.push(a);
+	}
+	return out;
+}
+
+/**
+ * Aggregate live news across the registry.
+ *
+ * `lang` defaults to 'en'. The registry carries international feeds in 17
+ * languages, and folding them into the default view would interleave Korean and
+ * Chinese headlines into an English feed. They are opt-in: pass a language code
+ * for one, or 'all' for the whole registry.
+ *
+ * `featured` narrows the fan-out to the majors (tier1/tier2 or credibility
+ * ≥ 0.85) — the "Featured" tab on /markets/news.
+ *
+ * `curated` applies the editorial display gate (crypto-relevant + above the
+ * quality floor, see api/_lib/news-curation.js). Off by default: ingestion and
+ * agent-signal callers get the full firehose; human-facing feeds opt in.
+ *
+ * @param {object} opts { category, source, lang, q, limit, offset, featured, curated }
+ * @returns {{ articles: Array, total: number, sources_ok: number, sources_total: number }}
+ */
+export async function getNews({ category, source, lang = 'en', q, limit = 30, offset = 0, featured = false, curated = false } = {}) {
+	let keys;
+	if (source && NEWS_SOURCES[source]) keys = [source];
+	else if (source) return { articles: [], total: 0, sources_ok: 0, sources_total: 0 };
+	else {
+		keys = sourcesForCategory(category);
+		if (lang && lang !== 'all') {
+			const inLang = new Set(sourcesForLanguage(lang));
+			keys = keys.filter((k) => inLang.has(k));
+		}
+		if (featured) keys = keys.filter(isFeaturedSource);
+	}
+
+	// A narrow selection — one source, or a small language/category slice — has
+	// no other content to fall back on: truncating its refresh at the fan-out
+	// deadline returns an empty page rather than a partial one. Give it the full
+	// feed timeout. A broad query keeps the short deadline; it has plenty to show
+	// while the stragglers land in cache for the next caller.
+	const deadline = keys.length <= NARROW_QUERY_SOURCES ? FEED_TIMEOUT_MS + 500 : REFRESH_DEADLINE_MS;
+	const all = await ensureSources(keys, deadline);
+	// Rights filter, applied at the fan-out's single choke point: everything
+	// downstream of getNews (the /markets/news feed, the RSS mirror, related
+	// coverage, the coin rails, and the hourly archive-append cron) inherits it,
+	// so a withdrawn publisher can neither be displayed nor newly archived.
+	// The rights filter, curation gate and query run over whichever pool
+	// answered, native or the hosted failover, so neither can route around them.
+	const refine = (pool) => {
+		let list = dedupe(pool)
+			.filter((a) => !isSuppressed(a))
+			.sort((a, b) => new Date(b.pub_date || 0) - new Date(a.pub_date || 0));
+		// Editorial display gate (opt-in): crypto-relevant + above the quality
+		// floor. OFF by default so ingestion (the archive cron) and agent-signal
+		// callers keep the full firehose; the human-facing feeds pass curated:true.
+		// An explicit single-source request is exempt: the caller asked for that
+		// outlet by name, so honour it.
+		if (curated && !source) list = list.filter((a) => isDisplayable(a));
+		if (q) {
+			const needle = q.toLowerCase();
+			list = list.filter((a) =>
+				`${a.title} ${a.description || ''} ${a.tickers.join(' ')}`.toLowerCase().includes(needle),
+			);
+		}
+		return list;
+	};
+	let articles = refine(all);
+	// Failover rung: the native merge is empty (cold start, feed-wide outage),
+	// so ask the hosted cryptocurrency.cv API rather than render an empty page.
+	// Never for a named source, which has no equivalent upstream, and never when
+	// the caller is paging past the end of a populated result.
+	if (!articles.length && !source && offset === 0 && !all.length) {
+		articles = refine(await fetchHostedNews({ category, lang }));
+	}
+	const total = articles.length;
+	const sources_ok = keys.filter((k) => sourceCache.get(k)?.ok).length;
+	// content_text is a server-side field for the article reader; list payloads
+	// stay light.
+	// `description` is bounded here for the same reason content_text is dropped:
+	// a content:encoded feed puts the publisher's whole article in it, and this
+	// payload is what the feed UI, the RSS mirror and the coin rails render.
+	const page = articles
+		.slice(offset, offset + limit)
+		.map(({ content_text, ...a }) => ({ ...a, description: excerptText(a.description) }));
+	return {
+		articles: page,
+		total,
+		sources_ok,
+		sources_total: keys.length,
+	};
+}
+
+/** Search all sources — used by the /coin/:id related-news rail. */
+export async function searchNews(q, limit = 8) {
+	return getNews({ q, limit });
+}
+
+/**
+ * Locate one article (with its feed-provided full text, when the publisher
+ * ships one) by link or 16-hex id across every cached source. Used by the
+ * reader endpoint as the trusted fallback when a publisher blocks direct
+ * page fetches — the content still comes from the publisher's own feed.
+ */
+export async function findArticle({ link, id }) {
+	const wantId = id || (link ? articleId(link) : null);
+	if (!wantId && !link) return null;
+	const match = (articles) => articles.find((a) => a.id === wantId || (link && a.link === link)) || null;
+	// A withdrawn story is "not found" to every caller, including the reader's
+	// feed-body fallback: otherwise a blocked page fetch would route straight
+	// around the rights filter and serve the publisher's feed copy instead.
+	const answer = (hit) => (hit && isSuppressed(hit) ? null : hit);
+
+	// Ask the one feed that could hold this link first, with the full timeout a
+	// narrow query gets in getNews. The broad scan below fans out over every
+	// source in the registry and truncates at REFRESH_DEADLINE_MS, so on an
+	// instance whose cache is still cold the publisher is dropped mid-refresh
+	// and an article the feed served seconds earlier reads as unknown. That is
+	// how /api/news/image came to answer a cacheable 404 for a live card, which
+	// then pinned a console 404 on every reader for the life of the cache entry.
+	const key = link ? sourceKeyForLink(link) : null;
+	if (key) {
+		const narrow = answer(match(await ensureSources([key], FEED_TIMEOUT_MS + 500)));
+		if (narrow) return narrow;
+	}
+
+	return answer(match(await ensureSources(sourcesForCategory('all'))));
+}

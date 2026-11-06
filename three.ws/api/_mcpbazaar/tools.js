@@ -1,0 +1,347 @@
+// x402 Bazaar MCP: discovery tools over the live x402 facilitator network.
+//
+// Every tool hits real facilitators (no cache of fake data): search and browse
+// the merged catalog of paid agent services, and pull the full payment + input
+// schema for any one service. The result is everything a client needs to decide
+// to pay and exactly how: price, network, recipient, and a ready pay link.
+import { limits } from '../_lib/rate-limit.js';
+import { env } from '../_lib/env.js';
+import {
+	Bazaar,
+	filterByNetwork,
+	filterByMaxPrice,
+} from '../_lib/x402/bazaar-client.js';
+import { readResourceToolResult } from '../_mcp/resources.js';
+
+function rpcError(code, message, data) {
+	const e = new Error(message);
+	e.code = code;
+	e.data = data;
+	return e;
+}
+
+async function enforce(auth) {
+	const rl = await limits.mcpBazaar(auth.userId || auth.rateKey || 'anon');
+	if (!rl.success) {
+		throw rpcError(-32000, 'rate_limited', {
+			retry_after: Math.ceil((rl.reset - Date.now()) / 1000),
+		});
+	}
+}
+
+// USDC and most x402 stablecoins use 6 decimals, so convert a human dollar cap
+// to the atomic units filterByMaxPrice compares against. Returns null when the
+// cap is effectively unbounded (a number so large the conversion overflows),
+// telling the caller to skip the filter rather than reject the whole query.
+function usdcToAtomic(usd) {
+	const atomic = Math.round(Number(usd) * 1_000_000);
+	if (!Number.isFinite(atomic)) return null;
+	if (atomic <= 0) return '0';
+	// String(1e21) is "1e+21", which parseAtomicAmount rejects as non-integer and
+	// filterByMaxPrice then throws on. BigInt renders full digits at any
+	// magnitude, so a large cap filters instead of failing the tool call.
+	return BigInt(atomic).toString();
+}
+
+// Project a normalized bazaar item down to the fields a client actually needs,
+// dropping the bulky `raw` facilitator payload. Also shapes the
+// three://x402/services resource (api/_mcp/resources.js).
+export function slim(it) {
+	return {
+		type: it.type,
+		resource: it.resource,
+		tool_name: it.toolName || undefined,
+		name: it.serviceName || undefined,
+		description: it.description || undefined,
+		price: it.minPriceLabel || undefined,
+		price_atomic: it.minPriceAtomic ?? undefined,
+		networks: it.networks,
+		tags: it.tags?.length ? it.tags : undefined,
+		method: it.method || undefined,
+		facilitator: it.facilitator,
+	};
+}
+
+function applyFilters(resources, { network, max_price_usdc }) {
+	let out = resources;
+	if (network) out = filterByNetwork(out, network);
+	if (max_price_usdc != null) {
+		const cap = usdcToAtomic(max_price_usdc);
+		if (cap !== null) out = filterByMaxPrice(out, cap);
+	}
+	return out;
+}
+
+function payUrl(resource, toolName) {
+	const u = new URL(`${env.APP_ORIGIN}/pay`);
+	u.searchParams.set('resource', resource);
+	if (toolName) u.searchParams.set('tool', toolName);
+	return u.toString();
+}
+
+function formatList(items, { query } = {}) {
+	if (!items.length) {
+		return query
+			? `No x402 services matched "${query}".`
+			: 'No x402 services found on the configured facilitators.';
+	}
+	return items
+		.map((s, i) => {
+			const head = `${i + 1}. ${s.name || s.resource}${s.price ? ` - ${s.price}` : ''}`;
+			const desc = s.description ? `\n   ${s.description}` : '';
+			const net = s.networks?.length ? `\n   networks: ${s.networks.join(', ')}` : '';
+			const res = `\n   ${s.tool_name ? `${s.resource} #${s.tool_name}` : s.resource}`;
+			return head + desc + net + res;
+		})
+		.join('\n');
+}
+
+// MCP tool annotations (2025-06-18 spec): every discovery tool is a read-only
+// query of the live facilitator network. Listings and prices change between
+// calls, so not idempotent. destructiveHint defaults to TRUE when omitted, so
+// it is set explicitly.
+const DISCOVERY_ANNOTATIONS = {
+	readOnlyHint: true,
+	destructiveHint: false,
+	idempotentHint: false,
+	openWorldHint: true,
+};
+
+export const toolDefs = [
+	{
+		name: 'search_services',
+		title: 'Search the x402 bazaar',
+		annotations: DISCOVERY_ANNOTATIONS,
+		description:
+			'Ranked search across the live x402 facilitator network for paid agent services (APIs and MCP tools you can pay for in stablecoin). Returns matching services with price, networks, and resource URL. Use this when you know what capability you need; call get_service on a match for full payment and input details.',
+		inputSchema: {
+			type: 'object',
+			properties: {
+				query: { type: 'string', description: 'What you need, e.g. "weather", "image upscale", "onchain data".' },
+				type: { type: 'string', enum: ['http', 'mcp'], default: 'http', description: 'http API or mcp tool.' },
+				network: { type: 'string', description: 'Filter by CAIP-2 network, e.g. "eip155:8453" (Base) or "solana:*".' },
+				max_price_usdc: { type: 'number', minimum: 0, description: 'Only services at or below this price (USDC).' },
+				limit: { type: 'integer', minimum: 1, maximum: 100, default: 20 },
+			},
+			required: ['query'],
+			additionalProperties: false,
+		},
+		async handler(args, auth) {
+			await enforce(auth);
+			const type = args.type || 'http';
+			const baz = new Bazaar({});
+			const { resources, sources, errors } = await baz.search({ query: args.query, type });
+			const filtered = applyFilters(resources, args).slice(0, args.limit || 20).map(slim);
+			return {
+				content: [{ type: 'text', text: formatList(filtered, { query: args.query }) }],
+				structuredContent: {
+					query: args.query,
+					type,
+					count: filtered.length,
+					services: filtered,
+					sources,
+					errors,
+				},
+			};
+		},
+	},
+	{
+		name: 'browse_services',
+		title: 'Browse the x402 bazaar',
+		annotations: DISCOVERY_ANNOTATIONS,
+		description:
+			'List paid agent services from the live x402 facilitator network without a search query, useful for "what can I pay for?". Returns services with price, networks, and resource URL, cheapest filters applied. Use this when you have no specific need yet and want to see what is on offer; for a targeted lookup call search_services instead.',
+		inputSchema: {
+			type: 'object',
+			properties: {
+				type: { type: 'string', enum: ['http', 'mcp'], default: 'http' },
+				network: { type: 'string', description: 'Filter by CAIP-2 network, e.g. "eip155:8453".' },
+				max_price_usdc: { type: 'number', minimum: 0 },
+				limit: { type: 'integer', minimum: 1, maximum: 100, default: 30 },
+			},
+			additionalProperties: false,
+		},
+		async handler(args, auth) {
+			await enforce(auth);
+			const type = args.type || 'http';
+			const baz = new Bazaar({});
+			const { items, sources, errors } = await baz.list({ type });
+			const filtered = applyFilters(items, args).slice(0, args.limit || 30).map(slim);
+			return {
+				content: [{ type: 'text', text: formatList(filtered) }],
+				structuredContent: { type, count: filtered.length, services: filtered, sources, errors },
+			};
+		},
+	},
+	{
+		name: 'get_service',
+		title: 'Get full details for one x402 service',
+		annotations: DISCOVERY_ANNOTATIONS,
+		description:
+			'Resolve a single x402 service by its resource URL (and tool_name for MCP services). Returns the exact payment requirements (price, asset, network, recipient), the input/output schema, and a ready-to-use pay link on three.ws. Use this before paying any service, to confirm the exact amount, asset, and input shape.',
+		inputSchema: {
+			type: 'object',
+			properties: {
+				resource_url: { type: 'string', format: 'uri', description: 'The service resource URL.' },
+				tool_name: { type: 'string', description: 'For MCP services, the tool name on that resource.' },
+			},
+			required: ['resource_url'],
+			additionalProperties: false,
+		},
+		async handler(args, auth) {
+			await enforce(auth);
+			const baz = new Bazaar({});
+			const item = await baz.get(args.resource_url, { toolName: args.tool_name });
+			if (!item) {
+				return {
+					content: [
+						{ type: 'text', text: `No x402 service found for ${args.resource_url}${args.tool_name ? ` #${args.tool_name}` : ''}.` },
+					],
+					isError: true,
+				};
+			}
+			const accepts = item.accepts.map((a) => ({
+				network: a.network,
+				price: a.priceLabel,
+				amount_atomic: a.amountAtomic,
+				asset: a.asset,
+				pay_to: a.payTo,
+				scheme: a.scheme,
+			}));
+			const pay_link = payUrl(item.resource, item.toolName);
+			// Only the description is optional here. A blanket empty-string filter
+			// also swallowed the deliberate blank line before the pay link, so the
+			// URL rendered flush against the last payment option.
+			const lines = [
+				`${item.serviceName || item.resource}`,
+				...(item.description ? [item.description] : []),
+				`Price: ${item.minPriceLabel || 'see options'}`,
+				`Payment options:`,
+				...(accepts.length
+					? accepts.map((a) => `  • ${a.price} on ${a.network} → ${a.pay_to || '(recipient in challenge)'}`)
+					: ['  (none advertised; the resource returns its 402 challenge on call)']),
+				``,
+				`Pay & call via three.ws: ${pay_link}`,
+			];
+			return {
+				content: [{ type: 'text', text: lines.join('\n') }],
+				structuredContent: {
+					type: item.type,
+					resource: item.resource,
+					tool_name: item.toolName || undefined,
+					name: item.serviceName || undefined,
+					description: item.description || undefined,
+					accepts,
+					input_schema: item.input || undefined,
+					output_schema: item.output || undefined,
+					tags: item.tags?.length ? item.tags : undefined,
+					pay_link,
+				},
+			};
+		},
+	},
+	{
+		name: 'bazaar_service_details',
+		title: 'Live price details for one x402 service',
+		annotations: DISCOVERY_ANNOTATIONS,
+		description:
+			"Resolve the current live price of a single x402 service by its resource URL (and tool_name for MCP services). Returns the cheapest price across networks plus a per-network breakdown (amount in atomic units, asset, recipient) and whether the service is still listed and payable. Purpose-built for price tracking and cost-model maintenance. Use this instead of get_service when you only need the current price, for example on a schedule to watch a dependency's price over time and detect hikes or drops; call get_service when you also need the input/output schema and a ready pay link.",
+		inputSchema: {
+			type: 'object',
+			properties: {
+				resource_url: { type: 'string', format: 'uri', description: 'The service resource URL.' },
+				tool_name: { type: 'string', description: 'For MCP services, the tool name on that resource.' },
+			},
+			required: ['resource_url'],
+			additionalProperties: false,
+		},
+		async handler(args, auth) {
+			await enforce(auth);
+			const baz = new Bazaar({});
+			const item = await baz.get(args.resource_url, { toolName: args.tool_name });
+			const service_key = args.tool_name ? `${args.resource_url}#${args.tool_name}` : args.resource_url;
+
+			// A service that has dropped off every facilitator is itself a tracking
+			// signal (a dependency went away, or was unpriced), so return
+			// available:false in the same shape as a hit rather than an error. A
+			// price tracker records the gap instead of logging a failed call.
+			if (!item) {
+				return {
+					content: [
+						{ type: 'text', text: `x402 service ${service_key} is not currently listed on any facilitator.` },
+					],
+					structuredContent: {
+						service_key,
+						resource: args.resource_url,
+						tool_name: args.tool_name || undefined,
+						available: false,
+						networks: [],
+						prices: [],
+						min_price_atomic: null,
+						min_price_label: null,
+					},
+				};
+			}
+
+			const prices = item.accepts.map((a) => ({
+				network: a.network,
+				amount_atomic: a.amountAtomic ?? null,
+				price: a.priceLabel || null,
+				asset: a.asset || null,
+				pay_to: a.payTo || null,
+				scheme: a.scheme || null,
+			}));
+			const lines = [
+				`${item.serviceName || item.resource}`,
+				`Current price: ${item.minPriceLabel || 'see options'}`,
+				...prices.map((p) => `  • ${p.price || `${p.amount_atomic} atomic`} on ${p.network}`),
+			];
+			return {
+				content: [{ type: 'text', text: lines.join('\n') }],
+				structuredContent: {
+					service_key,
+					type: item.type,
+					resource: item.resource,
+					tool_name: item.toolName || undefined,
+					name: item.serviceName || undefined,
+					available: true,
+					networks: item.networks,
+					min_price_atomic: item.minPriceAtomic ?? null,
+					// null, not undefined: the miss branch above emits null and a
+					// price tracker diffs the two shapes field by field. An undefined
+					// drops the key entirely once serialized to JSON.
+					min_price_label: item.minPriceLabel || null,
+					prices,
+				},
+			};
+		},
+	},
+	{
+		name: 'read_resource',
+		title: 'Read a three:// resource',
+		annotations: {
+			readOnlyHint: true,
+			destructiveHint: false,
+			idempotentHint: false,
+			openWorldHint: false,
+		},
+		description:
+			'Read a live three.ws resource by URI: three://x402/services (the x402 service catalog), three://marketplace (paid agent skills and agent services) and three://me. Omit uri to list every resource you can read. Set format to markdown for a readable rendering. Use this to read the whole service catalog or your account in one call when a search tool is too narrow.',
+		inputSchema: {
+			type: 'object',
+			properties: {
+				uri: {
+					type: 'string',
+					maxLength: 300,
+					description:
+						'A three:// resource URI, for example three://me or three://agents/<agentId>/wallet. Omit to list every resource you can read here.',
+				},
+				format: { type: 'string', enum: ['json', 'markdown'], default: 'json' },
+			},
+			additionalProperties: false,
+		},
+		async handler(args, auth, req) {
+			return readResourceToolResult('mcp-bazaar', args, auth, req);
+		},
+	},
+];

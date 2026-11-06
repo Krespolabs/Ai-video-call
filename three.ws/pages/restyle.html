@@ -1,0 +1,261 @@
+<!doctype html>
+<html lang="en">
+	<head>
+		<script>/* three.ws theme boot — no-flash */(function(){try{var m=localStorage.getItem('twx_theme');var l=m==='auto'?(window.matchMedia&&window.matchMedia('(prefers-color-scheme: light)').matches):m==='light';document.documentElement.setAttribute('data-theme',l?'light':'dark');}catch(e){document.documentElement.setAttribute('data-theme','dark');}})();</script>
+		<meta charset="utf-8" />
+		<meta http-equiv="X-UA-Compatible" content="IE=edge" />
+		<title data-i18n="restyle.meta_title">Restyle Studio · three.ws</title>
+		<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+		<meta name="description" content="Re-skin any 3D model in the browser: apply PBR material presets (chrome, gold, glass, wood…), generate seeded colorway variants, AI-restyle from a text instruction, and export a validated GLB — non-destructively, with a real version lineage."  data-i18n-attr="content:restyle.meta_description"/>
+		<meta name="theme-color" content="#000000" />
+		<link rel="canonical" href="https://three.ws/restyle" />
+		<meta property="og:type" content="website" />
+		<meta property="og:site_name" content="three.ws" />
+		<meta property="og:title" content="Restyle Studio · three.ws"  data-i18n-attr="content:restyle.meta_og_title"/>
+		<meta property="og:description" content="Apply PBR material presets, AI restyle from a text instruction, and seeded variants to any GLB, fine-tune materials live, and export a validated model — non-destructively."  data-i18n-attr="content:restyle.meta_og_description"/>
+		<meta property="og:url" content="https://three.ws/restyle" />
+		<meta property="og:image" content="https://three.ws/api/page-og?s=build&amp;t=Restyle+Studio%3A+material+presets%2C+AI+restyle+%26+variants&amp;d=Re-skin+any+3D+model+in+the+browser%3A+apply+PBR+material+presets+%28chrome%2C+gold%2C+glass%2C+wood%E2%80%A6%29%2C+restyle+from+a+plain-language+AI+instruction%2C+fan+out+seeded&amp;p=%2Frestyle" />
+		<meta name="twitter:card" content="summary_large_image" />
+		<meta name="twitter:site" content="@trythreews" />
+		<link rel="stylesheet" href="/style.css" />
+		<style>
+			.rs-main { max-width: 1240px; margin: 0 auto; padding: 28px 20px 64px; }
+			.rs-head { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 12px 20px; margin-bottom: 20px; }
+			.rs-head h1 { font-size: clamp(24px, 4vw, 34px); font-weight: 700; letter-spacing: -0.02em; margin: 0; }
+			.rs-head p { color: var(--text-2); margin: 4px 0 0; max-width: 62ch; }
+			.rs-layout { display: grid; grid-template-columns: 1.5fr 1fr; gap: 18px; align-items: start; }
+			@media (max-width: 900px) { .rs-layout { grid-template-columns: 1fr; } }
+
+			.rs-stage { position: relative; aspect-ratio: 4 / 3; border-radius: 16px; overflow: hidden;
+				background: radial-gradient(120% 120% at 50% 0%, color-mix(in srgb, var(--text) 6%, transparent), transparent 60%), var(--bg-2, #0c0d12);
+				border: 1px solid var(--border, #23252d); }
+			.rs-canvas { position: absolute; inset: 0; }
+			.rs-canvas.is-hidden { opacity: 0; }
+			.rs-overlay { position: absolute; inset: 0; display: grid; place-content: center; text-align: center;
+				gap: 10px; padding: 24px; color: var(--text-2); }
+			.rs-spinner { width: 34px; height: 34px; border-radius: 50%; margin: 0 auto;
+				border: 3px solid color-mix(in srgb, var(--text) 18%, transparent); border-top-color: var(--text); animation: rs-spin 0.8s linear infinite; }
+			@keyframes rs-spin { to { transform: rotate(360deg); } }
+			.rs-stage-hint { position: absolute; left: 12px; bottom: 12px; font-size: 12px; color: var(--text-3);
+				background: color-mix(in srgb, var(--bg, #000) 60%, transparent); padding: 4px 8px; border-radius: 8px; pointer-events: none; }
+
+			.rs-panel { display: flex; flex-direction: column; gap: 18px; }
+			.rs-card { border: 1px solid var(--border, #23252d); border-radius: 14px; padding: 14px 15px; background: var(--bg-2, #0c0d12); }
+			.rs-card h2 { font-size: 12px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--text-3); margin: 0 0 10px; }
+
+			.rs-presets { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; }
+			.rs-preset { display: flex; align-items: center; gap: 9px; padding: 8px 10px; border-radius: 10px; cursor: pointer;
+				border: 1px solid var(--border, #23252d); background: transparent; color: var(--text); font-size: 13px; text-align: left;
+				transition: border-color var(--duration-fast) var(--ease-standard), background var(--duration-fast) var(--ease-standard), transform var(--duration-instant) var(--ease-standard); }
+			.rs-preset:hover { border-color: color-mix(in srgb, var(--text) 40%, transparent); background: color-mix(in srgb, var(--text) 5%, transparent); }
+			.rs-preset:active { transform: translateY(1px); }
+			.rs-preset:focus-visible { outline: 2px solid var(--accent, #7aa2ff); outline-offset: 2px; }
+			.rs-preset.is-active { border-color: var(--accent, #7aa2ff); background: color-mix(in srgb, var(--accent, #7aa2ff) 12%, transparent); }
+			.rs-preset__swatch { width: 20px; height: 20px; border-radius: 6px; flex: none;
+				box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--text) 20%, transparent); }
+
+			.rs-slider { display: grid; grid-template-columns: 84px 1fr; align-items: center; gap: 10px; margin: 9px 0; font-size: 13px; color: var(--text-2); }
+			.rs-slider input[type="range"] { width: 100%; accent-color: var(--accent, #7aa2ff); }
+			.rs-colors { display: flex; gap: 14px; margin-top: 6px; }
+			.rs-color { display: flex; align-items: center; gap: 7px; font-size: 13px; color: var(--text-2); }
+			.rs-color input[type="color"] { width: 34px; height: 26px; border: none; background: none; padding: 0; border-radius: 6px; cursor: pointer; }
+
+			.rs-row { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+			.rs-row label { font-size: 13px; color: var(--text-2); }
+			.rs-input { width: 66px; padding: 6px 8px; border-radius: 8px; border: 1px solid var(--border, #23252d); background: var(--bg, #000); color: var(--text); font: inherit; }
+			.rs-strip { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
+			.rs-swatch { width: 40px; height: 40px; border-radius: 9px; cursor: pointer; border: 1px solid color-mix(in srgb, var(--text) 22%, transparent);
+				transition: transform var(--duration-instant) var(--ease-standard); }
+			.rs-swatch:hover { transform: scale(1.08); }
+			.rs-swatch:focus-visible { outline: 2px solid var(--accent, #7aa2ff); outline-offset: 2px; }
+
+			.rs-btn { padding: 9px 14px; border-radius: 10px; border: 1px solid var(--border, #23252d); background: transparent;
+				color: var(--text); font: inherit; font-size: 13px; cursor: pointer; transition: background var(--duration-fast) var(--ease-standard), border-color var(--duration-fast) var(--ease-standard); }
+			.rs-btn:hover { background: color-mix(in srgb, var(--text) 6%, transparent); }
+			.rs-btn:focus-visible { outline: 2px solid var(--accent, #7aa2ff); outline-offset: 2px; }
+			.rs-btn--primary { background: var(--text); color: var(--bg, #000); border-color: var(--text); font-weight: 600; }
+			.rs-btn--primary:hover { opacity: 0.9; background: var(--text); }
+			.rs-btn[disabled] { opacity: 0.5; cursor: default; }
+
+			.rs-history { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; font-size: 12px; color: var(--text-3); min-height: 18px; }
+			.rs-step { padding: 2px 7px; border-radius: 999px; background: color-mix(in srgb, var(--text) 8%, transparent); cursor: default; border: none; font: inherit; }
+			.rs-step.is-current { color: var(--text); background: color-mix(in srgb, var(--accent, #7aa2ff) 20%, transparent); }
+			.rs-step.is-versioned { cursor: pointer; color: var(--text); }
+			.rs-step.is-versioned:hover { background: color-mix(in srgb, var(--accent, #7aa2ff) 14%, transparent); }
+			.rs-step.is-versioned:focus-visible { outline: 2px solid var(--accent, #7aa2ff); outline-offset: 2px; }
+			.rs-arrow { color: var(--text-3); }
+			.rs-step-diff { font-size: 11px; color: var(--accent, #7aa2ff); text-decoration: none; padding: 2px 5px; border-radius: 999px; }
+			.rs-step-diff:hover { text-decoration: underline; background: color-mix(in srgb, var(--accent, #7aa2ff) 14%, transparent); }
+			.rs-step-diff:focus-visible { outline: 2px solid var(--accent, #7aa2ff); outline-offset: 2px; }
+			.rs-note { font-size: 12px; color: var(--text-3); margin-top: 8px; min-height: 16px; }
+			.rs-note.is-error { color: var(--danger, #e0645a); }
+			.rs-note.is-busy { color: var(--accent, #7aa2ff); }
+			.rs-note.is-done { color: var(--success); }
+			.rs-sources { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+			.rs-file { font-size: 12px; color: var(--text-2); }
+			.rs-hint { font-size: 12px; color: var(--text-3); margin-top: 8px; }
+			.rs-hint a { color: var(--accent, #7aa2ff); }
+			.sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0,0,0,0); border: 0; }
+			.rs-stage.is-dropping { border-color: var(--accent, #7aa2ff); box-shadow: inset 0 0 0 2px color-mix(in srgb, var(--accent, #7aa2ff) 45%, transparent); }
+		</style>
+	
+	<meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1">
+	<meta property="og:locale" content="en_US">
+	<meta property="og:image:alt" content="Restyle Studio — material presets, AI restyle &amp; variants — three.ws">
+	<meta name="twitter:title" content="Restyle Studio — material presets, AI restyle &amp; variants · three.ws" data-i18n-attr="content:restyle.meta_twitter_title">
+	<meta name="twitter:description" content="Re-skin any 3D model in the browser: apply PBR material presets (chrome, gold, glass, wood…), restyle from a plain-language AI instruction, fan out seeded colorway variants as durable versions, fine-tune metalness and roughness live, and export a validated GLB — non-destructively, with a real revertable version lineage." data-i18n-attr="content:restyle.meta_twitter_description">
+	<meta name="twitter:image" content="https://three.ws/api/page-og?s=build&amp;t=Restyle+Studio%3A+material+presets%2C+AI+restyle+%26+variants&amp;d=Re-skin+any+3D+model+in+the+browser%3A+apply+PBR+material+presets+%28chrome%2C+gold%2C+glass%2C+wood%E2%80%A6%29%2C+restyle+from+a+plain-language+AI+instruction%2C+fan+out+seeded&amp;p=%2Frestyle">
+	<script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"WebPage","name":"Restyle Studio - material presets, AI restyle & variants","description":"Re-skin any 3D model in the browser: apply PBR material presets (chrome, gold, glass, wood…), restyle from a plain-language AI instruction, fan out seeded colorway variants as durable versions, fine-tune metalness and roughness live, and export a validated GLB - non-destructively, with a real revertable version lineage.","url":"https://three.ws/restyle","isPartOf":{"@type":"WebSite","name":"three.ws","url":"https://three.ws"},"primaryImageOfPage":"https://three.ws/api/page-og?s=build&t=Restyle+Studio+-+material+presets%2C+AI+restyle+%26+variants&d=Re-skin+any+3D+model+in+the+browser%3A+apply+PBR+material+presets+%28chrome%2C+gold%2C+glass%2C+wood%E2%80%A6%29%2C+restyle+from+a+plain-language+AI+instruction%2C+fan+out+seeded+color&p=%2Frestyle"}]}</script>
+</head>
+	<body>
+		<header>
+			<div id="nav-container"></div>
+		</header>
+		<script src="/nav.js"></script>
+
+		<main class="rs-main">
+			<div class="rs-head">
+				<div>
+					<h1 data-i18n="restyle.restyle_studio">Restyle Studio</h1>
+					<p data-i18n="restyle.re_skin_any_3d_model_in_your">Re-skin any 3D model in your browser — apply a PBR material preset, describe a look in plain
+						language for an AI restyle, fan out seeded colorway variants, fine-tune metalness and roughness
+						live, then export a validated GLB. Your original is never touched; Reset restores it instantly.
+						Load a model with named, separable parts (from Segment, PartCrafter, or HoloPart) and a Parts
+						panel appears below: edit, swap, or regenerate any one part on its own.</p>
+				</div>
+			</div>
+
+			<div class="rs-layout">
+				<!-- Stage -->
+				<div class="rs-stage" id="stage">
+					<div class="rs-canvas" id="canvas-wrap"></div>
+					<div class="rs-overlay" id="status" role="status" aria-live="polite" hidden>
+						<div class="rs-spinner" aria-hidden="true"></div>
+						<div>Loading model…</div>
+					</div>
+					<div class="rs-overlay" id="error" role="alert" hidden>
+						<div id="error-msg">That model could not be loaded.</div>
+						<button class="rs-btn" id="retry" data-i18n="restyle.load_the_sample_model">Load the sample model</button>
+					</div>
+					<div class="rs-stage-hint">Drag to orbit · scroll to zoom · drop a .glb to load</div>
+					<div class="rs-stage-hint" style="left: auto; right: 12px" title="Renderer in use. Add ?renderer=webgpu to the URL to opt in to WebGPU."><span class="sr-only">Renderer: </span><span id="renderer-badge">WebGL2</span></div>
+				</div>
+
+				<!-- Controls -->
+				<div class="rs-panel">
+					<div class="rs-card">
+						<h2 data-i18n="restyle.load_a_model">Load a model</h2>
+						<div class="rs-sources">
+							<button class="rs-btn" id="upload" data-i18n="restyle.upload_glb">Upload GLB</button>
+							<input id="file" type="file" accept=".glb,.gltf,model/gltf-binary" class="sr-only" tabindex="-1" aria-hidden="true" />
+							<label class="sr-only" for="url-input" data-i18n="restyle.model_url">Model URL</label>
+							<input class="rs-input" id="url-input" style="width: 150px" type="url" placeholder="https://…/model.glb" />
+							<button class="rs-btn" id="load-url" data-i18n="restyle.load_url">Load URL</button>
+						</div>
+						<div class="rs-note" id="load-note" aria-live="polite"></div>
+						<div class="rs-hint">No model? The platform's sample avatar loads by default. Make one in <a href="/forge" data-i18n="restyle.forge">Forge</a>.</div>
+					</div>
+
+					<div class="rs-card" id="parts-card" hidden>
+						<h2 data-i18n="restyle.parts">Parts</h2>
+						<div class="rs-presets" id="parts-list"></div>
+						<div class="rs-row" style="margin-top: 10px">
+							<button class="rs-btn" id="part-swap" disabled data-i18n="restyle.swap_part">Swap part</button>
+							<input id="part-swap-file" type="file" accept=".glb,.gltf,model/gltf-binary" class="sr-only" tabindex="-1" aria-hidden="true" />
+							<button class="rs-btn" id="part-regenerate" disabled data-i18n="restyle.regenerate_part">Regenerate part</button>
+							<button class="rs-btn" id="part-deselect" disabled data-i18n="restyle.edit_whole_model">Edit whole model</button>
+						</div>
+						<div class="rs-note" id="parts-note" aria-live="polite"></div>
+						<div class="rs-hint" data-i18n="restyle.parts_hint">This model has named, separable parts (from Segment, PartCrafter,
+							or HoloPart). Select one to scope presets, AI restyle, and fine-tuning to it alone. Swap replaces its
+							geometry from another file; Regenerate completes its hidden geometry via HoloPart, then reassembles it
+							back into this model, leaving every other part untouched.</div>
+					</div>
+
+					<div class="rs-card">
+						<h2 data-i18n="restyle.material_presets">Material presets</h2>
+						<div class="rs-presets" id="presets"></div>
+					</div>
+
+					<div class="rs-card">
+						<h2 data-i18n="restyle.ai_restyle">AI restyle</h2>
+						<div class="rs-row">
+							<label class="sr-only" for="ai-instruction" data-i18n="restyle.describe_the_look">Describe the look</label>
+							<input class="rs-input" id="ai-instruction" style="width: 100%; flex: 1 1 auto" type="text"
+								placeholder="e.g. cyberpunk neon, worn copper, glossy ceramic" maxlength="300" />
+						</div>
+						<div class="rs-row" style="margin-top: 8px">
+							<button class="rs-btn rs-btn--primary" id="ai-restyle" data-i18n="restyle.restyle">Restyle</button>
+							<label class="rs-color" style="font-size: 12px"><input id="ai-texture" type="checkbox" checked /> Generate texture too</label>
+						</div>
+						<div class="rs-note" id="ai-note" aria-live="polite"></div>
+						<div class="rs-hint">Describe a look in plain language — IBM Granite proposes real PBR values (base
+							color, metalness, roughness, emissive), applied live and checkpointed as a new version below.
+							For a full pixel-level UV repaint (not just flat PBR), use the
+							<a href="/docs/mcp" data-i18n="restyle.retexture_model_mcp_tool">retexture_model MCP tool</a>.</div>
+					</div>
+
+					<div class="rs-card">
+						<h2 data-i18n="restyle.fine_tune">Fine-tune</h2>
+						<div class="rs-slider"><label for="metalness" data-i18n="restyle.metalness">Metalness</label><input id="metalness" type="range" min="0" max="1" step="0.01" /></div>
+						<div class="rs-slider"><label for="roughness" data-i18n="restyle.roughness">Roughness</label><input id="roughness" type="range" min="0" max="1" step="0.01" /></div>
+						<div class="rs-slider"><label for="emissive" data-i18n="restyle.emissive">Emissive</label><input id="emissive" type="range" min="0" max="4" step="0.05" /></div>
+						<div class="rs-slider"><label for="rim" title="View-only Fresnel edge light. Not written to the exported GLB.">Rim light</label><input id="rim" type="range" min="0" max="3" step="0.05" value="0" /></div>
+						<div class="rs-colors">
+							<label class="rs-color">Base <input id="basecolor" type="color" value="#888888" /></label>
+							<label class="rs-color">Glow <input id="emissivecolor" type="color" value="#000000" /></label>
+							<label class="rs-color">Rim <input id="rimcolor" type="color" value="#6ea8ff" /></label>
+						</div>
+					</div>
+
+					<div class="rs-card">
+						<h2 data-i18n="restyle.seeded_variants">Seeded variants</h2>
+						<div class="rs-row">
+							<label>Seed <input class="rs-input" id="seed" type="number" value="42" min="0" /></label>
+							<label>Count <input class="rs-input" id="variant-count" type="number" value="6" min="1" max="12" /></label>
+							<button class="rs-btn" id="gen-variants" data-i18n="restyle.generate">Generate</button>
+						</div>
+						<div id="variants" hidden>
+							<div class="rs-strip" id="variant-strip"></div>
+							<div class="rs-row" style="margin-top: 10px">
+								<button class="rs-btn" id="save-variants" data-i18n="restyle.save_all_as_versions">Save all as versions</button>
+							</div>
+							<div class="rs-note" id="variants-note" aria-live="polite"></div>
+						</div>
+						<div class="rs-hint">Same seed → same set, every time. Variants fan out from the last preset you applied.
+							Swatches preview instantly in-browser; "Save all as versions" mints each one as its own real,
+							durable GLB in Versions below.</div>
+					</div>
+
+					<div class="rs-card">
+						<h2 data-i18n="restyle.history_export">History &amp; export</h2>
+						<div class="rs-history" id="history"></div>
+						<div class="rs-row" style="margin-top: 12px">
+							<button class="rs-btn" id="reset" data-i18n="restyle.reset_to_original">Reset to original</button>
+							<button class="rs-btn rs-btn--primary" id="export" data-i18n="restyle.export_glb">Export GLB</button>
+						</div>
+						<div class="rs-note" id="export-note" aria-live="polite"></div>
+					</div>
+
+					<div class="rs-card">
+						<h2 data-i18n="restyle.versions">Versions</h2>
+						<p class="rs-hint" style="margin: 0 0 10px" data-i18n="restyle.every_ai_restyle_mints_a_real_durable">Every AI restyle mints a real, durable GLB — never
+							overwriting the one before it. "Save version" checkpoints your current fine-tune/preset edits
+							the same way. Click a version to revert to it; the original is always version 1.</p>
+						<div class="rs-history" id="lineage-strip"></div>
+						<div class="rs-row" style="margin-top: 12px">
+							<button class="rs-btn" id="save-version" data-i18n="restyle.save_version">Save version</button>
+						</div>
+						<div class="rs-note" id="lineage-note" aria-live="polite"></div>
+					</div>
+				</div>
+			</div>
+		</main>
+
+		<div id="footer-container"></div>
+		<script src="/footer.js" defer></script>
+		<script type="module" src="/src/restyle.js"></script>
+		<!-- Runtime i18n: detects locale, swaps annotated copy, mounts <lang-switcher>. -->
+	<script type="module" src="/i18n.js"></script>
+</body>
+</html>

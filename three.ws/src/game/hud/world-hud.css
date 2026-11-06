@@ -1,0 +1,262 @@
+/* WorldHud — unified GTA-style chrome. Inherits the /play monochrome tokens
+   (--cc-*) from coincommunities.css; falls back gracefully if loaded alone. */
+
+.wh-hud {
+	--wh-pad: 14px;
+	/* Per-side pads: base padding plus the device safe area (notches, home
+	   indicator, curved corners). /play ships viewport-fit=cover, so fixed
+	   chrome must budget for env(safe-area-inset-*) itself. */
+	--wh-pad-top: calc(var(--wh-pad) + env(safe-area-inset-top, 0px));
+	--wh-pad-right: calc(var(--wh-pad) + env(safe-area-inset-right, 0px));
+	--wh-pad-bottom: calc(var(--wh-pad) + env(safe-area-inset-bottom, 0px));
+	--wh-pad-left: calc(var(--wh-pad) + env(safe-area-inset-left, 0px));
+	position: fixed;
+	inset: 0;
+	z-index: 30;
+	pointer-events: none;          /* the world stays interactive; children opt back in */
+	font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+	color: var(--cc-text, #f5f5f6);
+}
+.wh-hud [hidden] { display: none !important; }
+
+/* ---------------------------------------------------------------- money ---- */
+.wh-money {
+	position: absolute;
+	/* Clears the whole cc right rail: leave (14), status (58), voice (96),
+	   power saver (140), and the Zen button (184, ~34px tall). */
+	top: calc(var(--wh-pad-top) + 220px);
+	right: var(--wh-pad-right);
+	display: flex;
+	flex-direction: column;
+	align-items: flex-end;
+	gap: 6px;
+}
+.wh-cash {
+	display: flex;
+	align-items: baseline;
+	gap: 4px;
+	padding: 5px 11px;
+	border-radius: var(--cc-radius, 4px);
+	background: var(--cc-panel, rgba(12, 12, 14, 0.78));
+	border: 1px solid var(--cc-edge, rgba(255, 255, 255, 0.12));
+	-webkit-backdrop-filter: blur(8px);
+	backdrop-filter: blur(8px);
+	box-shadow: var(--cc-shadow, 0 16px 50px rgba(0, 0, 0, 0.7));
+	transition: transform var(--duration-fast) var(--ease-standard), color var(--duration-fast) var(--ease-standard);
+}
+.wh-cash-glyph { font-weight: 800; color: var(--cc-dim, #9a9aa2); font-size: 14px; }
+.wh-cash-amt {
+	font-variant-numeric: tabular-nums;
+	font-weight: 800;
+	font-size: 19px;
+	letter-spacing: 0.01em;
+}
+.wh-cash.is-gain { animation: wh-cash-gain 0.55s ease; }
+.wh-cash.is-loss { animation: wh-cash-loss 0.55s ease; }
+@keyframes wh-cash-gain {
+	0% { transform: scale(1); color: var(--cc-text, #fff); }
+	35% { transform: scale(1.12); color: #8effa6; }
+	100% { transform: scale(1); }
+}
+@keyframes wh-cash-loss {
+	0% { transform: scale(1); }
+	35% { transform: scale(0.94); color: #ff9b9b; }
+	100% { transform: scale(1); }
+}
+.wh-banked {
+	display: flex;
+	align-items: center;
+	gap: 5px;
+	padding: 3px 9px;
+	border-radius: var(--cc-radius-sm, 2px);
+	background: rgba(8, 8, 10, 0.6);
+	border: 1px solid var(--cc-edge-soft, rgba(255, 255, 255, 0.07));
+	font-size: 13px;
+	font-variant-numeric: tabular-nums;
+	color: var(--cc-dim, #9a9aa2);
+}
+.wh-banked-glyph { font-size: 11px; opacity: 0.85; }
+
+/* Wanted stars. */
+.wh-wanted { display: flex; gap: 2px; margin-top: 2px; }
+.wh-star {
+	font-size: 17px;
+	line-height: 1;
+	color: rgba(255, 255, 255, 0.16);
+	transition: color var(--duration-fast) var(--ease-standard), transform var(--duration-fast) var(--ease-standard);
+	text-shadow: 0 1px 2px rgba(0, 0, 0, 0.6);
+}
+.wh-star.is-on { color: #fff; }
+.wh-wanted.is-hunting .wh-star.is-on { animation: wh-star-flash 0.9s steps(2) infinite; }
+@keyframes wh-star-flash { 50% { color: var(--cc-dim, #9a9aa2); } }
+
+/* ------------------------------------------------------------ objective ---- */
+.wh-objective {
+	position: absolute;
+	left: var(--wh-pad-left);
+	top: 50%;
+	transform: translateY(-50%);
+	display: flex;
+	max-width: min(320px, 42vw);
+	border-radius: var(--cc-radius, 4px);
+	overflow: hidden;
+	background: var(--cc-panel, rgba(12, 12, 14, 0.78));
+	border: 1px solid var(--cc-edge, rgba(255, 255, 255, 0.12));
+	-webkit-backdrop-filter: blur(8px);
+	backdrop-filter: blur(8px);
+	box-shadow: var(--cc-shadow, 0 16px 50px rgba(0, 0, 0, 0.7));
+}
+.wh-objective.is-in { animation: wh-obj-in 0.36s cubic-bezier(0.2, 0.9, 0.25, 1); }
+@keyframes wh-obj-in { from { opacity: 0; transform: translate(-12px, -50%); } to { opacity: 1; transform: translate(0, -50%); } }
+.wh-obj-bar { width: 4px; flex: none; background: var(--obj-accent, #fff); }
+.wh-obj-body { padding: 9px 13px; }
+.wh-obj-title { font-weight: 700; font-size: 14px; }
+.wh-obj-detail { font-size: 12.5px; color: var(--cc-dim, #9a9aa2); margin-top: 2px; }
+
+/* ----------------------------------------------------- vitals + minimap ---- */
+.wh-corner-bl {
+	position: absolute;
+	left: var(--wh-pad-left);
+	bottom: var(--wh-pad-bottom);
+	display: flex;
+	flex-direction: column;
+	gap: 7px;
+	align-items: flex-start;
+}
+.wh-vitals { display: flex; flex-direction: column; gap: 4px; width: 184px; }
+.wh-bar {
+	position: relative;
+	height: 7px;
+	border-radius: 4px;
+	overflow: hidden;
+	background: rgba(8, 8, 10, 0.7);
+	border: 1px solid var(--cc-edge-soft, rgba(255, 255, 255, 0.07));
+	/* faint segment ticks for a game-y read */
+	background-image: repeating-linear-gradient(90deg, transparent 0, transparent 11px, rgba(0, 0, 0, 0.55) 11px, rgba(0, 0, 0, 0.55) 12px);
+}
+.wh-bar-fill {
+	display: block;
+	height: 100%;
+	width: 100%;
+	transition: width var(--duration-base) var(--ease-standard), background var(--duration-base) var(--ease-standard);
+}
+.wh-bar--hp .wh-bar-fill { background: linear-gradient(90deg, #e7e7ea, #fff); }
+.wh-bar--hp.is-critical .wh-bar-fill { background: linear-gradient(90deg, #ff6b6b, #ff9b9b); }
+.wh-bar--hp.is-critical { animation: wh-hp-pulse 0.8s ease-in-out infinite; }
+@keyframes wh-hp-pulse { 50% { box-shadow: 0 0 10px rgba(255, 80, 80, 0.55); } }
+.wh-bar--armor .wh-bar-fill { background: linear-gradient(90deg, #7c93b8, #b9c8e0); }
+
+.wh-minimap {
+	position: relative;
+	width: 184px;
+	height: 184px;
+	border-radius: 50%;
+	overflow: visible;
+	/* Purely informational on /play (no tap-to-waypoint handler): let touches
+	   fall through to the world so the radar never eats a look-drag or, on
+	   phones, the movement joystick's touches. */
+	pointer-events: none;
+	border: 1.5px solid var(--cc-edge, rgba(255, 255, 255, 0.14));
+	box-shadow: var(--cc-shadow, 0 16px 50px rgba(0, 0, 0, 0.7)), inset 0 0 0 4px rgba(0, 0, 0, 0.35);
+	background: rgba(6, 6, 8, 0.5);
+}
+.wh-minimap-canvas { width: 184px; height: 184px; border-radius: 50%; display: block; }
+.wh-minimap-n {
+	position: absolute;
+	left: 50%;
+	top: 50%;
+	font: 800 11px/1 ui-sans-serif, system-ui, sans-serif;
+	color: var(--cc-text, #fff);
+	text-shadow: 0 1px 3px rgba(0, 0, 0, 0.9);
+	pointer-events: none;
+}
+
+/* --------------------------------------------------------------- speedo ---- */
+.wh-speedo {
+	position: absolute;
+	right: var(--wh-pad-right);
+	bottom: var(--wh-pad-bottom);
+	width: 124px;
+	height: 124px;
+	pointer-events: none;
+	display: grid;
+	place-items: center;
+}
+.wh-speed-dial {
+	position: absolute;
+	inset: 0;
+	border-radius: 50%;
+	background: conic-gradient(from 225deg, rgba(255, 255, 255, 0.14) 0deg, rgba(255, 255, 255, 0.14) 270deg, transparent 270deg);
+	-webkit-mask: radial-gradient(circle, transparent 46px, #000 47px, #000 56px, transparent 57px);
+	mask: radial-gradient(circle, transparent 46px, #000 47px, #000 56px, transparent 57px);
+}
+.wh-speed-fill {
+	position: absolute;
+	left: 50%;
+	top: 50%;
+	width: 3px;
+	height: 56px;
+	background: #fff;
+	transform-origin: bottom center;
+	transform: translate(-50%, -100%) rotate(-135deg);
+	border-radius: 2px;
+	box-shadow: 0 0 6px rgba(255, 255, 255, 0.6);
+	transition: transform var(--duration-fast) var(--ease-standard);
+}
+.wh-speed-read { text-align: center; }
+.wh-speed-num { font-weight: 800; font-size: 30px; line-height: 1; font-variant-numeric: tabular-nums; }
+.wh-speed-unit { font-size: 9px; letter-spacing: 0.14em; color: var(--cc-dim, #9a9aa2); }
+.wh-speed-gear {
+	position: absolute;
+	bottom: 18px;
+	font-weight: 700;
+	font-size: 12px;
+	color: var(--cc-dim, #9a9aa2);
+}
+
+/* On-screen interaction-menu button (touch entry + desktop discoverability). */
+.wh-menu-btn {
+	position: absolute;
+	right: var(--wh-pad-right);
+	top: 50%;
+	transform: translateY(-50%);
+	width: 44px;
+	height: 44px;
+	border-radius: 50%;
+	display: grid;
+	place-items: center;
+	font-size: 20px;
+	line-height: 1;
+	color: var(--cc-text, #f5f5f6);
+	pointer-events: auto;
+	cursor: pointer;
+	background: var(--cc-panel, rgba(12, 12, 14, 0.78));
+	border: 1px solid var(--cc-edge, rgba(255, 255, 255, 0.12));
+	-webkit-backdrop-filter: blur(8px);
+	backdrop-filter: blur(8px);
+	box-shadow: var(--cc-shadow, 0 16px 50px rgba(0, 0, 0, 0.7));
+	transition: transform var(--duration-fast) var(--ease-standard), border-color var(--duration-fast) var(--ease-standard), background var(--duration-fast) var(--ease-standard);
+}
+.wh-menu-btn:hover { background: rgba(34, 34, 40, 0.9); border-color: var(--cc-edge-hi, rgba(255, 255, 255, 0.5)); }
+.wh-menu-btn:active { transform: translateY(-50%) scale(0.92); }
+.wh-menu-btn:focus-visible { outline: 2px solid var(--cc-edge-hi, #fff); outline-offset: 2px; }
+
+/* ----------------------------------------------------------- responsive ---- */
+@media (max-width: 640px) {
+	.wh-hud { --wh-pad: 10px; }
+	/* The movement joystick owns the bottom-left corner on phones (#cc-joystick:
+	   left 16px, bottom 20px, 104px tall → up to ~124px from the bottom). Lift
+	   the vitals + minimap column clear of it so the radar never sits on top of
+	   the stick. */
+	.wh-corner-bl { bottom: calc(var(--wh-pad-bottom) + 140px); }
+	.wh-vitals { width: 132px; }
+	.wh-minimap, .wh-minimap-canvas { width: 132px; height: 132px; }
+	.wh-objective { max-width: 60vw; }
+	.wh-speedo { width: 96px; height: 96px; }
+	.wh-speed-num { font-size: 22px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+	.wh-cash, .wh-bar-fill, .wh-speed-fill, .wh-objective.is-in { transition: none; animation: none; }
+	.wh-wanted.is-hunting .wh-star.is-on, .wh-bar--hp.is-critical { animation: none; }
+}

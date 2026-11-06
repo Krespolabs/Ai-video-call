@@ -1,0 +1,197 @@
+# Listings & Distribution
+
+three.ws is open source and self-hostable. It is also distributed through cloud marketplaces (for enterprise procurement) and indexed in ecosystem dApp directories (for community discovery). This page tracks every official listing.
+
+The full machine-checked index of every surface, including awesome-list PRs and aggregators, is the [listings registry](./listings-registry.md).
+
+If you maintain a marketplace, registry, or directory and want three.ws listed, open an issue at [github.com/nirholas/three.ws/issues](https://github.com/nirholas/three.ws/issues) or reach out via the contacts on [three.ws](https://three.ws).
+
+---
+
+## Cloud Marketplaces
+
+Cloud marketplaces are the procurement flow enterprises use to acquire software through their existing cloud account, with consolidated billing, compliance, and support.
+
+| Cloud | Status | Links |
+|---|---|---|
+| **AWS** Marketplace | Integration ready, listing not yet created | three.ws is an AWS Partner and the SaaS integration is built, deployed, and conformant with the Concurrent Agreements requirements AWS made mandatory for new products on 2026-06-01. The product itself has not been created in the AWS Marketplace Management Portal yet, so there is nothing to subscribe to on the AWS side: use [x402](/docs/x402) directly in the meantime, which needs no AWS account. Once the listing is public, subscribing consolidates procurement on your AWS account and auto-issues an x402 API key. Re-checked 2026-09-16: AWS Marketplace public search returns no three.ws product, the [/aws](/aws) page says the listing is coming soon, and the production subscription webhook answers `503 not_configured` because no product code exists yet. See [aws-marketplace.md](./aws-marketplace.md) and the [listing kit](./aws-marketplace-listing-kit.md). |
+| **Alibaba Cloud** International Marketplace | Live (checked 2026-09-16) | [Product listing](https://marketplace.alibabacloud.com/products/56724001/sgcmfw00036800.html) · [Storefront](https://marketplace.alibabacloud.com/store/3247293.html) · [Announcement](/blog/three-ws-on-alibaba-cloud-marketplace.html) · [Marketplace blog feature](https://marketplace.alibabacloud.com/doc/blog/detail/mplace-sgcmfw00036800.html) |
+| **Google Cloud** Marketplace | Open to partnership | three.ws already runs its production stack on Google Cloud Run (`three-ws-api`, us-central1) — a natural fit for Vertex AI and GCP's global CDN. Reach out for co-listing, credits, and joint GTM. |
+| **Microsoft** Marketplace | Live (2026-10) | [Publisher profile](https://marketplace.microsoft.com/en-us/partners/d11c4453-6e12-499d-8dfe-48fcbaa22e2f/overview) · [Announcement](/blog/three-ws-microsoft-partnership) · Coverage: [partnership](https://coinmarketcap.com/community/articles/6ae3dfb3543b1b2fccd5fcf1/), [Marketplace launch](https://coinmarketcap.com/community/articles/6ae275a5e7c4846f5d1cca15/) (CoinMarketCap). Listed alongside the partnership three.ws and Microsoft announced in October 2026; Microsoft Marketplace is the storefront that unified Azure Marketplace and AppSource. Details: [microsoft.md](./microsoft.md). |
+
+---
+
+## Startup & Credit Programs
+
+Infrastructure programs that back three.ws with credits, tooling, and founder networks.
+
+| Program | Status | Details |
+|---|---|---|
+| **Quicknode** Startup Program | Accepted (2026-07) | three.ws is accepted into the Quicknode Startup Program and approved for free infrastructure credits. Quicknode's globally distributed RPC endpoints (Solana first, plus the EVM chains x402 settles on) add capacity and redundancy behind agent wallets, settlement verification, and live market data. Announcement: [three.ws Joins the Quicknode Startup Program](/blog/three-ws-quicknode-startup-program). |
+| **Google Cloud** for Web3 Startups | Member | Production runs on Google Cloud Run; the program backs compute and Vertex AI usage. Announcement: [three.ws Joins Google Cloud for Web3 Startups](/blog/three-ws-google-cloud-partnership). |
+| **NVIDIA Inception** | Member (2026-07) | NVIDIA's program for startups building on accelerated computing. Every generation lane runs on NVIDIA: a self-hosted Cloud Run GPU fleet (L4 plus one RTX PRO 6000 Blackwell) behind text-to-3D, rigging, and motion, and a free hosted lane behind chat, vision, embeddings, safety, and speech. Surface: [/nvidia](/nvidia). Docs: [NVIDIA Inception](./nvidia-inception.md), [NVIDIA models](./nvidia-models.md), [visibility map](./nvidia-visibility-map.md). Listings that run through the membership are in AI Platform Directories below. Membership is a startup program, not a partnership, an investment, or an endorsement. |
+
+---
+
+## Ecosystem Directories
+
+Ecosystem directories are the discovery surfaces that L1/L2 communities, chain foundations, and dApp explorers publish to help users find vetted projects on their stack.
+
+| Directory | Status | Listing details |
+|---|---|---|
+| **BNB Chain · Dappbay** | Live | [dappbay.bnbchain.org/detail/three](https://dappbay.bnbchain.org/detail/three) — categories: *AI Agent Launchpad · AI Data · AI Infra*. Announcement: [three.ws Listed on BNB Chain's Dappbay Directory](/blog/three-ws-on-bnb-chain-dappbay.html). |
+
+Dappbay is BNB Chain's official dApp directory. The listing is about distribution and discovery into BNB Chain's AI dApp audience — three.ws still settles agent payments on Solana, Base, and Polygon via the chain-agnostic [x402 protocol](./x402.md).
+
+---
+
+## AI Platform Directories
+
+The discovery surfaces owned by the AI platforms themselves, where an MCP server can be listed as an installable product rather than a documentation page.
+
+| Directory | Status | Listing details |
+|---|---|---|
+| **OpenAI** Plugin Directory (ChatGPT + Codex) | Open to submission | The universal directory shared by ChatGPT and Codex since 2026-07-09, superseding the former App directory. three.ws already meets the gating requirement: a public OAuth 2.1 MCP server at `https://three.ws/api/mcp` ([mcp.md](./mcp.md)). Full submission kit, prerequisites, and rejection criteria: [openai-listing-channels.md](./openai-listing-channels.md). |
+| **OpenAI** Showcase Gallery | Open to submission | Editorial feature on openai.com for apps, demos, and open-source projects built with OpenAI models, APIs, or Codex. Open web form, no repo gate. See [openai-listing-channels.md](./openai-listing-channels.md). |
+| **OpenAI** Cookbook | Submitted, not merged | [PR #2874](https://github.com/openai/openai-cookbook/pull/2874) (a self-correcting 3D collectible pipeline using text-to-3D, function calling, and vision) has been open since 2026-07-21; on 2026-09-16 it was still open, unmerged, and awaiting review, with last activity on 2026-09-14. Root-cause analysis and the revival steps are in [openai-listing-channels.md](./openai-listing-channels.md). |
+| **NVIDIA** Accelerated Apps Catalog | Requested; portal completion required | NVIDIA's curated catalog of applications built by Inception members, published at [marketplace.nvidia.com](https://marketplace.nvidia.com/en-us/enterprise/applications/). The request was sent 2026-09-04 and NVIDIA replied 2026-09-14: qualifying Shipping product records with runtime-technology evidence, descriptions, technical details, logo, and brand color are reviewed periodically. There is no separate submission ID or promised review date. On 2026-09-16 three.ws was not among the 1,846 applications in the public catalog. The current record still needs its technology corrections and complete fields; a live catalog URL is the only evidence of publication. See [nvidia-apps-catalog-listing.md](./nvidia-apps-catalog-listing.md) and [nvidia-apps-catalog-request.md](./nvidia-apps-catalog-request.md). |
+| **NVIDIA** NGC Catalog | Prerequisites cleared, submission pending | The one NVIDIA directory with a self-serve intake form, and a real distribution channel: an NVIDIA-hosted listing for the container itself at [catalog.ngc.nvidia.com](https://catalog.ngc.nvidia.com/). Our candidate is the [model-trellis](../workers/model-trellis) image-to-3D server (MIT upstream model, no baked weights, no telemetry). The EULA prerequisite is closed at [/legal/nvidia-ngc-eula](/legal/nvidia-ngc-eula); what remains is one build and the partner legal agreement. Kit: [nvidia-ngc-listing.md](./nvidia-ngc-listing.md). |
+
+---
+
+## MCP Directories
+
+Where the three.ws MCP servers are discoverable as installable servers. Most of these ingest the official MCP Registry or GitHub automatically, so a listing can exist without anyone submitting it. States below were checked against each live directory on 2026-09-16.
+
+| Directory | Status | Listing details |
+|---|---|---|
+| **Official MCP Registry** | Live | 72 servers are published under `io.github.nirholas/*`, including `io.github.nirholas/three.ws` 1.0.1 (the hosted `https://three.ws/api/mcp` server), `threews-3d-studio`, `threews-3d-studio-free`, `threews-agent`, `threews-avatar`, `threews-pumpfun`, and `threews-x402-bazaar`. [Registry search](https://registry.modelcontextprotocol.io/v0/servers?search=three.ws). See [mcp.md](./mcp.md). |
+| **PulseMCP** | Live | [pulsemcp.com/servers/nirholas-three-ws](https://www.pulsemcp.com/servers/nirholas-three-ws), ingested from the official registry. |
+| **Glama** | Live, unclaimed | Connectors ingested from the official registry, for example [three.ws Avatars & Agents](https://glama.ai/mcp/connectors/io.github.nirholas/three.ws) and [three.ws 3D Studio](https://glama.ai/mcp/connectors/io.github.nirholas/threews-3d-studio). The main connector is not yet claimed and shows a failing health check because Glama holds no OAuth test credentials. The maintainer contact is declared in [`/.well-known/glama.json`](https://three.ws/.well-known/glama.json). |
+| **LobeHub** MCP marketplace | Live | Indexed from GitHub, for example [@three-ws/portal](https://lobehub.com/mcp/nirholas-three-ws-portal) and [@three-ws/avatar-mcp](https://lobehub.com/mcp/nirholas-threews-avatar-mcp). The separate LobeHub chat plugin described by [`/.well-known/lobehub-plugin.json`](https://three.ws/.well-known/lobehub-plugin.json) is not in LobeHub's plugin index. |
+| **Smithery** | Not listed | No three.ws server in Smithery's registry or search. |
+| **mcp.so** | Not listed | Search returns no results for three.ws. |
+
+---
+
+## Media & Content Partners
+
+| Partner | Status | Links |
+|---|---|---|
+| **IBM Community** | Live | [Embodied, Intelligent, and Self-Custodied: three.ws and the 3D AI Agent Stack](https://community.ibm.com/community/user/blogs/nich8/2026/06/08/3d-ai-web3-just-converge-threews-shipped-the-whole) — IBM Community blog covering the convergence of 3D, AI agents, and web3 in the three.ws stack. |
+| **HackerNoon** | Author page live, no stories published yet | [hackernoon.com/u/three-ws](https://hackernoon.com/u/three-ws): three.ws posts auto-import from the RSS feed into the HackerNoon drafts queue. As of 2026-09-16 the author page shows no published stories. Announcement: [three.ws Partners with HackerNoon](/news/partnered-with-hackernoon) |
+| **Hugging Face** | Live | [huggingface.co/three-ws](https://huggingface.co/three-ws): the [Avatar Viewer Space](https://huggingface.co/spaces/three-ws/avatar-viewer), the [avatars model repo](https://huggingface.co/three-ws/avatars), and two articles, most recently [Inside three.ws](https://huggingface.co/blog/three-ws/building-3d-ai-agents-end-to-end) (2026-08-29). See [huggingface.md](./huggingface.md). |
+| **Alibaba Cloud Marketplace Blog** | Live | [Editorial feature](https://marketplace.alibabacloud.com/doc/blog/detail/mplace-sgcmfw00036800.html) — Alibaba Cloud Marketplace published an editorial introducing three.ws. Announcement: [three.ws Featured on the Alibaba Cloud Marketplace Blog](/blog/three-ws-featured-on-alibaba-cloud-marketplace-blog) |
+| **pump.fun** | Live | [Three Builds With Tech Giants](https://pump.fun/coin/FeMbDoX7R1Psc4GEcvJdsbNbZA3bfztcyDCatJVJpump/article): a feature article published on the official $THREE coin page, profiling the platform's browser-native 3D AI agents with onchain identities, the Animations and Poses Studio, the 3D Studio MCP server, and the AWS and IBM milestones. |
+
+### pump.fun verification
+
+$THREE is a verified project on pump.fun. Verification is pump.fun's own statement that the coin at `FeMbDoX7R1Psc4GEcvJdsbNbZA3bfztcyDCatJVJpump` belongs to three.ws, which is what separates the real token from the copies that share its name and ticker.
+
+three.ws never hardcodes that claim. `GET /api/three-token/stats` reads pump.fun's public coin record on every (5-minute cached) request and returns the live flag on the token block:
+
+```json
+{
+  "token": {
+    "mint": "FeMbDoX7R1Psc4GEcvJdsbNbZA3bfztcyDCatJVJpump",
+    "symbol": "$THREE",
+    "verified": true,
+    "verified_source": "pumpfun",
+    "pump_url": "https://pump.fun/coin/FeMbDoX7R1Psc4GEcvJdsbNbZA3bfztcyDCatJVJpump"
+  }
+}
+```
+
+`verified` has three states, and callers should treat them differently:
+
+| Value | Meaning | What the UI does |
+|---|---|---|
+| `true` | pump.fun publishes the badge right now | Render the badge |
+| `false` | pump.fun publishes no badge | Render nothing |
+| `null` | pump.fun could not be reached this request | Render nothing |
+
+The badge itself is one shared component ([src/pump/verified-badge.js](../src/pump/verified-badge.js)), so the public [/three-token](/three-token) page and the [/dashboard/three-token](/dashboard/three-token) holder view can never disagree about whether the coin is verified. If pump.fun ever withdraws verification, the badge disappears on the next stats read with no deploy.
+
+HackerNoon is one of the world's largest independent tech publications, read by millions of developers and founders monthly. Every three.ws announcement is pulled automatically from [`three.ws/rss/announcements.xml`](https://three.ws/rss/announcements.xml) into the HackerNoon drafts queue. A draft only goes public once it is submitted and passes HackerNoon's editorial review, and it then carries a canonical URL pointing back to three.ws. See [syndication setup](/docs/syndication#hackernoon) for technical details.
+
+### DEXTools
+
+$THREE trades on DEXTools as the [three / SOL pair](https://www.dextools.io/app/solana/pair-explorer/CnK82s8exdsK9nwqQ55kd9wcxoA22NwTchZJCBdu8LDa), and the public [/three-token](/three-token) page draws its live chart with DEXTools' own chart widget.
+
+DEXTools also runs [Social Boost](https://www.dextools.io/app/social-boost), which ranks tokens by daily and weekly visits to their pair page and buys the winner's token on the open market. $THREE has won it three times (checked 2026-09-18):
+
+| Date | Prize | Receipt |
+|---|---|---|
+| 2026-06-08 | Weekly winner, $5,543 buyback | [DEXTools announcement](https://x.com/DEXToolsApp/status/2064037499060555807) |
+| 2026-06-06 | Daily winner, $3,649 buyback | [Winner page](https://www.dextools.io/app/solana/pair-explorer/CnK82s8exdsK9nwqQ55kd9wcxoA22NwTchZJCBdu8LDa?social-boost=daily-2026-06-06) |
+| 2026-06-04 | Daily winner, $2,190 buyback | [Winner page](https://www.dextools.io/app/solana/pair-explorer/CnK82s8exdsK9nwqQ55kd9wcxoA22NwTchZJCBdu8LDa?social-boost=daily-2026-06-04) |
+
+The same list renders on [/three-token](/three-token#tk-social-boost) from one record, [src/pump/dextools-social-boost.js](../src/pump/dextools-social-boost.js). DEXTools publishes no API for past winners, so a new win is added there by hand (newest first, with its receipt) and mirrored in this table. Story: [three.ws Wins DEXTools Social Boost](/blog/three-ws-dextools-social-boost-buyback).
+
+#### Where DEXTools appears on three.ws
+
+Social Boost ranks by visits to a pair page, so every surface that shows a coin also sends people to that coin's DEXTools page:
+
+| Surface | What it shows |
+|---|---|
+| [/three-token](/three-token) | The DEXTools chart widget as the $THREE chart, the Social Boost wins, and the pair page link |
+| Every coin chart (`/launches/<mint>`, `/coin/:id`, `/trades`, Mission Control, the Oracle, `/pump-dashboard`) | DEXTools as a chart source in the switcher ([coin pages](./coin-pages.md)) |
+| Trading terminal rows (coin pages, the $THREE dashboard, the pump.fun feed widget, Oracle share pages) | DEXTools leads the row ([src/shared/trading-terminals.js](../src/shared/trading-terminals.js)) |
+| [/launch](/launch) success screen | A DEXTools button and the "Rally on DEXTools" Social Boost card, right after a coin goes live |
+| `/launches/<mint>` Take action | The same Social Boost card for any coin |
+| `/coin3d` | A DEXTools link in the HUD. A scene embedded by `?pair=` links back to that exact pair ([coin3d embed](./coin3d-embed.md)) |
+| `/oracle/coin/<mint>` | A DEXTools button beside the other market links |
+| Agent profiles, character pages, `/gmgn`, `/pumpfun`, the token dashboard | A DEXTools chart link for every coin shown |
+| [/dextools](/dextools) | The hub: $THREE as a DEXTools chart and a 3D scene side by side, the live visit totals, an embed builder for any DEXTools pair, and the Social Boost wins ([DEXTools integration](./dextools.md)) |
+| `/embed/dextools-boost?mint=` | The Social Boost card as a framable embed any project can put on its own site, every link counted as `embed-boost` ([DEXTools integration](./dextools.md#boost-on-dextools-card-embeddextools-boost)) |
+
+**Which page a link opens.** DEXTools files a pump.fun mint as the coin's bonding-curve pair, so a raw-mint link sends a graduated coin to its dead curve page. Links that already know the pair use it. Every other link goes through [`GET /api/coin/dextools`](https://three.ws/api/coin/dextools?address=FeMbDoX7R1Psc4GEcvJdsbNbZA3bfztcyDCatJVJpump&from=docs), which resolves the most-liquid pool, redirects to its pair page, and pins $THREE to the pair its Social Boost wins are credited to. The redirect counts each visit per UTC day, coin and sending surface (no visitor data), and [`GET /api/coin/dextools-stats`](https://three.ws/api/coin/dextools-stats) publishes those totals, so the traffic three.ws sends DEXTools can be checked rather than claimed.
+
+**The Social Boost card** is one component, `socialBoostCard()` in [src/shared/dextools-boost.js](../src/shared/dextools-boost.js). It explains the ranking, cites the $THREE wins from the record above, and gives three actions: open the DEXTools page, post a ready-made rally to X, and copy the link. It takes the host page's button classes and an optional `href`, so a surface can route it through the counted redirect with its own `from` tag:
+
+```js
+import { socialBoostCard } from './shared/dextools-boost.js';
+import { dextoolsTokenUrl } from './shared/trading-terminals.js';
+
+const card = socialBoostCard({
+	mint,
+	symbol: 'THREE',
+	href: dextoolsTokenUrl(mint, { from: 'my-surface' }),
+	buttonClass: 'btn',
+	primaryClass: 'btn primary',
+});
+if (card) host.append(card); // null for an address it cannot link
+```
+
+---
+
+## Open Source
+
+The full stack is on GitHub:
+
+- **three.ws** — [github.com/nirholas/three.ws](https://github.com/nirholas/three.ws) (canonical source of truth)
+
+The codebase includes the `<agent-3d>` browser component, the Solana minting SDK, the x402 payment SDK, the ERC-8004 wallet integration, and the agent-payments SDK used by third-party developers.
+
+---
+
+## RSS & Announcements
+
+Every listing is announced through:
+
+- **RSS** — [`https://three.ws/rss/announcements.xml`](https://three.ws/rss/announcements.xml)
+- **News index**: [`https://three.ws/news`](https://three.ws/news)
+- **Blog** — [`https://three.ws/blog/`](https://three.ws/blog/)
+
+Subscribe via RSS to track new listings, integrations, and protocol updates.
+
+---
+
+## Related
+
+- [Partnership and listing pipeline](./partners/opportunities.md): the same surfaces as an action list, showing what is stuck, on whom, and the single step that unblocks each one
+- [AWS Marketplace](/docs/aws-marketplace): the AWS listing and entitlement-issued x402 API keys
+- [Syndication](/docs/syndication): how announcements flow to HackerNoon and other channels
+- [Publishing program, September 2026](./publishing-program-2026-09.md): the venue matrix, running order, and per-venue rules for the current writing push
+- [x402 protocol](/docs/x402): the payment rail behind the paid endpoints these listings distribute
+- [Introduction](/docs/introduction): the full technical picture of the platform being listed

@@ -1,0 +1,14 @@
+{
+  "name": "@three-ws/agent-forge",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Headless Live Avatar Forge caster — runs free TRELLIS text→3D and broadcasts the forged GLB onto an agent's live screen.",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js"
+  },
+  "engines": {
+    "node": ">=22"
+  }
+}

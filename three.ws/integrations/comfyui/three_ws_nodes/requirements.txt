@@ -1,0 +1,5 @@
+# The three.ws nodes use only the Python standard library plus numpy + Pillow,
+# both of which ComfyUI already ships. Nothing to install in a normal ComfyUI
+# environment; these are listed for completeness / non-ComfyUI hosts.
+numpy
+Pillow

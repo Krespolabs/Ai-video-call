@@ -1,0 +1,1018 @@
+<!doctype html>
+<html lang="en">
+<head>
+	<script>/* three.ws theme boot — no-flash; runtime in /theme-switcher.js */(function(){try{var m=localStorage.getItem('twx_theme');var l=m==='auto'?(window.matchMedia&&window.matchMedia('(prefers-color-scheme: light)').matches):m==='light';document.documentElement.setAttribute('data-theme',l?'light':'dark');}catch(e){document.documentElement.setAttribute('data-theme','dark');}})();</script>
+	<meta charset="utf-8">
+	<title data-i18n="vanity_wallet.meta_title">Solana vanity wallet generator · three.ws</title>
+	<meta name="viewport" content="width=device-width, initial-scale=1">
+	<meta name="description" content="Grind a custom Solana address by prefix or suffix, entirely in your browser across your CPU cores. Send it as a sealed gift link only the recipient can open." data-i18n-attr="content:vanity_wallet.meta_description">
+	<link rel="icon" href="/favicon.ico">
+	<link rel="stylesheet" href="/footer.css">
+	<link rel="stylesheet" href="/nav.css">
+	<link rel="stylesheet" href="/fonts/fonts.css" />
+	<script defer src="/footer-newsletter.js"></script>
+	<script src="/x402.js" type="module"></script>
+	<script type="module" src="https://cdn.jsdelivr.net/npm/@google/model-viewer@4.4.0/dist/model-viewer.min.js" integrity="sha384-wjsPzEO+lXOf7d9csIDfAQpPt2OKuUU3m0K9qsdKIuzX4N8czSF6hdh23eAbZa3p" crossorigin="anonymous"></script>
+	<style>
+		* { box-sizing: border-box; }
+		:root {
+			color-scheme: dark;
+			--fg: #f0f0f0; --muted: #888; --border: rgba(255,255,255,0.08); --bg: #111;
+			--accent: #fff; --accent-fg: #000;
+			--ok-bg: rgba(74,222,128,0.12); --ok-fg: #4ade80;
+			--warn-bg: rgba(251,191,36,0.1); --warn-fg: #fbbf24;
+			--bad-bg: rgba(239,68,68,0.1); --bad-fg: #f87171;
+			--card-bg: #0f0f0f;
+			--header-h: 3.5rem;
+			--font-display: 'Space Grotesk', 'Inter', system-ui, sans-serif;
+			--space-xs: 0.382rem;
+			--space-sm: 0.618rem;
+			--space-md: 1rem;
+			--space-lg: 1.618rem;
+			--text-sm: 0.764rem;
+			--text-lg: 1.236rem;
+			--radius-md: 5px;
+		}
+		body {
+			font: 15px/1.5 'Inter', system-ui, -apple-system, sans-serif;
+			background: #000;
+			color: var(--fg);
+			margin: 0;
+			min-height: 100vh;
+			display: flex;
+			flex-direction: column;
+		}
+		main {
+			flex: 1;
+			max-width: 660px;
+			width: 100%;
+			margin: 0 auto;
+			padding: 2.5rem 1rem 3rem;
+		}
+		h1 { font-size: 1.5rem; margin: 0 0 .25rem; font-family: var(--font-display); letter-spacing: -0.02em; }
+		p.lede { color: var(--muted); margin: 0 0 1.25rem; }
+		label { display: block; font-size: .8rem; color: var(--muted); margin: 1rem 0 .25rem; }
+
+		.card { border: 1px solid var(--border); border-radius: 10px; padding: 1.1rem 1.25rem; background: var(--card-bg); }
+
+		input[type=text] { font: inherit; font-family: ui-monospace, monospace; padding: .55rem .7rem; width: 100%; border: 1px solid rgba(255,255,255,0.12); border-radius: 6px; background: #1a1a1a; color: var(--fg); }
+		input[type=text]:focus { outline: none; border-color: rgba(255,255,255,0.3); }
+		/* Removing the UA outline above leaves a keyboard visitor with only a faint
+		   border shift to find the caret by, so put a real ring back for the
+		   keyboard case (and cover every other control the page renders). */
+		input[type=text]:focus-visible, input[type=number]:focus-visible,
+		select:focus-visible, textarea:focus-visible,
+		button:focus-visible, a:focus-visible, input[type=checkbox]:focus-visible, input[type=radio]:focus-visible {
+			outline: 2px solid rgba(255,213,79,0.9); outline-offset: 2px;
+		}
+		input.invalid { border-color: var(--bad-fg); background: rgba(239,68,68,0.06); }
+
+		.preview { font-family: ui-monospace, monospace; font-size: .9rem; padding: .65rem .75rem; background: #1a1a1a; border-radius: 6px; margin-top: .55rem; word-break: break-all; min-height: 2.4em; line-height: 1.4; border: 1px solid var(--border); }
+		.preview .pfx, .preview .sfx { background: linear-gradient(90deg,#ffd54f,#ff8a65); color: #1a1a1a; padding: 0 3px; border-radius: 3px; font-weight: 700; }
+		.preview .rest { color: #555; }
+
+		/* ── Prefix / suffix inputs ── */
+		.pattern-grid { display: grid; grid-template-columns: 1fr 1fr; gap: .75rem; }
+		.pattern-field label { margin: 0 0 .25rem; }
+		.pattern-field .affix-hint { display: block; font-size: .68rem; color: #555; margin-top: .3rem; min-height: 1em; }
+		@media (max-width: 480px) { .pattern-grid { grid-template-columns: 1fr; } }
+
+		.ci-toggle { display: flex; align-items: flex-start; gap: .5rem; margin-top: .9rem; font-size: .78rem; color: var(--muted); cursor: pointer; line-height: 1.4; }
+		.ci-toggle input { margin-top: 2px; accent-color: #ffd54f; cursor: pointer; }
+		.ci-toggle:hover { color: #bbb; }
+
+		.combo-warn { color: var(--bad-fg); font-size: .76rem; margin-top: .6rem; min-height: 1em; }
+
+		.meter { display: flex; gap: 4px; margin-top: .65rem; }
+		.meter .seg { flex: 1; height: 7px; border-radius: 4px; background: #2a2a2a; transition: background var(--duration-fast); }
+		.lit-1, .lit-2, .lit-3, .lit-4 { background: #4caf50 !important; }
+		.lit-5 { background: #fb8c00 !important; }
+		.lit-6 { background: #d32f2f !important; }
+
+		.row { display: flex; justify-content: space-between; align-items: center; margin-top: .55rem; font-size: .85rem; color: var(--muted); }
+
+		.chips { display: flex; flex-wrap: wrap; gap: .4rem; margin-top: .9rem; }
+		.chip { background: #1a1a1a; border: 1px solid rgba(255,255,255,0.1); border-radius: 999px; padding: .3rem .75rem; cursor: pointer; font-family: ui-monospace, monospace; font-size: .8rem; color: #bbb; }
+		.chip:hover { background: #242424; border-color: rgba(255,255,255,0.2); }
+		.chip:active { background: #2e2e2e; transform: translateY(1px); }
+		.chip-est { color: #555; margin-left: .35rem; font-family: system-ui, sans-serif; }
+
+		/* ── Compute / core selector ── */
+		.cores { margin-top: 1.1rem; padding-top: 1rem; border-top: 1px solid var(--border); }
+		.cores .cores-head { display: flex; justify-content: space-between; align-items: baseline; }
+		.cores .cores-head label { margin: 0; }
+		.cores .cores-val { font-family: ui-monospace, monospace; font-size: .85rem; color: var(--fg); }
+		.cores .cores-val b { color: #fff; font-size: 1rem; }
+		.cores-row { display: flex; align-items: center; gap: .75rem; margin-top: .55rem; }
+		.cores-row input[type=range] {
+			flex: 1; -webkit-appearance: none; appearance: none; height: 5px; border-radius: 999px;
+			background: #2a2a2a; outline: none; cursor: pointer; margin: 0;
+		}
+		.cores-row input[type=range]::-webkit-slider-thumb {
+			-webkit-appearance: none; appearance: none; width: 18px; height: 18px; border-radius: 50%;
+			background: #fff; cursor: pointer; border: 3px solid #000; box-shadow: 0 0 0 1px rgba(255,255,255,0.2);
+			transition: transform var(--duration-instant);
+		}
+		.cores-row input[type=range]::-webkit-slider-thumb:hover { transform: scale(1.15); }
+		.cores-row input[type=range]::-moz-range-thumb {
+			width: 18px; height: 18px; border-radius: 50%; background: #fff; cursor: pointer;
+			border: 3px solid #000; box-shadow: 0 0 0 1px rgba(255,255,255,0.2);
+		}
+		.cores-row input[type=range]:disabled { opacity: .4; cursor: not-allowed; }
+		.cores-row input[type=range]:focus-visible { box-shadow: 0 0 0 2px rgba(255,255,255,0.35); }
+		.cores .cores-hint { font-size: .72rem; color: var(--muted); margin-top: .45rem; }
+		.cores-ticks { display: flex; gap: .35rem; margin-top: .55rem; }
+		.cores-ticks button {
+			font: inherit; font-size: .72rem; padding: .2rem .55rem; border-radius: 999px;
+			border: 1px solid rgba(255,255,255,0.1); background: #1a1a1a; color: #bbb; cursor: pointer;
+		}
+		.cores-ticks button:hover { background: #242424; border-color: rgba(255,255,255,0.2); }
+		.cores-ticks button[aria-pressed=true] { background: #fff; color: #000; border-color: #fff; font-weight: 600; }
+
+		.progress.paused { opacity: .75; }
+		.paused-tag { display: inline-block; padding: .1rem .5rem; border-radius: 999px; font-size: .7rem; font-weight: 600;
+			background: var(--warn-bg); color: var(--warn-fg); border: 1px solid rgba(251,191,36,0.2); margin-left: .5rem; vertical-align: middle; }
+
+		.actions { display: flex; gap: .55rem; margin-top: 1.25rem; align-items: center; flex-wrap: wrap; }
+		.btn { font: inherit; padding: .55rem 1.1rem; border-radius: 6px; border: 1px solid rgba(255,255,255,0.12); background: #1a1a1a; color: var(--fg); cursor: pointer; }
+		.btn:hover { background: #222; }
+		.btn:active:not(:disabled) { transform: translateY(1px); }
+		.btn.primary { background: #fff; color: #000; border-color: #fff; font-weight: 600; }
+		.btn.primary:hover { background: #e8e8e8; }
+		.btn:disabled { opacity: .35; cursor: not-allowed; }
+
+		.progress { margin-top: 1.25rem; padding: .9rem 1.1rem; background: #111; border-radius: 8px; border: 1px solid var(--border); font-family: ui-monospace, monospace; font-size: .85rem; }
+		.progress .live { display: flex; justify-content: space-between; align-items: center; gap: 1rem; }
+		.progress .stat { font-size: 1.1rem; font-weight: 600; color: #fff; }
+		.progress .scan { font-family: ui-monospace, monospace; font-size: .85rem; color: #555; margin-top: .35rem; word-break: break-all; min-height: 1.4em; }
+		.progress .scan .pfx, .progress .scan .sfx { background: linear-gradient(90deg,#ffd54f,#ff8a65); color: #1a1a1a; padding: 0 3px; border-radius: 3px; font-weight: 700; }
+
+		.result { margin-top: 1.25rem; padding: 1.1rem 1.25rem; background: rgba(255,213,79,0.06); border: 1px solid rgba(255,213,79,0.25); border-radius: 10px; }
+		.result h3 { margin: 0 0 .4rem; font-size: 1rem; color: #fff; }
+		.result .addr { font-family: ui-monospace, monospace; font-size: .9rem; word-break: break-all; padding: .5rem; background: #111; border-radius: 6px; border: 1px solid rgba(255,213,79,0.15); }
+		.result .addr .pfx, .result .addr .sfx { background: linear-gradient(90deg,#ffd54f,#ff8a65); color: #1a1a1a; padding: 0 3px; border-radius: 3px; font-weight: 700; }
+		.result .meta { font-size: .8rem; color: var(--muted); margin: .55rem 0 1rem; }
+
+		.warn { background: var(--warn-bg); color: var(--warn-fg); padding: .6rem .85rem; border-radius: 6px; margin-top: 1rem; font-size: .8rem; border: 1px solid rgba(251,191,36,0.15); }
+		.warn strong { color: #fca5a5; }
+
+		.assign { margin-top: 1rem; padding: .9rem 1rem; background: #111; border: 1px solid var(--border); border-radius: 8px; }
+		.assign h4 { margin: 0 0 .4rem; font-size: .9rem; color: #fff; }
+		.assign select { font: inherit; padding: .4rem .55rem; border: 1px solid rgba(255,255,255,0.12); border-radius: 6px; width: 100%; background: #1a1a1a; color: var(--fg); }
+		.assign .custody { font-size: .72rem; color: var(--muted); margin-top: .5rem; }
+		.assign .custody label { display: flex; align-items: flex-start; gap: .4rem; cursor: pointer; }
+		.assign .custody input { margin-top: 3px; }
+		.assigned-ok { background: var(--ok-bg); color: var(--ok-fg); padding: .6rem .85rem; border-radius: 6px; margin-top: 1rem; font-size: .85rem; border: 1px solid rgba(74,222,128,0.15); }
+
+		.error { background: var(--bad-bg); color: var(--bad-fg); padding: .6rem .85rem; border-radius: 6px; margin-top: 1rem; font-size: .85rem; border: 1px solid rgba(239,68,68,0.15); }
+
+		.tier-tag { padding: .15rem .55rem; border-radius: 999px; font-size: .75rem; font-weight: 600; }
+		.tier-free { background: rgba(74,222,128,0.12); color: #4ade80; }
+		.tier-paid { background: linear-gradient(90deg,rgba(255,213,79,0.15),rgba(255,138,101,0.15)); color: #fbbf24; border: 1px solid rgba(255,213,79,0.2); }
+
+		/* ── Sealed gift drops (shared visual language with /vanity/bounties) ── */
+		.section-divider { margin: 2.6rem 0 1.6rem; padding-top: 2rem; border-top: 1px solid var(--border); }
+		.section-divider h2 { font-family: var(--font-display); font-size: 1.25rem; margin: 0 0 .25rem; letter-spacing: -0.01em; }
+		.section-divider p.lede { font-size: .85rem; margin-bottom: 1.1rem; }
+		.fl { display: block; font-size: .72rem; text-transform: uppercase; letter-spacing: .04em; color: #666; margin: .9rem 0 .3rem; }
+		input.t, textarea.t, select.t { width: 100%; font: inherit; background: #1a1a1a; color: var(--fg); border: 1px solid rgba(255,255,255,.12); border-radius: 6px; padding: .6rem .8rem; }
+		textarea.t { min-height: 70px; resize: vertical; }
+		.gift-row { display: flex; gap: .7rem; flex-wrap: wrap; }
+		.gift-row > div { flex: 1; min-width: 140px; }
+		.chk { display: flex; align-items: flex-start; gap: .5rem; margin-top: .7rem; font-size: .82rem; color: #ccc; cursor: pointer; }
+		.chk input { margin-top: 2px; }
+		.mono { font-family: ui-monospace, monospace; word-break: break-all; }
+		.errbox, .okbox, .warnbox { display: none; margin-top: .9rem; padding: .7rem .9rem; border-radius: 8px; font-size: .85rem; }
+		.errbox.show { display: block; border: 1px solid rgba(248,113,113,.4); background: rgba(248,113,113,.08); color: #fca5a5; }
+		.okbox.show { display: block; border: 1px solid rgba(74,222,128,.4); background: rgba(74,222,128,.08); color: #86efac; }
+		.warnbox.show { display: block; border: 1px solid rgba(255,176,32,.4); background: rgba(255,176,32,.08); color: #fcd34d; }
+		/* Same warning visuals as .warnbox, but visibility is driven purely by the
+		   inline style="display:none" sealed-drops.js toggles directly — unlike
+		   .errbox/.okbox/.warnbox above (which need a .show class added), this one
+		   has no hidden-by-default class rule to fight the JS's own toggle. */
+		.keynote { padding: .7rem .9rem; border-radius: 8px; font-size: .85rem; border: 1px solid rgba(255,176,32,.4); background: rgba(255,176,32,.08); color: #fcd34d; margin-top: .6rem; }
+		.keybox { background: #0a0a0a; border: 1px solid rgba(255,176,32,.35); border-radius: 8px; padding: .8rem; margin-top: .8rem; }
+		.keybox code { display: block; word-break: break-all; font-family: ui-monospace, monospace; font-size: .78rem; color: #fcd34d; background: #111; padding: .5rem; border-radius: 6px; margin: .4rem 0; }
+		.kv { display: flex; justify-content: space-between; gap: 1rem; padding: .35rem 0; border-bottom: 1px solid var(--border); font-size: .86rem; }
+		.kv:last-child { border-bottom: none; } .kv .k { color: #666; } .kv .v { font-weight: 700; font-family: ui-monospace, monospace; }
+		.qrwrap { display: flex; flex-direction: column; align-items: center; gap: .3rem; margin-top: .9rem; }
+		.qrbox { background: #fff; padding: .6rem; border-radius: 8px; line-height: 0; }
+		.qrbox svg { width: 160px; height: 160px; display: block; }
+		.qrcap { font-size: .72rem; color: #666; }
+		details > summary { cursor: pointer; font-size: .82rem; color: #999; }
+		details p.note { font-size: .78rem; color: #666; margin: .5rem 0 0; }
+		#drop-toast.toast { position: fixed; left: 50%; bottom: 1.5rem; transform: translateX(-50%) translateY(120%); background: #1a1a1a; border: 1px solid var(--border); color: #fff; padding: .6rem 1rem; border-radius: 8px; font-size: .85rem; transition: transform var(--duration-base) var(--ease-standard); z-index: 50; max-width: 90vw; }
+		#drop-toast.toast.show { transform: translateX(-50%) translateY(0); }
+		.spin { width: 14px; height: 14px; border: 2px solid rgba(255,255,255,.2); border-top-color: #fff; border-radius: 50%; display: inline-block; animation: rot .7s linear infinite; vertical-align: -2px; }
+		@keyframes rot { to { transform: rotate(360deg); } }
+		.empty { text-align: center; padding: 2.5rem 1rem; border: 1px dashed var(--border); border-radius: 10px; color: var(--muted); }
+		.empty .glyph { font-size: 2.2rem; margin-bottom: .5rem; opacity: .5; }
+		.empty h3 { font-family: var(--font-display); margin: .2rem 0 .4rem; color: #ccc; font-size: 1rem; }
+		.minerow { display: flex; justify-content: space-between; align-items: center; gap: .8rem; padding: .8rem 0; border-bottom: 1px solid var(--border); }
+		.minerow:last-child { border-bottom: none; }
+		.mr-amt { font-weight: 700; font-family: var(--font-display); }
+		.mr-meta { font-size: .74rem; color: #666; margin-top: .2rem; }
+		.mr-meta .dot { width: 6px; height: 6px; border-radius: 50%; display: inline-block; margin-right: .3rem; }
+		.mr-meta .dot.open { background: #4ade80; } .mr-meta .dot.claimed { background: #38bdf8; } .mr-meta .dot.reclaimed { background: #666; } .mr-meta .dot.expired { background: #f87171; }
+		.mr-actions { display: flex; gap: .4rem; flex-shrink: 0; }
+		.skel { position: relative; overflow: hidden; background: #161616; border-radius: 8px; }
+		.skel::after { content: ''; position: absolute; inset: 0; background: linear-gradient(90deg,transparent,rgba(255,255,255,.05),transparent); animation: sweep 1.3s infinite; }
+		@keyframes sweep { 0% { transform: translateX(-100%); } 100% { transform: translateX(100%); } }
+		/* sealed-drops.js renders bare .primary/.ghost buttons (not .btn-prefixed
+		   like the grinder above) — matching /vanity/bounties' own button pattern
+		   so the two sibling pages read as one design language. */
+		button.primary, button.ghost, a.primary, a.ghost { appearance: none; font: inherit; font-weight: 700; border-radius: 6px; cursor: pointer; text-decoration: none; display: inline-flex; align-items: center; gap: .4rem; transition: transform var(--duration-instant), background var(--duration-fast), border-color var(--duration-fast); }
+		button.primary, a.primary { background: #fff; color: #000; border: 1px solid #fff; padding: .55rem 1.1rem; }
+		button.primary:hover, a.primary:hover { transform: translateY(-1px); background: #e8e8e8; }
+		button.primary:active:not(:disabled), a.primary:active { transform: translateY(0); background: #dcdcdc; }
+		button.primary:disabled { opacity: .5; cursor: not-allowed; transform: none; }
+		button.ghost, a.ghost { background: transparent; color: var(--fg); border: 1px solid rgba(255,255,255,.12); padding: .5rem .9rem; }
+		button.ghost:hover, a.ghost:hover { border-color: rgba(255,255,255,.3); }
+		button.ghost:active:not(:disabled), a.ghost:active { background: rgba(255,255,255,.06); }
+		button.small, a.small { font-size: .78rem; padding: .4rem .7rem; }
+		button.big, a.big { font-size: 1rem; padding: .8rem 1.4rem; width: 100%; justify-content: center; }
+
+		/* ── Site nav ── */
+		.skip-link {
+			position: absolute; left: -9999px; top: auto; width: 1px; height: 1px; overflow: hidden;
+		}
+		.skip-link:focus {
+			left: 1rem; top: 1rem; width: auto; height: auto;
+			padding: 0.5rem 1rem; background: #0c0c0c; border: 1px solid rgba(255,255,255,0.1);
+			border-radius: 6px; z-index: 9999; color: #fff; text-decoration: none;
+		}
+		.wordmark-dot {
+			width: 8px; height: 8px; border-radius: 50%;
+			background: linear-gradient(135deg, #ffffff 0%, #ffffff 100%);
+			box-shadow: 0 0 10px rgba(139,92,246,0.6);
+			display: inline-block;
+		}
+	</style>
+
+	<link rel="canonical" href="https://three.ws/vanity-wallet">
+	<meta property="og:type" content="website">
+	<meta property="og:site_name" content="three.ws">
+	<meta property="og:title" content="Solana Vanity Wallet · three.ws" data-i18n-attr="content:vanity_wallet.meta_og_title">
+	<meta property="og:description" content="Grind a Solana address with a custom prefix or suffix, entirely in your browser. Send it as a sealed gift only the recipient can open." data-i18n-attr="content:vanity_wallet.meta_og_description">
+	<meta property="og:url" content="https://three.ws/vanity-wallet">
+	<meta property="og:image" content="https://three.ws/api/page-og?s=crypto&amp;t=Solana+Vanity+Wallet&amp;d=Grind+a+Solana+address+with+a+custom+prefix%3A+entirely+in+your+browser%2C+across+your+CPU+cores.+Also+send+sealed+wallet+gifts%3A+fund+a+fresh+%28optionally&amp;p=%2Fvanity-wallet">
+	<meta property="og:image:width" content="1200">
+	<meta property="og:image:height" content="630">
+	<meta name="twitter:card" content="summary_large_image">
+	<meta name="twitter:title" content="Solana Vanity Wallet · three.ws" data-i18n-attr="content:vanity_wallet.meta_twitter_title">
+	<meta name="twitter:description" content="Grind a Solana address with a custom prefix or suffix, entirely in your browser. Send it as a sealed gift only the recipient can open." data-i18n-attr="content:vanity_wallet.meta_twitter_description">
+	<meta name="twitter:image" content="https://three.ws/api/page-og?s=crypto&amp;t=Solana+Vanity+Wallet&amp;d=Grind+a+Solana+address+with+a+custom+prefix%3A+entirely+in+your+browser%2C+across+your+CPU+cores.+Also+send+sealed+wallet+gifts%3A+fund+a+fresh+%28optionally&amp;p=%2Fvanity-wallet">
+	<script type="application/ld+json">{"@context":"https://schema.org","@type":"WebPage","name":"Solana Vanity Wallet","description":"Grind a Solana address with a custom prefix or suffix, entirely in your browser. Send it as a sealed gift only the recipient can open.","url":"https://three.ws/vanity-wallet","isPartOf":{"@type":"WebSite","name":"three.ws","url":"https://three.ws"}}</script>
+
+	<meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1">
+	<meta property="og:locale" content="en_US">
+	<meta property="og:image:alt" content="Solana Vanity Wallet — three.ws">
+	<meta name="twitter:site" content="@trythreews">
+	<script src="/model-viewer-meshopt.js"></script>
+</head>
+<body>
+	<a href="#main-content" class="skip-link" data-i18n="vanity_wallet.skip_to_main_content">Skip to main content</a>
+		<header>
+			<div id="nav-container"></div>
+		</header>
+		<script src="/nav.js"></script>
+
+	<main id="main-content">
+		<h1 data-i18n="vanity_wallet.vanity_wallet_generator">✦ Vanity wallet generator</h1>
+		<p class="lede" data-i18n-html="vanity_wallet.grind_a_solana_wallet_address_that_starts">
+			Grind a Solana wallet address that <strong>starts with</strong>, <strong>ends with</strong>, or is bookended by characters of your choice — for your agent, treasury, or anywhere a memorable address matters.
+			<strong>Runs entirely in your browser.</strong> The secret key stays on your device — it only leaves if you explicitly assign the wallet to an agent.
+		</p>
+		<p class="lede" style="margin-top:-0.5rem;font-size:.85rem" data-i18n-html="vanity_wallet.bought_a_wallet_from_the_provably_fair">
+			Bought a wallet from the <a href="/vanity/verify" style="color:#ffd54f;text-decoration:none;border-bottom:1px solid rgba(255,213,79,.4)">provably-fair grinder</a>?
+			Verify the receipt — prove we generated your key fresh and never kept a copy. See the rarest wallets ground here in the
+			<a href="/vanity/gallery" style="color:#ffd54f;text-decoration:none;border-bottom:1px solid rgba(255,213,79,.4)">proof-of-grind gallery</a>.
+			Need a <strong>hard</strong> pattern too slow for one machine?
+			<a href="/vanity/bounties" style="color:#ffd54f;text-decoration:none;border-bottom:1px solid rgba(255,213,79,.4)">post a grind bounty</a> and a fleet grinds it for you,
+			or buy a long, brandable one <strong>instantly from stock</strong> in the
+			<a href="/vanity/premium" style="color:#ffd54f;text-decoration:none;border-bottom:1px solid rgba(255,213,79,.4)">premium inventory</a>.
+		</p>
+
+		<div class="card">
+			<div class="pattern-grid">
+				<div class="pattern-field">
+					<label for="prefix" data-i18n="vanity_wallet.starts_with">Starts with</label>
+					<input id="prefix" type="text" maxlength="6" placeholder="e.g. AGNT" autocomplete="off" spellcheck="false" inputmode="latin" />
+					<span class="affix-hint" id="prefix-hint" data-i18n="vanity_wallet.base58_max_6">Base58 · max 6</span>
+				</div>
+				<div class="pattern-field">
+					<label for="suffix" data-i18n="vanity_wallet.ends_with">Ends with</label>
+					<input id="suffix" type="text" maxlength="6" placeholder="e.g. pump" autocomplete="off" spellcheck="false" inputmode="latin" />
+					<span class="affix-hint" id="suffix-hint" data-i18n="vanity_wallet.base58_max_6_2">Base58 · max 6</span>
+				</div>
+			</div>
+
+			<label class="ci-toggle" for="ignore-case">
+				<input type="checkbox" id="ignore-case" />
+				<span data-i18n="vanity_wallet.case_insensitive_match_letters_in_any_case">Case-insensitive — match letters in any case. Much faster to grind, but you don't get to choose the casing of the result.</span>
+			</label>
+
+			<div class="combo-warn" id="combo-warn" aria-live="polite"></div>
+
+			<div class="preview" id="preview" aria-live="polite"></div>
+
+			<div class="meter" aria-hidden="true">
+				<div class="seg" data-seg="1"></div>
+				<div class="seg" data-seg="2"></div>
+				<div class="seg" data-seg="3"></div>
+				<div class="seg" data-seg="4"></div>
+				<div class="seg" data-seg="5"></div>
+				<div class="seg" data-seg="6"></div>
+			</div>
+
+			<div class="row">
+				<span id="est" data-i18n="vanity_wallet.type_a_prefix_or_suffix_to_see">type a prefix or suffix to see estimated time</span>
+				<span id="tier"></span>
+			</div>
+
+			<div class="chips" aria-label="Suggested patterns">
+				<button class="chip" data-prefix="AGNT" type="button" data-i18n-html="vanity_wallet.agnt">AGNT…<span class="chip-est"></span></button>
+				<button class="chip" data-prefix="BOT"  type="button" data-i18n-html="vanity_wallet.bot">BOT…<span class="chip-est"></span></button>
+				<button class="chip" data-prefix="AI"   type="button" data-i18n-html="vanity_wallet.ai">AI…<span class="chip-est"></span></button>
+				<button class="chip" data-suffix="pump" type="button" data-i18n-html="vanity_wallet.pump">…pump<span class="chip-est"></span></button>
+				<button class="chip" data-prefix="GM" data-suffix="gm" type="button" data-i18n-html="vanity_wallet.gm_gm">GM…gm<span class="chip-est"></span></button>
+				<button class="chip" data-suffix="3" type="button">…3<span class="chip-est"></span></button>
+			</div>
+
+			<div class="cores">
+				<div class="cores-head">
+					<label for="core-count" data-i18n="vanity_wallet.compute_cpu_cores_to_use">Compute — CPU cores to use</label>
+					<span class="cores-val"><b id="core-count-val">4</b> / <span id="core-max">8</span></span>
+				</div>
+				<div class="cores-row">
+					<input id="core-count" type="range" min="1" max="8" value="4" step="1"
+						aria-label="Number of CPU cores to use for grinding" />
+				</div>
+				<div class="cores-ticks" id="core-ticks" aria-label="Quick core presets"></div>
+				<div class="cores-hint" id="cores-hint">More cores = faster, but a heavier load on your machine. Pause anytime to free them.</div>
+			</div>
+
+			<div class="actions">
+				<button id="grind" class="btn primary" type="button" disabled data-i18n="vanity_wallet.generate_wallet">Generate wallet</button>
+				<button id="pause" class="btn" type="button" hidden data-i18n="vanity_wallet.pause">Pause</button>
+				<button id="stop" class="btn" type="button" hidden data-i18n="vanity_wallet.stop">Stop</button>
+			</div>
+
+			<div id="progress" hidden class="progress">
+				<div class="live">
+					<div>
+						<div class="stat" id="rate">0/s</div>
+						<div style="font-size:.75rem;color:#555">tries/sec across <span id="cores">?</span> cores<span id="paused-tag" class="paused-tag" hidden data-i18n="vanity_wallet.paused">paused</span></div>
+					</div>
+					<div style="text-align:right">
+						<div class="stat"><span id="attempts">0</span></div>
+						<div style="font-size:.75rem;color:#555">attempts · eta <span id="eta">—</span></div>
+					</div>
+				</div>
+				<div class="scan" id="scan"></div>
+			</div>
+
+			<div id="error" hidden class="error"></div>
+			<div id="result" hidden></div>
+		</div>
+
+		<div class="section-divider" id="drop-create">
+			<h2 data-i18n="vanity_wallet.send_a_sealed_gift">🎁 Send a sealed gift</h2>
+			<p class="lede" data-i18n="vanity_wallet.fund_a_fresh_wallet_optionally_vanity_ground">
+				Fund a fresh wallet — optionally vanity-ground with the pattern above — and wrap it in an end-to-end sealed link.
+				Only the recipient can ever open it; three.ws never sees the key.
+			</p>
+			<div class="card">
+				<div class="gift-row">
+					<div>
+						<label class="fl" for="dc-asset" data-i18n="vanity_wallet.asset">Asset</label>
+						<select class="t" id="dc-asset">
+							<option value="SOL" data-i18n="vanity_wallet.sol">SOL</option>
+							<option value="USDC" data-i18n="vanity_wallet.usdc">USDC</option>
+							<option value="THREE" data-i18n="vanity_wallet.three">$THREE</option>
+						</select>
+					</div>
+					<div>
+						<label class="fl" for="dc-amount" data-i18n="vanity_wallet.amount">Amount</label>
+						<input class="t" id="dc-amount" type="text" inputmode="decimal" placeholder="e.g. 0.1" autocomplete="off" />
+					</div>
+				</div>
+
+				<span class="fl" id="dc-pattern-label" data-i18n="vanity_wallet.vanity_pattern_optional">Vanity pattern (optional)</span>
+				<p class="note" style="font-size:.78rem;color:#666;margin:0 0 .4rem" data-i18n="vanity_wallet.reuses_the_prefix_suffix_above_leave_blank">Reuses the prefix/suffix above — leave blank to skip grinding and fund instantly.</p>
+				<div class="gift-row" role="group" aria-labelledby="dc-pattern-label">
+					<div>
+						<input class="t mono" id="dc-prefix" type="text" maxlength="6" placeholder="Starts with" aria-label="Gift wallet starts with" autocomplete="off" spellcheck="false" />
+					</div>
+					<div>
+						<input class="t mono" id="dc-suffix" type="text" maxlength="6" placeholder="Ends with" aria-label="Gift wallet ends with" autocomplete="off" spellcheck="false" />
+					</div>
+				</div>
+
+				<label class="fl" for="dc-format" data-i18n="vanity_wallet.key_export_format">Key export format</label>
+				<select class="t" id="dc-format">
+					<option value="mnemonic" data-i18n="vanity_wallet.seed_phrase_mnemonic">Seed phrase (mnemonic)</option>
+					<option value="base58" data-i18n="vanity_wallet.secret_key_base58">Secret key (Base58)</option>
+				</select>
+
+				<span class="fl" id="dc-seal-label" data-i18n="vanity_wallet.how_should_this_be_sealed">How should this be sealed?</span>
+				<div role="radiogroup" aria-labelledby="dc-seal-label">
+				<label class="chk"><input type="radio" name="dc-seal" value="claim-time" checked /><span data-i18n-html="vanity_wallet.bearer_link_anyone_with_the_full_link"><strong>Bearer link</strong> — anyone with the full link can claim it once. Simplest to share.</span></label>
+				<label class="chk"><input type="radio" name="dc-seal" value="direct" /><span data-i18n-html="vanity_wallet.sealed_to_a_key_only_the_holder"><strong>Sealed to a key</strong> — only the holder of a specific X25519 private key can open it, even with the link.</span></label>
+				</div>
+				<p class="note" id="dc-bearer-note" style="font-size:.78rem;color:#666;margin:.5rem 0 0" data-i18n="vanity_wallet.the_claim_link_itself_carries_the_key">The claim link itself carries the key — send it privately, the same way you'd send cash.</p>
+
+				<div id="dc-direct-wrap" style="display:none">
+					<label class="fl" for="dc-recipient" data-i18n="vanity_wallet.recipient_s_x25519_public_key">Recipient's X25519 public key</label>
+					<input class="t mono" id="dc-recipient" type="text" placeholder="Paste a public key, or generate a fresh pair" autocomplete="off" />
+					<div class="actions" style="margin-top:.5rem"><button class="ghost small" id="dc-genkey" type="button" data-i18n="vanity_wallet.generate_a_key_pair_for_them">Generate a key pair for them</button></div>
+					<div id="dc-genkey-note" class="keynote" style="display:none"></div>
+				</div>
+
+				<label class="fl" for="dc-message" data-i18n="vanity_wallet.message_optional">Message (optional)</label>
+				<textarea class="t" id="dc-message" maxlength="200" placeholder="Happy birthday!"></textarea>
+
+				<div class="gift-row">
+					<div>
+						<label class="fl" for="dc-theme" data-i18n="vanity_wallet.theme">Theme</label>
+						<select class="t" id="dc-theme">
+							<option value="default" data-i18n="vanity_wallet.default">🎁 Default</option>
+							<option value="birthday" data-i18n="vanity_wallet.birthday">🎂 Birthday</option>
+							<option value="congrats" data-i18n="vanity_wallet.congrats">🎉 Congrats</option>
+							<option value="thanks" data-i18n="vanity_wallet.thanks">🙏 Thanks</option>
+							<option value="welcome" data-i18n="vanity_wallet.welcome">👋 Welcome</option>
+							<option value="tip" data-i18n="vanity_wallet.tip">⚡ Tip</option>
+						</select>
+					</div>
+					<div>
+						<label class="fl" for="dc-sender" data-i18n="vanity_wallet.your_name_optional">Your name (optional)</label>
+						<input class="t" id="dc-sender" type="text" maxlength="40" placeholder="Shown to the recipient" autocomplete="off" />
+					</div>
+				</div>
+
+				<div class="gift-row">
+					<div>
+						<label class="fl" for="dc-expiry" data-i18n="vanity_wallet.expires_in_hours">Expires in (hours)</label>
+						<input class="t" id="dc-expiry" type="number" min="1" max="2160" value="168" />
+					</div>
+					<div>
+						<label class="fl" for="dc-reclaim" data-i18n="vanity_wallet.reclaim_address_optional">Reclaim address (optional)</label>
+						<input class="t mono" id="dc-reclaim" type="text" placeholder="Defaults to your connected wallet" autocomplete="off" />
+					</div>
+				</div>
+
+				<div class="actions">
+					<button class="primary" id="dc-submit" type="button" data-i18n="vanity_wallet.create_sealed_gift">Create sealed gift</button>
+				</div>
+				<p class="note" id="dc-hint" style="font-size:.8rem;color:#666;margin-top:.6rem" data-i18n="vanity_wallet.loading_pricing">Loading pricing…</p>
+				<div class="errbox" id="dc-err"></div>
+				<div id="dc-result" hidden></div>
+			</div>
+		</div>
+
+		<div class="section-divider" id="drop-mine">
+			<h2 id="mine" data-i18n="vanity_wallet.my_sealed_drops">My sealed drops</h2>
+			<p class="lede" data-i18n="vanity_wallet.gifts_you_ve_sent_from_this_browser">Gifts you've sent from this browser — reclaim any that expire unclaimed.</p>
+			<div class="card">
+				<div id="dm-list"></div>
+			</div>
+		</div>
+	</main>
+
+	<script type="module">
+		import { apiFetch } from '/src/api.js';
+		import { grindVanity } from '/src/solana/vanity/grinder.js';
+		import { validatePattern, expectedAttempts, effectiveLength, formatTimeEstimate, MAX_PATTERN_LENGTH } from '/src/solana/vanity/validation.js';
+
+		const $ = (id) => document.getElementById(id);
+		const BASE58 = '123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz';
+		const BASE58_RE = /^[1-9A-HJ-NP-Za-km-z]+$/;
+		// Rough per-core throughput for the pre-grind ETA only. The WASM
+		// ed25519 grinder derives tens of thousands of keypairs/sec per core;
+		// 30k is a conservative, defensible figure consistent with the LIVE
+		// rate the grinder reports once running. The pre-grind number is always
+		// shown as a rough estimate ("~") — the live rate is the real one.
+		const RATE_PER_CORE = 30000;
+
+		// Current pattern state, kept in sync by update().
+		let ignoreCase = false;
+
+		// ── Core selection ─────────────────────────────────────────────────
+		// The machine's logical core count is the ceiling; default to a
+		// conservative half (min 1) so we don't peg the whole CPU by surprise.
+		const HW_CORES = Math.max(1, navigator.hardwareConcurrency || 4);
+		const DEFAULT_CORES = Math.max(1, Math.min(HW_CORES, Math.round(HW_CORES / 2) || 1));
+		let cores = DEFAULT_CORES;
+
+		const coreSlider = $('core-count');
+		coreSlider.max = String(HW_CORES);
+		coreSlider.value = String(DEFAULT_CORES);
+		$('core-max').textContent = HW_CORES;
+		$('core-count-val').textContent = DEFAULT_CORES;
+		$('cores').textContent = DEFAULT_CORES;
+
+		// Quick presets: 1, half, max — deduped for low-core machines.
+		const presetVals = [...new Set([1, DEFAULT_CORES, HW_CORES])].sort((a, b) => a - b);
+		const presetLabel = (n) => n === 1 ? '1 core' : n === HW_CORES ? `Max (${n})` : `${n}`;
+		$('core-ticks').innerHTML = presetVals
+			.map((n) => `<button type="button" data-cores="${n}" aria-pressed="${n === DEFAULT_CORES}">${presetLabel(n)}</button>`)
+			.join('');
+
+		function setCores(n) {
+			cores = Math.max(1, Math.min(HW_CORES, n | 0));
+			coreSlider.value = String(cores);
+			$('core-count-val').textContent = cores;
+			$('core-ticks').querySelectorAll('button').forEach((b) => {
+				b.setAttribute('aria-pressed', String(Number(b.dataset.cores) === cores));
+			});
+			refreshChipEstimates();
+			update();
+		}
+
+		function refreshChipEstimates() {
+			document.querySelectorAll('.chip').forEach((c) => {
+				const est = c.querySelector('.chip-est');
+				if (est) est.textContent = ' ' + fmtTime(estSeconds(c.dataset.prefix || '', c.dataset.suffix || ''));
+			});
+		}
+
+		coreSlider.addEventListener('input', () => setCores(Number(coreSlider.value)));
+		$('core-ticks').querySelectorAll('button').forEach((b) => {
+			b.addEventListener('click', () => setCores(Number(b.dataset.cores)));
+		});
+
+		function esc(s) { return String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' })[c]); }
+		const ADDR_LEN = 44;
+		// Build a sample address with the given fixed prefix/suffix and random middle.
+		function sample(prefix = '', suffix = '') {
+			const mid = Math.max(0, ADDR_LEN - prefix.length - suffix.length);
+			let out = prefix;
+			for (let i = 0; i < mid; i++) out += BASE58[Math.floor(Math.random() * BASE58.length)];
+			return out + suffix;
+		}
+		function fmtTime(seconds) {
+			if (seconds < 1) return '<1s';
+			if (seconds < 60) return `~${Math.round(seconds)}s`;
+			if (seconds < 3600) return `~${Math.round(seconds / 60)}m`;
+			if (seconds < 86400) return `~${Math.round(seconds / 3600)}h`;
+			return '>1d';
+		}
+		// Estimated wall-clock seconds for the current core count, accounting for
+		// combined prefix+suffix difficulty and the case-insensitive discount.
+		function estSeconds(prefix, suffix) {
+			if (!prefix && !suffix) return 0;
+			return expectedAttempts(prefix, suffix, ignoreCase) / (RATE_PER_CORE * cores);
+		}
+
+		// Seed chip estimates + wire chip clicks (a chip can set prefix, suffix, or both).
+		document.querySelectorAll('.chip').forEach((c) => {
+			c.querySelector('.chip-est').textContent = ' ' + fmtTime(estSeconds(c.dataset.prefix || '', c.dataset.suffix || ''));
+			c.addEventListener('click', () => {
+				$('prefix').value = c.dataset.prefix || '';
+				$('suffix').value = c.dataset.suffix || '';
+				$('prefix').dispatchEvent(new Event('input'));
+				($('prefix').value ? $('prefix') : $('suffix')).focus();
+			});
+		});
+
+		// Live preview animation while idle — only the random middle shimmers.
+		let previewLoop = null;
+		function startPreviewLoop() {
+			stopPreviewLoop();
+			previewLoop = setInterval(() => {
+				const pfx = $('prefix').value, sfx = $('suffix').value;
+				if ((!pfx && !sfx) || $('prefix').classList.contains('invalid') || $('suffix').classList.contains('invalid')) return;
+				const rest = $('preview').querySelector('.rest');
+				if (rest) rest.textContent = sample(pfx, sfx).slice(pfx.length, ADDR_LEN - sfx.length);
+			}, 700);
+		}
+		function stopPreviewLoop() { if (previewLoop) clearInterval(previewLoop); previewLoop = null; }
+
+		// Render a preview address as prefix + dim middle + suffix.
+		function renderPreview(pfx, sfx, restClass = 'rest') {
+			const s = sample(pfx, sfx);
+			const mid = s.slice(pfx.length, ADDR_LEN - sfx.length);
+			return `${pfx ? `<span class="pfx">${esc(pfx)}</span>` : ''}<span class="${restClass}">${esc(mid)}</span>${sfx ? `<span class="sfx">${esc(sfx)}</span>` : ''}`;
+		}
+
+		// #est ships an idle placeholder as translatable copy, but every other
+		// value it shows is computed here. i18n.js applies its catalog once,
+		// asynchronously, after the locale loads, so a computed estimate written
+		// before that pass would be silently replaced by the placeholder. Take
+		// ownership of the node while the text is ours and hand it back (with an
+		// immediate re-translation) when the placeholder returns.
+		const EST_KEY = 'vanity_wallet.type_a_prefix_or_suffix_to_see';
+		function setEst(text, { placeholder = false } = {}) {
+			const el = $('est');
+			el.textContent = text;
+			if (placeholder) {
+				el.setAttribute('data-i18n', EST_KEY);
+				window.threewsI18n?.apply(el);
+			} else {
+				el.removeAttribute('data-i18n');
+			}
+		}
+
+		function update() {
+			const pfx = $('prefix').value, sfx = $('suffix').value;
+			ignoreCase = $('ignore-case').checked;
+
+			const pfxValid = !pfx || BASE58_RE.test(pfx);
+			const sfxValid = !sfx || BASE58_RE.test(sfx);
+			$('prefix').classList.toggle('invalid', !pfxValid);
+			$('suffix').classList.toggle('invalid', !sfxValid);
+
+			const total = pfx.length + sfx.length;
+			const over = total > MAX_PATTERN_LENGTH;
+			$('combo-warn').textContent = over
+				? `Prefix + suffix can be at most ${MAX_PATTERN_LENGTH} characters combined (you have ${total}). Longer patterns aren't realistic to grind in a browser.`
+				: '';
+
+			// Difficulty meter reflects total fixed characters.
+			document.querySelectorAll('.meter .seg').forEach((s, i) => {
+				const lit = Math.min(total, MAX_PATTERN_LENGTH);
+				s.className = 'seg' + (i < lit ? ` lit-${lit}` : '');
+			});
+
+			if (!pfx && !sfx) {
+				$('preview').innerHTML = `<span class="rest">${esc(sample())}</span>`;
+				setEst('type a prefix or suffix to see estimated time', { placeholder: true });
+				$('tier').innerHTML = '';
+				$('grind').disabled = true;
+				return;
+			}
+			if (!pfxValid || !sfxValid) {
+				$('preview').textContent = 'invalid Base58 — avoid 0, O, I, l';
+				setEst('');
+				$('tier').innerHTML = '';
+				$('grind').disabled = true;
+				return;
+			}
+			if (over) {
+				$('preview').innerHTML = renderPreview(pfx, sfx);
+				setEst('');
+				$('tier').innerHTML = '';
+				$('grind').disabled = true;
+				return;
+			}
+
+			$('preview').innerHTML = renderPreview(pfx, sfx);
+			setEst(`rough estimate: ${fmtTime(estSeconds(pfx, sfx))} on ${cores} cores`);
+			const effLen = effectiveLength(expectedAttempts(pfx, sfx, ignoreCase));
+			$('tier').innerHTML = effLen >= 5
+				? '<span class="tier-tag tier-paid">slow — minutes+</span>'
+				: '<span class="tier-tag tier-free">fast</span>';
+			$('grind').disabled = false;
+		}
+
+		['prefix', 'suffix'].forEach((id) => {
+			$(id).addEventListener('input', update);
+			$(id).addEventListener('keydown', (e) => {
+				if (e.key === 'Enter' && !$('grind').disabled) $('grind').click();
+			});
+		});
+		$('ignore-case').addEventListener('change', () => { refreshChipEstimates(); update(); });
+		update();
+		startPreviewLoop();
+
+		// ── Grind ──────────────────────────────────────────────────────────
+		let abort = null;
+		let controls = null;   // GrindController for pause/resume/stop
+		let scanLoop = null;
+
+		// Toggle the pattern + core controls — they can only change between runs,
+		// since the worker pool and target pattern are fixed for the lifetime of
+		// a grind.
+		function setCoreControlsDisabled(disabled) {
+			coreSlider.disabled = disabled;
+			$('core-ticks').querySelectorAll('button').forEach((b) => { b.disabled = disabled; });
+			$('prefix').disabled = disabled;
+			$('suffix').disabled = disabled;
+			$('ignore-case').disabled = disabled;
+		}
+
+		function setPaused(paused) {
+			$('pause').textContent = paused ? 'Resume' : 'Pause';
+			$('pause').classList.toggle('primary', paused);
+			$('paused-tag').hidden = !paused;
+			$('progress').classList.toggle('paused', paused);
+		}
+
+		function endGrindUI() {
+			if (scanLoop) { clearInterval(scanLoop); scanLoop = null; }
+			$('pause').hidden = true;
+			$('stop').hidden = true;
+			setPaused(false);
+			setCoreControlsDisabled(false);
+		}
+
+		$('grind').addEventListener('click', async () => {
+			const prefix = $('prefix').value.trim();
+			const suffix = $('suffix').value.trim();
+			if (!prefix && !suffix) {
+				$('error').textContent = 'Enter a prefix, a suffix, or both.';
+				$('error').hidden = false;
+				return;
+			}
+			const errs = [];
+			if (prefix) { const v = validatePattern(prefix); if (!v.valid) errs.push(...v.errors.map((e) => `prefix: ${e}`)); }
+			if (suffix) { const v = validatePattern(suffix); if (!v.valid) errs.push(...v.errors.map((e) => `suffix: ${e}`)); }
+			if (prefix.length + suffix.length > MAX_PATTERN_LENGTH) errs.push(`prefix + suffix exceed ${MAX_PATTERN_LENGTH} characters combined`);
+			if (errs.length) {
+				$('error').textContent = errs.join('; ');
+				$('error').hidden = false;
+				return;
+			}
+
+			$('grind').hidden = true;
+			$('pause').hidden = false;
+			$('stop').hidden = false;
+			setPaused(false);
+			setCoreControlsDisabled(true);
+			$('progress').hidden = false;
+			$('result').hidden = true;
+			$('error').hidden = true;
+			$('attempts').textContent = '0';
+			$('rate').textContent = '0/s';
+			$('cores').textContent = cores;
+			$('eta').textContent = fmtTime(estSeconds(prefix, suffix));
+			$('scan').innerHTML = renderPreview(prefix, suffix, 'scan-mid');
+			stopPreviewLoop();
+
+			// Animate the scan line during grind (frozen while paused).
+			scanLoop = setInterval(() => {
+				if (controls?.paused) return;
+				const midNode = $('scan').querySelector('.scan-mid');
+				if (midNode) midNode.textContent = sample(prefix, suffix).slice(prefix.length, ADDR_LEN - suffix.length);
+			}, 100);
+
+			abort = new AbortController();
+			controls = {};
+			try {
+				const result = await grindVanity({
+					prefix,
+					suffix,
+					ignoreCase,
+					maxWorkers: cores,
+					controller: controls,
+					signal: abort.signal,
+					onProgress: ({ attempts, rate, eta, paused }) => {
+						$('attempts').textContent = attempts.toLocaleString();
+						$('rate').textContent = paused ? 'paused' : `${Math.round(rate).toLocaleString()}/s`;
+						$('eta').textContent = eta;
+					},
+				});
+				renderResult(result, prefix, suffix);
+			} catch (err) {
+				endGrindUI();
+				if (err?.name !== 'AbortError') {
+					$('error').textContent = `Grind failed: ${err.message || err}`;
+					$('error').hidden = false;
+				}
+				$('grind').hidden = false;
+				$('progress').hidden = true;
+				startPreviewLoop();
+			} finally {
+				controls = null;
+				// Belt-and-suspenders: the decorative scan-line interval is
+				// normally cleared in endGrindUI, but clear it here too so it
+				// can never leak if an error is thrown before endGrindUI runs.
+				if (scanLoop) { clearInterval(scanLoop); scanLoop = null; }
+			}
+		});
+
+		$('pause').addEventListener('click', () => {
+			if (!controls) return;
+			if (controls.paused) { controls.resume(); setPaused(false); }
+			else { controls.pause(); setPaused(true); }
+		});
+
+		$('stop').addEventListener('click', () => abort?.abort());
+
+		function renderResult(result, prefix, suffix) {
+			endGrindUI();
+			$('grind').hidden = false;
+			$('grind').textContent = 'Generate another';
+			$('progress').hidden = true;
+
+			const addr = result.publicKey;
+			const mid = addr.slice(prefix.length, suffix ? addr.length - suffix.length : addr.length);
+			const addrHtml = `${prefix ? `<span class="pfx">${esc(prefix)}</span>` : ''}${esc(mid)}${suffix ? `<span class="sfx">${esc(suffix)}</span>` : ''}`;
+			$('result').hidden = false;
+			$('result').innerHTML = `
+				<div class="result">
+					<h3>✦ Wallet ready</h3>
+					<div class="addr">${addrHtml}</div>
+					<div class="meta">
+						${result.attempts.toLocaleString()} attempts in ${(result.durationMs / 1000).toFixed(1)}s
+						across ${result.workers} cores
+						(${Math.round(result.attempts / (result.durationMs / 1000)).toLocaleString()}/s)
+					</div>
+					<div class="actions">
+						<button id="download" class="btn primary" type="button">⬇ Download keypair (Solana CLI format)</button>
+						<button id="copy-pubkey" class="btn" type="button">Copy public key</button>
+					</div>
+					<div class="warn">
+						<strong>Save this file somewhere safe before navigating away.</strong>
+						Once you close this tab the secret key is gone unless you assign it to an agent below.
+						Anyone with the file can spend funds at this address.
+					</div>
+				</div>
+				<div id="assign-host"></div>
+			`;
+
+			const filename = `${addr.slice(0, 8)}.json`;
+			$('download').addEventListener('click', () => {
+				const json = JSON.stringify(Array.from(result.secretKey));
+				const blob = new Blob([json], { type: 'application/json' });
+				const url = URL.createObjectURL(blob);
+				const a = document.createElement('a');
+				a.href = url;
+				a.download = filename;
+				document.body.appendChild(a);
+				a.click();
+				a.remove();
+				URL.revokeObjectURL(url);
+			});
+
+			$('copy-pubkey').addEventListener('click', async () => {
+				const btn = $('copy-pubkey');
+				try {
+					await navigator.clipboard.writeText(addr);
+					btn.textContent = 'Copied!';
+				} catch {
+					// Clipboard access can be denied (permission, insecure context).
+					// Select the address instead of leaving a button that silently
+					// does nothing, so the visitor can still copy it by hand.
+					const range = document.createRange();
+					range.selectNodeContents($('result').querySelector('.addr'));
+					const sel = window.getSelection();
+					sel.removeAllRanges();
+					sel.addRange(range);
+					btn.textContent = 'Selected, press Ctrl+C';
+				}
+				setTimeout(() => { btn.textContent = 'Copy public key'; }, 2000);
+			});
+
+			renderAssignBlock(result, prefix, suffix);
+		}
+
+		// ── Assign to agent ────────────────────────────────────────────────
+		async function renderAssignBlock(result, prefix, suffix) {
+			const host = document.getElementById('assign-host');
+			const addr = result.publicKey;
+			let agents = [];
+			try {
+				const r = await fetch('/api/agents', { credentials: 'include' });
+				if (r.status === 401) {
+					host.innerHTML = `
+						<div class="assign">
+							<h4>Use this wallet with an agent</h4>
+							<p style="font-size:.8rem;color:#888;margin:0">
+								<a href="/login?next=${encodeURIComponent(location.pathname)}" style="color:#ffffff">Sign in</a>
+								to assign this wallet to one of your agents — they'll be able to sign transactions with it (e.g. for pump.fun trades).
+							</p>
+						</div>`;
+					return;
+				}
+				if (!r.ok) throw new Error(`agents fetch ${r.status}`);
+				const data = await r.json();
+				agents = data.agents || [];
+			} catch (e) {
+				// The wallet is already ground and downloadable at this point, so the
+				// only thing lost here is the agent list. Say so and offer the retry
+				// rather than dead-ending on a raw fetch message.
+				host.innerHTML = `
+					<div class="assign">
+						<h4>Use this wallet with an agent</h4>
+						<p style="font-size:.8rem;color:var(--bad-fg);margin:0 0 .5rem">
+							Could not load your agents (${esc(e.message)}). Your wallet above is unaffected: download it now, then retry.
+						</p>
+						<div class="actions"><button id="assign-retry" class="btn" type="button">Retry</button></div>
+					</div>`;
+				document.getElementById('assign-retry').addEventListener('click', () => renderAssignBlock(result, prefix, suffix));
+				return;
+			}
+			if (!agents.length) {
+				host.innerHTML = `
+					<div class="assign">
+						<h4>Use this wallet with an agent</h4>
+						<p style="font-size:.8rem;color:#888;margin:0">No agents yet. <a href="/create" style="color:#ffffff">Create one</a> and come back to assign this wallet.</p>
+					</div>`;
+				return;
+			}
+
+			host.innerHTML = `
+				<div class="assign">
+					<h4>Assign this wallet to an agent</h4>
+					<p style="font-size:.78rem;color:#888;margin:0 0 .5rem">
+						The agent will be able to sign Solana transactions with this address — pumpfun trades, attestations, payments. The secret key will be encrypted at rest on our server.
+					</p>
+					<select id="assign-agent">
+						<option value="">— select an agent —</option>
+						${agents.map((a) => `<option value="${esc(a.id)}">${esc(a.name)} ${a.meta?.solana_address ? '(already has wallet)' : ''}</option>`).join('')}
+					</select>
+					<div id="assign-replace-warn" hidden style="margin-top:.5rem;padding:.5rem .65rem;border:1px solid var(--bad-fg);border-radius:8px;background:rgba(255,90,90,.06);font-size:.78rem;line-height:1.45"></div>
+					<div class="custody">
+						<label>
+							<input type="checkbox" id="assign-ack" />
+							<span>I understand this transfers custody — three.ws will be able to sign transactions on the agent's behalf, and the secret key will be encrypted server-side. <strong>Download the file above first as a backup.</strong></span>
+						</label>
+					</div>
+					<div class="actions">
+						<button id="assign-btn" class="btn primary" type="button" disabled>Assign to agent</button>
+					</div>
+					<div id="assign-status" style="margin-top:.5rem;font-size:.8rem"></div>
+				</div>
+			`;
+
+			const sel    = document.getElementById('assign-agent');
+			const ack    = document.getElementById('assign-ack');
+			const btn    = document.getElementById('assign-btn');
+			const status = document.getElementById('assign-status');
+			const warn   = document.getElementById('assign-replace-warn');
+
+			// Existing Solana address per agent, so selecting an agent that already
+			// has a wallet switches the flow to an explicit replace instead of
+			// dead-ending on a 409 from POST /api/agents/:id/solana.
+			const walletByAgent = Object.fromEntries(agents.map((a) => [a.id, a.meta?.solana_address || null]));
+			const truncAddr = (a) => `${a.slice(0, 4)}…${a.slice(-4)}`;
+
+			function refresh() {
+				const existing = sel.value ? walletByAgent[sel.value] : null;
+				if (existing) {
+					warn.innerHTML = `<strong style="color:var(--bad-fg)">This agent already has a wallet</strong> (<code style="font-family:ui-monospace,monospace">${esc(truncAddr(existing))}</code>). Assigning will <strong>replace</strong> it — the old wallet is detached and can no longer sign for this agent. Make sure you have its key backed up.`;
+					warn.hidden = false;
+					btn.textContent = 'Replace wallet';
+				} else {
+					warn.hidden = true;
+					btn.textContent = 'Assign to agent';
+				}
+				btn.disabled = !sel.value || !ack.checked;
+			}
+			sel.addEventListener('change', refresh);
+			ack.addEventListener('change', refresh);
+
+			btn.addEventListener('click', async () => {
+				const replacing = !!walletByAgent[sel.value];
+				btn.disabled = true;
+				status.textContent = replacing ? 'replacing…' : 'assigning…';
+				status.style.color = '#888';
+				try {
+					// Replacing an existing wallet: detach it first so the POST below
+					// provisions cleanly instead of being rejected with a 409.
+					if (replacing) {
+						const del = await apiFetch(`/api/agents/${encodeURIComponent(sel.value)}/solana`, {
+							method: 'DELETE',
+							credentials: 'include',
+						});
+						if (!del.ok) {
+							const delData = await del.json().catch(() => ({}));
+							status.innerHTML = `<span style="color:var(--bad-fg)">Could not remove the existing wallet: ${esc(delData.error_description || del.status)}</span>`;
+							btn.disabled = false;
+							return;
+						}
+					}
+					const r = await apiFetch(`/api/agents/${encodeURIComponent(sel.value)}/solana`, {
+						method: 'POST',
+						credentials: 'include',
+						headers: { 'content-type': 'application/json' },
+						body: JSON.stringify({
+							secret_key: Array.from(result.secretKey),
+							...(prefix ? { vanity_prefix: prefix } : {}),
+							...(suffix ? { vanity_suffix: suffix } : {}),
+						}),
+					});
+					const data = await r.json();
+					if (!r.ok) {
+						if (r.status === 409) {
+							status.innerHTML = `<span style="color:var(--bad-fg)">${esc(data.error_description)} — pick another agent or remove the existing wallet first.</span>`;
+						} else {
+							status.innerHTML = `<span style="color:var(--bad-fg)">Failed: ${esc(data.error_description || r.status)}</span>`;
+						}
+						btn.disabled = false;
+						return;
+					}
+					walletByAgent[sel.value] = addr;
+					const agentName = sel.options[sel.selectedIndex].text.replace(/\s*\(already.*\)$/, '');
+					host.innerHTML = `
+						<div class="assigned-ok">
+							✦ Assigned to <strong>${esc(agentName)}</strong>.
+							The agent can now sign Solana transactions with <code style="font-family:ui-monospace,monospace">${esc(prefix || addr.slice(0, 4))}…${esc(suffix || addr.slice(-4))}</code>.
+							<a href="/agents/${esc(sel.value)}" style="color:inherit;text-decoration:underline">Open agent →</a>
+						</div>`;
+				} catch (e) {
+					status.innerHTML = `<span style="color:var(--bad-fg)">Network error: ${esc(e.message)}</span>`;
+					btn.disabled = false;
+				}
+			});
+		}
+	</script>
+	<script type="module" src="/src/pages/sealed-drops.js"></script>
+	<script src="/brand.js" defer></script>
+		<div id="footer-container"></div>
+		<script src="/footer.js"></script>
+	<!-- Runtime i18n: detects locale, swaps annotated copy, mounts <lang-switcher>. -->
+	<script type="module" src="/i18n.js"></script>
+</body>
+</html>

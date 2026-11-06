@@ -1,0 +1,174 @@
+<!doctype html>
+<html lang="en">
+	<head>
+		<meta charset="utf-8" />
+		<meta name="viewport" content="width=device-width, initial-scale=1" />
+		<title data-i18n="demos_agents_wrecking_ball.meta_title">Wrecking ball — three.ws</title>
+		<meta name="robots" content="noindex" />
+		<link rel="stylesheet" href="/fonts/fonts.css" />
+		<link rel="stylesheet" href="/demos/agents/_shared.css" />
+		<style>
+			.rope {
+				position: fixed; pointer-events: none;
+				width: 2px; background: rgba(61, 193, 255,0.5);
+				transform-origin: top center; z-index: 25;
+				box-shadow: 0 0 6px rgba(61, 193, 255,0.4);
+			}
+		</style>
+	</head>
+	<body>
+		<div class="stage">
+			<div class="hero-eyebrow">Wrecking-ball entrance</div>
+			<h1 class="hero-title" data-i18n-html="demos_agents_wrecking_ball.make_an_entrance">Make an <em>entrance</em>.</h1>
+			<p class="hero-sub" data-i18n="demos_agents_wrecking_ball.she_swings_in_from_off_canvas_on">
+				She swings in from off-canvas on a rope and knocks the ghost button
+				sideways. It wobbles, recovers, and she dangles before letting go.
+			</p>
+			<div class="cta-row">
+				<span class="btn btn-primary" data-i18n-html="demos_agents_wrecking_ball.don_t_mind_her"><span>Don't mind her</span><span>→</span></span>
+				<button type="button" class="btn btn-ghost" id="cta-btn" data-i18n-html="demos_agents_wrecking_ball.hit_this_one"><span>Hit this one</span><span>💥</span></button>
+				<button class="btn btn-ghost" id="restart" style="margin-top:8px;" data-i18n-html="demos_agents_wrecking_ball.swing_again"><span>Swing again</span></button>
+			</div>
+		</div>
+		<canvas id="avatar-canvas"></canvas>
+		<div class="rope" id="rope"></div>
+		<div class="hint">click "swing again"</div>
+
+		<script type="module">
+			import * as THREE from 'three';
+			import {
+				createStage, loadAvatar, loadClips, startLoop,
+				fireSplash, fireShockwave,
+				mountChrome, PX_PER_UNIT,
+			} from './_lib.js';
+
+			mountChrome('Wrecking-ball entrance');
+
+			const canvas = document.getElementById('avatar-canvas');
+			const ctaBtn = document.getElementById('cta-btn');
+			const restart= document.getElementById('restart');
+			const ropeEl = document.getElementById('rope');
+			const stage  = createStage(canvas);
+			const { avatar, mixer, rootBone, baseRootPos } = await loadAvatar();
+			stage.scene.add(avatar);
+			// Her body lies along the rope with her feet at its end, so the
+			// rope stops at the top of her head.
+			const box = new THREE.Box3().setFromObject(avatar);
+			const heightPx = (box.max.y - box.min.y) * PX_PER_UNIT;
+
+			const A = await loadClips(mixer, {
+				falling: '/animations/clips/falling.json',
+				idle:    '/animations/clips/idle.json',
+			});
+			A.falling.setLoop(THREE.LoopRepeat, Infinity);
+			A.idle.setLoop(THREE.LoopRepeat, Infinity);
+			A.falling.play();
+			let current = A.falling;
+
+			// Pendulum: the pivot sits up and to the right of the button, far
+			// enough out that the rope meets the button at about 45° below the
+			// pivot, and the rope is exactly long enough to reach it. She starts
+			// level with the pivot at the right edge and swings down into it.
+			let phase = 'swing'; // swing → recover → dangle
+			let pivotPx = { x: 0, y: 0 };
+			let length  = 0;
+			let t0 = 0;
+
+			function recalc() {
+				const c = ctaCenterPx();
+				const y = 60;
+				const x = Math.min(c.x + (c.y - y), window.innerWidth * 0.92);
+				pivotPx = { x, y };
+				length  = Math.hypot(c.x - x, c.y - y);
+			}
+			recalc();
+			window.addEventListener('resize', recalc);
+
+			function ctaCenterPx() {
+				const r = ctaBtn.getBoundingClientRect();
+				return { x: r.left + r.width / 2, y: r.top + r.height / 2 };
+			}
+
+			// Map t∈[0,1] to a swing angle that starts level to the right of
+			// the pivot and decelerates into the strike at the impact angle,
+			// where the end of the rope reaches the CTA. Angles are measured
+			// from straight down, positive to the right.
+			function swingAngle(t) {
+				const start = Math.PI / 2;
+				const end   = computeImpactAngle();
+				const e = 1 - (1 - t) * (1 - t);
+				return start + (end - start) * e;
+			}
+			function computeImpactAngle() {
+				const c = ctaCenterPx();
+				const dx = c.x - pivotPx.x;
+				const dy = c.y - pivotPx.y;
+				return Math.atan2(dx, dy); // angle from straight-down axis
+			}
+
+			function startSwing() {
+				recalc();
+				phase = 'swing'; t0 = performance.now();
+				ropeEl.style.display = 'block';
+				ctaBtn.style.transition = '';
+				ctaBtn.style.transform = '';
+			}
+			restart.addEventListener('click', startSwing);
+			ctaBtn.addEventListener('click', startSwing);
+			startSwing();
+
+			function setAvatarToPendulum(angle) {
+				// Position the agent at the end of the pendulum in screen px.
+				const px = pivotPx.x + Math.sin(angle) * length;
+				const py = pivotPx.y + Math.cos(angle) * length;
+				const w  = stage.domToWorld(px, py);
+				avatar.position.set(w.x, w.y, 0);
+				// Tilt the agent so her head points up the rope at the pivot.
+				avatar.rotation.z = angle;
+				// Update rope visual. CSS rotates clockwise, which swings a
+				// downward rope to the left, hence the negated angle.
+				ropeEl.style.left = `${pivotPx.x}px`;
+				ropeEl.style.top  = `${pivotPx.y}px`;
+				ropeEl.style.height = `${Math.max(length - heightPx, 0)}px`;
+				ropeEl.style.transform = `rotate(${-angle}rad)`;
+			}
+
+			startLoop(stage.renderer, stage.scene, stage.camera, mixer, () => {
+				if (phase === 'swing') {
+					const p = Math.min((performance.now() - t0) / 1100, 1);
+					setAvatarToPendulum(swingAngle(p));
+					if (p >= 1) {
+						const c = ctaCenterPx();
+						fireSplash(c.x, c.y, { count: 22 });
+						fireShockwave(c.x, c.y, { size: 36, max: 220 });
+						ctaBtn.style.transition = 'transform 0.6s cubic-bezier(0.16,1,0.3,1)';
+						ctaBtn.style.transform = 'translateX(-26px) rotate(-9deg)';
+						setTimeout(() => { ctaBtn.style.transform = 'translateX(0) rotate(0)'; }, 220);
+						phase = 'recover'; t0 = performance.now();
+					}
+				} else if (phase === 'recover') {
+					// Mini swing-back of the pendulum after impact.
+					const p = Math.min((performance.now() - t0) / 1400, 1);
+					const a0 = computeImpactAngle();
+					// Bounce back ~30° and oscillate decaying.
+					const swing = Math.sin(p * Math.PI * 2.5) * (1 - p) * 0.45;
+					setAvatarToPendulum(a0 + swing);
+					if (p >= 1) {
+						phase = 'dangle'; t0 = performance.now();
+						A.idle.reset();
+						A.idle.crossFadeFrom(current, 0.4, false).play();
+						current = A.idle;
+					}
+				} else if (phase === 'dangle') {
+					// Slight swaying dangle.
+					const a0 = computeImpactAngle();
+					const wob = Math.sin((performance.now() - t0) / 600) * 0.05;
+					setAvatarToPendulum(a0 + wob);
+				}
+			}, rootBone, baseRootPos);
+		</script>
+		<script src="/brand.js" defer></script>
+	<!-- Runtime i18n: detects locale, swaps annotated copy, mounts <lang-switcher>. -->
+	<script type="module" src="/i18n.js"></script>
+</body>
+</html>

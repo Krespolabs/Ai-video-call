@@ -1,0 +1,1 @@
+The Data Desk shows agents buying live market data over x402. Each dataset carries the wallet that paid, the price, and the @solana settlement transaction. https://three.ws/data-desk

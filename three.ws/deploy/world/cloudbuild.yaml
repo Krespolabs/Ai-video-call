@@ -1,0 +1,45 @@
+# Cloud Build — builds and pushes the Hyperfy image to Artifact Registry.
+# Trigger this manually or connect it to a GitHub webhook.
+#
+# Run manually:
+#   gcloud builds submit --config deploy/world/cloudbuild.yaml deploy/world/
+#
+# Or: set up a Cloud Build trigger on push to main in the GCP console:
+#   Cloud Build → Triggers → Create Trigger → connect GitHub repo →
+#   filter to deploy/world/** changes → build config = deploy/world/cloudbuild.yaml
+
+# _TAG defaults to "latest" so a manual `gcloud builds submit` works with no extra
+# flags. The built-in $SHORT_SHA is only populated for trigger/VCS builds — on a
+# local submit it is empty, which produced an invalid "…/hyperfy:" image name and
+# failed the build at validation. A Cloud Build trigger can still override _TAG
+# with the commit SHA. The cloudrun.yaml pulls :latest, so that tag is what deploys.
+substitutions:
+  _REGION: us-central1
+  _REPO: world
+  _IMAGE: hyperfy
+  _TAG: latest
+
+steps:
+  - name: gcr.io/cloud-builders/docker
+    args:
+      - build
+      - -t
+      - ${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO}/${_IMAGE}:${_TAG}
+      - -t
+      - ${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO}/${_IMAGE}:latest
+      - -f
+      - Dockerfile
+      - .
+    timeout: 900s
+
+images:
+  - ${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO}/${_IMAGE}:${_TAG}
+  - ${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO}/${_IMAGE}:latest
+
+options:
+  machineType: E2_HIGHCPU_8
+  logging: CLOUD_LOGGING_ONLY
+
+# The project's default compute SA was deleted; every manual build must pin the
+# dedicated build SA or Cloud Build refuses the submission.
+serviceAccount: projects/aerial-vehicle-466722-p5/serviceAccounts/three-ws-build@aerial-vehicle-466722-p5.iam.gserviceaccount.com

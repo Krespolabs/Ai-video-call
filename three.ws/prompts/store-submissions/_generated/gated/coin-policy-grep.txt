@@ -1,0 +1,9 @@
+api/_lib/embed-gate.js:25:FeMbDoX7R1Psc4GEcvJdsbNbZA3bfztcyDCatJVJpump
+data/changelog.json:7009:FeMbDoX7R1Psc4GEcvJdsbNbZA3bfztcyDCatJVJpump
+docs/mcp.md:521:FeMbDoX7R1Psc4GEcvJdsbNbZA3bfztcyDCatJVJpump
+docs/mcp.md:526:FeMbDoX7R1Psc4GEcvJdsbNbZA3bfztcyDCatJVJpump
+docs/mcp.md:551:FeMbDoX7R1Psc4GEcvJdsbNbZA3bfztcyDCatJVJpump
+docs/token-gated-3d-embeds.md:49:FeMbDoX7R1Psc4GEcvJdsbNbZA3bfztcyDCatJVJpump
+specs/EMBED_SPEC.md:749:FeMbDoX7R1Psc4GEcvJdsbNbZA3bfztcyDCatJVJpump
+tests/embed-gate.test.js:51:therMintAddress111111111111111111
+tests/embed-gate.test.js:52:therMintAddress111111111111111111

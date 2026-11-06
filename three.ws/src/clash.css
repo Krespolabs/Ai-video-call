@@ -1,0 +1,500 @@
+/* Coin Clash — token-gated community battle arena.
+   Tokens come from /tokens.css (loaded via /nav.css). No hardcoded palette. */
+
+.cl-shell {
+	max-width: 1100px;
+	margin: 0 auto;
+	padding: clamp(var(--space-6, 24px), 4vw, var(--space-10, 56px)) var(--space-4, 16px) var(--space-12, 80px);
+	position: relative;
+	z-index: 1;
+}
+
+/* ── Ambient field ──────────────────────────────────────────────────────── */
+#cl-field {
+	position: fixed;
+	inset: 0;
+	width: 100%;
+	height: 100%;
+	pointer-events: none;
+	z-index: 0;
+	opacity: 0.5;
+}
+.cl-aurora {
+	position: fixed;
+	inset: -20% -10% auto -10%;
+	height: 60vh;
+	z-index: 0;
+	pointer-events: none;
+	background:
+		radial-gradient(60% 80% at 20% 0%, color-mix(in srgb, var(--danger) 18%, transparent), transparent 70%),
+		radial-gradient(60% 80% at 80% 10%, color-mix(in srgb, var(--accent) 14%, transparent), transparent 70%);
+	filter: blur(40px);
+	opacity: 0.6;
+}
+@media (prefers-reduced-motion: reduce) {
+	#cl-field { display: none; }
+}
+
+/* ── Hero ───────────────────────────────────────────────────────────────── */
+.cl-hero { text-align: center; margin-bottom: var(--space-8, 32px); }
+.cl-kicker {
+	display: inline-flex;
+	align-items: center;
+	gap: var(--space-2, 8px);
+	font: 600 var(--text-2xs, 11px) / 1 var(--font-mono);
+	letter-spacing: 0.14em;
+	text-transform: uppercase;
+	color: var(--ink-dim);
+	margin: 0 0 var(--space-4, 16px);
+}
+.cl-live-dot {
+	width: 7px;
+	height: 7px;
+	border-radius: var(--radius-pill);
+	background: var(--danger);
+	box-shadow: 0 0 0 0 color-mix(in srgb, var(--danger) 60%, transparent);
+	animation: cl-pulse 1.8s ease-out infinite;
+}
+@keyframes cl-pulse {
+	0% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--danger) 55%, transparent); }
+	70% { box-shadow: 0 0 0 9px transparent; }
+	100% { box-shadow: 0 0 0 0 transparent; }
+}
+.cl-title {
+	margin: 0;
+	font-family: var(--font-display);
+	font-weight: 800;
+	line-height: 0.92;
+	letter-spacing: -0.02em;
+	font-size: clamp(2.6rem, 9vw, 5.2rem);
+	display: flex;
+	flex-direction: column;
+}
+.cl-title-em {
+	color: transparent;
+	background: linear-gradient(100deg, var(--ink-bright), color-mix(in srgb, var(--danger) 70%, var(--ink-bright)));
+	-webkit-background-clip: text;
+	background-clip: text;
+}
+.cl-sub {
+	max-width: 52ch;
+	margin: var(--space-4, 16px) auto 0;
+	color: var(--ink-dim);
+	font-size: var(--text-base, 1rem);
+	line-height: 1.55;
+}
+
+/* ── Demo badge + teaser ────────────────────────────────────────────────── */
+.cl-demo-badge {
+	display: inline-flex;
+	align-items: center;
+	gap: 5px;
+	margin-left: var(--space-2, 8px);
+	padding: 3px 9px;
+	border-radius: var(--radius-pill);
+	border: 1px solid color-mix(in srgb, rgb(var(--gold-rgb)) 40%, var(--line, rgba(255,255,255,0.1)));
+	background: color-mix(in srgb, rgb(var(--gold-rgb)) 12%, transparent);
+	font: 700 var(--text-3xs, 9.5px) / 1 var(--font-mono);
+	letter-spacing: 0.1em;
+	text-transform: uppercase;
+	color: rgb(var(--gold-rgb));
+	vertical-align: middle;
+}
+.cl-demo-badge::before {
+	content: '';
+	width: 5px;
+	height: 5px;
+	border-radius: 50%;
+	background: rgb(var(--gold-rgb));
+	box-shadow: 0 0 6px rgb(var(--gold-rgb));
+}
+.cl-demo-note {
+	max-width: 52ch;
+	margin: var(--space-3, 12px) auto 0;
+	color: var(--ink-faint, var(--ink-dim));
+	font-size: var(--text-sm, 0.875rem);
+	line-height: 1.5;
+}
+.cl-demo-note a {
+	color: var(--accent);
+	font-weight: 600;
+	white-space: nowrap;
+	border-bottom: 1px solid color-mix(in srgb, var(--accent) 45%, transparent);
+	transition: color var(--duration-fast) var(--ease-standard), border-color var(--duration-fast) var(--ease-standard);
+}
+.cl-demo-note a:hover { color: var(--ink-bright); border-color: var(--ink-bright); }
+.cl-demo-note a:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; border-radius: 3px; }
+
+.cl-round {
+	display: flex;
+	justify-content: center;
+	gap: clamp(var(--space-5, 20px), 6vw, var(--space-9, 48px));
+	margin: var(--space-6, 24px) 0 var(--space-5, 20px);
+}
+.cl-round-stat { text-align: center; }
+.cl-round-stat dt {
+	font: 600 var(--text-2xs, 11px) / 1 var(--font-mono);
+	letter-spacing: 0.1em;
+	text-transform: uppercase;
+	color: var(--ink-faint);
+	margin-bottom: 6px;
+}
+.cl-round-stat dd {
+	margin: 0;
+	font: 700 var(--text-xl, 1.6rem) / 1 var(--font-display);
+	color: var(--ink-bright);
+	font-variant-numeric: tabular-nums;
+}
+.cl-round-stat-timer dd { color: var(--warn); }
+
+/* The three tabs measure ~304px, so on a 320px screen (288px of content width
+   inside the shell) the trailing "Communities" tab used to run off the right
+   edge and get clipped, with no page scroll to reach it. Wrapping keeps the
+   whole group reachable; the pill radius still reads correctly on two rows. */
+.cl-tabs {
+	display: inline-flex;
+	flex-wrap: wrap;
+	justify-content: center;
+	max-width: 100%;
+	gap: 4px;
+	padding: 4px;
+	border: 1px solid var(--stroke);
+	border-radius: var(--radius-lg);
+	background: var(--surface-1);
+}
+@media (min-width: 480px) {
+	.cl-tabs { flex-wrap: nowrap; border-radius: var(--radius-pill); }
+}
+.cl-tab {
+	appearance: none;
+	border: 0;
+	background: transparent;
+	color: var(--ink-dim);
+	font: 600 var(--text-ui, 14px) / 1 var(--font-body);
+	padding: 9px 16px;
+	border-radius: var(--radius-pill);
+	cursor: pointer;
+	text-decoration: none;
+	white-space: nowrap;
+	transition: color var(--duration-fast) var(--ease-standard), background var(--duration-fast) var(--ease-standard);
+}
+@media (max-width: 479px) {
+	.cl-tab { padding: 9px 12px; }
+}
+.cl-tab:hover { color: var(--ink-bright); }
+.cl-tab.active { background: var(--surface-3); color: var(--ink-bright); }
+.cl-tab:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.cl-tab-link { color: var(--ink-faint); }
+
+/* ── Arena ──────────────────────────────────────────────────────────────── */
+.cl-arena { display: grid; gap: var(--space-4, 16px); }
+
+.cl-battle {
+	border: 1px solid var(--stroke);
+	border-radius: var(--radius-lg);
+	background: var(--surface-1);
+	padding: var(--space-4, 16px) clamp(var(--space-4, 16px), 3vw, var(--space-6, 24px));
+	display: grid;
+	grid-template-columns: 1fr minmax(120px, 1.2fr) 1fr;
+	align-items: center;
+	gap: var(--space-3, 12px);
+	box-shadow: var(--shadow-1);
+	transition: border-color var(--duration-base) var(--ease-standard), transform var(--duration-base) var(--ease-standard);
+	animation: cl-rise var(--duration-slow) var(--ease-out) both;
+}
+.cl-battle:hover { border-color: var(--stroke-strong); }
+@keyframes cl-rise {
+	from { opacity: 0; transform: translateY(10px); }
+	to { opacity: 1; transform: none; }
+}
+
+.cl-side { display: flex; flex-direction: column; align-items: center; gap: var(--space-2, 8px); text-align: center; }
+.cl-side-b { order: 3; }
+.cl-avatar {
+	width: 56px;
+	height: 56px;
+	border-radius: var(--radius-md);
+	object-fit: cover;
+	background: var(--surface-2);
+	border: 1px solid var(--stroke);
+}
+.cl-avatar.cl-avatar-ph {
+	display: grid;
+	place-items: center;
+	font: 800 var(--text-lg) var(--font-display);
+	color: var(--ink-dim);
+}
+.cl-sym { font: 700 var(--text-lg, 1.2rem) / 1 var(--font-display); color: var(--ink-bright); }
+.cl-meta { font: 500 var(--text-2xs, 11px) / 1.3 var(--font-mono); color: var(--ink-faint); }
+.cl-rec {
+	font: 600 var(--text-2xs, 11px) / 1 var(--font-mono);
+	color: var(--ink-dim);
+	letter-spacing: 0.04em;
+}
+.cl-rec b { color: var(--success); }
+.cl-rec i { color: var(--danger); font-style: normal; }
+
+.cl-fight {
+	appearance: none;
+	border: 1px solid var(--stroke-strong);
+	background: var(--surface-2);
+	color: var(--ink-bright);
+	font: 700 var(--text-sm, 12px) / 1 var(--font-body);
+	padding: 8px 14px;
+	border-radius: var(--radius-pill);
+	cursor: pointer;
+	transition: background var(--duration-fast) var(--ease-standard), transform var(--duration-fast) var(--ease-standard), border-color var(--duration-fast) var(--ease-standard);
+}
+.cl-fight:hover { background: var(--surface-3); border-color: var(--accent); transform: translateY(-1px); }
+.cl-fight:active { transform: translateY(0); }
+.cl-fight:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.cl-fight.is-mine {
+	background: color-mix(in srgb, var(--success) 22%, transparent);
+	border-color: var(--success);
+	color: var(--ink-bright);
+}
+
+/* Center: tug-of-war */
+.cl-vs { order: 2; display: flex; flex-direction: column; align-items: center; gap: var(--space-2, 8px); }
+.cl-tug {
+	position: relative;
+	width: 100%;
+	height: 14px;
+	border-radius: var(--radius-pill);
+	overflow: hidden;
+	background: color-mix(in srgb, var(--accent) 16%, transparent);
+	border: 1px solid var(--stroke);
+}
+.cl-tug-fill {
+	position: absolute;
+	inset: 0 auto 0 0;
+	width: 50%;
+	background: linear-gradient(90deg, color-mix(in srgb, var(--danger) 75%, transparent), var(--danger));
+	transition: width var(--duration-base) var(--ease-standard);
+}
+.cl-tug-mid {
+	position: absolute;
+	top: -3px;
+	bottom: -3px;
+	left: 50%;
+	width: 2px;
+	background: var(--ink-faint);
+	transform: translateX(-50%);
+}
+.cl-powers { display: flex; justify-content: space-between; width: 100%; font: 700 var(--text-md, 13px) / 1 var(--font-mono); }
+.cl-powers .cl-pa { color: var(--danger); }
+.cl-powers .cl-pb { color: var(--accent); }
+.cl-vs-label { font: 800 var(--text-2xs, 11px) / 1 var(--font-display); letter-spacing: 0.16em; color: var(--ink-faint); }
+.cl-mom { font: 500 var(--text-2xs, 11px) / 1 var(--font-mono); color: var(--ink-faint); }
+.cl-mom b { color: var(--warn); }
+
+/* The "b" side accents flip to the cool color for clarity */
+.cl-side-b .cl-fight.is-mine { background: color-mix(in srgb, var(--accent) 22%, transparent); border-color: var(--accent); }
+
+.cl-source {
+	margin: 0;
+	text-align: center;
+	color: var(--ink-dim);
+	font: 500 var(--text-sm, 12px) / 1.4 var(--font-body);
+}
+.cl-bye {
+	text-align: center;
+	color: var(--ink-faint);
+	font: 500 var(--text-sm, 12px) / 1.4 var(--font-mono);
+	padding: var(--space-3, 12px);
+	border: 1px dashed var(--stroke);
+	border-radius: var(--radius-lg);
+}
+
+/* States */
+.cl-state {
+	text-align: center;
+	padding: var(--space-9, 48px) var(--space-4, 16px);
+	color: var(--ink-dim);
+	border: 1px dashed var(--stroke);
+	border-radius: var(--radius-lg);
+	background: var(--surface-1);
+}
+.cl-state h2 { margin: 0 0 var(--space-2, 8px); font: 700 var(--text-lg) var(--font-display); color: var(--ink-bright); }
+.cl-state p { margin: 0 auto; max-width: 44ch; line-height: 1.5; }
+.cl-state .cl-fight { margin-top: var(--space-4, 16px); display: inline-block; }
+.cl-state-links {
+	display: flex;
+	justify-content: center;
+	align-items: center;
+	gap: var(--space-3, 12px);
+	flex-wrap: wrap;
+}
+.cl-state-links .cl-fight { text-decoration: none; }
+.cl-skel {
+	height: 110px;
+	border-radius: var(--radius-lg);
+	background: linear-gradient(100deg, var(--surface-1) 30%, var(--surface-2) 50%, var(--surface-1) 70%);
+	background-size: 200% 100%;
+	animation: cl-shimmer 1.4s linear infinite;
+}
+@keyframes cl-shimmer { from { background-position: 200% 0; } to { background-position: -200% 0; } }
+
+/* ── Standings ──────────────────────────────────────────────────────────── */
+.cl-standings { display: grid; gap: var(--space-2, 8px); }
+.cl-row {
+	display: grid;
+	grid-template-columns: 32px 1fr auto auto;
+	align-items: center;
+	gap: var(--space-3, 12px);
+	padding: var(--space-3, 12px) var(--space-4, 16px);
+	border: 1px solid var(--stroke);
+	border-radius: var(--radius-md);
+	background: var(--surface-1);
+	transition: border-color var(--duration-fast) var(--ease-standard);
+}
+.cl-row:hover { border-color: var(--stroke-strong); }
+.cl-rank { font: 800 var(--text-lg) var(--font-display); color: var(--ink-faint); text-align: center; }
+.cl-row:nth-child(1) .cl-rank { color: var(--warn); }
+.cl-row-id { display: flex; align-items: center; gap: var(--space-3, 12px); min-width: 0; }
+.cl-row-id .cl-avatar { width: 38px; height: 38px; }
+.cl-row-id .cl-sym { font-size: var(--text-md); }
+.cl-row-id small { color: var(--ink-faint); font: 500 var(--text-2xs) var(--font-mono); display: block; }
+.cl-wl { font: 700 var(--text-md, 13px) / 1 var(--font-mono); text-align: right; }
+.cl-wl b { color: var(--success); }
+.cl-wl i { color: var(--danger); font-style: normal; }
+.cl-wr { font: 600 var(--text-sm) var(--font-mono); color: var(--ink-dim); text-align: right; min-width: 56px; }
+/* Win-rate ring gauge (src/ui-juice.js) sits flush-right in the standings cell. */
+.cl-wr .juice-ring { margin-left: auto; }
+
+/* ── Rally dock ─────────────────────────────────────────────────────────── */
+.cl-rally {
+	position: fixed;
+	left: 50%;
+	bottom: clamp(12px, 3vh, 28px);
+	transform: translateX(-50%);
+	z-index: 60;
+	width: min(440px, calc(100vw - 24px));
+	animation: cl-dock var(--duration-base) var(--ease-emphasized) both;
+}
+@keyframes cl-dock { from { opacity: 0; transform: translate(-50%, 16px); } to { opacity: 1; transform: translate(-50%, 0); } }
+.cl-rally-inner {
+	position: relative;
+	border: 1px solid var(--stroke-strong);
+	border-radius: var(--radius-lg);
+	background: color-mix(in srgb, var(--bg-1) 88%, transparent);
+	backdrop-filter: blur(16px);
+	box-shadow: var(--shadow-3);
+	padding: var(--space-4, 16px);
+	text-align: center;
+}
+.cl-rally-close {
+	position: absolute;
+	top: 8px;
+	right: 8px;
+	appearance: none;
+	border: 0;
+	background: transparent;
+	color: var(--ink-faint);
+	font-size: 16px;
+	width: 28px;
+	height: 28px;
+	border-radius: var(--radius-sm);
+	cursor: pointer;
+}
+.cl-rally-close:hover { color: var(--ink-bright); background: var(--surface-2); }
+.cl-rally-id { display: flex; align-items: center; gap: var(--space-3, 12px); text-align: left; margin-bottom: var(--space-3, 12px); }
+.cl-rally-img { width: 42px; height: 42px; border-radius: var(--radius-md); object-fit: cover; background: var(--surface-2); border: 1px solid var(--stroke); }
+.cl-rally-id-text { display: flex; flex-direction: column; line-height: 1.25; min-width: 0; }
+.cl-rally-for { font: 500 var(--text-2xs) var(--font-mono); color: var(--ink-faint); text-transform: uppercase; letter-spacing: 0.08em; }
+.cl-rally-id-text strong { font: 800 var(--text-lg) var(--font-display); color: var(--ink-bright); }
+.cl-rally-hold { font: 500 var(--text-2xs) var(--font-mono); color: var(--success); }
+
+.cl-tap {
+	position: relative;
+	appearance: none;
+	width: 150px;
+	height: 150px;
+	margin: 0 auto var(--space-3, 12px);
+	display: grid;
+	place-items: center;
+	border-radius: var(--radius-pill);
+	border: 2px solid var(--danger);
+	background: radial-gradient(circle at 50% 35%, color-mix(in srgb, var(--danger) 32%, transparent), color-mix(in srgb, var(--danger) 8%, transparent));
+	color: var(--ink-bright);
+	cursor: pointer;
+	user-select: none;
+	-webkit-user-select: none;
+	touch-action: manipulation;
+	transition: transform var(--duration-instant) var(--ease-standard), box-shadow var(--duration-instant) var(--ease-standard);
+	box-shadow: 0 0 0 0 color-mix(in srgb, var(--danger) 40%, transparent);
+}
+.cl-tap:active, .cl-tap.is-hit { transform: scale(0.94); box-shadow: 0 0 36px 2px color-mix(in srgb, var(--danger) 45%, transparent); }
+.cl-tap:focus-visible { outline: 3px solid var(--accent); outline-offset: 3px; }
+.cl-tap-label { font: 800 var(--text-xl) var(--font-display); letter-spacing: 0.08em; }
+.cl-tap-ring { position: absolute; inset: -2px; border-radius: var(--radius-pill); border: 2px solid transparent; }
+.cl-tap.is-hit .cl-tap-ring { animation: cl-ring 360ms var(--ease-out); }
+@keyframes cl-ring { from { box-shadow: 0 0 0 0 color-mix(in srgb, var(--danger) 50%, transparent); } to { box-shadow: 0 0 0 20px transparent; } }
+.cl-tap-combo {
+	position: absolute;
+	top: 12px;
+	right: 14px;
+	font: 800 var(--text-sm) var(--font-mono);
+	color: var(--warn);
+	opacity: 0;
+	transition: opacity var(--duration-fast);
+}
+.cl-tap-combo.show { opacity: 1; }
+
+/* Floating "+N" power chips on tap */
+.cl-pop {
+	position: absolute;
+	left: 50%;
+	top: 30%;
+	transform: translateX(-50%);
+	font: 800 var(--text-md) var(--font-mono);
+	color: var(--warn);
+	pointer-events: none;
+	animation: cl-float 700ms var(--ease-out) forwards;
+}
+@keyframes cl-float { from { opacity: 1; transform: translate(-50%, 0); } to { opacity: 0; transform: translate(-50%, -42px); } }
+
+.cl-rally-stats { display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-3, 12px); margin-bottom: var(--space-2, 8px); }
+.cl-rs { text-align: left; }
+.cl-rs-k { font: 500 var(--text-2xs) var(--font-mono); color: var(--ink-faint); text-transform: uppercase; letter-spacing: 0.08em; }
+.cl-rs-v { display: block; font: 700 var(--text-lg) var(--font-display); color: var(--ink-bright); font-variant-numeric: tabular-nums; }
+.cl-rs-v i { font-style: normal; color: var(--ink-faint); font-size: var(--text-sm); font-weight: 500; }
+.cl-cap { height: 5px; border-radius: var(--radius-pill); background: var(--surface-3); overflow: hidden; margin-top: 5px; }
+.cl-cap-fill { display: block; height: 100%; width: 0; background: var(--success); transition: width var(--duration-base) var(--ease-standard); }
+.cl-cap-fill.is-full { background: var(--warn); }
+.cl-rally-hint { margin: var(--space-2, 8px) 0 0; font: 500 var(--text-2xs) var(--font-mono); color: var(--ink-faint); }
+.cl-rally-hint kbd {
+	font-family: var(--font-mono);
+	background: var(--surface-3);
+	border: 1px solid var(--stroke);
+	border-radius: var(--radius-sm);
+	padding: 1px 5px;
+}
+.cl-rally-hint.is-error { color: var(--danger); }
+.cl-rally-hint.is-ok { color: var(--success); }
+
+/* ── Responsive ─────────────────────────────────────────────────────────── */
+@media (max-width: 640px) {
+	.cl-battle { grid-template-columns: 1fr; }
+	.cl-side-b { order: 0; }
+	.cl-vs { order: 1; width: 100%; }
+	.cl-round { gap: var(--space-5, 20px); }
+	.cl-row { grid-template-columns: 28px 1fr auto; }
+	.cl-wr { display: none; }
+}
+
+/* ── Interactive states (QB-07) ────────────────────────────────────────────
+   The tap target is the whole game loop on this surface and it
+   never acknowledged the pointer resting on it. */
+
+.cl-tap {
+	transition: transform var(--duration-fast) var(--ease-standard);
+}
+
+.cl-tap:hover {
+	transform: scale(1.03);
+}
+
+.cl-tap:active {
+	transform: scale(0.97);
+}

@@ -1,0 +1,59 @@
+{
+  "composedPrompts": {
+    "v1": "a friendly round robot mascot, glossy white plastic, metallic and gold",
+    "v2": "a friendly round robot mascot, glossy white plastic, metallic and gold, add glowing blue eyes and antenna"
+  },
+  "lineage": [
+    {
+      "index": 0,
+      "parentIndex": null,
+      "glbUrl": "https://pub-2534e921bf9c4314addcd4d8a6e98b7b.r2.dev/forge/anon/d6892889-ca6b-4d77-8ffc-638a60002b15.glb",
+      "viewerUrl": "https://three.ws/viewer?src=https%3A%2F%2Fpub-2534e921bf9c4314addcd4d8a6e98b7b.r2.dev%2Fforge%2Fanon%2Fd6892889-ca6b-4d77-8ffc-638a60002b15.glb",
+      "label": "Original",
+      "instruction": null,
+      "active": false
+    },
+    {
+      "index": 1,
+      "parentIndex": 0,
+      "glbUrl": "https://pub-2534e921bf9c4314addcd4d8a6e98b7b.r2.dev/forge/anon/481ff3ff-db68-467a-b4be-47fa901bb664.glb",
+      "viewerUrl": "https://three.ws/viewer?src=https%3A%2F%2Fpub-2534e921bf9c4314addcd4d8a6e98b7b.r2.dev%2Fforge%2Fanon%2F481ff3ff-db68-467a-b4be-47fa901bb664.glb",
+      "label": "make it metallic and gold",
+      "instruction": "make it metallic and gold",
+      "active": false
+    },
+    {
+      "index": 2,
+      "parentIndex": 1,
+      "glbUrl": "https://pub-2534e921bf9c4314addcd4d8a6e98b7b.r2.dev/forge/anon/764e1e9d-f308-49d1-9689-7855bdb6f7c5.glb",
+      "viewerUrl": "https://three.ws/viewer?src=https%3A%2F%2Fpub-2534e921bf9c4314addcd4d8a6e98b7b.r2.dev%2Fforge%2Fanon%2F764e1e9d-f308-49d1-9689-7855bdb6f7c5.glb",
+      "label": "add glowing blue eyes and antenna",
+      "instruction": "add glowing blue eyes and antenna",
+      "active": true
+    }
+  ],
+  "integrity": {
+    "ok": true,
+    "errors": [],
+    "roots": [
+      0
+    ],
+    "leaves": [
+      2
+    ],
+    "chainLength": 3
+  },
+  "revertToOriginal": {
+    "activeIndex": 0,
+    "activeGlb": "https://pub-2534e921bf9c4314addcd4d8a6e98b7b.r2.dev/forge/anon/d6892889-ca6b-4d77-8ffc-638a60002b15.glb"
+  },
+  "branchOffV1": {
+    "newIndex": 3,
+    "parentIndex": 1,
+    "chainOk": true,
+    "leaves": [
+      2,
+      3
+    ]
+  }
+}

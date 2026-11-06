@@ -1,0 +1,17 @@
+{
+  "name": "vanity-grinder",
+  "type": "module",
+  "description": "WASM-backed Solana ed25519 vanity address grinder",
+  "version": "0.1.0",
+  "license": "MIT",
+  "files": [
+    "vanity_grinder_bg.wasm",
+    "vanity_grinder.js",
+    "vanity_grinder.d.ts"
+  ],
+  "main": "vanity_grinder.js",
+  "types": "vanity_grinder.d.ts",
+  "sideEffects": [
+    "./snippets/*"
+  ]
+}

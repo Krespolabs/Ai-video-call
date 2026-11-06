@@ -1,0 +1,103 @@
+<!doctype html>
+<html lang="en" class="cv-page">
+	<head>
+		<script>
+			/* three.ws theme boot — no-flash; runtime in /theme-switcher.js */ (function () {
+				try {
+					var m = localStorage.getItem('twx_theme');
+					var l =
+						m === 'auto'
+							? window.matchMedia &&
+								window.matchMedia('(prefers-color-scheme: light)').matches
+							: m === 'light';
+					document.documentElement.setAttribute('data-theme', l ? 'light' : 'dark');
+				} catch (e) {
+					document.documentElement.setAttribute('data-theme', 'dark');
+				}
+			})();
+		</script>
+		<meta charset="utf-8" />
+		<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+		<title data-i18n="gas.meta_title">Ethereum Gas Tracker · three.ws</title>
+		<meta
+			name="description"
+			content="Live Ethereum gas fees — slow, standard, and fast tiers in gwei with USD cost estimates for transfers, swaps, and NFT mints. Real on-chain data, no API key."
+		 data-i18n-attr="content:gas.meta_description"/>
+		<meta property="og:type" content="website" />
+		<meta property="og:site_name" content="three.ws" />
+		<meta property="og:url" content="https://three.ws/gas" />
+		<meta property="og:title" content="Ethereum Gas Tracker · three.ws"  data-i18n-attr="content:gas.meta_og_title"/>
+		<meta
+			property="og:description"
+			content="Live Ethereum gas fees — slow, standard, and fast tiers in gwei with USD cost estimates for common actions."
+		 data-i18n-attr="content:gas.meta_og_description"/>
+		<meta
+			property="og:image"
+			content="https://three.ws/api/page-og?s=crypto&amp;t=Ethereum+Gas+Tracker&amp;d=Live+Ethereum+gas+fees+straight+from+the+chain%3A+slow%2C+standard%2C+and+fast+tiers+in+gwei+with+USD+cost+estimates+for+transfers%2C+token+sends%2C+DEX+swaps%2C+and+NFT&amp;p=%2Fgas"
+		/>
+		<meta property="og:image:width" content="1200" />
+		<meta property="og:image:height" content="630" />
+		<meta name="twitter:card" content="summary_large_image" />
+		<meta name="twitter:site" content="@trythreews" />
+		<meta name="twitter:title" content="Ethereum Gas Tracker · three.ws"  data-i18n-attr="content:gas.meta_twitter_title"/>
+		<meta
+			name="twitter:description"
+			content="Live Ethereum gas fees — slow, standard, and fast tiers in gwei with USD cost estimates for common actions."
+		 data-i18n-attr="content:gas.meta_twitter_description"/>
+		<meta
+			name="twitter:image"
+			content="https://three.ws/api/page-og?s=crypto&amp;t=Ethereum+Gas+Tracker&amp;d=Live+Ethereum+gas+fees+straight+from+the+chain%3A+slow%2C+standard%2C+and+fast+tiers+in+gwei+with+USD+cost+estimates+for+transfers%2C+token+sends%2C+DEX+swaps%2C+and+NFT&amp;p=%2Fgas"
+		/>
+		<meta name="theme-color" content="#09090b" />
+		<link rel="icon" href="/favicon.ico" sizes="any" />
+		<link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+		<link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+		<link rel="manifest" href="/manifest.webmanifest" />
+		<link rel="stylesheet" href="/fonts/fonts.css" />
+		<link rel="stylesheet" href="/nav.css" />
+		<link rel="stylesheet" href="/src/coin-pages.css" />
+		<link rel="stylesheet" href="/footer.css" />
+		<link rel="canonical" href="https://three.ws/gas" />
+		<meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1" />
+		<meta property="og:locale" content="en_US" />
+		<meta property="og:image:alt" content="Ethereum Gas Tracker — three.ws" />
+	
+	<script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"WebPage","name":"Ethereum Gas Tracker","description":"Live Ethereum gas fees straight from the chain - slow, standard, and fast tiers in gwei with USD cost estimates for transfers, token sends, DEX swaps, and NFT mints. Real on-chain fee history, refreshed automatically, no API key required.","url":"https://three.ws/gas","isPartOf":{"@type":"WebSite","name":"three.ws","url":"https://three.ws"},"primaryImageOfPage":"https://three.ws/api/page-og?s=crypto&t=Ethereum+Gas+Tracker&d=Live+Ethereum+gas+fees+straight+from+the+chain+-+slow%2C+standard%2C+and+fast+tiers+in+gwei+with+USD+cost+estimates+for+transfers%2C+token+sends%2C+DEX+swaps%2C+and+NFT+m&p=%2Fgas"}]}</script>
+</head>
+	<body>
+		<header><div id="nav-container"></div></header>
+		<script src="/nav.js"></script>
+
+		<main class="cv-container">
+			<nav class="cv-crumbs" aria-label="Breadcrumb">
+				<a href="/markets" data-i18n="gas.markets">Markets</a><span class="sep">/</span><span class="here" data-i18n="gas.gas">Gas</span>
+			</nav>
+			<h1 class="cv-h1" data-i18n="gas.ethereum_gas_tracker">Ethereum Gas Tracker</h1>
+			<p class="cv-sub" data-i18n="gas.live_gas_prices_straight_from_the_chain">
+				Live gas prices straight from the chain — pick a speed, see what it costs. Fees
+				update every few seconds; the USD figures use the current ETH price.
+			</p>
+
+			<div class="gas-base" id="gas-base"></div>
+
+			<!-- Tier cards. Hydrated by src/gas.js. -->
+			<section id="gas-tiers" class="cv-section" aria-label="Gas fee tiers"></section>
+
+			<!-- Cost-by-action table. Hydrated by src/gas.js. -->
+			<section
+				id="gas-actions"
+				class="cv-section"
+				aria-label="Estimated cost by action"
+			></section>
+
+			<p class="cv-updated" id="gas-updated"></p>
+		</main>
+
+		<script type="module" src="/src/gas.js"></script>
+		<script src="/brand.js" defer></script>
+		<div id="footer-container"></div>
+		<script src="/footer.js"></script>
+		<!-- Runtime i18n: detects locale, swaps annotated copy, mounts <lang-switcher>. -->
+	<script type="module" src="/i18n.js"></script>
+</body>
+</html>

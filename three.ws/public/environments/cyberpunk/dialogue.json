@@ -1,0 +1,25 @@
+{
+	"$schema": "NPC dialogue table for the walk scene (Task 19). Slots: greeter, guide-wait, guide-arrive ({landmark} token). landmarks steer the guide NPC.",
+	"greeter": [
+		"Welcome to the strip — neon never sleeps here.",
+		"Hey. Watch the puddles, the lights look better in them anyway.",
+		"Glad you dropped in. The signs are louder than they look.",
+		"Welcome in. Stick to the glow and you won't get lost."
+	],
+	"guide-wait": [
+		"Take your time — I'll wait under the sign.",
+		"No rush. The city runs all night.",
+		"I'll hold here by the lights until you catch up."
+	],
+	"guide-arrive": [
+		"Here we go — {landmark}.",
+		"This is {landmark}. Best view of the towers.",
+		"We made it to {landmark}. Soak in the neon."
+	],
+	"landmarks": [
+		{ "name": "the holo signs", "pos": [5.975, 0, 5.769] },
+		{ "name": "the tower base", "pos": [-8.31, 0, 6.546] },
+		{ "name": "the rain-dark alley", "pos": [-1.604, 0, -9.815] },
+		{ "name": "the east overpass", "pos": [8.21, 0, -1.985] }
+	]
+}

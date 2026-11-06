@@ -1,0 +1,63 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>CFBundleDevelopmentRegion</key>
+	<string>$(DEVELOPMENT_LANGUAGE)</string>
+	<key>CFBundleDisplayName</key>
+	<string>three.ws</string>
+	<key>CFBundleExecutable</key>
+	<string>$(EXECUTABLE_NAME)</string>
+	<key>CFBundleIdentifier</key>
+	<string>$(PRODUCT_BUNDLE_IDENTIFIER)</string>
+	<key>CFBundleInfoDictionaryVersion</key>
+	<string>6.0</string>
+	<key>CFBundleName</key>
+	<string>$(PRODUCT_NAME)</string>
+	<key>CFBundlePackageType</key>
+	<string>$(PRODUCT_BUNDLE_PACKAGE_TYPE)</string>
+	<key>CFBundleShortVersionString</key>
+	<string>$(MARKETING_VERSION)</string>
+	<key>CFBundleVersion</key>
+	<string>$(CURRENT_PROJECT_VERSION)</string>
+	<key>NSExtension</key>
+	<dict>
+		<key>NSExtensionPointIdentifier</key>
+		<string>com.apple.share-services</string>
+		<key>NSExtensionPrincipalClass</key>
+		<string>$(PRODUCT_MODULE_NAME).ShareViewController</string>
+		<key>NSExtensionAttributes</key>
+		<dict>
+			<!--
+				The same things the Android app's share target accepts
+				(solana-mobile/twa/twa-manifest.json): up to three photos, which
+				become the front, left and right angles of a selfie-to-avatar
+				run, or one binary glTF. Written as a predicate rather than the
+				dictionary form because the dictionary form has no key for a
+				file type, and a .glb is exactly that. org.khronos.glb is
+				declared by the app's Info.plist (UTImportedTypeDeclarations),
+				which is what gives a .glb in Files that identifier.
+			-->
+			<key>NSExtensionActivationRule</key>
+			<string>SUBQUERY (
+				extensionItems, $extensionItem,
+				SUBQUERY (
+					$extensionItem.attachments, $attachment,
+					ANY $attachment.registeredTypeIdentifiers UTI-CONFORMS-TO "public.image"
+				).@count BETWEEN {1, 3}
+				OR SUBQUERY (
+					$extensionItem.attachments, $attachment,
+					ANY $attachment.registeredTypeIdentifiers UTI-CONFORMS-TO "org.khronos.glb"
+				).@count == 1
+			).@count >= 1</string>
+		</dict>
+	</dict>
+	<!--
+		SharedInbox.swift reads the App Group from this key, the same one the
+		app and the Agent glance widget read, so the three targets can never
+		disagree on where a share is parked.
+	-->
+	<key>GlanceAppGroup</key>
+	<string>$(GLANCE_APP_GROUP)</string>
+</dict>
+</plist>

@@ -1,0 +1,585 @@
+<!doctype html>
+<html lang="en">
+	<head>
+		<script>/* three.ws theme boot — no-flash; runtime in /theme-switcher.js */(function(){try{var m=localStorage.getItem('twx_theme');var l=m==='auto'?(window.matchMedia&&window.matchMedia('(prefers-color-scheme: light)').matches):m==='light';document.documentElement.setAttribute('data-theme',l?'light':'dark');}catch(e){document.documentElement.setAttribute('data-theme','dark');}})();</script>
+		<meta charset="utf-8" />
+		<title data-i18n="mocap_studio.meta_title">Mocap Studio · three.ws</title>
+		<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+		<meta name="description" content="Record your face, save the clip, replay it on any three.ws avatar."  data-i18n-attr="content:mocap_studio.meta_description"/>
+	<meta property="og:type" content="website" />
+	<meta property="og:site_name" content="three.ws" />
+	<meta property="og:url" content="https://three.ws/mocap-studio" />
+	<meta property="og:title" content="Mocap Studio · three.ws"  data-i18n-attr="content:mocap_studio.meta_og_title"/>
+	<meta property="og:description" content="Record your face, save the clip, replay it on any three.ws avatar."  data-i18n-attr="content:mocap_studio.meta_og_description"/>
+	<meta property="og:image" content="https://three.ws/api/page-og?s=main&amp;t=Mocap+Studio&amp;d=Drive+a+3D+avatar+with+your+webcam%3A+real-time+facial+motion+capture+in+the+browser%2C+no+rig+and+no+download.&amp;p=%2Fmocap-studio" />
+	<meta property="og:image:width" content="1200" />
+	<meta property="og:image:height" content="630" />
+	<meta name="twitter:card" content="summary_large_image" />
+	<meta name="twitter:site" content="@trythreews" />
+	<meta name="twitter:title" content="Mocap Studio · three.ws"  data-i18n-attr="content:mocap_studio.meta_twitter_title"/>
+	<meta name="twitter:description" content="Record your face, save the clip, replay it on any three.ws avatar."  data-i18n-attr="content:mocap_studio.meta_twitter_description"/>
+	<meta name="twitter:image" content="https://three.ws/api/page-og?s=main&amp;t=Mocap+Studio&amp;d=Drive+a+3D+avatar+with+your+webcam%3A+real-time+facial+motion+capture+in+the+browser%2C+no+rig+and+no+download.&amp;p=%2Fmocap-studio" />
+		<meta name="theme-color" content="#050505" />
+		<link rel="icon" href="/favicon.ico" sizes="any" />
+		<link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+		<link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png" />
+		<link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png" />
+		<link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+		<link rel="manifest" href="/manifest.webmanifest" />
+		<link rel="stylesheet" href="/fonts/fonts.css" />
+		<link rel="stylesheet" href="/nav.css" />
+		<link rel="stylesheet" href="/footer.css" />
+		<script defer src="/footer-newsletter.js"></script>
+		<style>
+			:root {
+				color-scheme: dark;
+				--bg:        #050505;
+				--surface-0: #0b0b0b;
+				--surface-1: #111111;
+				--surface-2: #181818;
+				--hairline:  #1c1c1c;
+				--hairline-strong: #2a2a2a;
+				--text:      #f6f6f6;
+				--text-2:    #a8a8a8;
+				--text-3:    #6a6a6a;
+				--text-4:    #4a4a4a;
+				--accent:    #ffffff;
+				--accent-2:  #ffffff;
+				--accent-glow: rgba(255, 255, 255, 0.15);
+				--rec:       #f43f5e;
+				--rec-glow:  rgba(244, 63, 94, 0.4);
+				--ok:        var(--success);
+				--font-display: 'Space Grotesk', 'Inter', system-ui, sans-serif;
+				--font-body:    "Space Grotesk", "Inter", -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+				--font-mono:    "JetBrains Mono", ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+			}
+			* { box-sizing: border-box; }
+			html, body { margin: 0; padding: 0; background: var(--bg); color: var(--text); font-family: var(--font-body); }
+			body {
+				font-size: 14.5px;
+				line-height: 1.55;
+				min-height: 100vh;
+				overflow-x: hidden;
+				-webkit-font-smoothing: antialiased;
+				text-rendering: optimizeLegibility;
+				display: flex;
+				flex-direction: column;
+			}
+			a { color: inherit; text-decoration: none; }
+			button { font-family: inherit; cursor: pointer; }
+			::selection { background: var(--accent); color: #fff; }
+
+			/* ── Page layout ───────────────────────────────────── */
+			.page-wrap {
+				flex: 1;
+				max-width: 1280px;
+				width: 100%;
+				margin: 0 auto;
+				padding: 40px 32px 64px;
+			}
+			@media (max-width: 720px) {
+				.page-wrap { padding: 24px 20px 48px; }
+			}
+
+			.page-header {
+				margin-bottom: 32px;
+			}
+			.page-eyebrow {
+				display: inline-flex;
+				align-items: center;
+				gap: 8px;
+				font-family: var(--font-mono);
+				font-size: 11px;
+				text-transform: uppercase;
+				letter-spacing: 0.16em;
+				color: var(--text-3);
+				margin-bottom: 12px;
+			}
+			.page-eyebrow::before {
+				content: "";
+				width: 5px;
+				height: 5px;
+				border-radius: 50%;
+				background: var(--accent);
+				box-shadow: 0 0 10px var(--accent-glow);
+			}
+			.page-title {
+				font-family: var(--font-display);
+				font-size: clamp(28px, 3.5vw, 40px);
+				font-weight: 600;
+				letter-spacing: -0.03em;
+				margin: 0 0 8px;
+				color: var(--text);
+				line-height: 1.1;
+			}
+			.page-sub {
+				color: var(--text-3);
+				font-size: 14px;
+				max-width: 480px;
+			}
+
+			/* ── Auth warning ───────────────────────────────────── */
+			.auth-banner {
+				display: none;
+				align-items: center;
+				gap: 10px;
+				padding: 12px 16px;
+				border-radius: 10px;
+				background: rgba(251, 191, 36, 0.06);
+				border: 1px solid rgba(251, 191, 36, 0.2);
+				font-size: 13px;
+				color: rgba(251, 191, 36, 0.9);
+				margin-bottom: 24px;
+			}
+			.auth-banner.visible { display: flex; }
+			.auth-banner a { color: inherit; font-weight: 600; text-decoration: underline; text-underline-offset: 3px; }
+
+			/* ── Studio grid ────────────────────────────────────── */
+			.studio-grid {
+				display: grid;
+				grid-template-columns: minmax(0, 1.25fr) minmax(300px, 0.85fr);
+				gap: 20px;
+			}
+			@media (max-width: 980px) {
+				.studio-grid { grid-template-columns: 1fr; }
+			}
+			@media (orientation: landscape) and (max-height: 500px) {
+				.studio-grid {
+					grid-template-columns: minmax(0, 1fr) minmax(240px, 0.65fr);
+					gap: 14px;
+				}
+			}
+
+			/* ── Stage (3D canvas) ──────────────────────────────── */
+			.stage-wrap {
+				position: relative;
+				background: linear-gradient(160deg, #0f0f0f 0%, #070707 100%);
+				border-radius: 16px;
+				border: 1px solid var(--hairline-strong);
+				overflow: hidden;
+				min-height: 540px;
+				box-shadow: 0 0 0 1px rgba(255,255,255,0.02) inset, 0 24px 48px -24px rgba(0,0,0,0.8);
+			}
+			.stage-wrap canvas {
+				display: block;
+				width: 100% !important;
+				height: 100% !important;
+			}
+			#webcam-pip {
+				position: absolute;
+				right: 14px;
+				top: 14px;
+				width: 152px;
+				height: 114px;
+				object-fit: cover;
+				border-radius: 10px;
+				border: 1px solid rgba(255, 255, 255, 0.14);
+				background: #000;
+				z-index: 3;
+				transform: scaleX(-1);
+				display: none;
+				box-shadow: 0 8px 24px rgba(0,0,0,0.7);
+			}
+			#webcam-pip.live { display: block; }
+
+			.rec-pill {
+				position: absolute;
+				left: 14px;
+				top: 14px;
+				z-index: 3;
+				display: none;
+				align-items: center;
+				gap: 7px;
+				padding: 6px 13px;
+				border-radius: 999px;
+				background: rgba(0, 0, 0, 0.72);
+				backdrop-filter: blur(12px);
+				color: #fff;
+				font-size: 11px;
+				letter-spacing: 0.08em;
+				text-transform: uppercase;
+				font-family: var(--font-mono);
+				border: 1px solid rgba(244, 63, 94, 0.35);
+				box-shadow: 0 0 12px rgba(244, 63, 94, 0.2);
+			}
+			.rec-pill.on { display: inline-flex; }
+			.rec-pill .dot {
+				width: 7px;
+				height: 7px;
+				border-radius: 50%;
+				background: var(--rec);
+				box-shadow: 0 0 8px var(--rec-glow);
+				animation: recpulse 1s ease-in-out infinite;
+			}
+			@keyframes recpulse {
+				0%, 100% { opacity: 1; box-shadow: 0 0 8px var(--rec-glow); }
+				50% { opacity: 0.5; box-shadow: 0 0 4px var(--rec-glow); }
+			}
+
+			@media (max-width: 640px) {
+				.stage-wrap { min-height: min(58vw, 380px); }
+				#webcam-pip { width: 96px; height: 72px; top: max(10px, env(safe-area-inset-top, 10px)); right: max(10px, env(safe-area-inset-right, 10px)); }
+				.rec-pill { top: max(10px, env(safe-area-inset-top, 10px)); left: max(10px, env(safe-area-inset-left, 10px)); }
+			}
+			@media (orientation: landscape) and (max-height: 500px) {
+				.stage-wrap { min-height: 200px; }
+				#webcam-pip { width: 76px; height: 57px; }
+			}
+
+			/* ── Cards ──────────────────────────────────────────── */
+			.card {
+				background: var(--surface-0);
+				border: 1px solid var(--hairline);
+				border-radius: 14px;
+				padding: 20px;
+				margin-bottom: 16px;
+			}
+			.card:last-child { margin-bottom: 0; }
+			.card-label {
+				font-family: var(--font-mono);
+				font-size: 10.5px;
+				text-transform: uppercase;
+				letter-spacing: 0.14em;
+				color: var(--text-4);
+				font-weight: 600;
+				margin: 0 0 16px;
+			}
+
+			/* ── Timer ──────────────────────────────────────────── */
+			.timer {
+				font-family: var(--font-mono);
+				font-size: 40px;
+				font-weight: 600;
+				letter-spacing: 0.02em;
+				color: var(--text-2);
+				margin: 0 0 16px;
+				text-align: center;
+				line-height: 1;
+				transition: color var(--duration-base);
+			}
+			.timer.recording {
+				color: var(--rec);
+				text-shadow: 0 0 20px var(--rec-glow);
+			}
+			@media (max-width: 640px) {
+				.timer { font-size: 30px; }
+			}
+			@media (orientation: landscape) and (max-height: 500px) {
+				.timer { font-size: 22px; margin-bottom: 10px; }
+			}
+
+			/* ── Form rows ──────────────────────────────────────── */
+			.field-row {
+				display: flex;
+				align-items: flex-start;
+				gap: 10px;
+				margin-bottom: 10px;
+			}
+			.field-row > label {
+				color: var(--text-3);
+				font-size: 13px;
+				min-width: 88px;
+				padding-top: 11px;
+				flex-shrink: 0;
+			}
+			.field-row input,
+			.field-row select,
+			.field-row textarea {
+				flex: 1;
+				background: var(--bg-0);
+				color: var(--text);
+				border: 1px solid var(--hairline-strong);
+				border-radius: 8px;
+				padding: 10px 13px;
+				font-size: 13.5px;
+				font-family: var(--font-body);
+				min-width: 0;
+				min-height: 44px;
+				outline: none;
+				transition: border-color var(--duration-fast);
+			}
+			.field-row input:focus,
+			.field-row select:focus,
+			.field-row textarea:focus {
+				border-color: rgba(255, 255, 255, 0.5);
+				box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.1);
+			}
+			.field-row textarea { resize: vertical; min-height: 64px; }
+			.field-row select { appearance: none; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%236a6a6a' stroke-width='1.5' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: right 13px center; padding-right: 32px; }
+			@media (max-width: 640px) {
+				.field-row { flex-direction: column; gap: 4px; }
+				.field-row > label { min-width: unset; padding-top: 0; }
+			}
+
+			/* ── Buttons ────────────────────────────────────────── */
+			.btn-row { display: flex; gap: 8px; flex-wrap: wrap; }
+			.btn {
+				appearance: none;
+				display: inline-flex;
+				align-items: center;
+				gap: 6px;
+				padding: 10px 18px;
+				border-radius: 8px;
+				font-size: 13.5px;
+				font-weight: 600;
+				font-family: var(--font-body);
+				border: 0;
+				cursor: pointer;
+				transition: opacity var(--duration-fast), transform var(--duration-instant), background var(--duration-fast);
+				min-height: 44px;
+				white-space: nowrap;
+			}
+			.btn:active { transform: scale(0.97); }
+			.btn[disabled] { opacity: 0.35; cursor: not-allowed; pointer-events: none; }
+			.btn-primary {
+				background: #ffffff;
+				color: #fff;
+				box-shadow: 0 1px 0 rgba(255,255,255,0.15) inset, 0 6px 18px -8px rgba(255, 255, 255, 0.6);
+			}
+			.btn-primary:hover { opacity: 0.9; }
+			.btn-danger {
+				background: var(--rec);
+				color: #fff;
+				box-shadow: 0 1px 0 rgba(255,255,255,0.1) inset, 0 6px 18px -8px var(--rec-glow);
+			}
+			.btn-danger:hover { opacity: 0.9; }
+			.btn-ghost {
+				background: transparent;
+				color: var(--text-2);
+				border: 1px solid var(--hairline-strong);
+			}
+			.btn-ghost:hover { border-color: rgba(255,255,255,0.18); color: var(--text); background: rgba(255,255,255,0.03); }
+			@media (max-width: 640px) {
+				.btn { font-size: 12.5px; padding: 10px 14px; }
+			}
+			@media (orientation: landscape) and (max-height: 500px) {
+				.btn { min-height: 38px; padding: 8px 13px; }
+			}
+
+			/* ── Avatar info ────────────────────────────────────── */
+			.avatar-info {
+				color: var(--text-3);
+				font-size: 12.5px;
+				margin-top: 6px;
+			}
+
+			/* ── Clip list ──────────────────────────────────────── */
+			.clip-list {
+				display: flex;
+				flex-direction: column;
+				gap: 6px;
+				max-height: 400px;
+				overflow-y: auto;
+				scrollbar-width: thin;
+				scrollbar-color: var(--hairline-strong) transparent;
+			}
+			.clip {
+				background: rgba(255, 255, 255, 0.025);
+				border: 1px solid var(--hairline);
+				border-radius: 10px;
+				padding: 12px 14px;
+				display: flex;
+				align-items: center;
+				gap: 10px;
+				transition: border-color var(--duration-fast), background var(--duration-fast);
+			}
+			.clip:hover { border-color: var(--hairline-strong); background: rgba(255,255,255,0.04); }
+			.clip .meta { flex: 1; min-width: 0; }
+			.clip .meta .n {
+				font-size: 13.5px;
+				font-weight: 500;
+				color: var(--text);
+				white-space: nowrap;
+				overflow: hidden;
+				text-overflow: ellipsis;
+			}
+			.clip .meta .d {
+				font-size: 11.5px;
+				color: var(--text-3);
+				margin-top: 2px;
+				font-family: var(--font-mono);
+			}
+			.clip .v-pill {
+				font-size: 9.5px;
+				padding: 2px 7px;
+				border-radius: 999px;
+				background: rgba(255, 255, 255, 0.05);
+				color: var(--text-3);
+				text-transform: uppercase;
+				letter-spacing: 0.07em;
+				font-family: var(--font-mono);
+				flex-shrink: 0;
+			}
+			.clip .v-pill.public {
+				background: rgba(74, 222, 128, 0.12);
+				color: var(--ok);
+				border: 1px solid rgba(74, 222, 128, 0.2);
+			}
+			.clip-actions { display: flex; gap: 5px; flex-shrink: 0; }
+			.clip-btn {
+				appearance: none;
+				background: transparent;
+				color: var(--text-3);
+				border: 1px solid var(--hairline);
+				border-radius: 6px;
+				padding: 5px 10px;
+				font-size: 11.5px;
+				cursor: pointer;
+				font-family: var(--font-body);
+				transition: color var(--duration-fast), border-color var(--duration-fast);
+			}
+			.clip-btn:hover { color: var(--text); border-color: var(--hairline-strong); }
+
+			/* ── Empty / format notes ───────────────────────────── */
+			.empty-state {
+				color: var(--text-3);
+				font-size: 13px;
+				padding: 24px 0;
+				text-align: center;
+				font-style: italic;
+			}
+			.format-note {
+				color: var(--text-3);
+				font-size: 12.5px;
+				line-height: 1.7;
+			}
+			.format-note code {
+				font-family: var(--font-mono);
+				font-size: 11.5px;
+				color: var(--text-2);
+				background: rgba(255,255,255,0.05);
+				padding: 1px 5px;
+				border-radius: 4px;
+			}
+
+			/* ── Section divider ────────────────────────────────── */
+			.col-left,
+			.col-right { display: flex; flex-direction: column; gap: 0; }
+		</style>
+	
+	<link rel="canonical" href="https://three.ws/mocap-studio">
+	<meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1">
+	<meta property="og:locale" content="en_US">
+	<meta property="og:image:alt" content="Mocap Studio — three.ws">
+	<script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"WebPage","name":"Mocap Studio","description":"Drive a 3D avatar with your webcam - real-time facial motion capture in the browser, no rig and no download.","url":"https://three.ws/mocap-studio","isPartOf":{"@type":"WebSite","name":"three.ws","url":"https://three.ws"},"primaryImageOfPage":"https://three.ws/api/page-og?s=main&t=Mocap+Studio&d=Drive+a+3D+avatar+with+your+webcam+-+real-time+facial+motion+capture+in+the+browser%2C+no+rig+and+no+download.&p=%2Fmocap-studio"}]}</script>
+</head>
+	<body>
+
+		<!-- ── NAV ─────────────────────────────────────────────────── -->
+		<header><div id="nav-container"></div></header>
+		<script src="/nav.js"></script>
+
+		<!-- ── PAGE ─────────────────────────────────────────────────── -->
+		<main class="page-wrap">
+
+			<div class="page-header">
+				<div class="page-eyebrow">Labs · Face Capture</div>
+				<h2 class="page-title" data-i18n="mocap_studio.mocap_studio">Mocap Studio</h2>
+				<p class="page-sub" data-i18n="mocap_studio.record_your_face_save_the_clip_replay">Record your face, save the clip, replay it on any avatar — yours or someone else's.</p>
+				<p class="page-sub" data-i18n-html="mocap_studio.already_have_a_video_turn_it_into">Already have a video of someone moving? Turn it into a downloadable animation file at <a href="/video-to-motion">Video to Motion</a>.</p>
+			</div>
+
+			<div id="auth-warning" class="auth-banner">
+				<svg width="15" height="15" viewBox="0 0 15 15" fill="none"><circle cx="7.5" cy="7.5" r="6.5" stroke="currentColor" stroke-width="1.2"/><path d="M7.5 4.5v4m0 2v.5" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/></svg>
+				You're not signed in — clips can be recorded locally but won't be saved.
+				<a href="/login" data-i18n="mocap_studio.sign_in_to_save_and_share">Sign in to save and share</a>
+			</div>
+
+			<div class="studio-grid">
+
+				<!-- LEFT: Stage + controls -->
+				<div class="col-left">
+					<div class="stage-wrap" id="stage-wrap">
+						<div id="stage"></div>
+						<div id="rec-pill" class="rec-pill">
+							<span class="dot"></span>
+							<span data-i18n-html="mocap_studio.rec_0_0s">REC <span id="rec-time">0.0s</span></span>
+						</div>
+						<video id="webcam-pip" autoplay playsinline muted aria-hidden="true"></video>
+					</div>
+
+					<div class="card" style="margin-top:16px;">
+						<p class="card-label" data-i18n="mocap_studio.record">Record</p>
+						<div class="timer" id="timer">00.0s</div>
+						<div class="btn-row">
+							<button class="btn btn-primary" id="start-cam" data-i18n="mocap_studio.start_camera">Start camera</button>
+							<button class="btn btn-ghost" id="calibrate" disabled data-i18n="mocap_studio.calibrate_neutral">Calibrate neutral</button>
+							<button class="btn btn-danger" id="record" disabled data-i18n="mocap_studio.record_2">Record</button>
+							<button class="btn btn-ghost" id="replay" disabled data-i18n="mocap_studio.replay_last">Replay last</button>
+							<button class="btn btn-ghost" id="discard" disabled data-i18n="mocap_studio.discard">Discard</button>
+						</div>
+					</div>
+
+					<div class="card">
+						<p class="card-label" data-i18n="mocap_studio.save_clip">Save clip</p>
+						<div class="field-row">
+							<label for="clip-name" data-i18n="mocap_studio.name">Name</label>
+							<input id="clip-name" type="text" placeholder="head nod" maxlength="120" />
+						</div>
+						<div class="field-row">
+							<label for="clip-desc" data-i18n="mocap_studio.description">Description</label>
+							<textarea id="clip-desc" placeholder="Optional — what is this for?" maxlength="2000"></textarea>
+						</div>
+						<div class="field-row">
+							<label for="clip-tags" data-i18n="mocap_studio.tags">Tags</label>
+							<input id="clip-tags" type="text" placeholder="comma, separated" />
+						</div>
+						<div class="field-row">
+							<label for="clip-visibility" data-i18n="mocap_studio.visibility">Visibility</label>
+							<select id="clip-visibility">
+								<option value="private" data-i18n="mocap_studio.private_just_you">Private (just you)</option>
+								<option value="unlisted" data-i18n="mocap_studio.unlisted_anyone_with_link">Unlisted (anyone with link)</option>
+								<option value="public" data-i18n="mocap_studio.public_in_marketplace">Public (in marketplace)</option>
+							</select>
+						</div>
+						<div class="btn-row" style="margin-top:4px;">
+							<button class="btn btn-primary" id="save-clip" disabled data-i18n="mocap_studio.save_clip_2">Save clip</button>
+							<button class="btn btn-ghost" id="download-clip" disabled data-i18n="mocap_studio.download_json">Download JSON</button>
+						</div>
+					</div>
+				</div>
+
+				<!-- RIGHT: Avatar + clips -->
+				<div class="col-right">
+					<div class="card">
+						<p class="card-label" data-i18n="mocap_studio.source_avatar">Source avatar</p>
+						<div class="field-row">
+							<label for="avatar-handle" data-i18n="mocap_studio.handle">Handle</label>
+							<input id="avatar-handle" type="text" placeholder="@yourname" autocomplete="off" />
+							<button class="btn btn-ghost" id="load-avatar" style="flex-shrink:0;" data-i18n="mocap_studio.load">Load</button>
+						</div>
+						<div class="avatar-info" id="avatar-info">no avatar loaded</div>
+						<avatar-actions id="mc-actions" mode="wallet" style="display:none;margin-top:10px"></avatar-actions>
+					</div>
+
+					<div class="card" style="flex:1;">
+						<p class="card-label" data-i18n="mocap_studio.saved_clips">Saved clips</p>
+						<div class="clip-list" id="clip-list">
+							<div class="empty-state">Loading…</div>
+						</div>
+					</div>
+
+					<div class="card">
+						<p class="card-label" data-i18n="mocap_studio.format">Format</p>
+						<p class="format-note" data-i18n-html="mocap_studio.clips_are_stored_as_json_of_frame">
+							Clips are stored as <code>three.ws.face-mocap.v1</code> — JSON of <code>{ format, duration, frames: [{ t, shapes, mat }] }</code>.
+							Frame data is raw MediaPipe ARKit-52 output plus an optional 4×4 head transform.
+							Compatible with any three.ws avatar via the ARKit-52 canonical morph map.
+						</p>
+					</div>
+				</div>
+
+			</div>
+		</main>
+
+		<!-- ── FOOTER ───────────────────────────────────────────────── -->
+		<div id="footer-container"></div>
+		<script src="/footer.js"></script>
+
+		<script type="module" src="/avatar-actions.js"></script>
+		<script type="module" src="/src/mocap-studio.js"></script>
+		<script src="/brand.js" defer></script>
+	<!-- Runtime i18n: detects locale, swaps annotated copy, mounts <lang-switcher>. -->
+	<script type="module" src="/i18n.js"></script>
+</body>
+</html>

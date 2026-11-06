@@ -1,0 +1,4 @@
+# Devnet signing keypairs for each citizen + the work dispatcher. Cached so a
+# citizen keeps its on-chain identity across restarts. NEVER commit a secret key.
+.cache/
+node_modules/

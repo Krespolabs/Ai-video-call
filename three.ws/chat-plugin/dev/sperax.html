@@ -1,0 +1,345 @@
+<!doctype html>
+<html lang="en">
+	<head>
+		<meta charset="utf-8" />
+		<title>three.ws — SperaxOS / LobeChat plugin protocol harness</title>
+		<meta name="viewport" content="width=device-width, initial-scale=1" />
+		<style>
+			*,
+			*::before,
+			*::after {
+				box-sizing: border-box;
+			}
+			body {
+				margin: 0;
+				font:
+					14px/1.5 system-ui,
+					sans-serif;
+				background: #0f0f10;
+				color: #e0e0e0;
+				display: flex;
+				height: 100vh;
+				overflow: hidden;
+			}
+			#sidebar {
+				width: 420px;
+				flex-shrink: 0;
+				background: #151618;
+				border-right: 1px solid #2a2a2e;
+				display: flex;
+				flex-direction: column;
+			}
+			#sidebar-header {
+				padding: 12px 16px;
+				border-bottom: 1px solid #2a2a2e;
+				font-size: 12px;
+				color: #888;
+				letter-spacing: 0.05em;
+				text-transform: uppercase;
+				display: flex;
+				align-items: center;
+				gap: 8px;
+			}
+			#agent-frame {
+				flex: 1;
+				border: none;
+				width: 100%;
+				background: transparent;
+			}
+			#controls {
+				flex: 1;
+				padding: 24px;
+				overflow-y: auto;
+				display: flex;
+				flex-direction: column;
+				gap: 20px;
+			}
+			h1 {
+				margin: 0 0 4px;
+				font-size: 18px;
+				font-weight: 600;
+			}
+			.subtitle {
+				color: #888;
+				font-size: 13px;
+				margin: 0 0 8px;
+			}
+			.section {
+				background: #151618;
+				border: 1px solid #2a2a2e;
+				border-radius: 8px;
+				padding: 16px;
+			}
+			.section h2 {
+				margin: 0 0 12px;
+				font-size: 13px;
+				font-weight: 600;
+				color: #aaa;
+				text-transform: uppercase;
+				letter-spacing: 0.05em;
+			}
+			.row {
+				display: flex;
+				gap: 8px;
+				align-items: center;
+				margin-bottom: 8px;
+			}
+			label {
+				font-size: 12px;
+				color: #888;
+			}
+			input[type='text'],
+			select {
+				flex: 1;
+				background: #0f0f10;
+				border: 1px solid #333;
+				border-radius: 6px;
+				color: #e0e0e0;
+				padding: 6px 10px;
+				font: inherit;
+			}
+			input[type='range'] {
+				flex: 1;
+			}
+			button {
+				background: #6366f1;
+				border: none;
+				border-radius: 6px;
+				color: #fff;
+				cursor: pointer;
+				font: inherit;
+				font-size: 13px;
+				padding: 6px 14px;
+				white-space: nowrap;
+				transition: background 0.15s;
+			}
+			button:hover {
+				background: #4f46e5;
+			}
+			button.secondary {
+				background: #2a2a2e;
+				color: #ccc;
+			}
+			button.secondary:hover {
+				background: #333;
+			}
+			#log {
+				font: 12px/1.6 monospace;
+				color: #93c5fd;
+				background: #0a0a0c;
+				border: 1px solid #1e2a3a;
+				border-radius: 6px;
+				padding: 10px;
+				max-height: 240px;
+				overflow-y: auto;
+				white-space: pre-wrap;
+				word-break: break-all;
+			}
+			.dot {
+				display: inline-block;
+				width: 8px;
+				height: 8px;
+				border-radius: 50%;
+				background: #ef4444;
+			}
+			.dot.ready {
+				background: #22c55e;
+			}
+		</style>
+	</head>
+	<body>
+		<div id="sidebar">
+			<div id="sidebar-header">
+				<span id="dot" class="dot"></span>
+				<span id="dot-label">waiting for plugin-ready…</span>
+			</div>
+			<iframe id="agent-frame" title="Agent embed" allow="microphone; camera"></iframe>
+		</div>
+
+		<div id="controls">
+			<div>
+				<h1>SperaxOS / LobeChat protocol harness</h1>
+				<p class="subtitle">
+					Drives <code>boot.js</code> with the exact standalone-plugin wire protocol —
+					<code>&lt;ns&gt;:plugin-ready-for-render</code> in, then
+					<code>&lt;ns&gt;:init-standalone-plugin</code> tool calls out. Verifies the
+					avatar reacts without running a full host.
+				</p>
+			</div>
+
+			<div class="section">
+				<h2>Config</h2>
+				<div class="row">
+					<label style="width: 80px">Namespace</label>
+					<select id="ns">
+						<option value="speraxos">speraxos:</option>
+						<option value="lobe-chat">lobe-chat:</option>
+					</select>
+				</div>
+				<div class="row">
+					<label style="width: 80px">Agent ID</label>
+					<input type="text" id="agent-id" placeholder="agent UUID (sent via settings)" />
+				</div>
+				<div class="row">
+					<label style="width: 80px">GLB URL</label>
+					<input type="text" id="src" placeholder="optional — bypasses agent API" />
+				</div>
+				<div class="row">
+					<label style="width: 80px">Origin</label>
+					<input type="text" id="origin" value="http://localhost:3000" />
+				</div>
+				<div class="row">
+					<button id="load">Load iframe</button>
+					<button class="secondary" id="send-settings">Send settings.agentId</button>
+				</div>
+			</div>
+
+			<div class="section">
+				<h2>Inject tool call (host → plugin)</h2>
+				<div class="row">
+					<label style="width: 60px">Text</label>
+					<input type="text" id="speak-text" value="Hello! I am your three.ws avatar." />
+				</div>
+				<div class="row">
+					<label style="width: 60px">Sentiment</label>
+					<input type="range" id="sentiment" min="-1" max="1" step="0.1" value="0.4" />
+					<span id="sentiment-label">0.4</span>
+				</div>
+				<div class="row"><button id="speak">Inject speak</button></div>
+				<div class="row" style="margin-top: 8px">
+					<label style="width: 60px">Gesture</label>
+					<select id="gesture-name">
+						<option>wave</option>
+						<option>nod</option>
+						<option>point</option>
+						<option>shrug</option>
+					</select>
+					<button id="gesture">Inject gesture</button>
+				</div>
+				<div class="row" style="margin-top: 8px">
+					<label style="width: 60px">Emote</label>
+					<select id="emote-trigger">
+						<option>celebration</option>
+						<option>curiosity</option>
+						<option>concern</option>
+						<option>patience</option>
+						<option>empathy</option>
+					</select>
+					<button id="emote">Inject emote</button>
+				</div>
+				<div class="row" style="margin-top: 8px">
+					<label style="width: 60px">Render</label>
+					<input type="text" id="render-id" placeholder="agentId to render_agent" />
+					<button id="render">Inject render_agent</button>
+				</div>
+			</div>
+
+			<div class="section">
+				<h2>postMessage log</h2>
+				<div id="log">Waiting…</div>
+			</div>
+		</div>
+
+		<script>
+			const frame = document.getElementById('agent-frame');
+			const logEl = document.getElementById('log');
+			const dot = document.getElementById('dot');
+			const dotLabel = document.getElementById('dot-label');
+			const $ = (id) => document.getElementById(id);
+
+			const log = (msg) => {
+				logEl.textContent += '\n' + new Date().toISOString().slice(11, 23) + ' ' + msg;
+				logEl.scrollTop = logEl.scrollHeight;
+			};
+
+			const ns = () => $('ns').value;
+			const targetOrigin = () => $('origin').value.trim() || '*';
+
+			// Post a message to the iframe exactly as a LobeChat/SperaxOS host would.
+			function post(type, body) {
+				const msg = { type: `${ns()}:${type}`, ...body };
+				log('→ ' + JSON.stringify(msg));
+				frame.contentWindow?.postMessage(msg, targetOrigin());
+			}
+
+			// A standalone tool call: payload.apiName + JSON-string arguments.
+			function toolCall(apiName, args) {
+				post('init-standalone-plugin', {
+					payload: {
+						identifier: 'three-ws',
+						apiName,
+						arguments: JSON.stringify(args),
+					},
+					settings: $('agent-id').value.trim()
+						? { agentId: $('agent-id').value.trim() }
+						: undefined,
+				});
+			}
+
+			function loadIframe() {
+				const base = targetOrigin().replace(/\/$/, '');
+				const params = new URLSearchParams({ host: location.origin, bg: 'transparent' });
+				const src = $('src').value.trim();
+				const agent = $('agent-id').value.trim();
+				// In production, the neutral /sperax/iframe/ path is a Vercel rewrite to
+				// the iframe. The Vite dev server applies no rewrites, so point straight
+				// at the real file (/lobehub/iframe/index.html) when testing locally.
+				const path = base.includes('localhost')
+					? '/lobehub/iframe/index.html'
+					: '/sperax/iframe/';
+				if (src) params.set('src', src);
+				else if (agent) params.set('agent', agent);
+				const url = `${base}${path}?${params}`;
+				dot.className = 'dot';
+				dotLabel.textContent = 'loading…';
+				frame.src = url;
+				log('→ load ' + url);
+			}
+
+			$('load').addEventListener('click', loadIframe);
+			$('send-settings').addEventListener('click', () =>
+				post('init-standalone-plugin', {
+					settings: { agentId: $('agent-id').value.trim() },
+				}),
+			);
+			$('speak').addEventListener('click', () =>
+				toolCall('speak', {
+					text: $('speak-text').value.trim(),
+					sentiment: parseFloat($('sentiment').value),
+				}),
+			);
+			$('gesture').addEventListener('click', () =>
+				toolCall('gesture', { name: $('gesture-name').value }),
+			);
+			$('emote').addEventListener('click', () =>
+				toolCall('emote', { trigger: $('emote-trigger').value, weight: 1 }),
+			);
+			$('render').addEventListener('click', () =>
+				toolCall('render_agent', { agentId: $('render-id').value.trim() }),
+			);
+			$('sentiment').addEventListener('input', (e) => {
+				$('sentiment-label').textContent = parseFloat(e.target.value).toFixed(1);
+			});
+
+			// Receive the plugin-ready signal and the v1 ready event from the iframe.
+			window.addEventListener('message', (ev) => {
+				const d = ev.data;
+				if (!d || typeof d !== 'object') return;
+				log('← ' + JSON.stringify(d));
+				if (
+					d.type === `${ns()}:plugin-ready-for-render` ||
+					(typeof d.type === 'string' && d.type.endsWith(':plugin-ready-for-render'))
+				) {
+					dot.className = 'dot ready';
+					dotLabel.textContent = 'plugin-ready ✓';
+				}
+			});
+
+			// Auto-load from query (?agent= / ?origin=).
+			const qp = new URLSearchParams(location.search);
+			if (qp.get('origin')) $('origin').value = qp.get('origin');
+			if (qp.get('agent')) $('agent-id').value = qp.get('agent');
+			if (qp.get('agent') || qp.get('src')) loadIframe();
+		</script>
+	</body>
+</html>

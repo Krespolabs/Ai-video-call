@@ -1,0 +1,154 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+	<style>/* three.ws hidden-guard: make the `hidden` attribute authoritative; see scripts/lib/hidden-guard.mjs */[hidden]{display:none!important}</style>
+	<meta charset="utf-8" />
+	<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+	<title data-i18n="play_war.meta_title">Coin Wars arena: fight for your community · three.ws</title>
+	<meta name="description" content="The live Coin Wars arena: two coin communities meet in one 3D battlefield, fight to the kill cap, and the result lands on the war league ladder. You fight for the coin you hold."  data-i18n-attr="content:play_war.meta_description"/>
+	<meta property="og:title" content="Coin Wars arena · three.ws"  data-i18n-attr="content:play_war.meta_og_title"/>
+	<meta property="og:description" content="Two coin communities, one battlefield. Hold the coin, enlist from your world's war portal, and fight for the ladder."  data-i18n-attr="content:play_war.meta_og_description"/>
+	<meta property="og:type" content="website" />
+	<meta property="og:site_name" content="three.ws" />
+	<meta property="og:url" content="https://three.ws/play/war" />
+	<meta property="og:image" content="https://three.ws/api/page-og?s=crypto&amp;t=Coin+Wars+arena%3A+two+communities%2C+one+battlefield&amp;d=The+live+Coin+Wars+arena.+Enlist+at+your+coin+world%27s+war+portal%2C+fight+the+rival+community+to+the+kill+cap%2C+and+the+result+lands+on+the+Elo+ladder.+You+fight&amp;p=%2Fplay%2Fwar" />
+	<meta name="twitter:card" content="summary_large_image" />
+	<meta name="twitter:title" content="Coin Wars arena · three.ws"  data-i18n-attr="content:play_war.meta_twitter_title"/>
+	<meta name="twitter:description" content="Two coin communities, one battlefield. Hold the coin, enlist from your world's war portal, and fight for the ladder."  data-i18n-attr="content:play_war.meta_twitter_description"/>
+	<meta name="twitter:image" content="https://three.ws/api/page-og?s=crypto&amp;t=Coin+Wars+arena%3A+two+communities%2C+one+battlefield&amp;d=The+live+Coin+Wars+arena.+Enlist+at+your+coin+world%27s+war+portal%2C+fight+the+rival+community+to+the+kill+cap%2C+and+the+result+lands+on+the+Elo+ladder.+You+fight&amp;p=%2Fplay%2Fwar" />
+	<link rel="canonical" href="https://three.ws/play/war" />
+	<link rel="icon" href="/favicon.ico" />
+
+	<!-- The Colyseus service that hosts clash_arena, read through the shared
+	     chain in src/shared/game-server-url.js. A production build resolves to
+	     "" without it (localhost and the Codespace forward are inferred, the
+	     public domain is not), which turned every arrival at this page into
+	     "The arena server is unreachable". /play carries the same meta. -->
+	<meta name="game-server" content="wss://three-ws-multiplayer-93741856042.us-central1.run.app" />
+
+	<!-- Design tokens. This bespoke 3D page skips the global style.css, and
+	     tokens.css is variables-only, so linking it does not touch the arena's
+	     own layout. src/play/war.css spends the motion tokens on every hover,
+	     focus and cooldown transition; unresolved they made the whole
+	     `transition` declaration invalid and the HUD moved in hard cuts. -->
+	<link rel="stylesheet" href="/tokens.css" />
+	<!-- The clip manifest, preloaded only when this link actually carries a
+	     pairing. src/play/war.js returns early with "No battle to join" when
+	     match/ticket/coin are missing (a shared, expired, or hand-typed link),
+	     and a static preload on that path downloads a file the page never reads,
+	     which is what the browser reports as "preloaded ... but not used".
+	     Injecting from the head keeps the head start on the real path: this runs
+	     before the module graph below is even fetched. `crossorigin` stays
+	     because the consumer requests in CORS mode (fetch() defaults to it), so
+	     dropping it would silently orphan the preload instead. The fighter body
+	     is warmed from war.js instead, immediately before the room join, because
+	     it is only read once the play gate and the holder gate have both passed
+	     and its URL is whichever avatar the player picked in /play. -->
+	<script>
+		(function () {
+			var q = new URLSearchParams(location.search);
+			if (!q.get('match') || !q.get('ticket') || !q.get('coin')) return;
+			var l = document.createElement('link');
+			l.rel = 'preload';
+			l.as = 'fetch';
+			l.crossOrigin = 'anonymous';
+			l.href = '/animations/manifest.json';
+			document.head.appendChild(l);
+		})();
+	</script>
+	<meta name="robots" content="index, follow, max-image-preview:large" />
+
+	<meta property="og:locale" content="en_US">
+	<meta property="og:image:alt" content="Coin Wars arena: two communities, one battlefield - three.ws">
+	<meta name="twitter:site" content="@trythreews">
+	<script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"WebPage","name":"Coin Wars arena: two communities, one battlefield","description":"The live Coin Wars arena. Enlist at your coin world's war portal, fight the rival community to the kill cap, and the result lands on the Elo ladder. You fight for the coin you hold.","url":"https://three.ws/play/war","isPartOf":{"@type":"WebSite","name":"three.ws","url":"https://three.ws"},"primaryImageOfPage":"https://three.ws/api/page-og?s=crypto&t=Coin+Wars+arena%3A+two+communities%2C+one+battlefield&d=The+live+Coin+Wars+arena.+Enlist+at+your+coin+world%27s+war+portal%2C+fight+the+rival+community+to+the+kill+cap%2C+and+the+result+lands+on+the+Elo+ladder.+You+fight&p=%2Fplay%2Fwar"},{"@type":"BreadcrumbList","itemListElement":[{"@type":"ListItem","position":1,"name":"Home","item":"https://three.ws/"},{"@type":"ListItem","position":2,"name":"Play","item":"https://three.ws/play"},{"@type":"ListItem","position":3,"name":"War","item":"https://three.ws/play/war"}]}]}</script>
+</head>
+<body>
+	<!-- The page heading. A fullscreen arena has no chrome to hang a visible
+	     title on, but the document still needs exactly one h1: the two cards
+	     below are dialog headings and are mutually exclusive. -->
+	<h1 class="war-page-title" data-i18n="play_war.coin_wars_arena">Coin Wars arena</h1>
+	<canvas id="scene" aria-label="Coin Wars battlefield"></canvas>
+	<div class="war-vignette" aria-hidden="true"></div>
+	<div id="labels" aria-hidden="true"></div>
+
+	<!-- Loading / working. Never a spinner alone: it always says what it is doing. -->
+	<div id="status" class="war-status" role="status" aria-live="polite">
+		<span class="war-spinner" aria-hidden="true"></span>
+		<span id="status-text" data-i18n="play_war.preparing_the_arena">Preparing the arena…</span>
+	</div>
+
+	<!-- The battle HUD. Hidden until the room is joined. -->
+	<header id="hud" class="war-hud" hidden>
+		<div class="war-side war-side-us">
+			<span id="score-us" class="war-score">0</span>
+			<span class="war-side-meta">
+				<span id="name-us" class="war-side-name">Your community</span>
+				<span id="roster-us" class="war-side-roster">0 fighting</span>
+			</span>
+		</div>
+		<div class="war-mid">
+			<span id="clock" class="war-clock">-</span>
+			<span id="cap" class="war-cap"></span>
+			<span class="war-coin">
+				<img id="coin-img" class="war-coin-img" alt="" hidden />
+				<span id="coin-label"></span>
+			</span>
+		</div>
+		<div class="war-side war-side-them">
+			<span id="score-them" class="war-score">0</span>
+			<span class="war-side-meta">
+				<span id="name-them" class="war-side-name">Opponent</span>
+				<span id="roster-them" class="war-side-roster">0 fighting</span>
+			</span>
+		</div>
+	</header>
+
+	<p id="phase" class="war-phase" role="status" aria-live="polite" hidden></p>
+	<p id="lobby-note" class="war-lobby-note" hidden></p>
+
+	<!-- Controls. Hidden until joined; the stick is thumb-sized on phones. -->
+	<div id="controls" class="war-controls" hidden>
+		<div id="stick" class="war-stick no-orbit" aria-hidden="true">
+			<span id="stick-nub" class="war-stick-nub" aria-hidden="true"></span>
+		</div>
+		<div class="war-right">
+			<dl class="war-vitals" aria-label="Your record this battle">
+				<div><dt data-i18n="play_war.kills">Kills</dt><dd id="kills">0</dd></div>
+				<div><dt data-i18n="play_war.downs">Downs</dt><dd id="deaths">0</dd></div>
+			</dl>
+			<button id="attack" class="war-attack no-orbit" type="button" aria-keyshortcuts="Space F" data-i18n-html="play_war.firespace">Fire<small aria-hidden="true">space</small></button>
+			<button id="leave" class="war-leave no-orbit" type="button" data-i18n="play_war.leave">Leave</button>
+		</div>
+		<p id="downed" class="war-downed" role="status" hidden data-i18n="play_war.you_are_down_respawning_shortly">You are down, respawning shortly.</p>
+		<p class="war-keys" data-i18n="play_war.wasd_or_the_arrow_keys_to_move">WASD or the arrow keys to move</p>
+	</div>
+
+	<!-- Terminal states. Both are designed cards with the one way out. -->
+	<div id="result" class="war-modal" role="dialog" aria-modal="true" aria-labelledby="result-title" hidden>
+		<div class="war-modal-card">
+			<h2 id="result-title" class="war-result-title" data-i18n="play_war.battle_over">Battle over</h2>
+			<p id="result-score" class="war-result-score"></p>
+			<p id="result-reason" class="war-modal-b"></p>
+			<p id="result-mvp" class="war-modal-b war-modal-faint"></p>
+			<button id="result-back" class="war-modal-btn" type="button" data-i18n="play_war.back_to_the_world">Back to the world</button>
+		</div>
+	</div>
+
+	<div id="fail" class="war-modal" role="dialog" aria-modal="true" aria-labelledby="fail-title" hidden>
+		<div class="war-modal-card">
+			<h2 id="fail-title" class="war-fail-title" data-i18n="play_war.no_battle_to_join">No battle to join</h2>
+			<p id="fail-detail" class="war-modal-b"></p>
+			<button id="fail-back" class="war-modal-btn" type="button" data-i18n="play_war.back_to_the_world_2">Back to the world</button>
+			<!-- The war room. src/play/war-board.js fills this from /api/wars with
+			     the battles running now, the communities queued for an opponent
+			     and the top of the ladder, so a card that says "no battle here"
+			     always ends in a door into a world that has one. -->
+			<div id="fail-board"></div>
+		</div>
+	</div>
+
+	<script type="module" src="/src/play/war.js"></script>
+	<script type="module" src="/i18n.js"></script>
+</body>
+</html>

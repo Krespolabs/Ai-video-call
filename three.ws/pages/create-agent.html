@@ -1,0 +1,2662 @@
+<!doctype html>
+<html lang="en">
+	<head>
+		<script>/* three.ws theme boot — no-flash; runtime in /theme-switcher.js */(function(){try{var m=localStorage.getItem('twx_theme');var l=m==='auto'?(window.matchMedia&&window.matchMedia('(prefers-color-scheme: light)').matches):m==='light';document.documentElement.setAttribute('data-theme',l?'light':'dark');}catch(e){document.documentElement.setAttribute('data-theme','dark');}})();</script>
+		<meta charset="utf-8" />
+		<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+		<title data-i18n="create_agent.meta_title">Create an agent · three.ws</title>
+		<meta name="theme-color" content="#000000" />
+		<meta name="mobile-web-app-capable" content="yes" />
+		<meta name="apple-mobile-web-app-capable" content="yes" />
+		<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+		<meta name="apple-mobile-web-app-title" content="three.ws" />
+		<link rel="icon" href="/favicon.ico" sizes="any" />
+		<link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+		<link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png" />
+		<link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png" />
+		<link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+		<link rel="manifest" href="/manifest.webmanifest" />
+		<meta
+			name="description"
+			content="Create a 3D AI agent step by step — name it, give it a body, pick its skills, set its personality, and ship it on-chain."
+		 data-i18n-attr="content:create_agent.meta_description"/>
+		<meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1" />
+
+		<meta property="og:type" content="website" />
+		<meta property="og:site_name" content="three.ws" />
+		<meta property="og:url" content="https://three.ws/create-agent" />
+		<meta property="og:title" content="Create an agent · three.ws"  data-i18n-attr="content:create_agent.meta_og_title"/>
+		<meta
+			property="og:description"
+			content="Create a 3D AI agent step by step — name it, give it a body, pick its skills, set its personality, and ship it on-chain."
+		 data-i18n-attr="content:create_agent.meta_og_description"/>
+		<meta property="og:image" content="https://three.ws/api/page-og?s=build&amp;t=Create+an+Agent&amp;d=Step-by-step+wizard+to+create+a+3D+AI+agent%3A+name%2C+3D+body%2C+skills%2C+personality%2C+voice%2C+and+on-chain+identity.&amp;p=%2Fcreate-agent" />
+		<meta property="og:image:width" content="1200" />
+		<meta property="og:image:height" content="630" />
+		<meta name="twitter:card" content="summary_large_image" />
+		<meta name="twitter:title" content="Create an agent · three.ws"  data-i18n-attr="content:create_agent.meta_twitter_title"/>
+		<meta
+			name="twitter:description"
+			content="Create a 3D AI agent step by step — name it, give it a body, pick its skills, set its personality, and ship it on-chain."
+		 data-i18n-attr="content:create_agent.meta_twitter_description"/>
+		<meta name="twitter:image" content="https://three.ws/api/page-og?s=build&amp;t=Create+an+Agent&amp;d=Step-by-step+wizard+to+create+a+3D+AI+agent%3A+name%2C+3D+body%2C+skills%2C+personality%2C+voice%2C+and+on-chain+identity.&amp;p=%2Fcreate-agent" />
+
+		<link rel="stylesheet" href="/fonts/fonts.css" />
+		<link rel="stylesheet" href="/nav.css" />
+		<link rel="stylesheet" href="/footer.css" />
+		<link rel="stylesheet" href="/mobile.css" />
+		<link rel="stylesheet" href="/buttons.css" />
+		<script defer src="/footer-newsletter.js"></script>
+
+		<style>
+			:root {
+				color-scheme: dark;
+				--accent: #ffffff;
+				--accent-ink: #000000;
+				--bg: #000000;
+				--panel: var(--bg-0);
+				--panel-2: #101010;
+				--border: var(--stroke);
+				--border-strong: #2a2a2a;
+				--text: var(--ink);
+				--muted: var(--ink-dim);
+				/* 0.55, not 0.45: on the #000 bg 0.45 composites to ~4.0:1, under the
+				   4.5:1 axe AA floor; 0.55 measures ~5.8:1. */
+				--faint: rgba(255, 255, 255, 0.55);
+				--ok: var(--success);
+				--err: var(--danger);
+				--font-display: 'Space Grotesk', 'Inter', system-ui, sans-serif;
+				--header-h: 3.5rem;
+			}
+			* {
+				box-sizing: border-box;
+			}
+			html,
+			body {
+				margin: 0;
+				padding: 0;
+			}
+			body {
+				font:
+					15px/1.55 'Inter',
+					system-ui,
+					sans-serif;
+				color: var(--text);
+				background: var(--bg);
+				min-height: 100vh;
+				overflow-x: hidden;
+			}
+			body::before {
+				content: '';
+				position: fixed;
+				inset: 0;
+				z-index: -1;
+				pointer-events: none;
+				background:
+					radial-gradient(
+						820px 520px at 50% -120px,
+						rgba(255, 255, 255, 0.035) 0,
+						transparent 70%
+					),
+					#000;
+			}
+			.skip-link {
+				position: absolute;
+				left: -9999px;
+			}
+			.skip-link:focus {
+				left: 1rem;
+				top: 1rem;
+				padding: 0.5rem 1rem;
+				background: var(--panel);
+				border: 1px solid var(--border);
+				border-radius: 8px;
+				z-index: 9999;
+			}
+
+			/* ── Page loading veil ──────────────────────────────────────────── */
+			#page-loading {
+				position: fixed;
+				inset: 0;
+				z-index: 9999;
+				background: #000;
+				display: flex;
+				flex-direction: column;
+				align-items: center;
+				justify-content: center;
+				gap: 18px;
+			}
+			#page-loading img {
+				width: 56px;
+				height: 56px;
+				animation: pulse 1.6s ease-in-out infinite;
+			}
+			#page-loading .dots {
+				color: rgba(255, 255, 255, 0.6);
+				font-size: 22px;
+				letter-spacing: 4px;
+			}
+			@keyframes pulse {
+				0%,
+				100% {
+					opacity: 0.55;
+					transform: scale(1);
+				}
+				50% {
+					opacity: 1;
+					transform: scale(1.06);
+				}
+			}
+
+			/* ── Layout ─────────────────────────────────────────────────────── */
+			main.stage {
+				max-width: 840px;
+				margin: 0 auto;
+				padding: 44px 24px 96px;
+			}
+			.wizard-head {
+				text-align: center;
+				max-width: 600px;
+				margin: 0 auto 28px;
+			}
+			.wizard-title {
+				font-family: var(--font-display);
+				font-size: clamp(26px, 4.6vw, 36px);
+				font-weight: 600;
+				margin: 0 0 10px;
+				letter-spacing: -0.025em;
+				line-height: 1.1;
+				background: linear-gradient(180deg, #fff 0%, #b8b8b8 100%);
+				-webkit-background-clip: text;
+				background-clip: text;
+				-webkit-text-fill-color: transparent;
+			}
+			.wizard-sub {
+				color: var(--muted);
+				font-size: 14.5px;
+				margin: 0;
+			}
+			/* "No account needed to build" reassurance for signed-out visitors,
+			   so the try-first flow reads as intentional. Toggled by create-agent.js. */
+			.build-free-note {
+				display: inline-flex; align-items: center; gap: 8px;
+				margin: 14px auto 0; padding: 6px 14px;
+				font-size: 13px; color: var(--ink, #e8e8ea);
+				background: color-mix(in srgb, var(--accent, #7c5cff) 12%, transparent);
+				border: 1px solid color-mix(in srgb, var(--accent, #7c5cff) 32%, transparent);
+				border-radius: 999px;
+				animation: build-free-in 0.5s cubic-bezier(0.16, 1, 0.3, 1) both;
+			}
+			.build-free-dot {
+				width: 7px; height: 7px; border-radius: 50%;
+				background: var(--accent, #7c5cff);
+				animation: build-free-pulse 2.4s ease-in-out infinite;
+			}
+			@keyframes build-free-in { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: none; } }
+			@keyframes build-free-pulse {
+				0%, 100% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--accent, #7c5cff) 55%, transparent); }
+				50% { box-shadow: 0 0 0 5px color-mix(in srgb, var(--accent, #7c5cff) 0%, transparent); }
+			}
+			@media (prefers-reduced-motion: reduce) {
+				.build-free-note, .build-free-dot { animation: none; }
+			}
+
+			/* ── Stepper ────────────────────────────────────────────────────── */
+			.stepper {
+				display: flex;
+				align-items: center;
+				justify-content: center;
+				gap: 0;
+				margin: 0 auto 30px;
+				max-width: 720px;
+				list-style: none;
+				padding: 0;
+				flex-wrap: wrap;
+			}
+			.step-pip {
+				display: flex;
+			}
+			/* The pip's interactive core is a real button so completed steps are
+			   reachable by keyboard, not just by mouse. Reset it to look exactly
+			   like the inline text row it replaced. */
+			.step-pip-btn {
+				display: flex;
+				align-items: center;
+				gap: 9px;
+				color: var(--muted);
+				font-size: 12.5px;
+				font-weight: 500;
+				white-space: nowrap;
+				appearance: none;
+				background: none;
+				border: 0;
+				margin: 0;
+				padding: 0;
+				font-family: inherit;
+				cursor: default;
+			}
+			.step-pip-btn:disabled {
+				/* Not-yet-reached steps are inert, but must not read as greyed-out
+				   chrome: the pip is the progress indicator either way. */
+				opacity: 1;
+			}
+			.step-pip-btn:focus-visible {
+				outline: 2px solid var(--accent);
+				outline-offset: 3px;
+				border-radius: 999px;
+			}
+			.step-pip .num {
+				width: 26px;
+				height: 26px;
+				border-radius: 50%;
+				display: grid;
+				place-items: center;
+				border: 1.5px solid var(--border-strong);
+				background: var(--panel);
+				font-size: 12px;
+				font-weight: 600;
+				color: var(--muted);
+				transition:
+					background var(--duration-base),
+					border-color var(--duration-base),
+					color var(--duration-base),
+					transform var(--duration-base);
+				flex: 0 0 auto;
+			}
+			.step-pip[data-state='active'] .step-pip-btn {
+				color: var(--text);
+			}
+			.step-pip[data-state='active'] .num {
+				background: var(--accent);
+				border-color: var(--accent);
+				color: var(--accent-ink);
+				transform: scale(1.06);
+			}
+			.step-pip[data-state='done'] .step-pip-btn {
+				color: var(--text);
+			}
+			.step-pip[data-state='done'] .num {
+				background: rgba(74, 222, 128, 0.12);
+				border-color: rgba(74, 222, 128, 0.5);
+				color: var(--ok);
+			}
+			.step-pip[data-clickable='true'] .step-pip-btn {
+				cursor: pointer;
+			}
+			.step-pip[data-clickable='true'] .step-pip-btn:hover .num,
+			.step-pip[data-clickable='true'] .step-pip-btn:focus-visible .num {
+				border-color: var(--accent);
+			}
+			.step-pip[data-clickable='true'] .step-pip-btn:active .num {
+				transform: scale(0.94);
+			}
+			.step-pip .label {
+				display: none;
+			}
+			.step-bar {
+				flex: 1 1 18px;
+				min-width: 14px;
+				max-width: 48px;
+				height: 1.5px;
+				background: var(--border-strong);
+				margin: 0 4px;
+			}
+			.step-bar[data-state='done'] {
+				background: rgba(74, 222, 128, 0.5);
+			}
+			@media (min-width: 720px) {
+				.step-pip .label {
+					display: inline;
+				}
+			}
+
+			/* ── Card / panel ───────────────────────────────────────────────── */
+			.wizard-card {
+				border: 1px solid var(--border);
+				border-radius: 18px;
+				background: var(--panel);
+				box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+				overflow: hidden;
+			}
+			.wizard-body {
+				padding: 30px 30px 26px;
+			}
+			.panel {
+				display: none;
+				animation: panel-in 0.32s cubic-bezier(0.22, 1, 0.36, 1) both;
+			}
+			.panel.is-active {
+				display: block;
+			}
+			@keyframes panel-in {
+				from {
+					opacity: 0;
+					transform: translateY(8px);
+				}
+				to {
+					opacity: 1;
+					transform: translateY(0);
+				}
+			}
+			.panel-eyebrow {
+				font-size: 11px;
+				font-weight: 600;
+				letter-spacing: 0.09em;
+				text-transform: uppercase;
+				color: var(--faint);
+				margin: 0 0 6px;
+			}
+			.panel-title {
+				font-family: var(--font-display);
+				font-size: 21px;
+				font-weight: 600;
+				margin: 0 0 6px;
+				letter-spacing: -0.015em;
+			}
+			.panel-help {
+				color: var(--muted);
+				font-size: 13.5px;
+				margin: 0 0 22px;
+				line-height: 1.55;
+			}
+
+			/* ── Fields ─────────────────────────────────────────────────────── */
+			.field {
+				margin-bottom: 20px;
+			}
+			.field:last-child {
+				margin-bottom: 0;
+			}
+			.field-label {
+				display: flex;
+				align-items: baseline;
+				justify-content: space-between;
+				gap: 10px;
+				font-size: 13px;
+				font-weight: 600;
+				margin: 0 0 7px;
+				color: var(--text);
+			}
+			.field-label .req {
+				color: var(--err);
+				font-weight: 700;
+			}
+			.field-label .count {
+				font-size: 11.5px;
+				font-weight: 500;
+				color: var(--faint);
+			}
+			.field-hint {
+				font-size: 12px;
+				color: var(--muted);
+				margin: 6px 0 0;
+				line-height: 1.5;
+			}
+			.input,
+			.textarea,
+			.select {
+				width: 100%;
+				background: var(--panel-2);
+				border: 1px solid var(--border-strong);
+				border-radius: 10px;
+				color: var(--text);
+				font: inherit;
+				font-size: 14px;
+				padding: 11px 13px;
+				transition:
+					border-color var(--duration-fast),
+					box-shadow var(--duration-fast),
+					background var(--duration-fast);
+				outline: none;
+			}
+			.textarea {
+				resize: vertical;
+				min-height: 84px;
+				line-height: 1.5;
+			}
+			.input:focus,
+			.textarea:focus,
+			.select:focus {
+				border-color: rgba(255, 255, 255, 0.5);
+				box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.06);
+				background: #141414;
+			}
+			.input::placeholder,
+			.textarea::placeholder {
+				color: #555;
+			}
+			.input.is-invalid,
+			.select.is-invalid {
+				border-color: rgba(248, 113, 113, 0.6);
+				box-shadow: 0 0 0 3px rgba(248, 113, 113, 0.1);
+			}
+			.select {
+				appearance: none;
+				background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%23888' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E");
+				background-repeat: no-repeat;
+				background-position: right 13px center;
+				padding-right: 34px;
+				cursor: pointer;
+			}
+			.field-error {
+				display: none;
+				color: var(--err);
+				font-size: 12px;
+				margin: 7px 0 0;
+			}
+			.field-error.show {
+				display: block;
+			}
+
+			/* ── Magic generator (zero-typing entry) ───────────────────────── */
+			.magic {
+				position: relative;
+				border-radius: 14px;
+				padding: 18px 18px 16px;
+				margin: 0 0 26px;
+				background:
+					radial-gradient(120% 140% at 0% 0%, rgba(255, 255, 255, 0.06), transparent 55%),
+					var(--panel-2);
+				border: 1px solid var(--border-strong);
+				overflow: hidden;
+			}
+			.magic::before {
+				content: '';
+				position: absolute;
+				inset: 0;
+				border-radius: 14px;
+				padding: 1px;
+				background: linear-gradient(120deg, rgba(255, 255, 255, 0.28), transparent 40%, transparent 60%, rgba(255, 255, 255, 0.18));
+				-webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+				-webkit-mask-composite: xor;
+				mask-composite: exclude;
+				pointer-events: none;
+				opacity: 0.55;
+			}
+			.magic-head {
+				display: flex;
+				align-items: center;
+				gap: 9px;
+				margin: 0 0 4px;
+			}
+			.magic-head svg {
+				width: 17px;
+				height: 17px;
+				color: var(--text);
+				flex: none;
+			}
+			.magic-title {
+				font-family: var(--font-display);
+				font-size: 15px;
+				font-weight: 600;
+				margin: 0;
+				letter-spacing: -0.01em;
+			}
+			.magic-sub {
+				color: var(--muted);
+				font-size: 12.5px;
+				margin: 0 0 13px;
+				line-height: 1.5;
+			}
+			.magic-row {
+				display: flex;
+				gap: 9px;
+				align-items: stretch;
+			}
+			.magic-input {
+				flex: 1;
+				background: #0c0c0c;
+				border: 1px solid var(--border-strong);
+				border-radius: 10px;
+				color: var(--text);
+				font: inherit;
+				font-size: 14px;
+				padding: 11px 13px;
+				resize: none;
+				min-height: 46px;
+				line-height: 1.45;
+				transition: border-color var(--duration-fast), box-shadow var(--duration-fast);
+				outline: none;
+			}
+			.magic-input:focus {
+				border-color: rgba(255, 255, 255, 0.5);
+				box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.06);
+			}
+			.magic-input::placeholder {
+				color: #555;
+			}
+			.magic-go {
+				flex: none;
+				display: inline-flex;
+				align-items: center;
+				justify-content: center;
+				gap: 7px;
+				padding: 0 18px;
+				min-width: 128px;
+				border-radius: 10px;
+				border: 0;
+				background: var(--accent);
+				color: var(--accent-ink);
+				font: inherit;
+				font-size: 13.5px;
+				font-weight: 600;
+				cursor: pointer;
+				transition: transform var(--duration-fast), opacity var(--duration-fast), box-shadow var(--duration-fast);
+			}
+			.magic-go svg {
+				width: 15px;
+				height: 15px;
+			}
+			.magic-go:hover {
+				box-shadow: 0 0 0 4px rgba(255, 255, 255, 0.08);
+			}
+			.magic-go:active {
+				transform: translateY(1px);
+			}
+			.magic-go:disabled {
+				opacity: 0.6;
+				cursor: default;
+				box-shadow: none;
+			}
+			.magic-spin {
+				width: 14px;
+				height: 14px;
+				border: 2px solid rgba(0, 0, 0, 0.25);
+				border-top-color: var(--accent-ink);
+				border-radius: 50%;
+				animation: magic-rot 0.7s linear infinite;
+				display: none;
+			}
+			.magic-go[aria-busy='true'] .magic-spin {
+				display: inline-block;
+			}
+			.magic-go[aria-busy='true'] .magic-go-icon {
+				display: none;
+			}
+			@keyframes magic-rot {
+				to {
+					transform: rotate(360deg);
+				}
+			}
+			.magic-chips {
+				display: flex;
+				flex-wrap: wrap;
+				gap: 7px;
+				margin: 12px 0 0;
+				align-items: center;
+			}
+			.magic-chips .lead {
+				font-size: 11.5px;
+				color: var(--faint);
+				margin-right: 1px;
+			}
+			.magic-chip {
+				display: inline-flex;
+				align-items: center;
+				min-height: 32px;
+				background: rgba(255, 255, 255, 0.04);
+				border: 1px solid var(--border-strong);
+				border-radius: 999px;
+				color: var(--muted);
+				font: inherit;
+				font-size: 12px;
+				padding: 5px 11px;
+				cursor: pointer;
+				transition: color var(--duration-fast), border-color var(--duration-fast), background var(--duration-fast);
+			}
+			.magic-chip:hover {
+				color: var(--text);
+				border-color: rgba(255, 255, 255, 0.4);
+				background: rgba(255, 255, 255, 0.07);
+			}
+			.magic-chip.surprise {
+				margin-left: auto;
+				color: var(--text);
+			}
+			.magic-msg {
+				font-size: 12.5px;
+				margin: 11px 0 0;
+				min-height: 1px;
+				line-height: 1.5;
+			}
+			.magic-msg.err {
+				color: var(--err);
+			}
+			.magic-msg.ok {
+				color: var(--ok);
+			}
+			.magic-divider {
+				display: flex;
+				align-items: center;
+				gap: 12px;
+				margin: 0 0 22px;
+				color: var(--faint);
+				font-size: 11.5px;
+				text-transform: uppercase;
+				letter-spacing: 0.08em;
+			}
+			.magic-divider::before,
+			.magic-divider::after {
+				content: '';
+				flex: 1;
+				height: 1px;
+				background: var(--border);
+			}
+			@media (max-width: 560px) {
+				.magic-row {
+					flex-direction: column;
+				}
+				.magic-go {
+					min-width: 0;
+					padding: 11px 18px;
+				}
+				.magic-chip.surprise {
+					margin-left: 0;
+				}
+			}
+
+			/* ── Tag / chip input ───────────────────────────────────────────── */
+			.tagbox {
+				display: flex;
+				flex-wrap: wrap;
+				gap: 7px;
+				align-items: center;
+				background: var(--panel-2);
+				border: 1px solid var(--border-strong);
+				border-radius: 10px;
+				padding: 8px 10px;
+				transition: border-color var(--duration-fast);
+			}
+			.tagbox:focus-within {
+				border-color: rgba(255, 255, 255, 0.5);
+			}
+			.tag {
+				display: inline-flex;
+				align-items: center;
+				gap: 6px;
+				background: rgba(255, 255, 255, 0.07);
+				border: 1px solid var(--border-strong);
+				border-radius: 7px;
+				padding: 3px 5px 3px 9px;
+				font-size: 12.5px;
+				color: var(--text);
+				animation: panel-in 0.18s ease both;
+			}
+			.tag button {
+				display: grid;
+				place-items: center;
+				width: 16px;
+				height: 16px;
+				border: 0;
+				border-radius: 4px;
+				background: transparent;
+				color: var(--muted);
+				cursor: pointer;
+				font-size: 14px;
+				line-height: 1;
+				padding: 0;
+				transition:
+					background var(--duration-fast),
+					color var(--duration-fast);
+			}
+			.tag button:hover {
+				background: rgba(255, 255, 255, 0.12);
+				color: #fff;
+			}
+			.tagbox input {
+				flex: 1;
+				min-width: 100px;
+				border: 0;
+				background: transparent;
+				color: var(--text);
+				font: inherit;
+				font-size: 14px;
+				padding: 4px 2px;
+				outline: none;
+			}
+			.tagbox input::placeholder {
+				color: #555;
+			}
+
+			/* ── Selectable option grid (model / skills / voice) ────────────── */
+			.opt-grid {
+				display: grid;
+				gap: 12px;
+			}
+			.opt-grid.cols-2 {
+				grid-template-columns: repeat(2, 1fr);
+			}
+			.opt-grid.cols-3 {
+				grid-template-columns: repeat(3, 1fr);
+			}
+			.opt {
+				position: relative;
+				display: flex;
+				flex-direction: column;
+				gap: 8px;
+				text-align: left;
+				padding: 15px;
+				border: 1.5px solid var(--border-strong);
+				border-radius: 13px;
+				background: var(--panel-2);
+				color: inherit;
+				font: inherit;
+				cursor: pointer;
+				transition:
+					border-color var(--duration-fast),
+					background var(--duration-fast),
+					transform var(--duration-fast);
+			}
+			.opt:hover {
+				border-color: rgba(255, 255, 255, 0.3);
+				transform: translateY(-1px);
+			}
+			.opt:focus-visible {
+				outline: 2px solid var(--accent);
+				outline-offset: 2px;
+			}
+			.opt[aria-pressed='true'],
+			.opt.is-selected {
+				border-color: var(--accent);
+				background: rgba(255, 255, 255, 0.05);
+			}
+			.opt[aria-pressed='true']::after,
+			.opt.is-selected::after {
+				content: '';
+				position: absolute;
+				top: 11px;
+				right: 11px;
+				width: 18px;
+				height: 18px;
+				border-radius: 50%;
+				background: var(--accent)
+					url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='3.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='20 6 9 17 4 12'/%3E%3C/svg%3E")
+					center / 12px no-repeat;
+			}
+			.opt-icon {
+				width: 34px;
+				height: 34px;
+				border-radius: 9px;
+				background: rgba(255, 255, 255, 0.05);
+				border: 1px solid var(--border-strong);
+				display: grid;
+				place-items: center;
+				color: #cfd2e0;
+			}
+			.opt-icon svg {
+				width: 18px;
+				height: 18px;
+			}
+			.opt-name {
+				font-size: 14px;
+				font-weight: 600;
+				letter-spacing: -0.01em;
+			}
+			.opt-desc {
+				font-size: 12px;
+				color: var(--muted);
+				line-height: 1.5;
+			}
+
+			/* ── Model step ─────────────────────────────────────────────────── */
+			.model-preview {
+				margin-top: 18px;
+				height: 260px;
+				border: 1px solid var(--border);
+				border-radius: 14px;
+				background:
+					radial-gradient(
+						circle at 50% 28%,
+						rgba(255, 255, 255, 0.05) 0,
+						transparent 60%
+					),
+					rgba(255, 255, 255, 0.015);
+				overflow: hidden;
+				position: relative;
+			}
+			.model-preview model-viewer {
+				width: 100%;
+				height: 100%;
+				--poster-color: transparent;
+			}
+			.model-preview-empty {
+				position: absolute;
+				inset: 0;
+				display: flex;
+				flex-direction: column;
+				align-items: center;
+				justify-content: center;
+				gap: 8px;
+				color: var(--faint);
+				font-size: 12.5px;
+				text-align: center;
+				padding: 20px;
+			}
+			.model-preview-empty svg {
+				width: 30px;
+				height: 30px;
+				opacity: 0.5;
+			}
+			.starter-grid {
+				display: grid;
+				grid-template-columns: repeat(4, 1fr);
+				gap: 10px;
+				margin-top: 6px;
+			}
+			.starter {
+				border: 1.5px solid var(--border-strong);
+				border-radius: 12px;
+				background: var(--panel-2);
+				padding: 8px;
+				cursor: pointer;
+				transition:
+					border-color var(--duration-fast),
+					transform var(--duration-fast);
+				display: flex;
+				flex-direction: column;
+				gap: 6px;
+				align-items: center;
+			}
+			.starter:hover {
+				border-color: rgba(255, 255, 255, 0.3);
+				transform: translateY(-1px);
+			}
+			.starter:focus-visible {
+				outline: 2px solid var(--accent);
+				outline-offset: 2px;
+			}
+			.starter.is-selected {
+				border-color: var(--accent);
+				background: rgba(255, 255, 255, 0.05);
+			}
+			.starter-thumb {
+				width: 100%;
+				aspect-ratio: 1;
+				border-radius: 8px;
+				background:
+					radial-gradient(
+						circle at 50% 35%,
+						rgba(255, 255, 255, 0.06) 0,
+						transparent 65%
+					),
+					rgba(255, 255, 255, 0.02);
+				display: grid;
+				place-items: center;
+				overflow: hidden;
+			}
+			.starter-thumb model-viewer {
+				width: 100%;
+				height: 100%;
+			}
+			.starter-name {
+				font-size: 11.5px;
+				color: var(--muted);
+				font-weight: 500;
+			}
+			.starter.is-selected .starter-name {
+				color: var(--text);
+			}
+			.lib-noprev {
+				font-size: 12px;
+				font-weight: 600;
+				letter-spacing: 0.04em;
+				color: var(--faint);
+			}
+			.dropzone {
+				margin-top: 6px;
+				border: 1.5px dashed var(--border-strong);
+				border-radius: 12px;
+				padding: 26px 20px;
+				text-align: center;
+				cursor: pointer;
+				transition:
+					border-color var(--duration-fast),
+					background var(--duration-fast);
+				color: var(--muted);
+			}
+			.dropzone:hover,
+			.dropzone.is-drag {
+				border-color: rgba(255, 255, 255, 0.45);
+				background: rgba(255, 255, 255, 0.02);
+				color: var(--text);
+			}
+			.dropzone svg {
+				width: 26px;
+				height: 26px;
+				opacity: 0.6;
+				margin-bottom: 8px;
+			}
+			.dropzone-title {
+				font-size: 13.5px;
+				font-weight: 600;
+				color: var(--text);
+			}
+			.dropzone-sub {
+				font-size: 12px;
+				margin-top: 3px;
+			}
+			.dropzone .file-name {
+				color: var(--ok);
+				font-weight: 600;
+			}
+			.model-tabs {
+				display: flex;
+				gap: 6px;
+				margin-bottom: 14px;
+				border-bottom: 1px solid var(--border);
+			}
+			.model-tab {
+				appearance: none;
+				border: 0;
+				background: transparent;
+				color: var(--muted);
+				font: inherit;
+				font-size: 13px;
+				font-weight: 500;
+				padding: 8px 12px;
+				cursor: pointer;
+				border-bottom: 2px solid transparent;
+				margin-bottom: -1px;
+				transition:
+					color var(--duration-fast),
+					border-color var(--duration-fast);
+			}
+			.model-tab:hover {
+				color: var(--text);
+			}
+			.model-tab.is-active {
+				color: var(--text);
+				border-bottom-color: var(--accent);
+			}
+			.model-pane {
+				display: none;
+			}
+			.model-pane.is-active {
+				display: block;
+			}
+
+			/* ── Skills ─────────────────────────────────────────────────────── */
+			.skill-row {
+				display: flex;
+				align-items: center;
+				gap: 12px;
+				padding: 12px 14px;
+				border: 1px solid var(--border-strong);
+				border-radius: 11px;
+				background: var(--panel-2);
+				margin-bottom: 9px;
+				transition: border-color var(--duration-fast);
+			}
+			.skill-row.locked {
+				opacity: 0.85;
+			}
+			.skill-info {
+				flex: 1;
+				min-width: 0;
+			}
+			.skill-name {
+				font-size: 13.5px;
+				font-weight: 600;
+				display: flex;
+				align-items: center;
+				gap: 8px;
+			}
+			.skill-name .core-pill {
+				font-size: 9.5px;
+				font-weight: 600;
+				letter-spacing: 0.05em;
+				text-transform: uppercase;
+				color: var(--faint);
+				border: 1px solid var(--border-strong);
+				border-radius: 5px;
+				padding: 1px 5px;
+			}
+			.skill-desc {
+				font-size: 12px;
+				color: var(--muted);
+				margin-top: 2px;
+				line-height: 1.45;
+			}
+			/* toggle */
+			.toggle {
+				position: relative;
+				width: 40px;
+				height: 23px;
+				flex: 0 0 auto;
+				cursor: pointer;
+			}
+			.toggle input {
+				position: absolute;
+				opacity: 0;
+				width: 100%;
+				height: 100%;
+				margin: 0;
+				cursor: pointer;
+			}
+			.toggle .track {
+				position: absolute;
+				inset: 0;
+				border-radius: 999px;
+				background: #2a2a2a;
+				border: 1px solid var(--border-strong);
+				transition: background var(--duration-fast);
+			}
+			.toggle .knob {
+				position: absolute;
+				top: 3px;
+				left: 3px;
+				width: 16px;
+				height: 16px;
+				border-radius: 50%;
+				background: var(--ink-dim);
+				transition:
+					transform var(--duration-fast),
+					background var(--duration-fast);
+			}
+			.toggle input:checked ~ .track {
+				background: rgba(255, 255, 255, 0.9);
+				border-color: transparent;
+			}
+			.toggle input:checked ~ .knob {
+				transform: translateX(17px);
+				background: #000;
+			}
+			.toggle input:disabled {
+				cursor: not-allowed;
+			}
+			.toggle input:focus-visible ~ .track {
+				box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.18);
+			}
+			.skills-meta {
+				font-size: 12px;
+				color: var(--muted);
+				margin: 16px 0 0;
+				text-align: center;
+			}
+
+			/* ── Review ─────────────────────────────────────────────────────── */
+			.review-grid {
+				display: grid;
+				gap: 12px;
+			}
+			.review-row {
+				display: flex;
+				gap: 14px;
+				padding: 14px 16px;
+				border: 1px solid var(--border-strong);
+				border-radius: 12px;
+				background: var(--panel-2);
+				align-items: flex-start;
+			}
+			.review-key {
+				flex: 0 0 96px;
+				font-size: 12px;
+				font-weight: 600;
+				color: var(--faint);
+				text-transform: uppercase;
+				letter-spacing: 0.05em;
+				padding-top: 1px;
+			}
+			.review-val {
+				flex: 1;
+				min-width: 0;
+				font-size: 13.5px;
+				color: var(--text);
+				line-height: 1.5;
+				word-break: break-word;
+			}
+			.review-val .dim {
+				color: var(--muted);
+			}
+			.review-val .chips {
+				display: flex;
+				flex-wrap: wrap;
+				gap: 6px;
+				margin-top: 2px;
+			}
+			.review-val .mini-chip {
+				font-size: 11.5px;
+				padding: 2px 8px;
+				border-radius: 6px;
+				background: rgba(255, 255, 255, 0.06);
+				border: 1px solid var(--border-strong);
+				color: var(--text);
+			}
+			.review-edit {
+				background: 0;
+				border: 0;
+				color: var(--faint);
+				font: inherit;
+				font-size: 12px;
+				cursor: pointer;
+				padding: 0;
+				text-decoration: underline;
+				text-underline-offset: 2px;
+				white-space: nowrap;
+				align-self: center;
+			}
+			.review-edit:hover {
+				color: var(--text);
+			}
+			.publish-box {
+				display: flex;
+				gap: 12px;
+				align-items: flex-start;
+				margin-top: 16px;
+				padding: 14px 16px;
+				border: 1px solid var(--border-strong);
+				border-radius: 12px;
+				background: rgba(255, 255, 255, 0.02);
+			}
+			.publish-box .toggle {
+				margin-top: 1px;
+			}
+			.publish-text strong {
+				font-size: 13.5px;
+				display: block;
+				margin-bottom: 2px;
+			}
+			.publish-text span {
+				font-size: 12px;
+				color: var(--muted);
+				line-height: 1.5;
+			}
+
+			/* ── Footer nav (prev/next) ─────────────────────────────────────── */
+			.wizard-foot {
+				display: flex;
+				align-items: center;
+				justify-content: space-between;
+				gap: 12px;
+				padding: 18px 30px;
+				border-top: 1px solid var(--border);
+				background: rgba(255, 255, 255, 0.015);
+			}
+			/* ── Onboarding interview (step 4) ────────────────────────────── */
+			.interview {
+				border: 1px solid var(--border-strong);
+				border-radius: 14px;
+				background: var(--panel-2);
+				padding: 16px 18px;
+				margin: 0 0 22px;
+			}
+			.interview-head {
+				display: flex;
+				align-items: center;
+				justify-content: space-between;
+				gap: 14px;
+			}
+			.interview-title {
+				font-size: 13.5px;
+				font-weight: 600;
+				margin: 0 0 3px;
+			}
+			.interview-sub {
+				font-size: 12.5px;
+				color: var(--muted);
+				margin: 0;
+				line-height: 1.5;
+			}
+			.interview-toggle {
+				flex: none;
+				background: var(--accent);
+				color: var(--accent-ink);
+				border: 0;
+				border-radius: 9px;
+				font: inherit;
+				font-size: 13px;
+				font-weight: 600;
+				padding: 8px 16px;
+				cursor: pointer;
+				transition:
+					box-shadow var(--duration-fast),
+					transform var(--duration-fast),
+					opacity var(--duration-fast);
+			}
+			.interview-toggle:hover {
+				box-shadow: 0 0 0 4px rgba(255, 255, 255, 0.08);
+			}
+			.interview-toggle:active {
+				transform: translateY(1px);
+			}
+			.interview-toggle:focus-visible {
+				outline: 2px solid var(--accent);
+				outline-offset: 2px;
+			}
+			.interview-body {
+				margin-top: 18px;
+			}
+			.interview-q {
+				margin-bottom: 16px;
+			}
+			.interview-q .textarea {
+				min-height: 58px;
+				font-size: 13.5px;
+			}
+			.interview-foot {
+				display: flex;
+				align-items: center;
+				gap: 16px;
+				margin-top: 2px;
+			}
+			.interview-generate {
+				display: inline-flex;
+				align-items: center;
+				gap: 8px;
+				background: var(--accent);
+				color: var(--accent-ink);
+				border: 0;
+				border-radius: 9px;
+				font: inherit;
+				font-size: 13px;
+				font-weight: 600;
+				padding: 9px 16px;
+				cursor: pointer;
+				transition:
+					box-shadow var(--duration-fast),
+					transform var(--duration-fast),
+					opacity var(--duration-fast);
+			}
+			.interview-generate:hover:not(:disabled) {
+				box-shadow: 0 0 0 4px rgba(255, 255, 255, 0.08);
+			}
+			.interview-generate:active:not(:disabled) {
+				transform: translateY(1px);
+			}
+			.interview-generate:disabled {
+				opacity: 0.45;
+				cursor: default;
+			}
+			.interview-generate:focus-visible {
+				outline: 2px solid var(--accent);
+				outline-offset: 2px;
+			}
+			.interview-spin {
+				width: 13px;
+				height: 13px;
+				border: 2px solid rgba(0, 0, 0, 0.25);
+				border-top-color: var(--accent-ink);
+				border-radius: 50%;
+				animation: magic-rot 0.7s linear infinite;
+				display: none;
+			}
+			.interview-generate[aria-busy='true'] .interview-spin {
+				display: inline-block;
+			}
+			.interview-skip {
+				background: none;
+				border: none;
+				padding: 0;
+				font: inherit;
+				font-size: 12.5px;
+				color: var(--muted);
+				text-decoration: underline;
+				text-underline-offset: 2px;
+				cursor: pointer;
+				transition: color var(--duration-fast);
+			}
+			.interview-skip:hover {
+				color: var(--text);
+			}
+			.interview-skip:focus-visible {
+				outline: 2px solid var(--accent);
+				outline-offset: 2px;
+				border-radius: 2px;
+			}
+			.interview-status {
+				font-size: 12.5px;
+				margin: 11px 0 0;
+				min-height: 1px;
+				line-height: 1.5;
+			}
+			.interview-status.err {
+				color: var(--err);
+			}
+			.interview-status.ok {
+				color: var(--ok);
+			}
+			.interview-tags {
+				display: flex;
+				flex-wrap: wrap;
+				gap: 6px;
+				margin-top: 10px;
+			}
+			.interview-tag {
+				font-size: 11.5px;
+				color: var(--muted);
+				border: 1px solid var(--border-strong);
+				border-radius: 999px;
+				padding: 3px 10px;
+				background: rgba(255, 255, 255, 0.03);
+			}
+
+			.foot-msg {
+				flex: 1;
+				font-size: 12.5px;
+				color: var(--muted);
+				min-height: 18px;
+			}
+			.foot-msg.err {
+				color: var(--err);
+			}
+			.foot-msg.ok {
+				color: var(--ok);
+			}
+			.foot-msg .msg-link {
+				background: none;
+				border: none;
+				padding: 0;
+				font: inherit;
+				color: inherit;
+				text-decoration: underline;
+				text-underline-offset: 2px;
+				cursor: pointer;
+				transition: opacity var(--duration-fast) var(--ease-standard);
+			}
+			.foot-msg .msg-link:hover,
+			.foot-msg .msg-link:active {
+				opacity: 0.75;
+			}
+			.foot-msg .msg-link:focus-visible {
+				outline: 2px solid var(--accent);
+				outline-offset: 2px;
+				border-radius: 2px;
+			}
+			.foot-actions {
+				display: flex;
+				gap: 10px;
+				flex: 0 0 auto;
+			}
+
+			/* ── Auth gate ──────────────────────────────────────────────────── */
+			/* ── Success ────────────────────────────────────────────────────── */
+			.success {
+				display: none;
+				text-align: center;
+				padding: 24px 24px 12px;
+				animation: panel-in 0.4s ease both;
+			}
+			.success.show {
+				display: block;
+			}
+			.success-badge {
+				width: 60px;
+				height: 60px;
+				margin: 0 auto 18px;
+				border-radius: 50%;
+				display: grid;
+				place-items: center;
+				background: rgba(74, 222, 128, 0.12);
+				border: 1.5px solid rgba(74, 222, 128, 0.5);
+				color: var(--ok);
+			}
+			.success-badge svg {
+				width: 30px;
+				height: 30px;
+			}
+			.success h2 {
+				font-family: var(--font-display);
+				font-size: 23px;
+				margin: 0 0 8px;
+			}
+			.success p {
+				color: var(--muted);
+				font-size: 14px;
+				max-width: 420px;
+				margin: 0 auto 22px;
+			}
+			.success-preview {
+				width: 180px;
+				height: 180px;
+				margin: 0 auto 22px;
+				border: 1px solid var(--border);
+				border-radius: 16px;
+				overflow: hidden;
+				background: rgba(255, 255, 255, 0.02);
+			}
+			.success-preview model-viewer {
+				width: 100%;
+				height: 100%;
+			}
+			.success-actions {
+				display: flex;
+				gap: 10px;
+				justify-content: center;
+				flex-wrap: wrap;
+			}
+			/* Where this agent lives from now on. New creators told us the hard
+			   part was not building the agent, it was finding it again the next
+			   day, so the wizard says it out loud at the moment it is created. */
+			.success-find {
+				margin: 16px auto 0;
+				max-width: 460px;
+				font-size: 0.82rem;
+				line-height: 1.55;
+				color: var(--muted);
+			}
+			.success-find a {
+				color: var(--text);
+				font-weight: 600;
+				text-decoration: underline;
+				text-underline-offset: 3px;
+			}
+			.success-find a:hover { color: var(--accent, var(--text)); }
+
+			.success-deploy {
+				margin-top: 22px;
+				padding-top: 20px;
+				border-top: 1px solid var(--border);
+			}
+			.success-deploy-label {
+				margin: 0 0 12px;
+				font-size: 0.78rem;
+				font-weight: 600;
+				letter-spacing: 0.04em;
+				text-transform: uppercase;
+				color: var(--muted);
+			}
+			.success-deploy-actions {
+				display: flex;
+				gap: 10px;
+				justify-content: center;
+				flex-wrap: wrap;
+			}
+
+			@media (max-width: 640px) {
+				main.stage {
+					padding: 28px 14px 72px;
+				}
+				.wizard-body {
+					padding: 22px 18px 20px;
+				}
+				.wizard-foot {
+					padding: 16px 18px;
+				}
+				.opt-grid.cols-2,
+				.opt-grid.cols-3 {
+					grid-template-columns: 1fr;
+				}
+				.starter-grid {
+					grid-template-columns: repeat(2, 1fr);
+				}
+				.review-key {
+					flex-basis: 74px;
+				}
+			}
+
+			/* ── Template gallery ─────────────────────────────────────────── */
+			.tpl-strip {
+				display: grid;
+				grid-template-columns: 1fr auto;
+				gap: 6px 16px;
+				align-items: center;
+				padding: 14px 16px;
+				margin: 0 0 26px;
+				border: 1px solid var(--stroke);
+				border-radius: 14px;
+				background: color-mix(in srgb, var(--ink) 4%, transparent);
+			}
+			.tpl-strip-title {
+				font-family: var(--font-display);
+				font-size: 15px;
+				font-weight: 600;
+				margin: 0 0 3px;
+				letter-spacing: -0.01em;
+			}
+			.tpl-strip-sub {
+				margin: 0;
+				font-size: 12.5px;
+				line-height: 1.5;
+				color: var(--ink-dim);
+			}
+			.tpl-open,
+			.tpl-use {
+				border: 0;
+				border-radius: 10px;
+				padding: 11px 18px;
+				min-height: 44px;
+				font: inherit;
+				font-size: 13.5px;
+				font-weight: 600;
+				cursor: pointer;
+				background: var(--ink);
+				color: var(--bg-0);
+				transition: transform var(--duration-fast), box-shadow var(--duration-fast);
+			}
+			.tpl-open:hover,
+			.tpl-use:hover {
+				box-shadow: 0 0 0 4px color-mix(in srgb, var(--ink) 14%, transparent);
+			}
+			.tpl-open:active,
+			.tpl-use:active {
+				transform: translateY(1px);
+			}
+			.tpl-open:focus-visible,
+			.tpl-use:focus-visible,
+			.tpl-ghost:focus-visible,
+			.tpl-tag:focus-visible,
+			.tpl-card:focus-visible,
+			.tpl-close:focus-visible,
+			.tpl-back:focus-visible,
+			.tpl-search:focus-visible,
+			.tpl-persona:focus-visible,
+			.tpl-status button:focus-visible {
+				outline: 2px solid var(--ink);
+				outline-offset: 2px;
+			}
+			.tpl-status {
+				grid-column: 1 / -1;
+				margin: 4px 0 0;
+				padding-top: 10px;
+				border-top: 1px solid var(--stroke);
+				font-size: 12.5px;
+				color: var(--ink);
+				line-height: 1.5;
+			}
+			.tpl-status button {
+				background: none;
+				border: 0;
+				padding: 2px 4px;
+				margin-left: 6px;
+				font: inherit;
+				font-weight: 600;
+				color: var(--ink);
+				text-decoration: underline;
+				text-underline-offset: 2px;
+				cursor: pointer;
+			}
+			.tpl-status button:hover {
+				text-decoration-thickness: 2px;
+			}
+			.tpl-dialog {
+				padding: 0;
+				border: 1px solid var(--border-strong);
+				border-radius: 16px;
+				background: var(--bg-0);
+				color: var(--ink);
+				width: min(1040px, calc(100vw - 32px));
+				height: min(720px, calc(100dvh - 32px));
+				max-width: none;
+				max-height: none;
+				overflow: hidden;
+			}
+			.tpl-dialog::backdrop {
+				background: rgba(0, 0, 0, 0.62);
+				backdrop-filter: blur(3px);
+			}
+			html.tpl-lock {
+				overflow: hidden;
+			}
+			.tpl-shell {
+				display: flex;
+				flex-direction: column;
+				height: 100%;
+			}
+			.tpl-head {
+				display: flex;
+				justify-content: space-between;
+				align-items: flex-start;
+				gap: 12px;
+				padding: 18px 20px 14px;
+				border-bottom: 1px solid var(--stroke);
+			}
+			.tpl-title {
+				font-family: var(--font-display);
+				font-size: 18px;
+				font-weight: 600;
+				margin: 0 0 3px;
+				letter-spacing: -0.01em;
+			}
+			.tpl-lede {
+				margin: 0;
+				font-size: 12.5px;
+				color: var(--ink-dim);
+			}
+			.tpl-close {
+				flex: none;
+				width: 44px;
+				height: 44px;
+				display: grid;
+				place-items: center;
+				border: 1px solid var(--stroke);
+				border-radius: 10px;
+				background: transparent;
+				color: var(--ink);
+				cursor: pointer;
+				transition: background var(--duration-fast);
+			}
+			.tpl-close:hover {
+				background: color-mix(in srgb, var(--ink) 8%, transparent);
+			}
+			.tpl-body {
+				flex: 1;
+				min-height: 0;
+				display: grid;
+				grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr);
+			}
+			.tpl-browse {
+				display: flex;
+				flex-direction: column;
+				min-height: 0;
+				padding: 14px 16px 0 20px;
+				border-right: 1px solid var(--stroke);
+			}
+			.tpl-sr {
+				position: absolute;
+				width: 1px;
+				height: 1px;
+				overflow: hidden;
+				clip: rect(0 0 0 0);
+				white-space: nowrap;
+			}
+			.tpl-search {
+				width: 100%;
+				box-sizing: border-box;
+				min-height: 44px;
+				padding: 10px 13px;
+				border: 1px solid var(--border-strong);
+				border-radius: 10px;
+				background: color-mix(in srgb, var(--ink) 5%, transparent);
+				color: var(--ink);
+				font: inherit;
+				font-size: 14px;
+			}
+			.tpl-search::placeholder {
+				color: var(--ink-dim);
+			}
+			.tpl-tags {
+				display: flex;
+				flex-wrap: wrap;
+				gap: 6px;
+				margin: 10px 0 4px;
+			}
+			.tpl-tag {
+				min-height: 32px;
+				padding: 5px 12px;
+				border: 1px solid var(--stroke);
+				border-radius: 999px;
+				background: transparent;
+				color: var(--ink-dim);
+				font: inherit;
+				font-size: 12px;
+				cursor: pointer;
+				transition: background var(--duration-fast), color var(--duration-fast);
+			}
+			.tpl-tag:hover {
+				color: var(--ink);
+				background: color-mix(in srgb, var(--ink) 8%, transparent);
+			}
+			.tpl-tag[aria-pressed='true'] {
+				background: var(--ink);
+				color: var(--bg-0);
+				border-color: var(--ink);
+			}
+			.tpl-count {
+				margin: 6px 0 8px;
+				font-size: 12px;
+				color: var(--ink-dim);
+			}
+			.tpl-grid {
+				list-style: none;
+				margin: 0;
+				padding: 0 4px 16px 0;
+				flex: 1;
+				min-height: 0;
+				overflow-y: auto;
+				display: grid;
+				grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+				gap: 10px;
+				align-content: start;
+			}
+			.tpl-card {
+				width: 100%;
+				height: 100%;
+				display: flex;
+				flex-direction: column;
+				gap: 6px;
+				text-align: left;
+				padding: 13px 14px;
+				border: 1px solid var(--stroke);
+				border-radius: 12px;
+				background: color-mix(in srgb, var(--ink) 3%, transparent);
+				color: var(--ink);
+				font: inherit;
+				cursor: pointer;
+				transition: border-color var(--duration-fast), background var(--duration-fast), transform var(--duration-fast);
+			}
+			.tpl-card:hover {
+				border-color: color-mix(in srgb, var(--ink) 40%, transparent);
+				background: color-mix(in srgb, var(--ink) 7%, transparent);
+			}
+			.tpl-card:active {
+				transform: translateY(1px);
+			}
+			.tpl-card[aria-pressed='true'] {
+				border-color: var(--ink);
+				background: color-mix(in srgb, var(--ink) 10%, transparent);
+			}
+			.tpl-card-name {
+				font-family: var(--font-display);
+				font-size: 14px;
+				font-weight: 600;
+				line-height: 1.3;
+				overflow-wrap: anywhere;
+			}
+			.tpl-card-tag {
+				font-size: 12.5px;
+				line-height: 1.45;
+				color: var(--ink-dim);
+				display: -webkit-box;
+				-webkit-line-clamp: 3;
+				-webkit-box-orient: vertical;
+				overflow: hidden;
+			}
+			.tpl-card-meta {
+				margin-top: auto;
+				display: flex;
+				flex-wrap: wrap;
+				gap: 5px;
+				font-size: 11px;
+				color: var(--ink-dim);
+			}
+			.tpl-card-meta span {
+				padding: 2px 8px;
+				border: 1px solid var(--stroke);
+				border-radius: 999px;
+			}
+			.tpl-skel {
+				height: 112px;
+				border-radius: 12px;
+				background: linear-gradient(100deg, color-mix(in srgb, var(--ink) 5%, transparent) 30%, color-mix(in srgb, var(--ink) 11%, transparent) 50%, color-mix(in srgb, var(--ink) 5%, transparent) 70%);
+				background-size: 220% 100%;
+				animation: tpl-shimmer 1.3s linear infinite;
+			}
+			@keyframes tpl-shimmer {
+				to {
+					background-position: -220% 0;
+				}
+			}
+			.tpl-empty {
+				padding: 28px 8px;
+				text-align: center;
+				font-size: 13px;
+				color: var(--ink-dim);
+			}
+			.tpl-empty-title {
+				margin: 0 0 4px;
+				font-weight: 600;
+				color: var(--ink);
+			}
+			.tpl-ghost {
+				margin-top: 10px;
+				min-height: 40px;
+				padding: 8px 16px;
+				border: 1px solid var(--border-strong);
+				border-radius: 10px;
+				background: transparent;
+				color: var(--ink);
+				font: inherit;
+				font-size: 13px;
+				cursor: pointer;
+			}
+			.tpl-ghost:hover {
+				background: color-mix(in srgb, var(--ink) 8%, transparent);
+			}
+			.tpl-preview {
+				display: flex;
+				flex-direction: column;
+				min-height: 0;
+				min-width: 0;
+			}
+			.tpl-preview-empty {
+				margin: auto;
+				padding: 24px;
+				text-align: center;
+				font-size: 13px;
+				color: var(--ink-dim);
+			}
+			.tpl-back {
+				display: none;
+				margin: 12px 16px 0;
+				align-self: flex-start;
+				min-height: 40px;
+				padding: 6px 12px;
+				border: 1px solid var(--stroke);
+				border-radius: 10px;
+				background: transparent;
+				color: var(--ink);
+				font: inherit;
+				font-size: 13px;
+				cursor: pointer;
+			}
+			.tpl-preview-scroll {
+				flex: 1;
+				min-height: 0;
+				overflow-y: auto;
+				padding: 16px 20px 8px 20px;
+			}
+			.tpl-preview-name {
+				font-family: var(--font-display);
+				font-size: 17px;
+				font-weight: 600;
+				margin: 0 0 4px;
+				overflow-wrap: anywhere;
+			}
+			.tpl-preview-tag {
+				margin: 0 0 10px;
+				font-size: 13px;
+				line-height: 1.5;
+				color: var(--ink-dim);
+			}
+			.tpl-scope {
+				margin: 0 0 4px;
+				font-size: 12.5px;
+				line-height: 1.5;
+			}
+			.tpl-scope span {
+				margin-right: 6px;
+				font-size: 11px;
+				letter-spacing: 0.06em;
+				text-transform: uppercase;
+				color: var(--ink-dim);
+			}
+			.tpl-preview h4 {
+				margin: 16px 0 6px;
+				font-size: 11px;
+				letter-spacing: 0.06em;
+				text-transform: uppercase;
+				color: var(--ink-dim);
+				font-weight: 600;
+			}
+			.tpl-greeting {
+				margin: 0;
+				padding: 9px 12px;
+				border-left: 2px solid var(--ink);
+				font-size: 13px;
+				line-height: 1.55;
+				background: color-mix(in srgb, var(--ink) 4%, transparent);
+				border-radius: 0 8px 8px 0;
+			}
+			.tpl-prompts {
+				margin: 0;
+				padding-left: 18px;
+				font-size: 13px;
+				line-height: 1.6;
+			}
+			.tpl-tools {
+				margin: 0;
+				display: flex;
+				flex-wrap: wrap;
+				gap: 6px;
+			}
+			.tpl-tools code {
+				padding: 3px 8px;
+				border: 1px solid var(--stroke);
+				border-radius: 6px;
+				font-size: 11.5px;
+				background: color-mix(in srgb, var(--ink) 5%, transparent);
+			}
+			.tpl-persona {
+				margin: 0;
+				max-height: 220px;
+				overflow: auto;
+				padding: 11px 13px;
+				border: 1px solid var(--stroke);
+				border-radius: 10px;
+				background: color-mix(in srgb, var(--ink) 4%, transparent);
+				font: inherit;
+				font-size: 12.5px;
+				line-height: 1.6;
+				white-space: pre-wrap;
+				overflow-wrap: anywhere;
+			}
+			.tpl-preview-foot {
+				padding: 12px 20px 16px;
+				border-top: 1px solid var(--stroke);
+				display: flex;
+				align-items: center;
+				gap: 14px;
+			}
+			.tpl-preview-foot p {
+				margin: 0;
+				font-size: 12px;
+				line-height: 1.45;
+				color: var(--ink-dim);
+			}
+			.tpl-use {
+				flex: none;
+			}
+			@media (max-width: 820px) {
+				.tpl-dialog {
+					width: 100vw;
+					height: 100dvh;
+					border-radius: 0;
+					border: 0;
+				}
+				.tpl-body {
+					grid-template-columns: minmax(0, 1fr);
+				}
+				.tpl-browse {
+					padding: 12px 14px 0;
+					border-right: 0;
+				}
+				.tpl-grid {
+					grid-template-columns: minmax(0, 1fr);
+					padding-right: 0;
+				}
+				.tpl-shell[data-view='list'] .tpl-preview,
+				.tpl-shell[data-view='detail'] .tpl-browse {
+					display: none;
+				}
+				.tpl-back {
+					display: inline-flex;
+					align-items: center;
+				}
+				.tpl-preview-foot {
+					flex-direction: column;
+					align-items: stretch;
+					text-align: center;
+				}
+				.tpl-strip {
+					grid-template-columns: 1fr;
+				}
+				.tpl-open {
+					width: 100%;
+				}
+			}
+			@media (prefers-reduced-motion: reduce) {
+				.tpl-skel {
+					animation: none;
+				}
+			}
+		</style>
+
+		<script
+			type="module"
+			src="https://cdn.jsdelivr.net/npm/@google/model-viewer@4.4.0/dist/model-viewer.min.js"
+			integrity="sha384-wjsPzEO+lXOf7d9csIDfAQpPt2OKuUU3m0K9qsdKIuzX4N8czSF6hdh23eAbZa3p"
+			crossorigin="anonymous"
+		></script>
+		<link rel="canonical" href="https://three.ws/create-agent" />
+	
+	<script type="application/ld+json">{"@context":"https://schema.org","@type":"WebPage","name":"Create an Agent","description":"Step-by-step wizard to create a 3D AI agent: name, 3D body, skills, personality, voice, and on-chain identity.","url":"https://three.ws/create-agent","isPartOf":{"@type":"WebSite","name":"three.ws","url":"https://three.ws"}}</script>
+
+	<meta property="og:locale" content="en_US">
+	<meta property="og:image:alt" content="Create an Agent — three.ws">
+	<meta name="twitter:site" content="@trythreews">
+	<script src="/model-viewer-meshopt.js"></script>
+</head>
+	<body>
+		<div id="page-loading" aria-hidden="true">
+			<img src="/three.svg" alt="" />
+			<div class="dots">...</div>
+		</div>
+		<a href="#main-content" class="skip-link" data-i18n="create_agent.skip_to_main_content">Skip to main content</a>
+		<header>
+			<div id="nav-container"></div>
+		</header>
+		<script src="/nav.js"></script>
+
+		<main class="stage" id="main-content">
+			<div class="wizard-head">
+				<h1 class="wizard-title" data-i18n="create_agent.create_an_agent">Create an agent</h1>
+				<p class="wizard-sub" data-i18n="create_agent.five_quick_steps_name_it_give_it">
+					Five quick steps — name it, give it a body, pick its skills, set its voice, ship
+					it.
+				</p>
+			</div>
+
+			<p class="build-free-note" id="build-free-note" hidden data-i18n-html="create_agent.no_account_needed_to_build_sign_in">
+				<span class="build-free-dot" aria-hidden="true"></span>
+				No account needed to build — sign in only when you’re ready to ship.
+			</p>
+
+			<ol class="stepper" id="stepper" aria-label="Progress"></ol>
+
+			<div class="wizard-card">
+				<!-- Wizard form -->
+				<form id="wizard" novalidate>
+					<div class="wizard-body" id="wizard-body">
+						<!-- Step 1 — Basics -->
+						<section class="panel is-active" data-step="0" aria-label="Basic info">
+							<p class="panel-eyebrow" data-i18n="create_agent.step_1_of_6">Step 1 of 6</p>
+							<h2 class="panel-title" data-i18n="create_agent.the_basics">The basics</h2>
+							<p class="panel-help" data-i18n="create_agent.describe_your_agent_in_a_sentence_and">
+								Describe your agent in a sentence and we'll fill in everything —
+								name, skills, body, personality. Then review and ship.
+							</p>
+
+							<div class="magic">
+								<div class="magic-head">
+									<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+										<path d="M5 3v4M3 5h4M6 17v4M4 19h4M13 3l2.5 6.5L22 12l-6.5 2.5L13 21l-2.5-6.5L4 12l6.5-2.5L13 3z" />
+									</svg>
+									<h3 class="magic-title" data-i18n="create_agent.build_it_for_me">Build it for me</h3>
+								</div>
+								<p class="magic-sub" data-i18n="create_agent.one_line_is_enough_no_idea_tap">
+									One line is enough. No idea? Tap an example or “Surprise me”.
+								</p>
+								<div class="magic-row">
+									<textarea
+										class="magic-input"
+										id="magic-input"
+										rows="1"
+										maxlength="600"
+										autocomplete="off"
+										placeholder="e.g. a witty crypto market analyst that explains charts in plain English"
+										aria-label="Describe your agent"
+									></textarea>
+									<button type="button" class="magic-go" id="magic-go" data-i18n-html="create_agent.generate">
+										<span class="magic-go-icon" aria-hidden="true">
+											<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+												<path d="M5 3v4M3 5h4M13 4l2 5 5 2-5 2-2 5-2-5-5-2 5-2 2-5z" />
+											</svg>
+										</span>
+										<span class="magic-spin" aria-hidden="true"></span>
+										<span class="magic-go-label">Generate</span>
+									</button>
+								</div>
+								<div class="magic-chips" id="magic-chips">
+									<span class="lead" data-i18n="create_agent.try">Try:</span>
+									<button type="button" class="magic-chip" data-example="a calm meditation and breathing coach that guides short sessions" data-i18n="create_agent.meditation_coach">Meditation coach</button>
+									<button type="button" class="magic-chip" data-example="a sharp Solana market analyst that reads bonding curves and flags rug risk" data-i18n="create_agent.market_analyst">Market analyst</button>
+									<button type="button" class="magic-chip" data-example="a playful 3D art critic that reviews glTF models and gives honest feedback" data-i18n="create_agent.3d_art_critic">3D art critic</button>
+									<button type="button" class="magic-chip" data-example="an upbeat onboarding host that welcomes newcomers and shows them around" data-i18n="create_agent.onboarding_host">Onboarding host</button>
+									<button type="button" class="magic-chip surprise" id="magic-surprise" data-i18n="create_agent.surprise_me">✦ Surprise me</button>
+								</div>
+								<p class="magic-msg" id="magic-msg" role="status" aria-live="polite"></p>
+							</div>
+
+							<div class="tpl-strip" id="tpl-strip">
+								<div class="tpl-strip-copy">
+									<h3 class="tpl-strip-title">Start from a template</h3>
+									<p class="tpl-strip-sub">
+										Ready-made Solana finance personas: whale watching, wallet safety,
+										yield, launch vetting and more. Pick one, then edit anything.
+									</p>
+								</div>
+								<button type="button" class="tpl-open" id="tpl-open" aria-haspopup="dialog">Browse templates</button>
+								<p class="tpl-status" id="tpl-status" role="status" aria-live="polite" hidden></p>
+							</div>
+
+							<div class="magic-divider">or build it by hand</div>
+
+							<div class="field">
+								<label class="field-label" for="f-name" data-i18n-html="create_agent.agent_name_0_60">
+									<span
+										>Agent name
+										<span class="req" aria-hidden="true">*</span></span
+									>
+									<span class="count" id="name-count">0 / 60</span>
+								</label>
+								<input
+									class="input"
+									id="f-name"
+									type="text"
+									maxlength="60"
+									autocomplete="off"
+									placeholder="e.g. Nova, Atlas, Market Oracle"
+									aria-required="true"
+								/>
+								<p class="field-error" id="name-error" data-i18n="create_agent.please_enter_a_name_for_your_agent">
+									Please enter a name for your agent.
+								</p>
+							</div>
+
+							<div class="field">
+								<label class="field-label" for="f-description" data-i18n-html="create_agent.description_0_280">
+									<span>Description</span>
+									<span class="count" id="desc-count">0 / 280</span>
+								</label>
+								<textarea
+									class="textarea"
+									id="f-description"
+									maxlength="280"
+									placeholder="What does this agent do? Who is it for?"
+								></textarea>
+								<p class="field-hint" data-i18n="create_agent.one_or_two_sentences_you_can_refine">
+									One or two sentences. You can refine this later.
+								</p>
+							</div>
+
+							<div class="field">
+								<label class="field-label" for="f-tags-input"
+									 data-i18n-html="create_agent.tags"><span>Tags</span></label
+								>
+								<div class="tagbox" id="tagbox">
+									<input
+										id="f-tags-input"
+										type="text"
+										autocomplete="off"
+										placeholder="Type a tag and press Enter"
+										aria-describedby="tags-hint"
+									/>
+								</div>
+								<p class="field-hint" id="tags-hint" data-i18n="create_agent.press_enter_or_comma_to_add_tags">
+									Press Enter or comma to add. Tags help people discover your
+									agent. Up to 8.
+								</p>
+							</div>
+						</section>
+
+						<!-- Step 2 — 3D Model -->
+						<section class="panel" data-step="1" aria-label="3D model">
+							<p class="panel-eyebrow" data-i18n="create_agent.step_2_of_6">Step 2 of 6</p>
+							<h2 class="panel-title" data-i18n="create_agent.give_it_a_body">Give it a body</h2>
+							<p class="panel-help" data-i18n-html="create_agent.every_agent_gets_a_3d_avatar_pick">
+								Every agent gets a 3D avatar. Pick a ready-made character, upload
+								your own glTF model, or
+								<a href="/create/prompt">describe one in words and generate it</a> —
+								you can always swap it later.
+							</p>
+
+							<div class="model-tabs" role="tablist" aria-label="Choose where the 3D body comes from">
+								<button
+									type="button"
+									class="model-tab is-active"
+									data-pane="starter"
+									role="tab"
+									id="model-tab-starter"
+									aria-controls="model-pane-starter"
+									aria-selected="true"
+								 data-i18n="create_agent.starter_library">
+									Starter library
+								</button>
+								<button
+									type="button"
+									class="model-tab"
+									data-pane="library"
+									role="tab"
+									id="model-tab-library"
+									aria-controls="model-pane-library"
+									aria-selected="false"
+									tabindex="-1"
+								 data-i18n="create_agent.my_avatars">
+									My avatars
+								</button>
+								<button
+									type="button"
+									class="model-tab"
+									data-pane="upload"
+									role="tab"
+									id="model-tab-upload"
+									aria-controls="model-pane-upload"
+									aria-selected="false"
+									tabindex="-1"
+								 data-i18n="create_agent.upload_your_own">
+									Upload your own
+								</button>
+								<button
+									type="button"
+									class="model-tab"
+									data-pane="skip"
+									role="tab"
+									id="model-tab-skip"
+									aria-controls="model-pane-skip"
+									aria-selected="false"
+									tabindex="-1"
+								 data-i18n="create_agent.add_later">
+									Add later
+								</button>
+							</div>
+
+							<div
+								class="model-pane is-active"
+								data-pane="starter"
+								id="model-pane-starter"
+								role="tabpanel"
+								aria-labelledby="model-tab-starter"
+								tabindex="0"
+							>
+								<div class="starter-grid" id="starter-grid"></div>
+							</div>
+
+							<div
+								class="model-pane"
+								data-pane="library"
+								id="model-pane-library"
+								role="tabpanel"
+								aria-labelledby="model-tab-library"
+								tabindex="0"
+							>
+								<div
+									class="starter-grid"
+									id="library-grid"
+									aria-live="polite"
+								></div>
+							</div>
+
+							<div
+								class="model-pane"
+								data-pane="upload"
+								id="model-pane-upload"
+								role="tabpanel"
+								aria-labelledby="model-tab-upload"
+								tabindex="0"
+							>
+								<div
+									class="dropzone"
+									id="dropzone"
+									role="button"
+									tabindex="0"
+									aria-label="Upload a GLB file"
+								>
+									<svg
+										viewBox="0 0 24 24"
+										fill="none"
+										stroke="currentColor"
+										stroke-width="1.6"
+										stroke-linecap="round"
+										stroke-linejoin="round"
+									>
+										<polyline points="16 16 12 12 8 16" />
+										<line x1="12" y1="12" x2="12" y2="21" />
+										<path
+											d="M20.39 18.39A5 5 0 0 0 18 9h-1.26A8 8 0 1 0 3 16.3"
+										/>
+									</svg>
+									<div class="dropzone-title" id="dropzone-title">
+										Drop a .glb file or click to browse
+									</div>
+									<div class="dropzone-sub" id="dropzone-sub">
+										Any glTF 2.0 binary model, up to 16 MB
+									</div>
+								</div>
+								<input
+									type="file"
+									id="glb-input"
+									accept=".glb,model/gltf-binary"
+									hidden
+								/>
+							</div>
+
+							<div
+								class="model-pane"
+								data-pane="skip"
+								id="model-pane-skip"
+								role="tabpanel"
+								aria-labelledby="model-tab-skip"
+								tabindex="0"
+							>
+								<p class="panel-help" style="margin: 6px 0 0" data-i18n="create_agent.a_3d_avatar_is_how_people_recognize">
+									A 3D avatar is how people recognize and connect with your agent
+									across three.ws — we strongly recommend giving it one now from
+									the Starter library or your own upload.
+								</p>
+								<div class="publish-box" style="margin-top: 14px">
+									<label class="toggle">
+										<input type="checkbox" id="f-skip-ack" />
+										<span class="track"></span>
+										<span class="knob"></span>
+									</label>
+									<div class="publish-text">
+										<strong
+											 data-i18n="create_agent.don_t_pick_an_avatar_use_the">Don't pick an avatar — use the default body for
+											now</strong
+										>
+										<span
+											 data-i18n="create_agent.my_agent_will_launch_with_our_default">My agent will launch with our default 3D character. I
+											can pick or upload my own anytime from its editor.</span
+										>
+									</div>
+								</div>
+							</div>
+
+							<div class="model-preview" id="model-preview">
+								<div class="model-preview-empty" id="model-preview-empty">
+									<svg
+										viewBox="0 0 24 24"
+										fill="none"
+										stroke="currentColor"
+										stroke-width="1.4"
+										stroke-linecap="round"
+										stroke-linejoin="round"
+									>
+										<path
+											d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"
+										/>
+										<polyline points="3.27 6.96 12 12.01 20.73 6.96" />
+										<line x1="12" y1="22.08" x2="12" y2="12" />
+									</svg>
+									<span data-i18n="create_agent.select_a_model_to_preview_it_in">Select a model to preview it in 3D</span>
+								</div>
+							</div>
+						</section>
+
+						<!-- Step 3 — Skills -->
+						<section class="panel" data-step="2" aria-label="Skills">
+							<p class="panel-eyebrow" data-i18n="create_agent.step_3_of_6">Step 3 of 6</p>
+							<h2 class="panel-title" data-i18n="create_agent.pick_its_skills">Pick its skills</h2>
+							<p class="panel-help" data-i18n="create_agent.every_agent_ships_with_a_core_set">
+								Every agent ships with a core set. Toggle on extra capabilities to
+								extend what yours can do.
+							</p>
+
+							<div id="core-skills" aria-label="Core skills"></div>
+							<div id="optional-skills" aria-label="Optional skills"></div>
+							<p class="skills-meta" id="skills-meta" data-i18n="create_agent.5_skills_selected">5 skills selected</p>
+						</section>
+
+						<!-- Step 4 — Personality & Voice -->
+						<section class="panel" data-step="3" aria-label="Personality">
+							<p class="panel-eyebrow" data-i18n="create_agent.step_4_of_6">Step 4 of 6</p>
+							<h2 class="panel-title" data-i18n="create_agent.personality">Personality</h2>
+							<p class="panel-help" data-i18n="create_agent.shape_how_your_agent_talks_a_category">
+								Shape how your agent talks. A category and a profile prompt are what
+								publish it to the marketplace.
+							</p>
+
+							<div class="field">
+								<label class="field-label" for="f-category"
+									 data-i18n-html="create_agent.category"><span>Category</span></label
+								>
+								<select class="select" id="f-category">
+									<option value="" data-i18n="create_agent.choose_a_category">Choose a category…</option>
+								</select>
+								<p class="field-hint" data-i18n="create_agent.required_to_list_on_the_marketplace_pick">
+									Required to list on the marketplace. Pick the closest fit.
+								</p>
+							</div>
+
+							<div class="field">
+								<label class="field-label" for="f-greeting" data-i18n-html="create_agent.greeting_0_200">
+									<span>Greeting</span>
+									<span class="count" id="greet-count">0 / 200</span>
+								</label>
+								<input
+									class="input"
+									id="f-greeting"
+									type="text"
+									maxlength="200"
+									placeholder="Hey, I'm Nova — ask me anything about pump.fun."
+								/>
+								<p class="field-hint" data-i18n="create_agent.the_first_line_your_agent_says_when">
+									The first line your agent says when someone opens a chat.
+								</p>
+							</div>
+
+							<div class="interview" id="interview">
+								<div class="interview-head">
+									<div class="interview-intro">
+										<p class="interview-title">Not sure what to write? Answer a few questions instead</p>
+										<p class="interview-sub">
+											Seven quick questions about how your agent should talk. Answer any of
+											them, skip the rest, and the profile below is written for you.
+										</p>
+									</div>
+									<button
+										type="button"
+										class="interview-toggle"
+										id="interview-toggle"
+										aria-expanded="false"
+										aria-controls="interview-body"
+									>
+										Start
+									</button>
+								</div>
+								<div class="interview-body" id="interview-body" hidden>
+									<div id="interview-questions"></div>
+									<div class="interview-foot">
+										<button type="button" class="interview-generate" id="interview-generate" disabled>
+											<span id="interview-generate-label">Write the profile</span>
+											<span class="interview-spin" aria-hidden="true"></span>
+										</button>
+										<button type="button" class="interview-skip" id="interview-skip">Skip the interview</button>
+									</div>
+									<div class="interview-tags" id="interview-tags" hidden></div>
+									<p class="interview-status" id="interview-status" role="status" aria-live="polite"></p>
+								</div>
+							</div>
+
+							<div class="field">
+								<label class="field-label" for="f-persona" data-i18n-html="create_agent.profile_instructions_0_2000">
+									<span>Profile &amp; instructions</span>
+									<span class="count" id="persona-count">0 / 2000</span>
+								</label>
+								<textarea
+									class="textarea"
+									id="f-persona"
+									maxlength="2000"
+									style="min-height: 120px"
+									placeholder="Describe who your agent is and how it should behave. e.g. 'You are Nova, a sharp, friendly Solana market analyst. Be concise, cite on-chain data, and never give financial advice.'"
+								></textarea>
+								<p class="field-hint" data-i18n="create_agent.this_becomes_the_agent_s_system_prompt">
+									This becomes the agent's system prompt — its personality and
+									rules.
+								</p>
+							</div>
+
+						</section>
+
+						<!-- Step 5 - Voice -->
+						<section class="panel" data-step="4" aria-label="Voice">
+							<p class="panel-eyebrow" data-i18n="create_agent.step_5_of_6">Step 5 of 6</p>
+							<h2 class="panel-title" data-i18n="create_agent.give_it_a_voice">Give it a voice</h2>
+							<p class="panel-help" data-i18n="create_agent.every_agent_speaks_pick_the_built_in">
+								Every agent speaks. Pick the built-in voice, or record a short sample
+								and your agent talks in your own cloned voice everywhere on three.ws.
+							</p>
+
+							<div class="field">
+								<div class="opt-grid cols-2">
+									<button
+										type="button"
+										class="opt is-selected"
+										id="voice-browser"
+										data-voice="browser"
+										aria-pressed="true"
+									>
+										<div class="opt-icon">
+											<svg
+												viewBox="0 0 24 24"
+												fill="none"
+												stroke="currentColor"
+												stroke-width="1.6"
+												stroke-linecap="round"
+												stroke-linejoin="round"
+											>
+												<polygon
+													points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"
+												/>
+												<path d="M15.54 8.46a5 5 0 0 1 0 7.07" />
+											</svg>
+										</div>
+										<span class="opt-name" data-i18n="create_agent.built_in_voice">Built-in voice</span>
+										<span class="opt-desc"
+											 data-i18n="create_agent.free_browser_text_to_speech_works_instantly">Free browser text-to-speech. Works instantly, no
+											setup.</span
+										>
+									</button>
+									<button
+										type="button"
+										class="opt"
+										id="voice-custom"
+										data-voice="custom"
+										aria-pressed="false"
+									>
+										<div class="opt-icon">
+											<svg
+												viewBox="0 0 24 24"
+												fill="none"
+												stroke="currentColor"
+												stroke-width="1.6"
+												stroke-linecap="round"
+												stroke-linejoin="round"
+											>
+												<path
+													d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"
+												/>
+												<path d="M19 10v2a7 7 0 0 1-14 0v-2" />
+												<line x1="12" y1="19" x2="12" y2="23" />
+											</svg>
+										</div>
+										<span class="opt-name" data-i18n="create_agent.clone_your_voice">Clone your voice</span>
+										<span class="opt-desc"
+											 data-i18n="create_agent.record_thirty_seconds_and_your_agent_speaks">Record 30 seconds (or upload a clip) and your agent
+											speaks in your voice.</span
+										>
+									</button>
+								</div>
+							</div>
+
+							<div class="field" id="voice-clone-field" hidden>
+								<div id="voice-setup-host"></div>
+							</div>
+						</section>
+
+						<!-- Step 6 — Review -->
+						<section class="panel" data-step="5" aria-label="Review and create">
+							<p class="panel-eyebrow" data-i18n="create_agent.step_6_of_6">Step 6 of 6</p>
+							<h2 class="panel-title" data-i18n="create_agent.review_create">Review &amp; create</h2>
+							<p class="panel-help" data-i18n="create_agent.here_s_the_agent_you_re_about">
+								Here's the agent you're about to ship. Edit any step, then create
+								it.
+							</p>
+
+							<div class="review-grid" id="review-grid"></div>
+
+							<div class="publish-box">
+								<label class="toggle">
+									<input type="checkbox" id="f-publish" checked />
+									<span class="track"></span>
+									<span class="knob"></span>
+								</label>
+								<div class="publish-text">
+									<strong data-i18n="create_agent.list_on_the_agent_marketplace">List on the agent marketplace</strong>
+									<span id="publish-note"
+										 data-i18n="create_agent.make_your_agent_discoverable_requires_a_cate">Make your agent discoverable. Requires a category and a
+										profile prompt. You can unlist anytime.</span
+									>
+								</div>
+							</div>
+						</section>
+
+						<!-- Success -->
+						<section class="success" id="success" aria-live="polite">
+							<div class="success-badge">
+								<svg
+									viewBox="0 0 24 24"
+									fill="none"
+									stroke="currentColor"
+									stroke-width="2.4"
+									stroke-linecap="round"
+									stroke-linejoin="round"
+								>
+									<polyline points="20 6 9 17 4 12" />
+								</svg>
+							</div>
+							<h2 id="success-title" data-i18n="create_agent.your_agent_is_live">Your agent is live</h2>
+							<p id="success-sub" data-i18n="create_agent.it_now_has_its_own_wallet_and">
+								It now has its own wallet and on-chain identity. Open it to chat,
+								customize, or share.
+							</p>
+							<div class="success-preview" id="success-preview" hidden></div>
+							<div class="success-actions">
+								<a class="btn btn--primary btn--lg" id="success-activate"
+									 data-i18n="create_agent.go_live">⚡ Go live</a
+								>
+								<a class="btn btn--secondary btn--lg" id="success-fund"
+									 data-i18n="create_agent.fund_agent_wallet">Fund agent wallet</a
+								>
+								<a class="btn btn--secondary btn--lg" id="success-open"
+									 data-i18n="create_agent.open_agent">Open agent</a
+								>
+								<a class="btn btn--secondary btn--lg" id="success-edit"
+									 data-i18n="create_agent.customize_further">Customize further</a
+								>
+								<a class="btn btn--ghost btn--lg" href="/create-agent"
+									 data-i18n="create_agent.create_another">Create another</a
+								>
+								<a class="btn btn--ghost btn--lg" href="/profile"
+									 data-i18n="create_agent.view_my_profile">View my profile</a
+								>
+							</div>
+							<p class="success-find" data-i18n-html="create_agent.find_it_again">
+								Need it later? It is always waiting under
+								<a href="/mine">My creations</a> in the menu.
+							</p>
+							<div class="success-deploy">
+								<p class="success-deploy-label" data-i18n="create_agent.take_it_further">Take it further</p>
+								<div class="success-deploy-actions">
+									<a class="btn btn--ghost" id="success-voice" href="/voice"
+										 data-i18n="create_agent.give_it_a_voice">Give it a voice</a
+									>
+									<a class="btn btn--ghost" id="success-embed" href="/studio"
+										 data-i18n="create_agent.embed_it_anywhere">Embed it anywhere</a
+									>
+									<a class="btn btn--ghost" id="success-world" href="/play"
+										 data-i18n="create_agent.put_it_in_a_world">Put it in a world</a
+									>
+									<a class="btn btn--ghost" id="success-token" href="/launchpad"
+										 data-i18n="create_agent.launch_its_token">Launch its token</a
+									>
+								</div>
+							</div>
+						</section>
+					</div>
+
+					<div class="wizard-foot" id="wizard-foot">
+						<div class="foot-msg" id="foot-msg" role="status" aria-live="polite"></div>
+						<div class="foot-actions">
+							<button type="button" class="btn btn--ghost" id="btn-back" hidden data-i18n="create_agent.back">
+								Back
+							</button>
+							<button type="button" class="btn btn--primary" id="btn-next" data-i18n="create_agent.next">
+								Next
+							</button>
+							<button
+								type="submit"
+								class="btn btn--primary"
+								id="btn-create"
+								hidden
+								aria-label="Create agent"
+							 data-i18n="create_agent.create_agent" data-i18n-attr="aria-label:create_agent.create_agent_arialabel">
+								Create agent
+							</button>
+						</div>
+					</div>
+				</form>
+			</div>
+		</main>
+
+		<dialog class="tpl-dialog" id="tpl-dialog" aria-labelledby="tpl-title">
+			<div class="tpl-shell" data-view="list">
+				<header class="tpl-head">
+					<div>
+						<h2 class="tpl-title" id="tpl-title">Start from a template</h2>
+						<p class="tpl-lede">Choose a persona to prefill the Personality step. Everything stays editable.</p>
+					</div>
+					<button type="button" class="tpl-close" id="tpl-close" aria-label="Close templates">
+						<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18" /></svg>
+					</button>
+				</header>
+				<div class="tpl-body">
+					<section class="tpl-browse" aria-label="Template list">
+						<label class="tpl-sr" for="tpl-search">Search templates</label>
+						<input class="tpl-search" id="tpl-search" type="search" autocomplete="off" spellcheck="false" placeholder="Search by name, topic or tool" />
+						<div class="tpl-tags" id="tpl-tags" role="group" aria-label="Filter by tag"></div>
+						<p class="tpl-count" id="tpl-count" role="status" aria-live="polite"></p>
+						<ul class="tpl-grid" id="tpl-grid"></ul>
+						<div class="tpl-empty" id="tpl-empty" hidden>
+							<p class="tpl-empty-title">No templates match that search.</p>
+							<p>Try a broader word like "yield" or "wallet", or clear the filters.</p>
+							<button type="button" class="tpl-ghost" id="tpl-clear">Clear search and filters</button>
+						</div>
+						<div class="tpl-empty" id="tpl-error" hidden>
+							<p class="tpl-empty-title">Templates did not load.</p>
+							<p>Check your connection, then try again. You can still build your agent by hand.</p>
+							<button type="button" class="tpl-ghost" id="tpl-retry">Try again</button>
+						</div>
+					</section>
+					<aside class="tpl-preview" id="tpl-preview" aria-label="Template preview"></aside>
+				</div>
+			</div>
+		</dialog>
+
+		<div id="footer-container"></div>
+		<script src="/footer.js"></script>
+		<script type="module" src="/src/create-agent.js"></script>
+		<!-- Runtime i18n: detects locale, swaps annotated copy, mounts <lang-switcher>. -->
+	<script type="module" src="/i18n.js"></script>
+</body>
+</html>

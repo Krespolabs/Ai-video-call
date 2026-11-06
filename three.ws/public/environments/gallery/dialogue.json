@@ -1,0 +1,25 @@
+{
+	"$schema": "NPC dialogue table for the walk scene (Task 19). Slots: greeter, guide-wait, guide-arrive ({landmark} token). landmarks steer the guide NPC.",
+	"greeter": [
+		"Welcome to the gallery — every wall has something to say.",
+		"Hello, and welcome in. Feel free to take it all in slowly.",
+		"Glad you're here. The collection rotates, so look closely.",
+		"Welcome. Quiet steps, open mind — enjoy the show."
+	],
+	"guide-wait": [
+		"Take your time with the pieces — I'll wait here.",
+		"No rush. Good art rewards a slow walk.",
+		"I'll pause by the pedestal until you're ready."
+	],
+	"guide-arrive": [
+		"This way — {landmark}.",
+		"Here's {landmark}. One of my favourites in the space.",
+		"We've reached {landmark}. Worth a long look."
+	],
+	"landmarks": [
+		{ "name": "the central pedestals", "pos": [0, 0, 3.6] },
+		{ "name": "the east wall", "pos": [7.361, 0, 4.25] },
+		{ "name": "the north exhibit", "pos": [0, 0, 8.5] },
+		{ "name": "the west gallery", "pos": [-8.5, 0, 0] }
+	]
+}

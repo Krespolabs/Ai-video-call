@@ -1,0 +1,190 @@
+{
+	"id": "machine-atlas",
+	"scenarioHash": "3c460ecd12d53deda54575fabfdb6ba23a335a4909113e98609d07dedc2f22f0",
+	"ranAt": "2026-09-29T08:08:23.156Z",
+	"target": {
+		"commit": "f2081d946",
+		"revision": "three-ws-api-00460-4j6"
+	},
+	"passed": true,
+	"steps": [
+		{
+			"index": 1,
+			"kind": "goto",
+			"target": "https://three.ws/assembly",
+			"detail": "loaded https://three.ws/assembly",
+			"ok": true,
+			"ms": 14347,
+			"frames": 0
+		},
+		{
+			"index": 2,
+			"kind": "scroll",
+			"target": "72",
+			"detail": "scrolled 72 px",
+			"ok": true,
+			"ms": 13517,
+			"frames": 15
+		},
+		{
+			"index": 3,
+			"kind": "read",
+			"target": "machines",
+			"detail": "machines = \"TWO\"",
+			"ok": true,
+			"ms": 3,
+			"frames": 0
+		},
+		{
+			"index": 4,
+			"kind": "read",
+			"target": "cylinders",
+			"detail": "cylinders = \"9\"",
+			"ok": true,
+			"ms": 28,
+			"frames": 0
+		},
+		{
+			"index": 5,
+			"kind": "read",
+			"target": "displacement",
+			"detail": "displacement = \"29.7 L\"",
+			"ok": true,
+			"ms": 2,
+			"frames": 0
+		},
+		{
+			"index": 6,
+			"kind": "hold",
+			"target": "1600",
+			"detail": "1600 ms",
+			"ok": true,
+			"ms": 37230,
+			"frames": 48
+		},
+		{
+			"index": 7,
+			"kind": "drag",
+			"target": "0.5,0.8,0.6,0.66",
+			"detail": "dragged over 66 frames",
+			"ok": true,
+			"ms": 55206,
+			"frames": 84
+		},
+		{
+			"index": 8,
+			"kind": "drag",
+			"target": "0.8806,0.278,0.7,0.278",
+			"detail": "dragged over 45 frames",
+			"ok": true,
+			"ms": 29923,
+			"frames": 63
+		},
+		{
+			"index": 9,
+			"kind": "expect",
+			"target": "16.5 L",
+			"detail": "appeared after 0.0 s",
+			"ok": true,
+			"ms": 19,
+			"frames": 0
+		},
+		{
+			"index": 10,
+			"kind": "read",
+			"target": "cylindersAfter",
+			"detail": "cylindersAfter = \"5\"",
+			"ok": true,
+			"ms": 234,
+			"frames": 0
+		},
+		{
+			"index": 11,
+			"kind": "hold",
+			"target": "1800",
+			"detail": "1800 ms",
+			"ok": true,
+			"ms": 20761,
+			"frames": 54
+		},
+		{
+			"index": 12,
+			"kind": "click",
+			"target": "Coupled Six",
+			"detail": "clicked",
+			"ok": true,
+			"ms": 11022,
+			"frames": 21
+		},
+		{
+			"index": 13,
+			"kind": "expect",
+			"target": "Outside-cylinder steam locomotive",
+			"detail": "appeared after 0.4 s",
+			"ok": true,
+			"ms": 402,
+			"frames": 0
+		},
+		{
+			"index": 14,
+			"kind": "expect",
+			"target": "Solved four-bar chain, not baked animation",
+			"detail": "appeared after 0.0 s",
+			"ok": true,
+			"ms": 13,
+			"frames": 0
+		},
+		{
+			"index": 15,
+			"kind": "hold",
+			"target": "2400",
+			"detail": "2400 ms",
+			"ok": true,
+			"ms": 35840,
+			"frames": 72
+		},
+		{
+			"index": 16,
+			"kind": "press",
+			"target": "e",
+			"detail": "pressed e",
+			"ok": true,
+			"ms": 3028,
+			"frames": 6
+		},
+		{
+			"index": 17,
+			"kind": "hold",
+			"target": "3800",
+			"detail": "3800 ms",
+			"ok": true,
+			"ms": 47680,
+			"frames": 114
+		}
+	],
+	"facts": {
+		"machines": "TWO",
+		"cylinders": "9",
+		"displacement": "29.7 L",
+		"cylindersAfter": "5"
+	},
+	"saw": [
+		"16.5 L",
+		"Outside-cylinder steam locomotive",
+		"Solved four-bar chain, not baked animation"
+	],
+	"responses": [],
+	"cuts": [],
+	"video": {
+		"path": "public/x-media/machine-atlas/reel.mp4",
+		"sha256": "30a5680f55a903f938ba89ec76a47cafc7c4bd49006dd65b9611bdb6a62de54b",
+		"frames": 477,
+		"motion": 1,
+		"durationSec": 15.9,
+		"width": 1280,
+		"height": 720,
+		"fps": 30,
+		"videoCodec": "h264",
+		"pixFmt": "yuv420p"
+	}
+}

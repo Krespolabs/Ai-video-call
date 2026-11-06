@@ -1,0 +1,5 @@
+# Adds a "Sponsor" button to the repo. Coin-agnostic by design — links to the
+# product, not to any token. (Per project rules, $THREE is the only coin and is
+# never promoted via funding links.)
+custom:
+  - https://three.ws

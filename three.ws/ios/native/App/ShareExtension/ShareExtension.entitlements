@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<!--
+		The share extension writes shared photos and models into the App Group
+		container, and the app reads them back out (SharedInbox.swift). Without
+		the shared group the two processes cannot see each other's files and
+		every share arrives at an empty inbox.
+	-->
+	<key>com.apple.security.application-groups</key>
+	<array>
+		<string>$(GLANCE_APP_GROUP)</string>
+	</array>
+</dict>
+</plist>

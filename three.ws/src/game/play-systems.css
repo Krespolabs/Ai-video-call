@@ -1,0 +1,512 @@
+/* Play systems HUD — economy, hotbar, inventory, skills, fishing.
+ * Styled to the /play monochrome design tokens (declared on :root in
+ * coincommunities.css): dark glass panels, white ink, 4px radii, light as the
+ * only accent. Every interactive element has hover / active / focus states. */
+
+#ps-hud {
+	position: fixed;
+	inset: 0;
+	z-index: 23;
+	pointer-events: none;
+	font-family: inherit;
+}
+#ps-hud > * { pointer-events: auto; }
+
+#ps-hud button {
+	font-family: inherit;
+	color: var(--cc-text);
+	cursor: pointer;
+}
+#ps-hud button:focus-visible,
+.ps-slot:focus-visible,
+.ps-cell:focus-visible {
+	outline: 2px solid var(--cc-edge-hi);
+	outline-offset: 2px;
+}
+
+/* ---- Gold purse (top-left, under the coin banner) ---- */
+.ps-gold {
+	position: fixed;
+	top: 78px;
+	left: 14px;
+	display: inline-flex;
+	align-items: center;
+	gap: 7px;
+	padding: 6px 12px;
+	background: var(--cc-panel);
+	border: 1px solid var(--cc-edge);
+	border-radius: var(--cc-radius);
+	box-shadow: var(--cc-shadow);
+	backdrop-filter: blur(10px);
+	font-variant-numeric: tabular-nums;
+}
+.ps-gold-coin { font-size: 14px; filter: grayscale(0.2); }
+.ps-gold-amt {
+	font-size: 13px;
+	font-weight: 700;
+	letter-spacing: 0.02em;
+	color: var(--cc-text);
+}
+
+/* ---- Right tool rail (inventory / skills) ---- */
+.ps-rail {
+	position: fixed;
+	right: 14px;
+	top: 50%;
+	transform: translateY(-50%);
+	display: flex;
+	flex-direction: column;
+	gap: 8px;
+}
+.ps-rail-btn {
+	width: 46px;
+	height: 46px;
+	display: grid;
+	place-items: center;
+	font-size: 20px;
+	background: var(--cc-panel);
+	border: 1px solid var(--cc-edge);
+	border-radius: var(--cc-radius);
+	box-shadow: var(--cc-shadow);
+	backdrop-filter: blur(10px);
+	filter: grayscale(1);
+	transition: transform var(--duration-instant) var(--ease-standard), background var(--duration-fast) var(--ease-standard), border-color var(--duration-fast) var(--ease-standard), filter var(--duration-fast) var(--ease-standard);
+}
+.ps-rail-btn:hover { background: rgba(255, 255, 255, 0.12); border-color: var(--cc-edge-hi); transform: translateX(-3px); filter: grayscale(0); }
+.ps-rail-btn:active { transform: translateX(-1px) scale(0.96); }
+.ps-rail-btn.is-on { background: #fff; border-color: #fff; filter: grayscale(0); }
+.ps-rail-btn.is-on span { filter: none; }
+
+/* ---- Hotbar (bottom-center, above the emote tray) ---- */
+.ps-hotbar {
+	position: fixed;
+	left: 50%;
+	bottom: 74px;
+	transform: translateX(-50%);
+	display: flex;
+	gap: 6px;
+	padding: 7px;
+	background: var(--cc-panel);
+	border: 1px solid var(--cc-edge);
+	border-radius: var(--cc-radius);
+	box-shadow: var(--cc-shadow);
+	backdrop-filter: blur(10px);
+}
+.ps-slot {
+	position: relative;
+	width: 46px;
+	height: 46px;
+	display: grid;
+	place-items: center;
+	background: rgba(255, 255, 255, 0.04);
+	border: 1px solid transparent;
+	border-radius: var(--cc-radius-sm);
+	transition: transform var(--duration-instant) var(--ease-standard), background var(--duration-fast) var(--ease-standard), border-color var(--duration-fast) var(--ease-standard);
+}
+.ps-slot:hover { background: rgba(255, 255, 255, 0.12); border-color: var(--cc-edge); transform: translateY(-2px); }
+.ps-slot.is-active { border-color: #fff; background: rgba(255, 255, 255, 0.16); box-shadow: var(--cc-glow); }
+.ps-slot.is-empty { cursor: default; }
+.ps-slot.is-empty:hover { transform: none; background: rgba(255, 255, 255, 0.04); border-color: transparent; }
+.ps-slot-glyph { font-size: 22px; line-height: 1; }
+.ps-slot-qty {
+	position: absolute;
+	right: 3px;
+	bottom: 2px;
+	font-size: 10px;
+	font-weight: 700;
+	color: var(--cc-text);
+	text-shadow: 0 1px 2px #000;
+	font-variant-numeric: tabular-nums;
+}
+.ps-slot-key {
+	position: absolute;
+	left: 3px;
+	top: 1px;
+	font-size: 9px;
+	color: var(--cc-faint);
+}
+
+/* ---- Contextual action button (Cast / Equip rod) ---- */
+.ps-action {
+	position: fixed;
+	left: 50%;
+	bottom: 132px;
+	transform: translateX(-50%);
+	padding: 11px 22px;
+	font-size: 13px;
+	font-weight: 700;
+	letter-spacing: 0.04em;
+	text-transform: uppercase;
+	color: var(--cc-ink);
+	background: #fff;
+	border: 1px solid #fff;
+	border-radius: var(--cc-radius);
+	box-shadow: var(--cc-shadow), var(--cc-glow);
+	transition: transform var(--duration-instant) var(--ease-standard), filter var(--duration-fast) var(--ease-standard), opacity var(--duration-fast) var(--ease-standard);
+	animation: ps-rise 0.18s ease both;
+}
+/* Contextual-action stacking contract. Three independent systems mount a
+   `.ps-action` button at the same fixed spot: play-systems (fish/equip rod),
+   play-activities (`.pa-action`: chop/mine/cook/gather), wheel-station
+   (`.wh-action`: spin) and war-portal (`.wp-action`: enter the war). Standing
+   where two are in range used to render them pixel-perfectly on top of each
+   other, so only the last-appended one was clickable. Each modifier claims its
+   own row, bottom-up, in the order a player is most likely to want them. Keep
+   the 52px step in sync with the mobile overrides at the bottom of this file. */
+.ps-action.pa-action { bottom: 184px; }
+.ps-action.wh-action { bottom: 236px; }
+.ps-action.wp-action { bottom: 288px; }
+.ps-action:hover { filter: brightness(0.9); transform: translateX(-50%) translateY(-2px); }
+.ps-action:active { transform: translateX(-50%) scale(0.97); }
+.ps-action.is-disabled {
+	background: var(--cc-panel);
+	color: var(--cc-dim);
+	border-color: var(--cc-edge);
+	box-shadow: var(--cc-shadow);
+	cursor: default;
+}
+.ps-action.is-disabled:hover { filter: none; transform: translateX(-50%); }
+@keyframes ps-rise {
+	from { opacity: 0; transform: translateX(-50%) translateY(8px); }
+	to { opacity: 1; transform: translateX(-50%) translateY(0); }
+}
+
+/* ---- Panels (inventory / skills) ---- */
+.ps-panel {
+	position: fixed;
+	right: 72px;
+	top: 50%;
+	transform: translateY(-50%);
+	width: 300px;
+	max-width: calc(100vw - 96px);
+	max-height: 70vh;
+	display: flex;
+	flex-direction: column;
+	background: var(--cc-panel);
+	border: 1px solid var(--cc-edge);
+	border-radius: var(--cc-radius);
+	box-shadow: var(--cc-shadow);
+	backdrop-filter: blur(14px);
+	animation: ps-panel-in 0.16s ease both;
+	overflow: hidden;
+}
+@keyframes ps-panel-in {
+	from { opacity: 0; transform: translateY(-50%) translateX(10px); }
+	to { opacity: 1; transform: translateY(-50%) translateX(0); }
+}
+.ps-panel-head {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	padding: 12px 14px;
+	border-bottom: 1px solid var(--cc-edge-soft);
+}
+.ps-panel-title {
+	font-size: 11px;
+	font-weight: 700;
+	letter-spacing: 0.12em;
+	text-transform: uppercase;
+	color: var(--cc-text);
+}
+.ps-x {
+	width: 24px;
+	height: 24px;
+	display: grid;
+	place-items: center;
+	background: transparent;
+	border: 1px solid transparent;
+	border-radius: var(--cc-radius-sm);
+	color: var(--cc-dim);
+	font-size: 12px;
+	transition: color var(--duration-fast) var(--ease-standard), border-color var(--duration-fast) var(--ease-standard), background var(--duration-fast) var(--ease-standard);
+}
+.ps-x:hover { color: var(--cc-text); background: rgba(255, 255, 255, 0.08); border-color: var(--cc-edge); }
+
+/* Inventory grid */
+.ps-inv-grid {
+	display: grid;
+	grid-template-columns: repeat(6, 1fr);
+	gap: 5px;
+	padding: 12px;
+	overflow-y: auto;
+}
+.ps-cell {
+	position: relative;
+	aspect-ratio: 1;
+	display: grid;
+	place-items: center;
+	background: rgba(255, 255, 255, 0.04);
+	border: 1px solid var(--cc-edge-soft);
+	border-radius: var(--cc-radius-sm);
+	transition: transform var(--duration-instant) var(--ease-standard), background var(--duration-fast) var(--ease-standard), border-color var(--duration-fast) var(--ease-standard);
+}
+.ps-cell:hover { background: rgba(255, 255, 255, 0.12); border-color: var(--cc-edge); transform: translateY(-2px); }
+.ps-cell.is-empty { background: rgba(255, 255, 255, 0.02); border-style: dashed; cursor: default; pointer-events: none; }
+.ps-cell-glyph { font-size: 20px; }
+.ps-cell-qty {
+	position: absolute;
+	right: 3px;
+	bottom: 2px;
+	font-size: 10px;
+	font-weight: 700;
+	text-shadow: 0 1px 2px #000;
+	font-variant-numeric: tabular-nums;
+}
+.ps-inv-empty {
+	grid-column: 1 / -1;
+	padding: 26px 12px;
+	text-align: center;
+	font-size: 12px;
+	line-height: 1.5;
+	color: var(--cc-dim);
+}
+.ps-inv-hint {
+	padding: 10px 14px;
+	border-top: 1px solid var(--cc-edge-soft);
+	font-size: 11px;
+	color: var(--cc-faint);
+}
+
+/* Skills list */
+.ps-skills-list { padding: 12px; display: flex; flex-direction: column; gap: 10px; overflow-y: auto; }
+.ps-skill { display: flex; align-items: center; gap: 11px; }
+.ps-skill-glyph { font-size: 20px; width: 26px; text-align: center; filter: grayscale(0.4); }
+.ps-skill-body { flex: 1; min-width: 0; }
+.ps-skill-top { display: flex; align-items: baseline; justify-content: space-between; margin-bottom: 4px; }
+.ps-skill-name { font-size: 12px; color: var(--cc-text); }
+.ps-skill-lvl { font-size: 11px; color: var(--cc-dim); font-variant-numeric: tabular-nums; }
+.ps-skill-bar { height: 5px; background: rgba(255, 255, 255, 0.08); border-radius: 99px; overflow: hidden; }
+.ps-skill-fill { display: block; height: 100%; background: #fff; border-radius: 99px; transition: width var(--duration-slow) var(--ease-standard); }
+.ps-skill-next { margin-top: 3px; font-size: 10.5px; color: var(--cc-faint); font-variant-numeric: tabular-nums; }
+
+/* What the five bars are working toward. Blank until the server states the gate,
+   so this line is never a guess. */
+.ps-skills-next {
+	margin: 0 12px 12px; padding: 9px 10px; border-radius: var(--cc-radius-sm);
+	font-size: 11px; line-height: 1.45; color: var(--cc-dim);
+	background: rgba(255, 255, 255, 0.04); border: 1px solid var(--cc-edge-soft);
+}
+.ps-skills-next:empty { display: none; }
+.ps-skills-next[data-state="open"] { color: var(--cc-text); border-color: var(--cc-edge); }
+
+/* ---- My Cosmetics (R23) ---- */
+.ps-cos { width: 320px; }
+.ps-cos-body { padding: 12px 12px 6px; overflow-y: auto; }
+.ps-cos-slot-head {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	margin: 10px 2px 7px;
+}
+.ps-cos-slot-head:first-child { margin-top: 2px; }
+.ps-cos-slot-name {
+	font-size: 10px;
+	font-weight: 700;
+	letter-spacing: 0.14em;
+	text-transform: uppercase;
+	color: var(--cc-dim);
+}
+.ps-cos-remove {
+	font-size: 10px;
+	font-weight: 700;
+	letter-spacing: 0.04em;
+	text-transform: uppercase;
+	color: var(--cc-dim);
+	background: transparent;
+	border: 1px solid var(--cc-edge-soft);
+	border-radius: var(--cc-radius-sm);
+	padding: 2px 8px;
+	transition: color var(--duration-fast) var(--ease-standard), border-color var(--duration-fast) var(--ease-standard), background var(--duration-fast) var(--ease-standard);
+}
+.ps-cos-remove:hover { color: var(--cc-text); border-color: var(--cc-edge); background: rgba(255, 255, 255, 0.08); }
+.ps-cos-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 7px; }
+.ps-cos-card {
+	display: flex;
+	flex-direction: column;
+	gap: 3px;
+	padding: 6px;
+	background: rgba(255, 255, 255, 0.04);
+	border: 1px solid var(--cc-edge-soft);
+	border-radius: var(--cc-radius-sm);
+	cursor: pointer;
+	transition: transform var(--duration-instant) var(--ease-standard), background var(--duration-fast) var(--ease-standard), border-color var(--duration-fast) var(--ease-standard), box-shadow var(--duration-fast) var(--ease-standard);
+}
+.ps-cos-card[role="button"]:hover { background: rgba(255, 255, 255, 0.1); border-color: var(--cc-edge); transform: translateY(-2px); }
+.ps-cos-card[role="button"]:focus-visible { outline: 2px solid var(--focus-ring-color); outline-offset: 1px; }
+.ps-cos-card.is-equipped { border-color: #fff; background: rgba(255, 255, 255, 0.14); box-shadow: var(--cc-glow); cursor: default; }
+.ps-cos-card.is-locked { opacity: 0.5; cursor: default; }
+.ps-cos-card.is-locked:hover { transform: none; }
+/* A locked item with a real $THREE price is a working buy action, not a dead
+ * end (CLAUDE.md: every button/link must do something) — dim it less than an
+ * unpurchasable placeholder and restore the normal interactive affordance. */
+.ps-cos-card.is-locked[role="button"] { opacity: 0.82; cursor: pointer; }
+.ps-cos-card.is-locked[role="button"]:hover { background: rgba(255, 255, 255, 0.1); border-color: var(--cc-edge); transform: translateY(-2px); }
+.ps-cos-card.is-locked[role="button"].ps-cos-busy { opacity: 0.55; cursor: wait; pointer-events: none; }
+.ps-cos-status.ps-cos-price { color: var(--cc-text); font-weight: 700; }
+.ps-cos-preview {
+	position: relative;
+	aspect-ratio: 1;
+	display: grid;
+	place-items: center;
+	background: rgba(0, 0, 0, 0.25);
+	border-radius: var(--cc-radius-sm);
+	overflow: hidden;
+}
+.ps-cos-thumb { width: 100%; height: 100%; object-fit: contain; }
+.ps-cos-swatch { width: 60%; height: 60%; border-radius: 50%; box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.25); }
+.ps-cos-rarity {
+	position: absolute;
+	left: 3px;
+	bottom: 3px;
+	font-size: 8px;
+	font-weight: 800;
+	letter-spacing: 0.06em;
+	text-transform: uppercase;
+	padding: 1px 4px;
+	border-radius: 99px;
+	background: rgba(0, 0, 0, 0.6);
+	color: var(--cc-dim);
+}
+.ps-cos-rarity.is-rare { color: #7cc7ff; }
+.ps-cos-rarity.is-epic { color: #d49bff; }
+.ps-cos-rarity.is-legendary { color: #ffd470; }
+.ps-cos-check {
+	position: absolute;
+	top: 3px;
+	right: 3px;
+	width: 16px;
+	height: 16px;
+	display: grid;
+	place-items: center;
+	font-size: 10px;
+	font-weight: 900;
+	color: var(--cc-ink);
+	background: #fff;
+	border-radius: 50%;
+}
+.ps-cos-name {
+	font-size: 11px;
+	color: var(--cc-text);
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
+}
+.ps-cos-status { font-size: 9px; letter-spacing: 0.04em; text-transform: uppercase; color: var(--cc-faint); }
+.ps-cos-card.is-equipped .ps-cos-status { color: var(--cc-text); }
+.ps-cos-hint {
+	margin: 10px 2px 6px;
+	font-size: 11px;
+	line-height: 1.5;
+	color: var(--cc-faint);
+}
+.ps-cos-hint a { color: var(--cc-text); text-decoration: none; border-bottom: 1px solid var(--cc-edge); white-space: nowrap; }
+.ps-cos-hint a:hover { border-bottom-color: currentColor; }
+.ps-cos-hint a:focus-visible { outline: 2px solid var(--focus-ring-color); outline-offset: 3px; border-radius: 2px; }
+.ps-cos-state {
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	gap: 12px;
+	padding: 34px 12px;
+	text-align: center;
+}
+.ps-cos-state-text { font-size: 12px; color: var(--cc-dim); margin: 0; }
+.ps-cos-spinner {
+	width: 26px;
+	height: 26px;
+	border-radius: 50%;
+	border: 2px solid var(--cc-edge);
+	border-top-color: #fff;
+	animation: ps-cos-spin 0.8s linear infinite;
+}
+@keyframes ps-cos-spin { to { transform: rotate(360deg); } }
+
+/* ---- Floating XP + level-up ---- */
+.ps-xp-float {
+	position: fixed;
+	z-index: 40;
+	transform: translate(-50%, 0);
+	padding: 3px 9px;
+	font-size: 12px;
+	font-weight: 700;
+	color: var(--cc-text);
+	background: var(--cc-panel);
+	border: 1px solid var(--cc-edge);
+	border-radius: 99px;
+	box-shadow: var(--cc-shadow);
+	pointer-events: none;
+	opacity: 0;
+	transition: transform var(--duration-slow) var(--ease-standard), opacity var(--duration-slow) var(--ease-standard);
+}
+.ps-xp-float.is-up { transform: translate(-50%, -42px); opacity: 1; }
+
+.ps-levelup {
+	position: fixed;
+	left: 50%;
+	top: 34%;
+	transform: translate(-50%, -50%) scale(0.9);
+	z-index: 41;
+	padding: 18px 28px;
+	text-align: center;
+	background: var(--cc-panel);
+	border: 1px solid var(--cc-edge-hi);
+	border-radius: var(--cc-radius);
+	box-shadow: var(--cc-shadow), var(--cc-glow);
+	backdrop-filter: blur(14px);
+	pointer-events: none;
+	opacity: 0;
+	transition: transform var(--duration-slow) var(--ease-standard), opacity var(--duration-slow) var(--ease-standard);
+}
+.ps-levelup.is-show { transform: translate(-50%, -50%) scale(1); opacity: 1; }
+.ps-levelup-mark { font-size: 11px; font-weight: 800; letter-spacing: 0.28em; color: var(--cc-dim); }
+.ps-levelup-skill { margin-top: 6px; font-size: 18px; font-weight: 700; color: var(--cc-text); }
+
+/* ---- Pulse (skills button on XP gain) ---- */
+@keyframes ps-pulse-k {
+	0% { transform: scale(1); }
+	40% { transform: scale(1.14); }
+	100% { transform: scale(1); }
+}
+.ps-pulse { animation: ps-pulse-k 0.45s ease; }
+
+/* ---- Responsive: tuck the HUD in on small screens ---- */
+@media (max-width: 560px) {
+	.ps-gold { top: 70px; left: 10px; }
+	/* The bottom-left corner belongs to the movement joystick (#cc-joystick:
+	   left 16px, bottom 20px, 104px tall → occupies up to ~124px from the bottom).
+	   The hotbar is centred and wide, so at phone widths its left slots used to sit
+	   on top of the joystick — and because #ps-hud (z 23) paints above #cc-hud
+	   (z 20, the joystick's stacking context), those slots won the touch hit-test
+	   and swallowed every drag. The avatar couldn't be moved at all. Lift the hotbar
+	   into a clear band above the joystick and the bottom-right emote/reaction stack
+	   (which tops out at ~138px), and let it scroll horizontally so it never
+	   overflows a narrow screen. */
+	.ps-hotbar {
+		bottom: 150px; gap: 4px; padding: 5px;
+		left: 50%; transform: translateX(-50%);
+		max-width: calc(100vw - 20px); overflow-x: auto; scrollbar-width: none;
+	}
+	.ps-hotbar::-webkit-scrollbar { display: none; }
+	.ps-slot { width: 40px; height: 40px; flex: 0 0 auto; }
+	/* Contextual action button and tool rail ride above the lifted hotbar so the
+	   bottom-left joystick zone stays completely clear. */
+	.ps-action { bottom: 208px; }
+	/* Same 52px stacking step as the desktop rules above, rebased on the
+	   mobile origin so the joystick and hotbar still clear all three. */
+	.ps-action.pa-action { bottom: 260px; }
+	.ps-action.wh-action { bottom: 312px; }
+	.ps-action.wp-action { bottom: 364px; }
+	.ps-rail { top: auto; bottom: 232px; transform: none; right: 10px; }
+	.ps-panel { right: 10px; left: 10px; width: auto; max-width: none; }
+}
+
+/* ── Interactive states (QB-07) ────────────────────────────────────────────
+   The HUD buttons are the only chrome in the world view and none of them
+   reacted to the pointer. */
+#ps-hud button {
+	transition: color var(--duration-fast) var(--ease-standard);
+}
+
+#ps-hud button:hover {
+	color: var(--ink-bright);
+}

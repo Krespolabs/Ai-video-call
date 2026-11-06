@@ -1,0 +1,30 @@
+[toolchain]
+
+[features]
+resolver = "2"
+
+# Same program id on every cluster — it is the program keypair's pubkey, baked
+# into `declare_id!`. See DEPLOYMENT.md for deploy signatures + upgrade authority.
+[programs.localnet]
+skill_license = "EdngSwxmDktyrr4phwGEZnCXEoQ27vgnBtowjhKa7Wr8"
+
+[programs.devnet]
+skill_license = "EdngSwxmDktyrr4phwGEZnCXEoQ27vgnBtowjhKa7Wr8"
+
+[programs.mainnet]
+skill_license = "EdngSwxmDktyrr4phwGEZnCXEoQ27vgnBtowjhKa7Wr8"
+
+[registry]
+url = "https://api.apr.dev"
+
+[provider]
+cluster = "devnet"
+# Deploy/upgrade authority keypair — kept OUT of the repo (~/.config/solana,
+# mirrored to the secret manager as SKILL_LICENSE_DEPLOY_AUTHORITY).
+wallet = "~/.config/solana/skill-license-deployer.json"
+
+[workspace]
+members = ["."]
+
+[scripts]
+smoke = "node ../../scripts/skill-license-smoke.mjs"

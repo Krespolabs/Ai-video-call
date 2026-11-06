@@ -1,0 +1,24 @@
+{
+  "valid": false,
+  "version": null,
+  "errors": [
+    {
+      "path": "spatialMcpVersion",
+      "message": "required — set it to \"0.1\""
+    },
+    {
+      "path": "scene.glbUrl",
+      "message": "required — must be an https URL to a .glb asset"
+    }
+  ],
+  "warnings": [
+    {
+      "path": "scene.format",
+      "message": "recommended — set to \"glb\""
+    },
+    {
+      "path": "camera",
+      "message": "recommended — include `{ autoRotate: true }` so hosts frame the model"
+    }
+  ]
+}

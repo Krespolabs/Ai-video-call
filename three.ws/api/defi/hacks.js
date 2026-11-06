@@ -1,0 +1,200 @@
+// GET /api/defi/hacks
+// ---------------------------------------------------------------------------
+// DeFi exploit / hack history for the /hacks page. Fetches DeFiLlama's keyless
+// /hacks feed (no API key), normalizes each incident to the fields the page
+// renders, computes whole-dataset headline stats, then applies an optional
+// case-insensitive search over name+technique+classification and paginates.
+// The raw upstream is cached ~10 min in-memory + CDN. DeFiLlama's hacks
+// database is the data source. See the page's attribution line.
+//
+// Amount unit: DeFiLlama reports `amount` in raw USD (verified at build time
+// against incidents of known magnitude, the largest bridge exploits land at
+// hundreds of millions to billions, matching their public post-mortems), so no
+// scaling is applied. `returnedFunds` uses the same unit. `chain` is an array
+// of chain names (or null); it is normalized to an array.
+
+import { cors, json, method, wrap, error, rateLimited } from '../_lib/http.js';
+import { limits, clientIp } from '../_lib/rate-limit.js';
+import { createCache, cached } from '../_lib/mem-cache.js';
+import { fetchUpstream, lastGood } from '../_lib/upstream-fetch.js';
+
+// DeFiLlama is this page's only upstream. A TTL cache alone still 502s the
+// moment it expires during an outage, so every loader also keeps its last good
+// result for hours and serves that (the handler's cache headers keep the
+// staleness honest to the CDN) rather than blanking the page.
+const STALE_MAX_AGE_MS = 6 * 60 * 60_000;
+// Keys currently served from a last-good copy (either tier), so the handler can
+// label the response `x-three-stale: 1` instead of passing it off as live. A key
+// leaves the set the moment its loader succeeds again.
+const _staleKeys = new Set();
+const cachedStale = (cache, key, load) => cached(cache, key, async () => {
+	const r = await lastGood(`defi-hacks:${key}`, load, {
+		maxAgeMs: STALE_MAX_AGE_MS,
+		onFallback: (err, ageMs) => console.warn(`[upstream] defi-hacks:${key}: serving last good value (${Math.round(ageMs / 60_000)}m old) after ${err?.message || err}`),
+	});
+	if (r.stale) _staleKeys.add(key);
+	else _staleKeys.delete(key);
+	return r.value;
+}, { onStale: (err) => {
+	_staleKeys.add(key);
+	console.warn(`[upstream] defi-hacks:${key}: serving in-memory last good after ${err?.message || err}`);
+} });
+const staleHeaders = (...keys) => (keys.some((k) => _staleKeys.has(k)) ? { 'x-three-stale': '1' } : {});
+const UPSTREAM = 'https://api.llama.fi/hacks';
+const TTL_MS = 600_000;
+const YEAR_MS = 365 * 24 * 60 * 60 * 1000;
+const MAX_LIMIT = 200;
+const DEFAULT_LIMIT = 100;
+
+// Single-entry cache with single-flight de-dup, so a burst of concurrent
+// requests on a cold or just-expired entry shares one upstream fetch.
+const _cache = createCache({ max: 1, ttlMs: TTL_MS });
+const CACHE_KEY = 'hacks';
+
+const finiteOrNull = (n) => (Number.isFinite(n) ? n : null);
+
+function normalizeChains(chain) {
+	if (Array.isArray(chain)) return chain.filter((c) => typeof c === 'string' && c.length);
+	if (typeof chain === 'string' && chain.length) return [chain];
+	return [];
+}
+
+// Fetch + normalize the whole upstream feed once, cache it. Returns the full
+// sorted, normalized incident list plus the dataset-wide headline stats. The
+// per-request search/pagination happens on top of this cached whole.
+async function loadDataset() {
+	return cachedStale(_cache, CACHE_KEY, buildDataset);
+}
+
+async function buildDataset() {
+	const now = Date.now();
+
+	const resp = await fetchUpstream(UPSTREAM, {
+		headers: { accept: 'application/json', 'user-agent': 'three.ws/1.0' },
+	}, { timeoutMs: 10_000, attempts: 2 });
+	const raw = await resp.json();
+	if (!Array.isArray(raw)) throw new Error('unexpected upstream shape');
+
+	const hacks = [];
+	for (const h of raw) {
+		const dateSec = Number(h?.date);
+		if (!Number.isFinite(dateSec)) continue;
+		const amount = Number(h?.amount);
+		const returned = Number(h?.returnedFunds);
+		hacks.push({
+			date: dateSec * 1000, // epoch ms
+			name: typeof h.name === 'string' && h.name.length ? h.name : 'Unknown',
+			classification: typeof h.classification === 'string' ? h.classification : null,
+			technique: typeof h.technique === 'string' ? h.technique : null,
+			amount_usd: Number.isFinite(amount) && amount >= 0 ? amount : null,
+			chains: normalizeChains(h.chain),
+			bridge: h.bridgeHack === true,
+			target_type: typeof h.targetType === 'string' ? h.targetType : null,
+			// `source` is a post-mortem/reference URL when present; DeFiLlama
+			// frequently ships it empty, so keep it null rather than render a
+			// dead link.
+			source: typeof h.source === 'string' && /^https?:\/\//i.test(h.source) ? h.source : null,
+			returned_usd: Number.isFinite(returned) && returned > 0 ? returned : null,
+		});
+	}
+
+	// Newest first.
+	hacks.sort((a, b) => b.date - a.date);
+
+	// Headline stats span the entire dataset, independent of any search/paging.
+	const cutoff = now - YEAR_MS;
+	let totalAllTime = 0;
+	let total12mo = 0;
+	let incidents12mo = 0;
+	let bridgeAllTime = 0;
+	for (const h of hacks) {
+		const amt = h.amount_usd || 0;
+		totalAllTime += amt;
+		if (h.bridge) bridgeAllTime += amt;
+		if (h.date >= cutoff) {
+			total12mo += amt;
+			incidents12mo += 1;
+		}
+	}
+
+	return {
+		hacks,
+		stats: {
+			total_stolen_all_time: totalAllTime,
+			total_stolen_12mo: total12mo,
+			incidents_12mo: incidents12mo,
+			bridge_hack_share_pct: totalAllTime > 0 ? (bridgeAllTime / totalAllTime) * 100 : 0,
+		},
+		updated_at: now,
+	};
+}
+
+function clampInt(raw, fallback, min, max) {
+	const n = Number.parseInt(raw, 10);
+	if (!Number.isFinite(n)) return fallback;
+	return Math.min(max, Math.max(min, n));
+}
+
+// Exported for the paid Market Data API (api/_lib/market-data/), the x402
+// market-hacks endpoint sells the same exploit database this page renders.
+export async function queryHacks({ search = '', limit = DEFAULT_LIMIT, offset = 0 } = {}) {
+	const dataset = await loadDataset();
+
+	let filtered = dataset.hacks;
+	if (search) {
+		filtered = filtered.filter((h) => {
+			const hay = `${h.name} ${h.technique || ''} ${h.classification || ''}`.toLowerCase();
+			return hay.includes(search);
+		});
+	}
+
+	return {
+		stats: {
+			total_stolen_all_time: dataset.stats.total_stolen_all_time,
+			total_stolen_12mo: dataset.stats.total_stolen_12mo,
+			incidents_12mo: dataset.stats.incidents_12mo,
+			bridge_hack_share_pct: finiteOrNull(dataset.stats.bridge_hack_share_pct) ?? 0,
+		},
+		hacks: filtered.slice(offset, offset + limit),
+		count: filtered.length,
+		updated_at: dataset.updated_at,
+	};
+}
+
+export default wrap(async (req, res) => {
+	if (cors(req, res, { methods: 'GET,OPTIONS', origins: '*' })) return;
+	if (!method(req, res, ['GET'])) return;
+
+	const rl = await limits.marketDataIp(clientIp(req));
+	if (!rl.success) return rateLimited(res, rl);
+
+	let url;
+	try {
+		url = new URL(req.url, 'http://local');
+	} catch {
+		url = new URL('/api/defi/hacks', 'http://local');
+	}
+	const search = (url.searchParams.get('search') || '').trim().toLowerCase();
+	const limit = clampInt(url.searchParams.get('limit'), DEFAULT_LIMIT, 1, MAX_LIMIT);
+	const offset = clampInt(url.searchParams.get('offset'), 0, 0, Number.MAX_SAFE_INTEGER);
+
+	try {
+		return json(
+			res,
+			200,
+			await queryHacks({ search, limit, offset }),
+			{
+				'cache-control':
+					'public, max-age=120, s-maxage=600, stale-while-revalidate=1200',
+				...staleHeaders(CACHE_KEY),
+			},
+		);
+	} catch {
+		return error(
+			res,
+			502,
+			'upstream_error',
+			'DeFi hacks data is unavailable right now. Retry shortly',
+		);
+	}
+});

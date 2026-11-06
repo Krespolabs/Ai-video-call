@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+	<script>/* three.ws theme boot — no-flash; runtime in /theme-switcher.js */(function(){try{var m=localStorage.getItem('twx_theme');var l=m==='auto'?(window.matchMedia&&window.matchMedia('(prefers-color-scheme: light)').matches):m==='light';document.documentElement.setAttribute('data-theme',l?'light':'dark');}catch(e){document.documentElement.setAttribute('data-theme','dark');}})();</script>
+	<style>/* three.ws hidden-guard — make the `hidden` attribute authoritative */[hidden]{display:none!important}</style>
+	<meta charset="UTF-8" />
+	<meta name="viewport" content="width=device-width, initial-scale=1" />
+	<title data-i18n="pose_mini.meta_title">Pose it — three.ws</title>
+	<meta name="description" content="A live slice of three.ws Pose Studio: orbit the figure, grab a limb to pose it, or tap a preset to morph the whole pose. The same mannequin rig that drives every three.ws avatar — running in your browser, framable anywhere."  data-i18n-attr="content:pose_mini.meta_description"/>
+	<link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+	<meta name="robots" content="noindex" />
+	<style>
+		:root{
+			--bg:        #050505;
+			--surface-1: #111111;
+			--hairline:  #1c1c1c;
+			--hairline-strong: #2a2a2a;
+			--text:      #f6f6f6;
+			--text-2:    #a8a8a8;
+			--text-3:    #8a8a8a;
+			--accent:    #ffffff;
+			--font-display: 'Space Grotesk', 'Inter', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+			--font-mono:    'JetBrains Mono', 'SF Mono', 'Fira Code', ui-monospace, Menlo, Consolas, monospace;
+		}
+		*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+		html,body{height:100%}
+		body{
+			background:var(--bg); color:var(--text);
+			font-family:var(--font-display);
+			-webkit-font-smoothing:antialiased; text-rendering:optimizeLegibility;
+		}
+		#home-pose{ display:block; height:100%; padding:18px; }
+		#home-pose .hp-wrap{ display:grid; grid-template-columns:1.35fr 0.9fr; gap:20px; height:100%; align-items:stretch; }
+
+		#home-pose .hp-stage-card{
+			position:relative; border:1px solid var(--hairline); border-radius:16px; overflow:hidden;
+			background:radial-gradient(120% 100% at 50% 0%, #121214 0%, #09090a 70%); min-height:0;
+		}
+		#home-pose [data-pose-stage]{ position:absolute; inset:0; cursor:grab; }
+		#home-pose [data-pose-stage]:active{ cursor:grabbing; }
+		#home-pose .hp-canvas{ display:block; width:100%; height:100%; touch-action:none; }
+		#home-pose .hp-stage-hud{
+			position:absolute; left:16px; top:16px; display:flex; gap:8px; align-items:center;
+			font-family:var(--font-mono); font-size:11px; letter-spacing:0.08em; text-transform:uppercase;
+			color:var(--text-3); pointer-events:none;
+		}
+		#home-pose .hp-stage-hud .dot{ width:6px; height:6px; border-radius:50%; background:#4fc3ff; box-shadow:0 0 8px #4fc3ff; }
+		#home-pose .hp-hint{
+			position:absolute; left:50%; bottom:60px; transform:translateX(-50%);
+			font-size:12.5px; color:var(--text-3); background:rgba(0,0,0,0.45); border:1px solid var(--hairline);
+			padding:7px 14px; border-radius:999px; pointer-events:none; backdrop-filter:blur(6px); white-space:nowrap;
+		}
+		#home-pose .hp-chips{
+			position:absolute; left:0; right:0; bottom:0; display:flex; gap:8px; padding:14px;
+			overflow-x:auto; scrollbar-width:none; -webkit-mask:linear-gradient(90deg, transparent, #000 18px, #000 calc(100% - 18px), transparent);
+		}
+		#home-pose .hp-chips::-webkit-scrollbar{ display:none; }
+		#home-pose .hp-chip{
+			flex:0 0 auto; font-family:var(--font-mono); font-size:12px; color:var(--text-2);
+			background:rgba(20,20,22,0.82); border:1px solid var(--hairline); border-radius:999px;
+			padding:7px 14px; cursor:pointer; white-space:nowrap; transition:border-color .16s, color .16s, background .16s, transform .16s;
+			backdrop-filter:blur(8px);
+		}
+		#home-pose .hp-chip:hover{ color:var(--text); border-color:var(--hairline-strong); transform:translateY(-1px); }
+		#home-pose .hp-chip:focus-visible{ outline:2px solid #4fc3ff; outline-offset:2px; }
+		#home-pose .hp-chip.is-active{ color:#061015; background:#4fc3ff; border-color:#4fc3ff; }
+
+		#home-pose .hp-panel{ display:flex; flex-direction:column; gap:14px; min-height:0; overflow-y:auto; scrollbar-width:thin; }
+		#home-pose .hp-panel-card{ border:1px solid var(--hairline); border-radius:16px; background:var(--surface-1); padding:20px; }
+		#home-pose .hp-panel-label{ font-family:var(--font-mono); font-size:11px; letter-spacing:0.16em; text-transform:uppercase; color:var(--text-3); margin:0 0 4px; }
+		#home-pose .hp-panel-sel{ font-family:var(--font-display); font-size:22px; font-weight:600; letter-spacing:-0.02em; color:var(--text); margin:0 0 16px; }
+		#home-pose .hp-sliders{ display:flex; flex-direction:column; gap:16px; }
+		#home-pose .hp-sliders-empty{ font-size:13.5px; color:var(--text-3); margin:0; line-height:1.5; }
+		#home-pose .hp-slider-row{ display:flex; flex-direction:column; gap:7px; }
+		#home-pose .hp-slider-head{ display:flex; justify-content:space-between; align-items:baseline; }
+		#home-pose .hp-slider-axis{ font-size:12px; color:var(--text-2); font-weight:500; }
+		#home-pose .hp-slider-val{ font-family:var(--font-mono); font-size:11.5px; color:var(--text-3); }
+		#home-pose .hp-slider{ -webkit-appearance:none; appearance:none; width:100%; height:3px; border-radius:2px; background:var(--hairline-strong); outline:none; cursor:pointer; }
+		#home-pose .hp-slider::-webkit-slider-thumb{ -webkit-appearance:none; appearance:none; width:15px; height:15px; border-radius:50%; background:var(--text); border:2px solid #09090a; box-shadow:0 0 0 1px var(--hairline-strong); cursor:grab; transition:transform .12s; }
+		#home-pose .hp-slider::-webkit-slider-thumb:hover{ transform:scale(1.15); }
+		#home-pose .hp-slider:focus-visible{ outline:2px solid var(--accent); outline-offset:4px; }
+		#home-pose .hp-slider:focus-visible::-webkit-slider-thumb{ box-shadow:0 0 0 3px #4fc3ff; }
+		#home-pose .hp-slider:focus-visible::-moz-range-thumb{ box-shadow:0 0 0 3px #4fc3ff; }
+		#home-pose .hp-slider::-moz-range-thumb{ width:13px; height:13px; border-radius:50%; background:var(--text); border:2px solid #09090a; cursor:grab; }
+		#home-pose .hp-mini-actions{ display:grid; grid-template-columns:repeat(3, 1fr); gap:10px; }
+		#home-pose .hp-btn{
+			text-align:center; font-family:var(--font-mono); font-size:12.5px; padding:11px 14px;
+			border-radius:10px; border:1px solid var(--hairline); background:transparent; color:var(--text-2);
+			cursor:pointer; text-decoration:none; transition:border-color .16s, color .16s, background .16s;
+		}
+		#home-pose .hp-btn:hover{ color:var(--text); border-color:var(--hairline-strong); }
+		#home-pose .hp-btn:focus-visible{ outline:2px solid #4fc3ff; outline-offset:2px; }
+		#home-pose .hp-btn-primary{ display:block; background:var(--text); color:#09090a; border-color:var(--text); font-weight:600; }
+		#home-pose .hp-btn-primary:hover{ color:#09090a; background:#e2e2e2; }
+		#home-pose .hp-toast{
+			position:absolute; left:50%; top:16px; transform:translateX(-50%) translateY(-8px);
+			font-family:var(--font-mono); font-size:12px; color:#061015; background:#4fc3ff;
+			padding:7px 14px; border-radius:999px; opacity:0; pointer-events:none;
+			transition:opacity .2s, transform .2s; z-index:4;
+		}
+		#home-pose .hp-toast.is-show{ opacity:1; transform:translateX(-50%) translateY(0); }
+
+		/* Stack on narrow embeds — the iframe is often portrait on phones. */
+		@media (max-width:760px){
+			#home-pose{ padding:12px; height:auto; min-height:100%; }
+			#home-pose .hp-wrap{ grid-template-columns:1fr; height:auto; }
+			#home-pose .hp-stage-card{ min-height:60vh; }
+			#home-pose .hp-panel{ overflow:visible; }
+		}
+	</style>
+</head>
+<body>
+	<!-- The data-pose-* scaffold is the contract src/home-pose.js mounts against;
+	     it self-boots on import, finds #home-pose, and drives the real MannequinRig. -->
+	<section id="home-pose">
+		<div class="hp-wrap">
+			<div class="hp-stage-card">
+				<div data-pose-stage></div>
+				<div class="hp-stage-hud"><span class="dot"></span>Live rig</div>
+				<p class="hp-hint" data-pose-hint data-i18n="pose_mini.grab_a_limb_to_pose_it_drag">Grab a limb to pose it &middot; drag the floor to orbit</p>
+				<div class="hp-toast" data-pose-toast aria-live="polite"></div>
+				<div class="hp-chips" data-pose-chips role="group" aria-label="Preset poses"></div>
+			</div>
+			<div class="hp-panel">
+				<div class="hp-panel-card">
+					<p class="hp-panel-label" data-i18n="pose_mini.selected_joint">Selected joint</p>
+					<p class="hp-panel-sel" data-pose-selected>&mdash;</p>
+					<div class="hp-sliders" data-pose-sliders></div>
+				</div>
+				<div class="hp-mini-actions">
+					<button type="button" class="hp-btn" data-pose-reset data-i18n="pose_mini.reset">Reset</button>
+					<button type="button" class="hp-btn" data-pose-copy data-i18n="pose_mini.copy_link">Copy link</button>
+					<button type="button" class="hp-btn" data-pose-snap data-i18n="pose_mini.snapshot">Snapshot</button>
+				</div>
+				<a class="hp-btn hp-btn-primary" href="https://three.ws/pose" target="_blank" rel="noopener" data-pose-studio data-i18n="pose_mini.open_in_the_full_studio">Open in the full studio &rarr;</a>
+			</div>
+		</div>
+	</section>
+
+	<script type="module">
+		// home-pose.js pulls Three.js + OrbitControls + the full MannequinRig and
+		// self-boots on import: it finds #home-pose and wires the live demo. This
+		// minimal host exists so the lite "Pose it" demo is framable on its own
+		// route (e.g. embedded into the IBM showcase) without loading the homepage.
+		import('/src/home-pose.js');
+	</script>
+	<!-- Runtime i18n: detects locale, swaps annotated copy, mounts <lang-switcher>. -->
+	<script type="module" src="/i18n.js"></script>
+</body>
+</html>

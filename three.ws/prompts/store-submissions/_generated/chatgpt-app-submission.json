@@ -1,0 +1,176 @@
+{
+  "$schema": "https://developers.openai.com/apps-sdk/schemas/chatgpt-app-submission.v1.json",
+  "schema_version": 1,
+  "app_info": {
+    "display_name": "three.ws 3D Studio",
+    "subtitle": "Create 3D models from text",
+    "description": "Describe any object or character and three.ws 3D Studio builds a real, textured 3D model, then shows it in an interactive viewer inside the conversation. Eight tools cover the path from idea to asset: generate a model from text or a reference image, generate an avatar, auto-rig a static model so it can be animated, refine a model by describing a change, and inspect a finished model from several angles. Every result downloads as a standard GLB that opens in Blender, Unity, Unreal, three.js, or any glTF pipeline. No account, no API key, no payment.",
+    "category": "DESIGN"
+  },
+  "tools": {
+    "forge_free": {
+      "annotations": {
+        "readOnlyHint": false,
+        "openWorldHint": true,
+        "destructiveHint": false
+      },
+      "justifications": {
+        "read_only_justification": "Runs a 3D generation and writes a new GLB file into our object storage, then returns that file's URL.",
+        "open_world_justification": "Publishes the generated GLB at a public URL anyone with the link can fetch, and relies on third-party inference providers to produce it.",
+        "destructive_justification": "Only adds a new file and never overwrites or deletes an existing one, so a model supplied as input is left unchanged."
+      }
+    },
+    "text_to_avatar": {
+      "annotations": {
+        "readOnlyHint": false,
+        "openWorldHint": true,
+        "destructiveHint": false
+      },
+      "justifications": {
+        "read_only_justification": "Runs a 3D generation and writes a new GLB file into our object storage, then returns that file's URL.",
+        "open_world_justification": "Publishes the generated GLB at a public URL anyone with the link can fetch, and relies on third-party inference providers to produce it.",
+        "destructive_justification": "Only adds a new file and never overwrites or deletes an existing one, so a model supplied as input is left unchanged."
+      }
+    },
+    "mesh_forge": {
+      "annotations": {
+        "readOnlyHint": false,
+        "openWorldHint": true,
+        "destructiveHint": false
+      },
+      "justifications": {
+        "read_only_justification": "Runs a 3D generation and writes a new GLB file into our object storage, then returns that file's URL.",
+        "open_world_justification": "Publishes the generated GLB at a public URL anyone with the link can fetch, and relies on third-party inference providers to produce it.",
+        "destructive_justification": "Only adds a new file and never overwrites or deletes an existing one, so a model supplied as input is left unchanged."
+      }
+    },
+    "rig_mesh": {
+      "annotations": {
+        "readOnlyHint": false,
+        "openWorldHint": true,
+        "destructiveHint": false
+      },
+      "justifications": {
+        "read_only_justification": "Runs a 3D generation and writes a new GLB file into our object storage, then returns that file's URL.",
+        "open_world_justification": "Publishes the generated GLB at a public URL anyone with the link can fetch, and relies on third-party inference providers to produce it.",
+        "destructive_justification": "Only adds a new file and never overwrites or deletes an existing one, so a model supplied as input is left unchanged."
+      }
+    },
+    "forge_avatar": {
+      "annotations": {
+        "readOnlyHint": false,
+        "openWorldHint": true,
+        "destructiveHint": false
+      },
+      "justifications": {
+        "read_only_justification": "Runs a 3D generation and writes a new GLB file into our object storage, then returns that file's URL.",
+        "open_world_justification": "Publishes the generated GLB at a public URL anyone with the link can fetch, and relies on third-party inference providers to produce it.",
+        "destructive_justification": "Only adds a new file and never overwrites or deletes an existing one, so a model supplied as input is left unchanged."
+      }
+    },
+    "refine_model": {
+      "annotations": {
+        "readOnlyHint": false,
+        "openWorldHint": true,
+        "destructiveHint": false
+      },
+      "justifications": {
+        "read_only_justification": "Runs a 3D generation and writes a new GLB file into our object storage, then returns that file's URL.",
+        "open_world_justification": "Publishes the generated GLB at a public URL anyone with the link can fetch, and relies on third-party inference providers to produce it.",
+        "destructive_justification": "Only adds a new file and never overwrites or deletes an existing one, so a model supplied as input is left unchanged."
+      }
+    },
+    "check_job": {
+      "annotations": {
+        "readOnlyHint": false,
+        "openWorldHint": true,
+        "destructiveHint": false
+      },
+      "justifications": {
+        "read_only_justification": "The first check that finds a job finished copies the model into our storage and records the creation, so the call writes rather than only reads.",
+        "open_world_justification": "Collects work from third-party inference providers and publishes the finished GLB at a public URL anyone with the link can fetch.",
+        "destructive_justification": "Only adds the finished model and never deletes or overwrites an earlier one."
+      }
+    },
+    "look_at_model": {
+      "annotations": {
+        "readOnlyHint": true,
+        "openWorldHint": true,
+        "destructiveHint": false
+      },
+      "justifications": {
+        "read_only_justification": "Renders a model that already exists from several angles and returns the frames as images, storing nothing and changing nothing.",
+        "open_world_justification": "Fetches an arbitrary public GLB URL, so it reaches third-party hosts outside our own domain.",
+        "destructive_justification": "Only reads the supplied model in order to render it, and never modifies or deletes the source file."
+      }
+    }
+  },
+  "test_cases": [
+    {
+      "description": "Generate a 3D prop from a text description",
+      "user_prompt": "Make a 3D model of a friendly round robot mascot, glossy white plastic.",
+      "file_attachment_urls": null,
+      "tools_triggered": "forge_free; if it returns status \"pending\", the viewer widget collects the model with check_job",
+      "expected_output": "An inline 3D viewer showing the textured robot, auto-rotating until dragged, with Download GLB, Open viewer and View in your space. Free, no account. The call answers within about 40s; if still rendering, the viewer shows a live timer and fills in by itself, usually in 1-4 minutes.",
+      "expected_output_url": null
+    },
+    {
+      "description": "Generate a rigged, animation-ready character",
+      "user_prompt": "Make a rigged, animation-ready knight character I can pose.",
+      "file_attachment_urls": null,
+      "tools_triggered": "forge_avatar; if it returns status \"pending\", the viewer widget collects the mesh with check_job and rigs it with rig_mesh",
+      "expected_output": "The knight in the inline viewer, labeled rigged model, carrying a humanoid skeleton and skin weights so it can be posed. If the call answers before the mesh is done, the viewer finishes the mesh, runs the rig step itself, then shows the rigged model.",
+      "expected_output_url": null
+    },
+    {
+      "description": "Iterate on a model by describing the change in words",
+      "user_prompt": "Now make that robot's shell matte instead of glossy.",
+      "file_attachment_urls": null,
+      "tools_triggered": "refine_model; if it returns status \"pending\", the viewer widget collects it with check_job",
+      "expected_output": "Run right after test case 1 in the same conversation. A new version anchored to the robot, not an unrelated model, appears in the viewer with a Versions strip (Original, then the change) so either version can be shown again. A still-rendering one fills in by itself.",
+      "expected_output_url": null
+    },
+    {
+      "description": "Let the assistant see a 3D model and report on it",
+      "user_prompt": "Look at this 3D model and tell me what it is and whether it has any obvious defects: https://three.ws/cdn/objects/polyhaven/glb/ArmChair_01.glb",
+      "file_attachment_urls": null,
+      "tools_triggered": "look_at_model",
+      "expected_output": "Frames from four angles returned as image content, plus geometry stats, and the armchair in the inline viewer. The assistant describes the chair from images it can actually see. Free, about 30 seconds. The URL is ours and needs no credentials.",
+      "expected_output_url": null
+    },
+    {
+      "description": "Generate a model through the art-directed lane",
+      "user_prompt": "Use the art-directed generator to make a detailed vintage brass telescope on a wooden tripod.",
+      "file_attachment_urls": null,
+      "tools_triggered": "mesh_forge; if it returns status \"pending\", the viewer widget collects the model with check_job",
+      "expected_output": "A textured telescope in the same inline viewer, with Download GLB and Open viewer. An art-direction pass may first tighten the prompt into a single-subject spec. Free, no account. If still rendering after about 40s, the viewer shows progress and fills in by itself.",
+      "expected_output_url": null
+    }
+  ],
+  "negative_test_cases": [
+    {
+      "description": "The user wants a 2D image, not a 3D model. The wording nearly matches our main generation prompt, but this plugin only returns 3D GLB files, so image generation should handle it.",
+      "user_prompt": "Draw a cartoon robot mascot for my startup's landing page.",
+      "file_attachment_urls": null,
+      "tools_triggered": null,
+      "expected_output": "The app should not be invoked, because it only produces 3D GLB models and the user asked for a 2D image.",
+      "expected_output_url": null
+    },
+    {
+      "description": "\"Model\" is a verb here, meaning a financial projection. Nothing 3D is involved, and no tool in this plugin operates on spreadsheets or forecasts.",
+      "user_prompt": "Model out our Q3 revenue if we raise prices 20%.",
+      "file_attachment_urls": null,
+      "tools_triggered": null,
+      "expected_output": "The app should not be invoked, because no tool here operates on spreadsheets, forecasts or financial data.",
+      "expected_output_url": null
+    },
+    {
+      "description": "The user asks how to do something in other software, not for work on a file. It says \"rig\" and \"character\", but rig_mesh needs the URL of an existing GLB and would return nothing they asked for.",
+      "user_prompt": "How do I rig a humanoid character in Blender?",
+      "file_attachment_urls": null,
+      "tools_triggered": null,
+      "expected_output": "The app should not be invoked, because the user wants an explanation of other software rather than work on a file.",
+      "expected_output_url": null
+    }
+  ]
+}

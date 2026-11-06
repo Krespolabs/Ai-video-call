@@ -1,0 +1,140 @@
+{
+	"id": "splat-viewer",
+	"scenarioHash": "2e5cf194cc35fd104348ab396389d6c72083737ef665a7964966cb55a9ae9f09",
+	"ranAt": "2026-09-30T08:19:04.686Z",
+	"target": {
+		"commit": "07a1ab3b5",
+		"revision": "three-ws-api-00466-85g"
+	},
+	"passed": true,
+	"steps": [
+		{
+			"index": 1,
+			"kind": "goto",
+			"target": "https://three.ws/splat",
+			"detail": "loaded https://three.ws/splat",
+			"ok": true,
+			"ms": 7290,
+			"frames": 0
+		},
+		{
+			"index": 2,
+			"kind": "hold",
+			"target": "1400",
+			"detail": "1400 ms",
+			"ok": true,
+			"ms": 11376,
+			"frames": 42
+		},
+		{
+			"index": 3,
+			"kind": "scroll",
+			"target": "Samples",
+			"detail": "scrolled 885 px",
+			"ok": true,
+			"ms": 6354,
+			"frames": 27
+		},
+		{
+			"index": 4,
+			"kind": "click",
+			"target": "Synthetic head bust · 14k splats",
+			"detail": "clicked",
+			"ok": true,
+			"ms": 8333,
+			"frames": 21
+		},
+		{
+			"index": 5,
+			"kind": "expect",
+			"target": "Synthetic head bust · 14,000 splats",
+			"detail": "appeared after 0 filmed frames",
+			"ok": true,
+			"ms": 13,
+			"frames": 0
+		},
+		{
+			"index": 6,
+			"kind": "read",
+			"target": "splats",
+			"detail": "splats = \"14,000\"",
+			"ok": true,
+			"ms": 2,
+			"frames": 0
+		},
+		{
+			"index": 7,
+			"kind": "drag",
+			"target": "0.012,0.5,0.012,0.5",
+			"detail": "dragged over 6 frames",
+			"ok": true,
+			"ms": 16529,
+			"frames": 24
+		},
+		{
+			"index": 8,
+			"kind": "scroll",
+			"target": "-670",
+			"detail": "scrolled -670 px",
+			"ok": true,
+			"ms": 19763,
+			"frames": 27
+		},
+		{
+			"index": 9,
+			"kind": "hold",
+			"target": "1000",
+			"detail": "1000 ms",
+			"ok": true,
+			"ms": 20041,
+			"frames": 30
+		},
+		{
+			"index": 10,
+			"kind": "drag",
+			"target": "0.3,0.5,0.74,0.5",
+			"detail": "dragged over 84 frames",
+			"ok": true,
+			"ms": 66450,
+			"frames": 102
+		},
+		{
+			"index": 11,
+			"kind": "drag",
+			"target": "0.62,0.52,0.48,0.58",
+			"detail": "dragged over 48 frames",
+			"ok": true,
+			"ms": 47243,
+			"frames": 66
+		},
+		{
+			"index": 12,
+			"kind": "hold",
+			"target": "2800",
+			"detail": "2800 ms",
+			"ok": true,
+			"ms": 58064,
+			"frames": 84
+		}
+	],
+	"facts": {
+		"splats": "14,000"
+	},
+	"saw": [
+		"Synthetic head bust · 14,000 splats"
+	],
+	"responses": [],
+	"cuts": [],
+	"video": {
+		"path": "public/x-media/splat-viewer/reel.mp4",
+		"sha256": "8efc37023d7c61293380b59e572894cfe5b95f012b082128bf048f149395f870",
+		"frames": 423,
+		"motion": 0.806,
+		"durationSec": 14.1,
+		"width": 1080,
+		"height": 1080,
+		"fps": 30,
+		"videoCodec": "h264",
+		"pixFmt": "yuv420p"
+	}
+}

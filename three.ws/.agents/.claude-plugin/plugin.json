@@ -1,0 +1,21 @@
+{
+  "name": "three-ws-core",
+  "description": "The three.ws skill pack: 3D model and avatar generation, building and monetizing agents on the platform, and the wallet/x402 agent economy.",
+  "version": "1.0.0",
+  "author": {
+    "name": "nirholas"
+  },
+  "homepage": "https://three.ws",
+  "license": "Apache-2.0",
+  "repository": "https://github.com/nirholas/three.ws",
+  "keywords": [
+    "wallet",
+    "x402",
+    "usdc",
+    "payments",
+    "trade",
+    "base",
+    "solana",
+    "polygon"
+  ]
+}

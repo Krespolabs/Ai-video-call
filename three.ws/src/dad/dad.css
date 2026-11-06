@@ -1,0 +1,348 @@
+/* /dad — "Make Dad a 3D avatar" page styles. Consumes the canonical design
+   tokens (public/tokens.css) directly; buttons use the shared .btn system. */
+
+.dad {
+	max-width: 880px;
+	margin: 0 auto;
+	padding: var(--space-2xl) var(--space-lg) var(--space-2xl);
+	min-height: 70vh;
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	text-align: center;
+}
+
+.dad [data-region] {
+	width: 100%;
+	animation: dad-fade-in 0.4s ease both;
+}
+
+/* Headings get programmatic focus on stage change for screen-reader continuity;
+   they aren't keyboard targets, so suppress the visible ring (keep the SR move). */
+.dad [tabindex='-1']:focus {
+	outline: none;
+}
+
+@keyframes dad-fade-in {
+	from { opacity: 0; transform: translateY(8px); }
+	to { opacity: 1; transform: translateY(0); }
+}
+
+/* ── Hero / intro ─────────────────────────────────────────────────────────── */
+
+.dad-eyebrow {
+	font: 600 var(--text-sm) / 1 var(--font-display);
+	letter-spacing: 0.12em;
+	text-transform: uppercase;
+	color: var(--accent);
+	opacity: 0.85;
+	margin: 0 0 var(--space-md);
+}
+
+.dad-title {
+	font: 700 var(--text-2xl) / 1.04 var(--font-display);
+	color: var(--ink);
+	margin: 0 0 var(--space-md);
+	letter-spacing: -0.02em;
+}
+
+.dad-sub {
+	font: 400 var(--text-lg) / 1.5 var(--font-body);
+	color: var(--ink);
+	opacity: 0.7;
+	max-width: 30ch;
+	margin: 0 auto var(--space-xl);
+}
+
+.dad-drop {
+	width: 100%;
+	max-width: 460px;
+	margin: 0 auto;
+	padding: var(--space-2xl) var(--space-lg);
+	background: var(--surface-1);
+	border: 1.5px dashed var(--stroke-strong);
+	border-radius: var(--radius-lg);
+	cursor: pointer;
+	transition: border-color var(--duration-fast) var(--ease-standard), background var(--duration-fast) var(--ease-standard), transform var(--duration-fast) var(--ease-standard);
+}
+
+.dad-drop:hover,
+.dad-drop:focus-visible,
+.dad-drop.is-drag {
+	border-color: var(--accent);
+	background: var(--surface-2);
+	outline: none;
+}
+
+.dad-drop.is-drag { transform: scale(1.01); }
+
+.dad-drop:focus-visible {
+	box-shadow: 0 0 0 var(--focus-ring-width) var(--focus-ring-color);
+}
+
+.dad-drop-icon {
+	width: 40px;
+	height: 40px;
+	color: var(--accent);
+	opacity: 0.9;
+	margin-bottom: var(--space-sm);
+}
+
+.dad-drop-strong {
+	font: 600 var(--text-lg) / 1.2 var(--font-body);
+	color: var(--ink);
+	margin: 0 0 var(--space-2xs);
+}
+
+.dad-drop-hint {
+	font: 400 var(--text-md) / 1.4 var(--font-body);
+	color: var(--ink);
+	opacity: 0.6;
+	margin: 0;
+}
+
+.dad-link { color: var(--accent); text-decoration: underline; }
+
+.dad-fineprint {
+	font: 400 var(--text-sm) / 1.5 var(--font-body);
+	color: var(--ink);
+	opacity: 0.45;
+	margin: var(--space-md) auto 0;
+	max-width: 40ch;
+}
+
+/* ── Generic stage boxes ──────────────────────────────────────────────────── */
+
+.dad-stage-box {
+	width: 100%;
+	max-width: 520px;
+	margin: 0 auto;
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+}
+
+.dad-h2 {
+	font: 700 var(--text-xl) / 1.1 var(--font-display);
+	color: var(--ink);
+	margin: var(--space-md) 0 var(--space-xs);
+	letter-spacing: -0.01em;
+}
+
+.dad-stage-help {
+	font: 400 var(--text-md) / 1.5 var(--font-body);
+	color: var(--ink);
+	opacity: 0.65;
+	margin: 0 0 var(--space-lg);
+	max-width: 38ch;
+}
+
+.dad-actions {
+	display: flex;
+	flex-wrap: wrap;
+	gap: var(--space-sm);
+	justify-content: center;
+}
+
+.dad-actions-col {
+	flex-direction: column;
+	align-items: stretch;
+	width: 100%;
+	max-width: 260px;
+}
+
+.dad-btn { min-width: 160px; }
+
+/* ── Preview ──────────────────────────────────────────────────────────────── */
+
+.dad-preview-frame {
+	width: 100%;
+	max-width: 320px;
+	aspect-ratio: 1 / 1;
+	margin: 0 auto var(--space-lg);
+	border-radius: var(--radius-lg);
+	overflow: hidden;
+	background:
+		var(--surface-2)
+		repeating-conic-gradient(rgba(255, 255, 255, 0.03) 0% 25%, transparent 0% 50%) 50% / 22px 22px;
+	border: 1px solid var(--stroke);
+	box-shadow: var(--shadow-2);
+}
+
+.dad-preview-img {
+	width: 100%;
+	height: 100%;
+	object-fit: contain;
+	display: block;
+}
+
+/* ── Generating ───────────────────────────────────────────────────────────── */
+
+.dad-stage {
+	width: 100%;
+	max-width: 320px;
+	aspect-ratio: 1 / 1;
+	margin: 0 auto var(--space-md);
+	border-radius: var(--radius-lg);
+	overflow: hidden;
+	border: 1px solid var(--stroke);
+	background: var(--surface-1);
+}
+
+/* Gradient is built from theme-flipping surface tokens so the shimmer stays
+   visible in both dark and light themes (the global --skeleton-* tokens don't
+   remap for light). */
+.dad-skeleton {
+	width: 100%;
+	height: 100%;
+	background: linear-gradient(
+		100deg,
+		var(--surface-2) 30%,
+		var(--surface-3) 50%,
+		var(--surface-2) 70%
+	);
+	background-size: 200% 100%;
+	animation: dad-shimmer 1.4s ease-in-out infinite;
+}
+
+@keyframes dad-shimmer {
+	from { background-position: 200% 0; }
+	to { background-position: -200% 0; }
+}
+
+.dad-progress {
+	width: 100%;
+	max-width: 320px;
+	height: 4px;
+	border-radius: var(--radius-pill);
+	background: var(--surface-3);
+	overflow: hidden;
+	margin-top: var(--space-sm);
+}
+
+/* Indeterminate: the reconstruct API reports no true percent, so the bar
+   communicates "working" honestly rather than faking a percentage. */
+.dad-progress-bar {
+	width: 40%;
+	height: 100%;
+	border-radius: var(--radius-pill);
+	background: var(--accent);
+	animation: dad-indeterminate 1.3s ease-in-out infinite;
+}
+
+@keyframes dad-indeterminate {
+	0% { transform: translateX(-120%); }
+	100% { transform: translateX(320%); }
+}
+
+/* ── Result ───────────────────────────────────────────────────────────────── */
+
+.dad-result {
+	max-width: 880px;
+	flex-direction: row;
+	gap: var(--space-xl);
+	align-items: stretch;
+	text-align: left;
+}
+
+.dad-viewer-wrap {
+	position: relative;
+	flex: 1 1 60%;
+	min-width: 0;
+	min-height: 420px;
+	border-radius: var(--radius-lg);
+	background: radial-gradient(120% 90% at 50% 0%, var(--surface-2), var(--surface-1));
+	border: 1px solid var(--stroke);
+	overflow: hidden;
+}
+
+.dad-viewer { position: absolute; inset: 0; }
+
+.dad-viewer-toolbar {
+	position: absolute;
+	left: 50%;
+	bottom: var(--space-md);
+	transform: translateX(-50%);
+	display: flex;
+	gap: var(--space-2xs);
+	padding: var(--space-2xs);
+	border-radius: var(--radius-pill);
+	background: var(--surface-glass);
+	-webkit-backdrop-filter: blur(8px);
+	backdrop-filter: blur(8px);
+	border: 1px solid var(--stroke);
+}
+
+.dad-chip {
+	appearance: none;
+	border: none;
+	background: transparent;
+	color: var(--ink);
+	opacity: 0.7;
+	font: 600 var(--text-sm) / 1 var(--font-body);
+	padding: var(--space-xs) var(--space-md);
+	border-radius: var(--radius-pill);
+	cursor: pointer;
+	transition: background var(--duration-fast) var(--ease-standard), opacity var(--duration-fast) var(--ease-standard), color var(--duration-fast) var(--ease-standard);
+}
+
+.dad-chip:hover { opacity: 1; background: var(--surface-3); }
+.dad-chip:focus-visible {
+	outline: none;
+	box-shadow: 0 0 0 var(--focus-ring-width) var(--focus-ring-color);
+}
+.dad-chip.is-active {
+	background: var(--accent);
+	color: var(--btn-primary-fg);
+	opacity: 1;
+}
+
+.dad-result-side {
+	flex: 1 1 40%;
+	display: flex;
+	flex-direction: column;
+	justify-content: center;
+}
+
+.dad-result-side .dad-h2 { margin-top: 0; }
+
+.dad-share-copied {
+	font: 500 var(--text-sm) / 1.4 var(--font-body);
+	color: var(--success);
+	margin: var(--space-sm) 0 0;
+}
+
+/* ── Error ────────────────────────────────────────────────────────────────── */
+
+.dad-error-icon {
+	width: 48px;
+	height: 48px;
+	display: grid;
+	place-items: center;
+	margin: 0 auto;
+	border-radius: var(--radius-pill);
+	background: var(--badge-danger-bg);
+	color: var(--danger);
+	border: 1px solid var(--badge-danger-border);
+	font: 700 var(--text-xl) / 1 var(--font-display);
+}
+
+/* ── Responsive ───────────────────────────────────────────────────────────── */
+
+/* Stack the result before the row gets cramped (viewer + side-panel). */
+@media (max-width: 860px) {
+	.dad-result { flex-direction: column; }
+}
+
+@media (max-width: 720px) {
+	.dad { padding: var(--space-xl) var(--space-md); }
+	.dad-title { font-size: var(--text-xl); }
+	.dad-viewer-wrap { min-height: 340px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+	.dad [data-region],
+	.dad-skeleton,
+	.dad-progress-bar { animation: none; }
+	.dad-progress-bar { width: 100%; }
+}

@@ -1,0 +1,97 @@
+<!doctype html>
+<html lang="en">
+	<head>
+		<script>/* three.ws theme boot */(function(){try{var m=localStorage.getItem('twx_theme');var l=m==='auto'?(window.matchMedia&&window.matchMedia('(prefers-color-scheme: light)').matches):m==='light';document.documentElement.setAttribute('data-theme',l?'light':'dark');}catch(e){document.documentElement.setAttribute('data-theme','dark');}})();</script>
+		<meta charset="utf-8" />
+		<script src="/referral-capture.js"></script>
+		<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+		<title data-i18n="syndicates.page_title">Syndicates: copy-trade as a team · three.ws</title>
+		<meta name="description" data-i18n-attr="content:syndicates.meta_desc" content="Named teams of copiers who follow the same verified pump.fun trader agents together. Each member copies from their own wallet with their own caps; the group shares a flag, a live equity curve, and a rival on the board. No pooled funds, no custody." />
+		<meta property="og:type" content="website" />
+		<meta property="og:site_name" content="three.ws" />
+		<meta property="og:url" content="https://three.ws/syndicates" />
+		<meta property="og:title" data-i18n-attr="content:syndicates.share_title" content="Syndicates: copy-trade as a team · three.ws" />
+		<meta property="og:description" data-i18n-attr="content:syndicates.og_desc" content="Pick a flag, rally around a verified trader agent, and climb the board against every other syndicate. Every member copies from their own wallet under their own caps." />
+		<meta property="og:image" content="https://three.ws/api/page-og?s=crypto&amp;t=Syndicates%3A+copy-trade+as+a+team&amp;d=Named+teams+of+copiers+who+follow+the+same+verified+pump.fun+trader+agents+together.+Each+member+copies+from+their+own+wallet+under+their+own+caps%3B+the+team&amp;p=%2Fsyndicates" />
+		<meta property="og:image:width" content="1200" />
+		<meta property="og:image:height" content="630" />
+		<meta property="og:image:alt" content="Syndicates: copy-trade as a team on three.ws" />
+		<meta name="twitter:card" content="summary_large_image" />
+		<meta name="twitter:site" content="@trythreews" />
+		<meta name="twitter:title" data-i18n-attr="content:syndicates.share_title" content="Syndicates: copy-trade as a team · three.ws" />
+		<meta name="twitter:description" data-i18n-attr="content:syndicates.twitter_desc" content="Rally around a verified trader agent with a named team. Your wallet, your caps, a shared flag and a rival on the board." />
+		<meta name="twitter:image" content="https://three.ws/api/page-og?s=crypto&amp;t=Syndicates%3A+copy-trade+as+a+team&amp;d=Named+teams+of+copiers+who+follow+the+same+verified+pump.fun+trader+agents+together.+Each+member+copies+from+their+own+wallet+under+their+own+caps%3B+the+team&amp;p=%2Fsyndicates" />
+		<meta name="theme-color" content="#0a0a0a" />
+		<link rel="canonical" href="https://three.ws/syndicates" />
+		<meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1" />
+		<link rel="icon" href="/favicon.ico" sizes="any" />
+		<link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+		<link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+		<link rel="manifest" href="/manifest.webmanifest" />
+		<link rel="stylesheet" href="/fonts/fonts.css" />
+		<link rel="stylesheet" href="/nav.css" />
+		<link rel="stylesheet" href="/src/syndicates.css" />
+		<link rel="stylesheet" href="/footer.css" />
+		<script defer src="/footer-newsletter.js"></script>
+		<script type="application/ld+json">{"@context":"https://schema.org","@type":"WebApplication","name":"Syndicates","applicationCategory":"FinanceApplication","operatingSystem":"Web","description":"Named teams of copiers who follow the same verified pump.fun trader agents together, each from their own wallet under their own caps. Non-custodial.","url":"https://three.ws/syndicates","isPartOf":{"@type":"WebSite","name":"three.ws","url":"https://three.ws"}}</script>
+	
+	<meta property="og:locale" content="en_US">
+</head>
+	<body>
+		<header><div id="nav-container"></div></header>
+		<script src="/nav.js"></script>
+
+		<main class="sy" aria-labelledby="sy-title">
+			<p class="sy-kicker" data-i18n="syndicates.kicker">Copy-trade as a team · your wallet, your caps</p>
+			<h1 id="sy-title" class="sy-title" data-i18n="syndicates.h1">Syndicates</h1>
+			<p class="sy-sub" data-i18n="syndicates.sub">
+				A syndicate is a named team that follows the same verified trader agents together. Every member
+				copies from their own wallet with their own per-trade cap, daily budget, and drawdown limit, and
+				the team shares a flag, a live equity curve built from members' real copies, and a rival on the board.
+				Nothing is pooled and nobody holds your funds.
+			</p>
+			<div class="sy-actions">
+				<button type="button" class="sy-btn primary" id="syStart" data-i18n="syndicates.start_btn">Start a syndicate</button>
+				<a class="sy-btn" href="/quests" data-i18n="syndicates.quests_link">Today's trading quests</a>
+				<a class="sy-btn" href="/docs/syndicates" data-i18n="syndicates.how_link">How syndicates work</a>
+			</div>
+
+			<section class="sy-section" aria-labelledby="syBoardTitle">
+				<div class="sy-toolbar">
+					<h2 id="syBoardTitle" class="sy-h2"><span data-i18n="syndicates.board_h2_label">The board</span> <small id="syCount"></small></h2>
+					<div class="sy-seg" role="group" aria-label="Sort the board" id="sySort" data-i18n-attr="aria-label:syndicates.sort_aria">
+						<button type="button" data-sort="profit" aria-pressed="true" data-i18n="syndicates.sort_profit">Top profit</button>
+						<button type="button" data-sort="members" aria-pressed="false" data-i18n="syndicates.sort_members">Most members</button>
+						<button type="button" data-sort="new" aria-pressed="false" data-i18n="syndicates.sort_new">Newest</button>
+					</div>
+				</div>
+				<div id="syBoard" aria-live="polite" aria-busy="true"></div>
+				<div class="sy-actions" style="justify-content:center;margin-top:14px">
+					<button type="button" class="sy-btn" id="syMore" hidden data-i18n="syndicates.show_more">Show more</button>
+				</div>
+			</section>
+
+			<section class="sy-section" id="syCandidatesWrap" aria-labelledby="syCandTitle" hidden>
+				<h2 id="syCandTitle" class="sy-h2" data-i18n-html="syndicates.candidates_h2">Leaders you can rally around today <small>real closed on-chain records, judged by the copyable bar</small></h2>
+				<div id="syCandidates" class="sy-leaders"></div>
+			</section>
+		</main>
+
+		<dialog class="sy-dialog" id="syCreate" aria-labelledby="syCreateTitle">
+			<div class="sy-dialog-head">
+				<h2 id="syCreateTitle" data-i18n="syndicates.create_h2">Start a syndicate</h2>
+				<button type="button" class="sy-x" id="syCreateClose" aria-label="Close" data-i18n-attr="aria-label:syndicates.close_aria">×</button>
+			</div>
+			<div class="sy-dialog-body" id="syCreateBody"></div>
+		</dialog>
+
+		<div id="syToast" class="sy-toast" role="status" aria-live="polite"></div>
+
+		<script type="module" src="/src/syndicates.js"></script>
+		<script src="/brand.js" defer></script>
+		<div id="footer-container"></div>
+		<script src="/footer.js"></script>
+		<!-- Runtime i18n: detects locale, swaps annotated copy, mounts <lang-switcher>. -->
+		<script type="module" src="/i18n.js"></script>
+	</body>
+</html>

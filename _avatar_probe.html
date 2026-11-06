@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>agent-3d API probe</title>
+  <script
+    type="module"
+    src="https://three.ws/agent-3d/1.5.2/agent-3d.js"
+    integrity="sha384-KdAiFRsdcCbQMu4O5rkoL8hOEYLkmrdpf9ELd7jro+9NTNipWis3oqqFLll7v20Q"
+    crossorigin="anonymous"
+  ></script>
+  <style>
+    agent-3d { width: 640px; height: 520px; display: block; }
+  </style>
+</head>
+<body>
+  <agent-3d
+    id="a"
+    body="https://three.ws/avatars/default.glb"
+    mode="section"
+    kiosk
+    clip="idle"
+  ></agent-3d>
+  <pre id="result">pending</pre>
+  <script>
+    const a = document.getElementById("a");
+    const result = document.getElementById("result");
+    const out = [];
+    let stateLine = "state: starting";
+    const render = () => {
+      result.textContent = stateLine + "\n" + out.join("\n");
+    };
+    const log = (k, v) => {
+      out.push(`${k}: ${v}`);
+      render();
+    };
+
+    a.addEventListener("agent:error", (e) => log("agent:error", JSON.stringify(e.detail?.error?.message || e.detail || null)));
+    a.addEventListener("agent:ready", () => log("agent:ready", "fired"));
+    a.addEventListener("agent:load-progress", (e) => log("progress", `${e.detail?.phase}@${e.detail?.pct}`));
+
+    window.addEventListener("error", (e) => log("window:error", `${e.message} @${e.filename}:${e.lineno}`));
+    window.addEventListener("unhandledrejection", (e) => log("unhandledrejection", String(e.reason && e.reason.message || e.reason)));
+
+    // Poll instead of relying only on agent:ready, so the probe also reports
+    // what the element looks like if boot never completes.
+    let ran = false;
+    const poll = setInterval(() => {
+      stateLine = `state: ready=${a.hasAttribute("data-ready")} bare=${a.hasAttribute("data-bare")} avatar=${typeof a._avatar} scene=${typeof a._scene}`;
+      render();
+      if (!ran && a._avatar && typeof a._avatar === "object") {
+        ran = true;
+        clearInterval(poll);
+        log("poll", "calling runProbe");
+        try {
+          runProbe();
+        } catch (err) {
+          log("runProbe ERR", err && err.message);
+        }
+      }
+    }, 700);
+
+    async function runProbe() {
+      log("api", ["speak", "playClip", "wave", "setMood", "lookAt", "pause", "resume", "destroy"].map((m) => `${m}=${typeof a[m]}`).join(","));
+      log("_avatar", typeof a._avatar);
+      log("connectLipSync", typeof a._avatar?.connectLipSync);
+      log("disconnectLipSync", typeof a._avatar?.disconnectLipSync);
+
+      try {
+        a.speak("Hello there, this is a test of the talk animation for the avatar.");
+        log("speak", "ok");
+      } catch (e) {
+        log("speak ERR", e.message);
+      }
+      try {
+        a.setMood(0.4, 0.6);
+        log("setMood", "ok");
+      } catch (e) {
+        log("setMood ERR", e.message);
+      }
+      try {
+        await a.lookAt("user");
+        log("lookAt(user)", "ok");
+      } catch (e) {
+        log("lookAt ERR", e.message);
+      }
+      try {
+        a.playClip("nod");
+        log("playClip(nod)", "ok");
+      } catch (e) {
+        log("playClip ERR", e.message);
+      }
+      try {
+        await a.wave();
+        log("wave", "ok");
+      } catch (e) {
+        log("wave ERR", e.message);
+      }
+
+      try {
+        const ctx = new AudioContext();
+        const osc = ctx.createOscillator();
+        const analyser = ctx.createAnalyser();
+        analyser.fftSize = 1024;
+        osc.connect(analyser);
+        osc.start();
+        a._avatar.connectLipSync(analyser);
+        log("connectLipSync(analyser)", "ok");
+        setTimeout(() => {
+          try {
+            a._avatar.disconnectLipSync();
+            log("disconnectLipSync()", "ok");
+          } catch (e) {
+            log("disconnectLipSync ERR", e.message);
+          }
+          log("probe", "complete");
+        }, 1200);
+      } catch (e) {
+        log("lipsync ERR", e.message + " / " + e.name);
+      }
+    }
+  </script>
+</body>
+</html>

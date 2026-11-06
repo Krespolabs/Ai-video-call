@@ -1,0 +1,55 @@
+// D3 — ambient interaction-reaction policy for the IRL world.
+//
+// Pure, dependency-free helpers so the validation + debounce rules are unit-tested
+// without spinning up a Colyseus room. IrlRoom.onMessage('interaction') consumes
+// these to decide whether a viewer's tap/pay/message becomes a `reaction` broadcast
+// to everyone co-located in the geocell.
+//
+// The split that matters: `open`/`view` are common and noisy, so they're debounced
+// per (session, pin) — a jittery finger can't spam every nearby phone with bursts.
+// `pay`/`message` are rare and high-signal, so they're NEVER debounced or dropped:
+// an agent visibly earning money is exactly the moment bystanders should see.
+
+// The interaction types a viewer may send. `open` and `view` both render as the
+// same soft 💜 reaction client-side; keeping them distinct lets the taxonomy match
+// the durable `/api/irl/interactions` record (C4) without a translation layer.
+export const REACTION_TYPES = new Set(['open', 'view', 'pay', 'message']);
+
+// Common, debounced types — one reaction per (session, pin) per window.
+export const DEBOUNCED_TYPES = new Set(['open', 'view']);
+
+// How long to suppress a repeat `open`/`view` reaction from the same viewer on the
+// same pin. 5 s kills tap-jitter spam while still letting a deliberate re-tap a few
+// seconds later read as a fresh glance.
+export const REACTION_DEBOUNCE_MS = 5000;
+
+// Cap on the debounce ledger so a long-lived, busy room can't grow it unbounded.
+// When exceeded, the caller prunes expired entries (see pruneReactionLedger).
+export const REACTION_LEDGER_MAX = 4000;
+
+export function isReactionType(type) {
+	return REACTION_TYPES.has(type);
+}
+
+// True when this interaction should fan out as a reaction right now. `pay`/`message`
+// always pass; a debounced type passes only if this (session, pin) pair hasn't fired
+// inside the window — in which case the ledger is stamped so the next one is gated.
+// `ledger` is a Map<string, number> of `${sessionId}\u0000${pinId}` → lastTs.
+export function reactionAllowed(ledger, sessionId, pinId, type, now, windowMs = REACTION_DEBOUNCE_MS) {
+	if (!isReactionType(type)) return false;
+	if (!DEBOUNCED_TYPES.has(type)) return true; // pay / message — never debounced
+	const key = `${sessionId}\u0000${pinId}`;
+	// has() rather than a `|| 0` default, so a legitimate now=0 isn't mistaken for a
+	// prior hit at t=0: the absent case must read as "never seen", not "seen at zero".
+	if (ledger.has(key) && now - ledger.get(key) < windowMs) return false;
+	ledger.set(key, now);
+	return true;
+}
+
+// Drop ledger entries older than the window so the Map tracks only live debounces.
+// Cheap and only invoked when the ledger crosses REACTION_LEDGER_MAX.
+export function pruneReactionLedger(ledger, now, windowMs = REACTION_DEBOUNCE_MS) {
+	for (const [key, ts] of ledger) {
+		if (now - ts >= windowMs) ledger.delete(key);
+	}
+}

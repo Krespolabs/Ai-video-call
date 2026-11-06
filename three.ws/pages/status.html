@@ -1,0 +1,842 @@
+<!doctype html>
+<html lang="en">
+	<head>
+		<script>/* three.ws theme boot — no-flash; runtime in /theme-switcher.js */(function(){try{var m=localStorage.getItem('twx_theme');var l=m==='auto'?(window.matchMedia&&window.matchMedia('(prefers-color-scheme: light)').matches):m==='light';document.documentElement.setAttribute('data-theme',l?'light':'dark');}catch(e){document.documentElement.setAttribute('data-theme','dark');}})();</script>
+		<meta charset="utf-8" />
+		<title data-i18n="status.meta_title">Status — three.ws</title>
+		<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+		<meta name="theme-color" content="#000000" />
+		<meta
+			name="description"
+			content="Live operational status and 90-day uptime history for the three.ws platform, API, and x402 paid-API surfaces."
+		 data-i18n-attr="content:status.meta_description"/>
+
+		<meta property="og:type" content="website" />
+		<meta property="og:url" content="https://three.ws/status" />
+		<meta property="og:title" content="Status — three.ws"  data-i18n-attr="content:status.meta_og_title"/>
+		<meta
+			property="og:description"
+			content="Live operational status and 90-day uptime history for the three.ws platform."
+		 data-i18n-attr="content:status.meta_og_description"/>
+		<meta property="og:image" content="https://three.ws/api/page-og?s=learn&amp;t=Status&amp;d=Live+operational+status+and+90-day+uptime+history+for+the+platform%2C+API%2C+and+x402+surfaces%3A+probed+every+5+minutes.&amp;p=%2Fstatus" />
+		<meta property="og:image:width" content="1200" />
+		<meta property="og:image:height" content="630" />
+		<meta name="twitter:card" content="summary_large_image" />
+		<meta name="twitter:image" content="https://three.ws/api/page-og?s=learn&amp;t=Status&amp;d=Live+operational+status+and+90-day+uptime+history+for+the+platform%2C+API%2C+and+x402+surfaces%3A+probed+every+5+minutes.&amp;p=%2Fstatus" />
+
+		<link rel="icon" href="/favicon.ico" sizes="any" />
+		<link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+		<link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png" />
+		<link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png" />
+		<link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+		<link rel="manifest" href="/manifest.webmanifest" />
+		<link rel="stylesheet" href="/style.css" />
+		<link rel="stylesheet" href="/nav.css" />
+		<link rel="stylesheet" href="/footer.css" />
+		<link rel="stylesheet" href="/fonts/fonts.css" />
+		<script defer src="/footer-newsletter.js"></script>
+
+		<style>
+			.st-wrap {
+				max-width: 880px;
+				margin: 0 auto;
+				padding: calc(var(--space-md) * 2) var(--space-md) calc(var(--space-md) * 4);
+			}
+			.st-crumb {
+				font: var(--text-sm) var(--font-body);
+				color: var(--ink-dim);
+				margin: 0 0 var(--space-md);
+			}
+			.st-crumb a {
+				color: inherit;
+			}
+			.st-title {
+				font-family: var(--font-display);
+				font-size: clamp(1.6rem, 4vw, 2.2rem);
+				margin: 0 0 var(--space-md);
+			}
+
+			.st-banner {
+				display: flex;
+				align-items: center;
+				gap: 0.75rem;
+				border: 1px solid var(--stroke-strong);
+				border-radius: var(--radius-lg);
+				padding: 1rem 1.25rem;
+				margin-bottom: calc(var(--space-md) * 1.5);
+				background: var(--surface-glass);
+				font-family: var(--font-display);
+				font-size: 1.05rem;
+				transition: border-color var(--duration-base) var(--ease-standard);
+			}
+			.st-banner .st-dot {
+				width: 12px;
+				height: 12px;
+			}
+			/* Monochrome by design: a healthy platform reads in ink, not green.
+			   --danger (red) is reserved as the SINGLE exception for a genuine
+			   outage so it's unmistakable precisely because nothing else is colored. */
+			.st-banner[data-state='ok'] {
+				border-color: var(--ink);
+			}
+			/* Degraded: a dependency is on a fallback but surfaces are up. Dim ink,
+			   not red — red stays reserved for a genuine surface outage. */
+			.st-banner[data-state='degraded'] {
+				border-color: var(--ink-dim);
+				border-style: dashed;
+			}
+			.st-banner[data-state='down'] {
+				border-color: var(--danger);
+			}
+
+			.st-dot {
+				width: 9px;
+				height: 9px;
+				border-radius: 50%;
+				background: var(--ink-dim);
+				flex: none;
+				transition: background var(--duration-base) var(--ease-standard);
+			}
+			.st-dot[data-state='ok'] {
+				background: var(--ink);
+				box-shadow: 0 0 0 3px color-mix(in srgb, var(--ink) 14%, transparent);
+			}
+			.st-dot[data-state='down'] {
+				background: var(--danger);
+				box-shadow: 0 0 0 3px color-mix(in srgb, var(--danger) 30%, transparent);
+			}
+
+			.st-meta {
+				color: var(--ink-dim);
+				font: var(--text-sm) var(--font-body);
+				margin: 0 0 calc(var(--space-md) * 1.5);
+			}
+
+			/* Fleet KPI band — three monochrome stats so the headline numbers are
+			   readable at a glance before scanning the per-service cards. */
+			.st-summary {
+				display: grid;
+				grid-template-columns: repeat(3, 1fr);
+				gap: 1px;
+				background: var(--stroke);
+				border: 1px solid var(--stroke);
+				border-radius: var(--radius-lg);
+				overflow: hidden;
+				margin-bottom: calc(var(--space-md) * 1.5);
+			}
+			.st-kpi {
+				background: var(--surface-1);
+				padding: 0.9rem 1.1rem;
+				transition: background var(--duration-base) var(--ease-standard);
+			}
+			.st-kpi:hover {
+				background: var(--surface-2);
+			}
+			.st-kpi-val {
+				font-family: var(--font-mono, monospace);
+				font-size: clamp(1.25rem, 3.2vw, 1.7rem);
+				line-height: 1.1;
+				color: var(--ink);
+				font-variant-numeric: tabular-nums;
+			}
+			.st-kpi-label {
+				font: var(--text-sm) var(--font-body);
+				/* --ink-dim clears 4.5:1 against the page background but only
+				   reaches 4.32:1 against the lighter surface this band sits on,
+				   so the label pulls a step toward --ink. Expressed as a mix of
+				   the two tokens rather than a literal, it stays correct in the
+				   light theme, where the same shift means darker. */
+				color: color-mix(in srgb, var(--ink-dim) 80%, var(--ink));
+				margin-top: 0.3rem;
+			}
+			.st-summary.st-skel .st-kpi-val,
+			.st-summary.st-skel .st-kpi-label {
+				color: transparent;
+				background: var(--surface-2);
+				border-radius: var(--radius-md);
+				animation: st-pulse 1.4s ease-in-out infinite;
+			}
+			@media (max-width: 480px) {
+				.st-summary {
+					grid-template-columns: 1fr;
+				}
+			}
+
+			.st-card {
+				border: 1px solid var(--stroke);
+				border-radius: var(--radius-lg);
+				background: var(--surface-1);
+				padding: 1rem 1.25rem;
+				margin-bottom: var(--space-md);
+				transition:
+					border-color var(--duration-base) var(--ease-standard),
+					background var(--duration-base) var(--ease-standard);
+			}
+			.st-card:hover {
+				border-color: var(--stroke-strong);
+				background: var(--surface-2);
+			}
+			.st-card-head {
+				display: flex;
+				align-items: center;
+				gap: 0.6rem;
+				flex-wrap: wrap;
+			}
+			.st-card-head h2 {
+				font-family: var(--font-display);
+				font-size: 1rem;
+				margin: 0;
+				flex: 1 1 auto;
+			}
+			.st-stats {
+				display: flex;
+				gap: 1rem;
+				color: var(--ink-dim);
+				font: var(--text-sm) var(--font-mono, monospace);
+				white-space: nowrap;
+			}
+			.st-stats strong {
+				color: var(--ink);
+				font-weight: 600;
+			}
+
+			/* 90-day uptime bar — one cell per day, oldest → newest */
+			.st-bar {
+				display: flex;
+				gap: 2px;
+				margin-top: 0.85rem;
+				height: 28px;
+			}
+			.st-cell {
+				flex: 1 1 0;
+				border-radius: 2px;
+				background: var(--surface-3);
+				transition: transform var(--duration-fast) var(--ease-standard);
+			}
+			.st-cell:hover,
+			.st-cell:focus-visible {
+				transform: scaleY(1.25);
+				outline: none;
+			}
+			.st-cell[data-band='up'] {
+				background: var(--ink);
+				opacity: 0.9;
+			}
+			.st-cell[data-band='degraded'] {
+				background: var(--ink);
+				opacity: 0.34;
+			}
+			.st-cell[data-band='down'] {
+				background: var(--danger);
+				opacity: 0.92;
+			}
+			.st-bar-labels {
+				display: flex;
+				justify-content: space-between;
+				color: var(--ink-dim);
+				font: var(--text-sm) var(--font-body);
+				margin-top: 0.35rem;
+			}
+
+			/* Loading skeleton */
+			.st-skel .st-card-head h2,
+			.st-skel .st-stats,
+			.st-skel .st-bar {
+				background: var(--surface-2);
+				border-radius: var(--radius-md);
+				color: transparent;
+				animation: st-pulse 1.4s ease-in-out infinite;
+			}
+			@keyframes st-pulse {
+				0%,
+				100% {
+					opacity: 0.5;
+				}
+				50% {
+					opacity: 1;
+				}
+			}
+			@media (prefers-reduced-motion: reduce) {
+				.st-skel .st-card-head h2,
+				.st-skel .st-stats,
+				.st-skel .st-bar {
+					animation: none;
+				}
+				.st-cell:hover {
+					transform: none;
+				}
+			}
+
+			/* Internal-dependency health list */
+			.st-subhead {
+				font-family: var(--font-display);
+				font-size: 1.1rem;
+				margin: calc(var(--space-md) * 2) 0 0.4rem;
+			}
+			.st-subnote {
+				color: var(--ink-dim);
+				font: var(--text-sm) var(--font-body);
+				margin: 0 0 var(--space-md);
+				max-width: 60ch;
+			}
+			.st-sublist {
+				border: 1px solid var(--stroke);
+				border-radius: var(--radius-lg);
+				overflow: hidden;
+				background: var(--surface-1);
+			}
+			.st-sub {
+				display: grid;
+				grid-template-columns: auto 1fr auto;
+				align-items: baseline;
+				gap: 0.6rem 0.75rem;
+				padding: 0.85rem 1.1rem;
+				border-top: 1px solid var(--stroke);
+			}
+			.st-sub:first-child {
+				border-top: none;
+			}
+			.st-sub .st-dot {
+				align-self: center;
+			}
+			/* degraded = dim ink (functional-but-throttled); paused/unknown = hollow;
+			   down = the single reserved red. Matches the monochrome status language. */
+			.st-dot[data-state='degraded'] {
+				background: var(--ink);
+				opacity: 0.4;
+			}
+			.st-dot[data-state='paused'],
+			.st-dot[data-state='unknown'] {
+				background: transparent;
+				box-shadow: inset 0 0 0 1.5px var(--ink-dim);
+			}
+			.st-sub-name {
+				font-family: var(--font-display);
+				font-size: 0.95rem;
+				color: var(--ink);
+			}
+			.st-sub-state {
+				font: var(--text-sm) var(--font-mono, monospace);
+				color: var(--ink-dim);
+				text-transform: uppercase;
+				letter-spacing: 0.04em;
+				white-space: nowrap;
+			}
+			.st-sub[data-state='down'] .st-sub-state {
+				color: var(--danger);
+			}
+			.st-sub-detail {
+				grid-column: 2 / -1;
+				color: var(--ink-dim);
+				font: var(--text-sm) var(--font-body);
+			}
+			.st-sub-hint {
+				grid-column: 2 / -1;
+				color: var(--ink);
+				font: var(--text-sm) var(--font-body);
+				margin-top: 0.15rem;
+				padding-left: 0.75rem;
+				border-left: 2px solid var(--stroke-strong);
+			}
+			/* Structured numbers a subsystem publishes alongside its sentence, so a
+			   reader can see the index's freshness without parsing prose. */
+			.st-sub-metrics {
+				grid-column: 2 / -1;
+				display: flex;
+				flex-wrap: wrap;
+				gap: 0.35rem 0.5rem;
+				margin-top: 0.4rem;
+			}
+			.st-metric {
+				display: inline-flex;
+				align-items: baseline;
+				gap: 0.35rem;
+				border: 1px solid var(--stroke);
+				border-radius: var(--radius-sm, 6px);
+				padding: 0.15rem 0.5rem;
+				background: var(--surface-1);
+			}
+			.st-metric-k {
+				font: var(--text-xs, 0.75rem) var(--font-mono, monospace);
+				color: var(--ink-dim);
+				text-transform: uppercase;
+				letter-spacing: 0.04em;
+			}
+			.st-metric-v {
+				font: var(--text-sm) var(--font-mono, monospace);
+				color: var(--ink);
+			}
+
+			.st-note {
+				border: 1px solid var(--stroke);
+				border-radius: var(--radius-lg);
+				background: var(--surface-1);
+				color: var(--ink-dim);
+				padding: 1rem 1.25rem;
+				font: var(--text-sm) var(--font-body);
+			}
+			.st-note a {
+				color: var(--ink);
+			}
+			.st-error {
+				border-color: rgba(248, 113, 113, 0.35);
+			}
+
+			@media (max-width: 480px) {
+				.st-stats {
+					flex-basis: 100%;
+					gap: 0.75rem;
+				}
+			}
+		</style>
+	
+	<link rel="canonical" href="https://three.ws/status">
+	<meta property="og:site_name" content="three.ws">
+	<meta name="twitter:title" content="Status · three.ws" data-i18n-attr="content:status.meta_twitter_title">
+	<meta name="twitter:description" content="Live operational status and 90-day uptime history for the platform, API, and x402 surfaces — probed every 5 minutes." data-i18n-attr="content:status.meta_twitter_description">
+	<script type="application/ld+json">{"@context":"https://schema.org","@type":"WebPage","name":"Status","description":"Live operational status and 90-day uptime history for the platform, API, and x402 surfaces — probed every 5 minutes.","url":"https://three.ws/status","isPartOf":{"@type":"WebSite","name":"three.ws","url":"https://three.ws"}}</script>
+
+	<meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1">
+	<meta property="og:locale" content="en_US">
+	<meta property="og:image:alt" content="Status — three.ws">
+	<meta name="twitter:site" content="@trythreews">
+</head>
+	<body>
+		<header><div id="nav-container"></div></header>
+
+		<main class="st-wrap">
+			<p class="st-crumb" data-i18n-html="status.home_status"><a href="/">Home</a> / Status</p>
+			<h1 class="st-title" data-i18n="status.platform_status">Platform status</h1>
+
+			<div class="st-banner" id="st-banner" role="status" aria-live="polite">
+				<span class="st-dot" id="st-banner-dot" aria-hidden="true"></span>
+				<!-- The live verdict is written straight onto #st-banner-text, so the
+				     translatable placeholder is a child rather than this element's own
+				     i18n binding: the first render removes that child, and the i18n pass
+				     then has no node here to repaint. Bound directly, it painted
+				     "Checking platform status…" back over the real verdict a second after
+				     the fetch resolved, leaving a red banner claiming it was still
+				     checking. -->
+				<span id="st-banner-text"><span data-i18n="status.checking_platform_status">Checking platform status…</span></span>
+			</div>
+			<div class="st-summary st-skel" id="st-summary" aria-label="Fleet summary">
+				<div class="st-kpi"><div class="st-kpi-val" id="st-kpi-uptime">—</div><div class="st-kpi-label">90-day uptime</div></div>
+				<div class="st-kpi"><div class="st-kpi-val" id="st-kpi-services">—</div><div class="st-kpi-label">services operational</div></div>
+				<div class="st-kpi"><div class="st-kpi-val" id="st-kpi-latency">—</div><div class="st-kpi-label">avg response</div></div>
+			</div>
+
+			<!-- The cadence sentence is i18n-managed, so the live "last check" stamp
+			     gets its own sibling span: the i18n pass rewrites #st-meta's innerHTML
+			     wholesale on every locale application, which used to wipe the stamp a
+			     second after the fetch wrote it. Keeping them separate makes the stamp
+			     survive by construction instead of depending on script ordering. -->
+			<p class="st-meta">
+				<span id="st-meta" data-i18n-html="status.probed_every_5_minutes_from_outside_our">
+					Probed every 5 minutes from outside our infrastructure.
+					<a href="/api/status" style="color: inherit">JSON feed</a> ·
+					<a href="/api/status?format=svg" style="color: inherit">status badge</a> ·
+					<a href="/changelog" style="color: inherit">Changelog</a>
+				</span>
+				<span id="st-checked" hidden></span>
+			</p>
+			<p class="st-meta" id="st-build" hidden>
+				<!-- filled from /api/version: the exact commit + Cloud Run revision live now -->
+			</p>
+
+			<section id="st-services" aria-label="Service status list">
+				<!-- skeletons swapped out by render() -->
+				<article class="st-card st-skel" aria-hidden="true">
+					<div class="st-card-head"><h2 data-i18n="status.loading">loading</h2><div class="st-stats">…</div></div>
+					<div class="st-bar"></div>
+				</article>
+				<article class="st-card st-skel" aria-hidden="true">
+					<div class="st-card-head"><h2 data-i18n="status.loading_2">loading</h2><div class="st-stats">…</div></div>
+					<div class="st-bar"></div>
+				</article>
+				<article class="st-card st-skel" aria-hidden="true">
+					<div class="st-card-head"><h2 data-i18n="status.loading_3">loading</h2><div class="st-stats">…</div></div>
+					<div class="st-bar"></div>
+				</article>
+			</section>
+
+			<!-- Internal dependency health — hidden until the API returns a
+			     subsystems block (older deploys / warming-up omit it). -->
+			<section id="st-subsystems" aria-label="Internal dependency health" hidden>
+				<h2 class="st-subhead" data-i18n="status.internal_dependencies">Internal dependencies</h2>
+				<p class="st-subnote" data-i18n="status.health_of_the_systems_behind_the_public">
+					Health of the systems behind the public surfaces — cache, database,
+					payment ring, RPC. A green surface can still hide a degraded
+					dependency; this is where it shows.
+				</p>
+				<div class="st-sublist" id="st-sublist"></div>
+			</section>
+
+			<!-- Agent-economy heartbeat — hidden until the API returns an economy
+			     block (older deploys / pre-first-tick omit it). -->
+			<section id="st-economy" aria-label="Agent economy heartbeat" hidden>
+				<h2 class="st-subhead" data-i18n="status.agent_economy_heartbeat">Agent economy heartbeat</h2>
+				<p class="st-subnote" data-i18n="status.the_per_minute_tick_that_drives_every">
+					The per-minute tick that drives every agent-to-agent engine — ring
+					settlements, the Money Pulse, the Labor Market, launches, payouts.
+					Each engine reports ran, skipped (with its own reason), or failed.
+				</p>
+				<div class="st-sublist" id="st-econlist"></div>
+			</section>
+
+			<!-- Readiness probes and platform totals, from /api/health and
+			     /api/stats; each section stays hidden until its feed answers. -->
+			<section id="st-health" aria-label="Readiness probes" hidden>
+				<h2 class="st-subhead">Readiness probes</h2>
+				<p class="st-subnote">
+					Live checks of the database, Solana RPC, the background worker and
+					custodial wallet encryption, from <a href="/api/health">/api/health</a>.
+					Unlike the liveness check, this reports degraded when something is wrong.
+				</p>
+				<div class="st-sublist" id="st-healthlist"></div>
+			</section>
+
+			<section id="st-stats" aria-label="Platform totals" hidden>
+				<h2 class="st-subhead">Platform totals</h2>
+				<p class="st-subnote">
+					Real counts read from the database, each with its source and read time,
+					from <a href="/api/stats">/api/stats</a>.
+				</p>
+				<div class="st-sublist" id="st-statslist"></div>
+			</section>
+		</main>
+
+		<script type="module">
+			const banner = document.getElementById('st-banner');
+			const bannerDot = document.getElementById('st-banner-dot');
+			const bannerText = document.getElementById('st-banner-text');
+			const checkedAtEl = document.getElementById('st-checked');
+			const list = document.getElementById('st-services');
+			const subsWrap = document.getElementById('st-subsystems');
+			const subsList = document.getElementById('st-sublist');
+			const econWrap = document.getElementById('st-economy');
+			const econList = document.getElementById('st-econlist');
+			const summaryEl = document.getElementById('st-summary');
+			const kpiUptime = document.getElementById('st-kpi-uptime');
+			const kpiServices = document.getElementById('st-kpi-services');
+			const kpiLatency = document.getElementById('st-kpi-latency');
+
+			const fmtPct = (v) => (v == null ? '—' : `${v}%`);
+			const band = (uptime) =>
+				uptime == null ? null : uptime >= 99.5 ? 'up' : uptime >= 95 ? 'degraded' : 'down';
+			const avg = (a) => (a.length ? a.reduce((x, y) => x + y, 0) / a.length : null);
+
+			function renderSummary(data) {
+				const services = data.services || [];
+				// Prefer the server-computed summary (single source of truth shared
+				// with agents reading the JSON); fall back to a client-side roll-up so
+				// the band still fills if an older API shape omits it.
+				const s =
+					data.summary ||
+					(() => {
+						const probed = services.filter((x) => x.operational !== null);
+						const lat = services.map((x) => x.avgLatency24hMs).filter((n) => n != null);
+						const u90 = services.map((x) => x.uptime90d).filter((n) => n != null);
+						const a = avg(u90);
+						return {
+							operational: probed.filter((x) => x.operational).length,
+							total: services.length,
+							avgLatencyMs: lat.length ? Math.round(avg(lat)) : null,
+							fleetUptime90d: a == null ? null : Math.round(a * 100) / 100,
+						};
+					})();
+				summaryEl.classList.remove('st-skel');
+				kpiUptime.textContent = s.fleetUptime90d == null ? '—' : `${s.fleetUptime90d}%`;
+				kpiServices.textContent = `${s.operational}/${s.total}`;
+				kpiLatency.textContent = s.avgLatencyMs == null ? '—' : `${s.avgLatencyMs}ms`;
+			}
+
+			// Human labels for the subsystem status vocabulary from the API.
+			const SUB_STATE_WORD = {
+				ok: 'operational',
+				degraded: 'degraded',
+				down: 'down',
+				paused: 'paused',
+				unknown: 'no data',
+			};
+			const esc = (s) =>
+				String(s ?? '').replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]);
+
+			// Minutes → a compact human duration for the metric pills.
+			const lagWord = (min) => {
+				if (min == null) return 'no data';
+				if (min < 60) return `${min}m`;
+				const h = Math.floor(min / 60);
+				const m = min % 60;
+				return m ? `${h}h ${m}m` : `${h}h`;
+			};
+
+			// Structured numbers a subsystem chose to publish (currently the agent
+			// index lag). Rendered as pills so the freshness of the on-chain index is
+			// a figure you can read at a glance, not prose buried in the detail line.
+			function subMetrics(m) {
+				if (!m || !m.solana || !m.evm) return '';
+				const pills = [
+					['Solana lag', lagWord(m.solana.medianLagMin)],
+					['Solana agents', String(m.solana.agents)],
+					['EVM lag', lagWord(m.evm.lagMin)],
+					['Events indexed', String((m.solana.events || 0) + (m.evm.events || 0))],
+				];
+				return `<span class="st-sub-metrics">${pills
+					.map(
+						([k, v]) =>
+							`<span class="st-metric"><span class="st-metric-k">${esc(k)}</span><b class="st-metric-v">${esc(v)}</b></span>`,
+					)
+					.join('')}</span>`;
+			}
+
+			function renderSubsystems(subs) {
+				// Older API shapes / warming-up omit the block — keep it hidden then.
+				if (!subs || !Array.isArray(subs.items) || subs.items.length === 0) {
+					subsWrap.hidden = true;
+					return;
+				}
+				subsWrap.hidden = false;
+				subsList.innerHTML = subs.items
+					.map((it) => {
+						const state = it.status || 'unknown';
+						const word = SUB_STATE_WORD[state] || state;
+						// Hint only earns screen space when there's an action to take.
+						const showHint = it.hint && (state === 'degraded' || state === 'down');
+						return `<div class="st-sub" data-state="${esc(state)}">
+							<span class="st-dot" data-state="${esc(state)}" aria-hidden="true"></span>
+							<span class="st-sub-name">${esc(it.label || it.name)}</span>
+							<span class="st-sub-state">${esc(word)}</span>
+							${it.detail ? `<span class="st-sub-detail">${esc(it.detail)}</span>` : ''}
+							${subMetrics(it.metrics)}
+							${showHint ? `<span class="st-sub-hint">${esc(it.hint)}</span>` : ''}
+						</div>`;
+					})
+					.join('');
+			}
+
+			function renderEconomy(econ) {
+				// Older API shapes / pre-first-tick omit the block — keep it hidden then.
+				if (!econ || !Array.isArray(econ.engines) || econ.engines.length === 0) {
+					econWrap.hidden = true;
+					return;
+				}
+				econWrap.hidden = false;
+				const ageMin = econ.tickedAt ? Math.max(0, Math.round((Date.now() - econ.tickedAt) / 60000)) : null;
+				const head = econ.stale
+					? `<div class="st-sub" data-state="down">
+							<span class="st-dot" data-state="down" aria-hidden="true"></span>
+							<span class="st-sub-name">Heartbeat</span>
+							<span class="st-sub-state">stalled</span>
+							<span class="st-sub-detail">last tick ${ageMin == null ? 'never' : `${ageMin} min ago`} — engines below reflect the last run, not the present</span>
+						</div>`
+					: `<div class="st-sub" data-state="ok">
+							<span class="st-dot" data-state="ok" aria-hidden="true"></span>
+							<span class="st-sub-name">Heartbeat</span>
+							<span class="st-sub-state">ticking</span>
+							<span class="st-sub-detail">last tick ${ageMin === 0 ? 'under a minute' : `${ageMin} min`} ago · ${econ.fired} engines ok · ${econ.failed} failing</span>
+						</div>`;
+				const rows = econ.engines
+					.map((e) => {
+						const state = e.ok ? 'ok' : 'down';
+						const word = e.ok ? (e.skipped ? 'skipped' : 'ran') : 'failed';
+						const detail = e.reason || e.error || '';
+						return `<div class="st-sub" data-state="${esc(state)}">
+							<span class="st-dot" data-state="${esc(state)}" aria-hidden="true"></span>
+							<span class="st-sub-name">${esc(e.label)}</span>
+							<span class="st-sub-state">${esc(word)}</span>
+							${detail ? `<span class="st-sub-detail">${esc(detail)}</span>` : ''}
+						</div>`;
+					})
+					.join('');
+				econList.innerHTML = head + rows;
+			}
+
+			function render(data) {
+				renderSummary(data);
+				renderSubsystems(data.subsystems);
+				renderEconomy(data.economy);
+				const probed = data.services.filter((s) => s.operational !== null);
+				const down = probed.filter((s) => !s.operational);
+				// Degraded internal dependencies (from the subsystems block) that the
+				// public-surface probes can't see — surfaced so the banner is honest.
+				const subItems = data.subsystems?.items || [];
+				const subBad = subItems.filter((s) => s.status === 'degraded' || s.status === 'down');
+				if (data.monitoring === 'warming-up') {
+					bannerText.textContent = 'Monitoring is warming up — first probes land within minutes.';
+				} else if (down.length === 0 && subBad.length === 0) {
+					banner.dataset.state = 'ok';
+					bannerDot.dataset.state = 'ok';
+					bannerText.textContent = 'All systems operational';
+				} else if (down.length === 0) {
+					// Surfaces are all up, but a dependency is degraded — honest amber.
+					banner.dataset.state = 'degraded';
+					bannerDot.dataset.state = 'degraded';
+					bannerText.textContent = `Operational with ${subBad.length} degraded ${
+						subBad.length === 1 ? 'dependency' : 'dependencies'
+					}: ${subBad.map((s) => s.label).join(', ')}`;
+				} else {
+					banner.dataset.state = 'down';
+					bannerDot.dataset.state = 'down';
+					const extra = subBad.length ? ` · ${subBad.length} degraded dependency(ies)` : '';
+					bannerText.textContent = `${down.length} of ${probed.length} services disrupted: ${down
+						.map((s) => s.label)
+						.join(', ')}${extra}`;
+				}
+				if (data.checkedAt) {
+					const ago = Math.max(0, Math.round((Date.now() - data.checkedAt) / 60000));
+					// Responses are edge-cached (max-age=60), so a reader can be looking
+					// at a round that is minutes older than the page load. Say how old.
+					checkedAtEl.textContent = `Last check ${
+						ago === 0 ? 'under a minute' : `${ago} min`
+					} ago.`;
+					checkedAtEl.hidden = false;
+				}
+
+				list.innerHTML = '';
+				for (const s of data.services) {
+					const card = document.createElement('article');
+					card.className = 'st-card';
+
+					const days = s.history.length;
+					const cells = s.history
+						.map((h) => {
+							const b = band(h.uptime);
+							const label =
+								h.uptime == null ? `${h.date}: no data` : `${h.date}: ${h.uptime}% uptime`;
+							return `<span class="st-cell" ${b ? `data-band="${b}"` : ''} role="img" tabindex="0" aria-label="${label}" title="${label}"></span>`;
+						})
+						.join('');
+
+					card.innerHTML = `
+						<div class="st-card-head">
+							<span class="st-dot" data-state="${s.operational === null ? '' : s.operational ? 'ok' : 'down'}" aria-hidden="true"></span>
+							<h2>${s.label}</h2>
+							<div class="st-stats">
+								<span><strong>${fmtPct(s.uptime90d ?? s.uptime24h)}</strong> uptime</span>
+								<span><strong>${s.avgLatency24hMs == null ? '—' : `${s.avgLatency24hMs}ms`}</strong> avg</span>
+							</div>
+						</div>
+						${
+							days > 0
+								? `<div class="st-bar" role="group" aria-label="${s.label} daily uptime, last ${days} days">${cells}</div>
+								   <div class="st-bar-labels"><span>${days} days ago</span><span>today</span></div>`
+								: `<div class="st-bar-labels"><span>History appears after the first day of monitoring.</span></div>`
+						}`;
+					list.appendChild(card);
+				}
+			}
+
+			function renderError() {
+				bannerText.textContent = 'Could not load status data.';
+				summaryEl.classList.remove('st-skel');
+				kpiUptime.textContent = '—';
+				kpiServices.textContent = '—';
+				kpiLatency.textContent = '—';
+				list.innerHTML = `<div class="st-note st-error">
+					The status feed at <a href="/api/status">/api/status</a> did not respond.
+					That can itself indicate an incident — try again in a minute, or check
+					<a href="https://x.com/trythreews" rel="noopener">@trythreews</a> for updates.
+				</div>`;
+			}
+
+			async function load() {
+				try {
+					const res = await fetch('/api/status', { headers: { accept: 'application/json' } });
+					if (!res.ok) throw new Error(`HTTP ${res.status}`);
+					render(await res.json());
+				} catch {
+					renderError();
+				}
+			}
+			load();
+			// Live page: refresh on the probe cadence without requiring a reload.
+			setInterval(load, 5 * 60 * 1000);
+
+			// Readiness probes (/api/health) and platform totals (/api/stats).
+			async function loadHealth() {
+				const wrap = document.getElementById('st-health');
+				try {
+					// /api/health answers 503 with a full body when a probe is down.
+					const res = await fetch('/api/health', { headers: { accept: 'application/json' } });
+					const h = await res.json();
+					if (!h || !h.probes) throw new Error('no probes');
+					wrap.hidden = false;
+					document.getElementById('st-healthlist').innerHTML = Object.values(h.probes)
+						.map((p) => `<div class="st-sub" data-state="${esc(p.status)}">
+							<span class="st-dot" data-state="${esc(p.status)}" aria-hidden="true"></span>
+							<span class="st-sub-name">${esc(p.name)}</span>
+							<span class="st-sub-state">${esc(SUB_STATE_WORD[p.status] || p.status)}</span>
+							${p.detail ? `<span class="st-sub-detail">${esc(p.detail)}</span>` : ''}
+						</div>`)
+						.join('');
+				} catch {
+					wrap.hidden = true;
+				}
+			}
+			const STAT_LABELS = {
+				agents: 'Agents',
+				launches: 'Coins launched',
+				volume_sol: 'Trading volume (SOL)',
+				earnings_paid: 'Earnings payouts completed',
+				active_strategies: 'Active strategies',
+			};
+			async function loadStats() {
+				const wrap = document.getElementById('st-stats');
+				try {
+					const res = await fetch('/api/stats', { headers: { accept: 'application/json' } });
+					if (!res.ok) throw new Error(`HTTP ${res.status}`);
+					const { stats } = await res.json();
+					wrap.hidden = false;
+					document.getElementById('st-statslist').innerHTML = Object.entries(stats)
+						.map(([key, m]) => {
+							const v = m.available === false ? null : key === 'earnings_paid' ? m.value.payouts : m.value;
+							return `<div class="st-sub" data-state="${v == null ? 'unknown' : 'ok'}">
+								<span class="st-dot" data-state="${v == null ? 'unknown' : 'ok'}" aria-hidden="true"></span>
+								<span class="st-sub-name">${esc(STAT_LABELS[key] || key)}</span>
+								<span class="st-sub-state">${v == null ? 'unavailable' : esc(Number(v).toLocaleString())}</span>
+								<span class="st-sub-detail">${esc(m.source)} · read ${esc(new Date(m.as_of).toLocaleTimeString())}</span>
+							</div>`;
+						})
+						.join('');
+				} catch {
+					wrap.hidden = true;
+				}
+			}
+			loadHealth();
+			loadStats();
+			setInterval(loadHealth, 60 * 1000);
+			setInterval(loadStats, 5 * 60 * 1000);
+
+			// Build traceability: show the exact commit + Cloud Run revision that is
+			// serving this page right now. Static (never changes within a revision),
+			// so it loads once and links the short SHA to the commit on GitHub.
+			(async () => {
+				const el = document.getElementById('st-build');
+				try {
+					const res = await fetch('/api/version', { headers: { accept: 'application/json' } });
+					if (!res.ok) return;
+					const v = await res.json();
+					if (!v || v.commitShort === 'unknown') return;
+					const shaLink = v.commit && v.commit !== 'unknown'
+						? `<a href="https://github.com/nirholas/three.ws/commit/${esc(v.commit)}" rel="noopener" style="color: inherit; font-family: var(--font-mono, monospace)">${esc(v.commitShort)}</a>`
+						: `<span style="font-family: var(--font-mono, monospace)">${esc(v.commitShort)}</span>`;
+					const rev = v.runtime && v.runtime.revision ? ` · revision ${esc(v.runtime.revision)}` : '';
+					const built = v.builtAt ? ` · built ${new Date(v.builtAt).toLocaleString()}` : '';
+					// The whole line already renders in muted ink; dimming the
+					// version a further 30% dropped it to 3.24:1, under AA.
+					el.innerHTML = `Live build: ${shaLink} v${esc(v.version)}${rev}${built}`;
+					el.hidden = false;
+				} catch {
+					/* version endpoint unreachable — leave the build line hidden */
+				}
+			})();
+		</script>
+
+		<script src="/nav.js" defer></script>
+		<script src="/brand.js" defer></script>
+		<div id="footer-container"></div>
+		<script src="/footer.js"></script>
+		<!-- Runtime i18n: detects locale, swaps annotated copy, mounts <lang-switcher>. -->
+	<script type="module" src="/i18n.js"></script>
+</body>
+</html>

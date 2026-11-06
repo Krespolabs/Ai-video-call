@@ -1,0 +1,324 @@
+<!doctype html>
+<html lang="en">
+	<head>
+		<script>/* three.ws theme boot — no-flash; runtime in /theme-switcher.js */(function(){try{var m=localStorage.getItem('twx_theme');var l=m==='auto'?(window.matchMedia&&window.matchMedia('(prefers-color-scheme: light)').matches):m==='light';document.documentElement.setAttribute('data-theme',l?'light':'dark');}catch(e){document.documentElement.setAttribute('data-theme','dark');}})();</script>
+		<meta charset="utf-8" />
+		<meta name="viewport" content="width=device-width, initial-scale=1" />
+		<title data-i18n="500.meta_title">three.ws — something broke on our end</title>
+		<meta name="robots" content="noindex" />
+		<link rel="stylesheet" href="/fonts/fonts.css" />
+		<link rel="stylesheet" href="/nav.css" />
+		<style>
+			:root { color-scheme: dark; }
+			*, *::before, *::after { box-sizing: border-box; }
+			html, body { height: 100%; margin: 0; background: #090909; color: #ccc; font: 15px/1.5 'Inter', -apple-system, system-ui, sans-serif; overflow: hidden; }
+
+			#avatar-canvas {
+				position: fixed; inset: 0;
+				width: 100vw; height: 100vh;
+				pointer-events: none; z-index: 999;
+			}
+
+			.stage {
+				min-height: calc(100vh - 58px);
+				display: flex; flex-direction: column; align-items: center; justify-content: center;
+				gap: 26px; padding: 40px 24px 60px;
+				text-align: center;
+			}
+			.eyebrow {
+				display: inline-flex; align-items: center; gap: 9px;
+				font-size: 11px; font-weight: 600;
+				letter-spacing: 0.17em; text-transform: uppercase;
+				color: #999;
+				font-family: 'Space Grotesk', 'Inter', sans-serif;
+			}
+			.eyebrow-dot {
+				width: 7px; height: 7px; border-radius: 50%;
+				background: #ff5d5d; box-shadow: 0 0 8px rgba(255,93,93,0.55);
+				animation: blink 1.6s ease-in-out infinite;
+			}
+			@keyframes blink { 0%,100%{opacity:1} 50%{opacity:0.18} }
+
+			.bignum {
+				position: relative;
+				font-family: 'Space Grotesk', 'Inter', sans-serif;
+				font-weight: 800; letter-spacing: -0.06em;
+				font-size: clamp(140px, 28vw, 320px);
+				line-height: 0.85;
+				margin: 0;
+				color: #fff;
+				text-shadow: var(--agent-shadow, none);
+				transition: text-shadow var(--duration-instant) var(--ease-standard);
+				user-select: none;
+			}
+			.bignum em { color: #666; font-style: normal; }
+			/* A restrained RGB-split flicker — signals "glitch" without the seizure
+			   risk of a fast strobe. Disabled under reduced-motion below. */
+			.bignum .glitch { position: relative; animation: jitter 3.8s steps(1) infinite; }
+			.bignum .glitch::before,
+			.bignum .glitch::after {
+				content: attr(data-ch);
+				position: absolute; inset: 0;
+				opacity: 0.0;
+			}
+			.bignum .glitch::before { color: #ff4d6d; }
+			.bignum .glitch::after  { color: #4dd2ff; }
+			@keyframes jitter {
+				0%, 92%, 100% {} /* mostly clean */
+				93% { transform: translateX(-2px); }
+				94% { transform: translateX(3px); }
+				95% { transform: translateX(-1px); }
+				96% { transform: translateX(0); }
+			}
+
+			.line {
+				font-family: 'Space Grotesk', 'Inter', sans-serif;
+				font-size: clamp(20px, 2.4vw, 28px); font-weight: 700;
+				margin: 0; color: #ddd; letter-spacing: -0.015em;
+			}
+			.sub { color: #6a6a6a; max-width: 46ch; margin: 0; font-size: 15px; }
+			.sub strong { color: #9a9a9a; font-weight: 600; }
+
+			/* Support reference chip — only shown when the error carried a ref. */
+			.refrow {
+				display: none;
+				align-items: center; gap: 10px;
+				padding: 9px 12px 9px 16px;
+				background: rgba(255,255,255,0.035);
+				border: 1.5px solid rgba(255,255,255,0.09);
+				border-radius: 12px;
+				max-width: 92vw;
+			}
+			.refrow.show { display: inline-flex; animation: rise 360ms cubic-bezier(.2,.7,.2,1) both; }
+			@keyframes rise { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+			.ref-label { font-size: 11px; letter-spacing: 0.14em; text-transform: uppercase; color: #6a6a6a; font-weight: 600; }
+			.ref-value {
+				font-family: 'Space Grotesk', ui-monospace, 'SF Mono', Menlo, monospace;
+				font-size: 14px; font-weight: 700; color: #eee; letter-spacing: 0.04em;
+			}
+			.copy-btn {
+				display: inline-flex; align-items: center; gap: 6px;
+				margin-left: 2px; padding: 7px 11px;
+				border: 1.5px solid rgba(255,255,255,0.12); border-radius: 9px;
+				background: rgba(255,255,255,0.04); color: #bbb;
+				font: 700 12px/1 'Inter', inherit; cursor: pointer;
+				transition: color var(--duration-fast), border-color var(--duration-fast), background var(--duration-fast), transform var(--duration-instant);
+			}
+			.copy-btn:hover { color: #fff; border-color: rgba(255,255,255,0.3); background: rgba(255,255,255,0.08); }
+			.copy-btn:active { transform: scale(0.94); }
+			.copy-btn:focus-visible { outline: 2px solid #4dd2ff; outline-offset: 2px; }
+			.copy-btn.copied { color: #6ee7a8; border-color: rgba(110,231,168,0.5); }
+			.copy-icon { width: 13px; height: 13px; }
+
+			.actions { display: flex; gap: 12px; flex-wrap: wrap; justify-content: center; margin-top: 6px; }
+			.btn {
+				display: inline-flex; align-items: center; gap: 10px;
+				padding: 14px 26px; border: none; border-radius: 12px;
+				font: 700 14.5px/1 'Inter', inherit; cursor: pointer; text-decoration: none;
+				user-select: none;
+				transform-origin: bottom center;
+				will-change: transform;
+				transition: background var(--duration-fast), color var(--duration-fast), border-color var(--duration-fast), transform var(--duration-instant), box-shadow var(--duration-instant);
+			}
+			.btn:active { transform: translateY(2px); }
+			.btn:focus-visible { outline: 2px solid #4dd2ff; outline-offset: 3px; }
+			.btn-primary {
+				background: #fff;
+				color: #0b0b0b;
+				box-shadow: 0 7px 0 0 #555, 0 9px 24px rgba(0,0,0,0.4);
+			}
+			.btn-primary:hover { background: #e8e8e8; }
+			.btn-primary:active { box-shadow: 0 5px 0 0 #555, 0 7px 18px rgba(0,0,0,0.4); }
+			.btn-ghost {
+				background: rgba(255,255,255,0.04); color: #888;
+				border: 1.5px solid rgba(255,255,255,0.1);
+				box-shadow: 0 4px 0 0 rgba(255,255,255,0.03);
+			}
+			.btn-ghost:hover { color: #ccc; border-color: rgba(255,255,255,0.25); }
+			.btn-ghost:active { box-shadow: 0 2px 0 0 rgba(255,255,255,0.03); }
+
+			.sr-only {
+				position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;
+				overflow: hidden; clip: rect(0,0,0,0); white-space: nowrap; border: 0;
+			}
+
+			/* Respect users who opt out of motion: no fall, no glitch, no blink. */
+			@media (prefers-reduced-motion: reduce) {
+				.eyebrow-dot { animation: none; }
+				.bignum .glitch { animation: none; }
+				.refrow.show { animation: none; }
+			}
+		</style>
+		<!-- Resolve the bare @three-ws/agent-ui specifier without a bundler (this
+		     file is served verbatim from public/). esm.sh ships the package's ESM
+		     build and resolves its peer deps (three, etc.) transitively. -->
+		<script type="importmap">
+			{ "imports": { "@three-ws/agent-ui": "https://esm.sh/@three-ws/agent-ui@0.2.1" } }
+		</script>
+	</head>
+	<body>
+		<div id="nav-container"></div>
+		<script src="/nav.js"></script>
+
+		<div class="stage">
+			<div class="eyebrow"><span class="eyebrow-dot"></span><span data-i18n="500.server_hiccup">Server hiccup</span></div>
+			<h1 class="bignum" id="bignum"><span id="five">5</span><em id="zero">0</em><span class="glitch" data-ch="0" id="zero-b">0</span></h1>
+			<p class="line" data-i18n="500.something_broke_on_our_end">Something broke on our end.</p>
+			<p class="sub" data-i18n-html="500.this_one_s_on_us_not_you">This one's on us, not you — and it isn't silent: the team was <strong>alerted automatically</strong> the moment it happened. Give it a moment and try again.</p>
+
+			<div class="refrow" id="refrow" role="group" aria-label="Support reference">
+				<span class="ref-label" data-i18n="500.reference">Reference</span>
+				<span class="ref-value" id="ref-value"></span>
+				<button type="button" class="copy-btn" id="copy-btn" aria-label="Copy support reference to clipboard" data-i18n-attr="aria-label:500.copy_support_reference_to_cl_arialabel">
+					<svg class="copy-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="9" width="13" height="13" rx="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
+					<span id="copy-label">Copy</span>
+				</button>
+			</div>
+
+			<div class="actions">
+				<a href="/" class="btn btn-primary" id="retry-btn" data-i18n-html="500.try_again">
+					<span id="retry-label">Try again</span>
+					<span>&rarr;</span>
+				</a>
+				<a href="/" class="btn btn-ghost" id="home-btn" data-i18n-html="500.take_me_home">
+					<span>Take me home</span>
+				</a>
+				<a href="/support" class="btn btn-ghost" id="support-btn" data-i18n-html="500.contact_support">
+					<span>Contact support</span>
+				</a>
+			</div>
+			<p class="sr-only" id="live-region" role="status" aria-live="polite"></p>
+		</div>
+
+		<canvas id="avatar-canvas" aria-hidden="true"></canvas>
+
+		<script>
+			// Wire the support reference + smart "Try again" before the 3D agent
+			// loads, so the page is fully useful even if the module/CDN is slow or
+			// the GPU is unavailable. The boundary (api/_lib/http.js) redirects a
+			// browser navigation that 5xx'd to /500?ref=<id>&from=<original-path>.
+			(function () {
+				var params = new URLSearchParams(location.search);
+				var ref = (params.get('ref') || '').trim();
+				// Defend the static page against reflected junk: a ref is short and
+				// hex-ish; anything else is ignored rather than rendered verbatim.
+				if (ref && /^[a-zA-Z0-9_-]{4,64}$/.test(ref)) {
+					document.getElementById('ref-value').textContent = ref;
+					document.getElementById('refrow').classList.add('show');
+				}
+
+				// "Try again" retries the page that actually failed, not this one.
+				// Only honor a same-origin absolute path so the param can't be used
+				// as an open-redirect.
+				var from = params.get('from') || '';
+				var safeFrom = /^\/(?!\/)[^\s]*$/.test(from) ? from : '';
+				if (safeFrom) {
+					var retry = document.getElementById('retry-btn');
+					retry.setAttribute('href', safeFrom);
+					document.getElementById('retry-label').textContent = 'Try that again';
+				}
+
+				var live = document.getElementById('live-region');
+				var copyBtn = document.getElementById('copy-btn');
+				var copyLabel = document.getElementById('copy-label');
+				copyBtn.addEventListener('click', function () {
+					var value = document.getElementById('ref-value').textContent || '';
+					if (!value) return;
+					var done = function () {
+						copyBtn.classList.add('copied');
+						copyLabel.textContent = 'Copied';
+						live.textContent = 'Reference ' + value + ' copied to clipboard';
+						setTimeout(function () {
+							copyBtn.classList.remove('copied');
+							copyLabel.textContent = 'Copy';
+						}, 1800);
+					};
+					if (navigator.clipboard && navigator.clipboard.writeText) {
+						navigator.clipboard.writeText(value).then(done).catch(fallbackCopy);
+					} else {
+						fallbackCopy();
+					}
+					function fallbackCopy() {
+						try {
+							var ta = document.createElement('textarea');
+							ta.value = value; ta.style.position = 'fixed'; ta.style.opacity = '0';
+							document.body.appendChild(ta); ta.focus(); ta.select();
+							document.execCommand('copy');
+							document.body.removeChild(ta);
+							done();
+						} catch (e) {
+							live.textContent = 'Could not copy automatically — the reference is ' + value;
+						}
+					}
+				});
+			})();
+		</script>
+
+		<script type="module">
+			import { createAgentUI } from '@three-ws/agent-ui';
+
+			const prefersReduced = window.matchMedia
+				&& window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+			const zero    = document.getElementById('zero');
+			const retryBtn = document.getElementById('retry-btn');
+			const homeBtn  = document.getElementById('home-btn');
+
+			let agent;
+			try {
+				agent = await createAgentUI({
+					canvas: document.getElementById('avatar-canvas'),
+					clips: ['idle', 'walk', 'falling', 'facepalm'],
+				});
+			} catch (e) {
+				// The page works without the avatar — a WebGL-less device or a blocked
+				// CDN simply gets the static layout. Never let a render failure throw.
+				agent = null;
+			}
+
+			if (agent) {
+				agent.fx.proximityShadow(document.getElementById('bignum'));
+
+				if (prefersReduced) {
+					// No theatrics for motion-sensitive users: just stand on the mark.
+					agent.standOn(zero, { anchor: 'top-center', offsetY: -8 });
+					agent.play('idle', { loop: true });
+				} else {
+					await agent.fallOnto(zero, {
+						duration: 1.3,
+						landingOffsetPx: 86,
+						tumble: 0.3,
+						onLand: () => {
+							agent.fx.dust(zero);
+							agent.fx.impactPulse(zero);
+						},
+					});
+
+					// The reaction: a one-shot facepalm at the broken server, then
+					// settle into idle and glance around.
+					agent.faceFront?.();
+					agent.play('facepalm', { loop: false });
+					const dur = (agent.clip?.('facepalm') || 1.4) * 1000;
+					setTimeout(() => {
+						if (agent.currentClip === 'facepalm' || !agent.currentClip) {
+							agent.play('idle', { loop: true });
+						}
+					}, dur);
+
+					const t0 = performance.now();
+					(function lookAround() {
+						if (agent._runningOff) return;
+						const t = (performance.now() - t0) / 1000;
+						agent.avatar.rotation.y = Math.sin(t * 1.1) * 0.32;
+						requestAnimationFrame(lookAround);
+					})();
+
+					agent.interceptNavigation(retryBtn, { direction: 'right', delay: 900 });
+					agent.interceptNavigation(homeBtn,  { direction: 'left',  delay: 900 });
+				}
+			}
+		</script>
+		<script src="/brand.js" defer></script>
+		<!-- Runtime i18n: detects locale, swaps annotated copy, mounts <lang-switcher>. -->
+	<script type="module" src="/i18n.js"></script>
+</body>
+</html>

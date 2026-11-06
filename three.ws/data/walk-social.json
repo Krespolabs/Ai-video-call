@@ -1,0 +1,26 @@
+[
+	{
+		"author": "three.ws",
+		"handle": "@trythreews",
+		"avatar": "/three.svg",
+		"url": "https://x.com/trythreews",
+		"quote": "Your avatar now walks anywhere on the web. Drop it on any page with one tag, drive it with WASD or a joystick, and let it read articles aloud as it strolls.",
+		"platform": "x"
+	},
+	{
+		"author": "three.ws Walk",
+		"handle": "@trythreews",
+		"avatar": "/three.svg",
+		"url": "https://three.ws/walk-embed?env=void&autoplay=true&controls=none",
+		"quote": "Six built-in worlds, real-time animation retargeting onto any humanoid rig, and a postMessage API so your site can steer the avatar. No app install — it just runs in the browser.",
+		"platform": "x"
+	},
+	{
+		"author": "three.ws Extension",
+		"handle": "@trythreews",
+		"avatar": "/three.svg",
+		"url": "https://three.ws/extension",
+		"quote": "Install the Chrome extension and your avatar follows you across the entire web — walking over real pages, narrating what you read, a living 3D browsing companion.",
+		"platform": "x"
+	}
+]

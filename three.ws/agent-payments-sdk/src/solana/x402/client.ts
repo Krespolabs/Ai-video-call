@@ -1,0 +1,385 @@
+// agent-payments-sdk
+// Copyright (c) 2026 nirholas | x.com/nichxbt | github.com/nirholas
+// All rights reserved.
+
+/**
+ * x402 v2 Client – automatic 402 handling
+ *
+ * A fetch wrapper that intercepts HTTP 402 responses, builds and signs
+ * a payment transaction matching the server's PaymentRequirements, and
+ * retries the request with an X-PAYMENT header.
+ *
+ * Supports both "pump-agent" (Pump Agent invoice) and "exact" (SPL
+ * TransferChecked) schemes.
+ */
+
+import {
+  Connection,
+  PublicKey,
+  Transaction,
+} from "@solana/web3.js";
+import {
+  getMint,
+  getAssociatedTokenAddressSync,
+  createAssociatedTokenAccountInstruction,
+  createTransferCheckedInstruction,
+  TOKEN_PROGRAM_ID,
+  ASSOCIATED_TOKEN_PROGRAM_ID,
+} from "@solana/spl-token";
+import { PumpAgentOffline } from "../PumpAgentOffline";
+import {
+  encodePaymentPayload,
+  getPaymentRequiredFromResponse,
+} from "./headers";
+import type {
+  AuthHintsCredentials,
+  AuthHintsExtension,
+  X402ClientConfig,
+  PaymentPayload,
+  PaymentRequired,
+  PaymentRequirements,
+  PumpAgentPaymentRequirements,
+  ExactPaymentRequirements,
+} from "./types";
+import {
+  X402_HEADER_PAYMENT,
+  X402_VERSION,
+  SOLANA_MAINNET,
+} from "./types";
+
+const AUTH_HINTS_KEY = "auth-hints";
+const SIWX_HEADER = "SIGN-IN-WITH-X";
+
+// ─── Client-side x402 fetch wrapper ─────────────────────────────────────────
+
+/**
+ * Create a fetch function that automatically handles HTTP 402 responses
+ * by building a payment transaction, signing, sending, and retrying
+ * the original request with payment proof in the X-PAYMENT header.
+ *
+ * @example
+ * ```ts
+ * import { createX402Fetch } from "@pump-fun/agent-payments-sdk/x402";
+ *
+ * const x402fetch = createX402Fetch({
+ *   payer: wallet.publicKey.toBase58(),
+ *   signTransaction: async (txBase64) => {
+ *     const tx = Transaction.from(Buffer.from(txBase64, "base64"));
+ *     const signed = await wallet.signTransaction(tx);
+ *     return Buffer.from(signed.serialize()).toString("base64");
+ *   },
+ *   sendTransaction: async (signedTxBase64) => {
+ *     const raw = Buffer.from(signedTxBase64, "base64");
+ *     const sig = await connection.sendRawTransaction(raw);
+ *     await connection.confirmTransaction(sig, "confirmed");
+ *     return sig;
+ *   },
+ * });
+ *
+ * const res = await x402fetch("https://api.agent.example/inference", {
+ *   method: "POST",
+ *   body: JSON.stringify({ prompt: "Hello" }),
+ * });
+ * ```
+ */
+export function createX402Fetch(
+  config: X402ClientConfig & { connection: Connection },
+): typeof fetch {
+  const {
+    payer,
+    signTransaction,
+    sendTransaction,
+    connection,
+    network = SOLANA_MAINNET,
+    confirmationTimeoutMs = 30_000,
+    onAuthRequired,
+  } = config;
+
+  return async (
+    input: RequestInfo | URL,
+    init?: RequestInit,
+  ): Promise<Response> => {
+    const response = await fetch(input, init);
+
+    if (response.status !== 402) return response;
+
+    const paymentRequired = await getPaymentRequiredFromResponse(response);
+    if (!paymentRequired) return response;
+
+    // USE-21: if the 402 advertises `auth-hints` and the caller wired up an
+    // onAuthRequired callback, let them attach OAuth/SIWX credentials and
+    // bypass payment entirely. Falls through to the payment flow when the
+    // callback returns null or no credentials match the offered methods.
+    const authExt = extractAuthHints(paymentRequired);
+    if (authExt && typeof onAuthRequired === "function") {
+      let creds: AuthHintsCredentials | null | undefined;
+      try {
+        creds = await onAuthRequired({
+          extension: authExt,
+          accepts: paymentRequired.accepts,
+          resource: paymentRequired.resource,
+        });
+      } catch {
+        creds = null;
+      }
+      if (creds && (creds.oauth2AccessToken || creds.siwxHeader)) {
+        const retryInit: RequestInit = { ...init };
+        const headers = new Headers(retryInit.headers);
+        if (creds.oauth2AccessToken) {
+          headers.set("Authorization", `Bearer ${creds.oauth2AccessToken}`);
+        }
+        if (creds.siwxHeader) {
+          headers.set(SIWX_HEADER, creds.siwxHeader);
+        }
+        retryInit.headers = headers;
+        return fetch(input, retryInit);
+      }
+    }
+
+    // Find a compatible requirement
+    const accepted = selectRequirement(paymentRequired, network);
+    if (!accepted) return response;
+
+    // Build, sign, and send the payment
+    const proof = await buildPaymentProof(
+      accepted,
+      payer,
+      connection,
+      signTransaction,
+      sendTransaction,
+      confirmationTimeoutMs,
+    );
+
+    // Build the PaymentPayload. Top-level scheme/network match the chosen
+    // `accepts[]` entry so the server's verify() can route the proof without
+    // re-walking `accepted` — this matches the Coinbase v2 wire shape.
+    const resourceUrl =
+      paymentRequired.resource.url ||
+      (typeof input === "string"
+        ? input
+        : input instanceof URL
+          ? input.href
+          : input.url);
+    // PayAI's facilitator rejects a bare-string `resource` with `invalid_payload`;
+    // it requires the same `{url, mimeType}` ResourceInfo object as the 402 body.
+    const paymentPayload: PaymentPayload = {
+      x402Version: X402_VERSION,
+      scheme: accepted.scheme,
+      network: accepted.network,
+      resource: {
+        url: resourceUrl,
+        mimeType: paymentRequired.resource.mimeType ?? "application/json",
+      },
+      accepted,
+      payload: proof,
+    };
+
+    // Retry the original request with X-PAYMENT header
+    const retryInit: RequestInit = { ...init };
+    const headers = new Headers(retryInit.headers);
+    headers.set(X402_HEADER_PAYMENT, encodePaymentPayload(paymentPayload));
+    retryInit.headers = headers;
+
+    return fetch(input, retryInit);
+  };
+}
+
+// ─── Requirement Selection ──────────────────────────────────────────────────
+
+function selectRequirement(
+  paymentRequired: PaymentRequired,
+  network: string,
+): PaymentRequirements | null {
+  // USE-21 auth-hints: skip free-tier accepts entries (amount === "0") that
+  // require authentication. The auth-hints code path handles them; the
+  // payment path must not try to settle a zero-amount transfer because the
+  // facilitator will reject it as invalid_payload.
+  const payable = paymentRequired.accepts.filter(
+    (r) => String(r.amount ?? "") !== "0",
+  );
+  // Prefer pump-agent scheme on the matching network, then fall back to exact
+  return (
+    payable.find((r) => r.scheme === "pump-agent" && r.network === network) ??
+    payable.find((r) => r.scheme === "exact" && r.network === network) ??
+    null
+  );
+}
+
+// ─── auth-hints extraction ──────────────────────────────────────────────────
+
+function extractAuthHints(
+  paymentRequired: PaymentRequired,
+): AuthHintsExtension | null {
+  const ext = paymentRequired.extensions?.[AUTH_HINTS_KEY] as
+    | AuthHintsExtension
+    | undefined;
+  if (!ext || typeof ext !== "object") return null;
+  if (!ext.info || !Array.isArray(ext.info.authRequirements)) return null;
+  return ext;
+}
+
+// ─── Payment Proof Builder ──────────────────────────────────────────────────
+
+async function buildPaymentProof(
+  requirements: PaymentRequirements,
+  payer: string,
+  connection: Connection,
+  signTransaction: (txBase64: string) => Promise<string>,
+  sendTransaction: (signedTxBase64: string) => Promise<string>,
+  confirmationTimeoutMs: number,
+): Promise<Record<string, unknown>> {
+  const scheme = requirements.scheme;
+  if (scheme === "pump-agent") {
+    return buildPumpAgentProof(
+      requirements as PumpAgentPaymentRequirements,
+      payer,
+      connection,
+      signTransaction,
+      sendTransaction,
+      confirmationTimeoutMs,
+    );
+  }
+
+  if (scheme === "exact") {
+    return buildExactProof(
+      requirements as ExactPaymentRequirements,
+      payer,
+      connection,
+      signTransaction,
+      sendTransaction,
+      confirmationTimeoutMs,
+    );
+  }
+
+  throw new Error(`Unsupported scheme: ${scheme}`);
+}
+
+async function buildPumpAgentProof(
+  requirements: PumpAgentPaymentRequirements,
+  payer: string,
+  connection: Connection,
+  signTransaction: (txBase64: string) => Promise<string>,
+  sendTransaction: (signedTxBase64: string) => Promise<string>,
+  confirmationTimeoutMs: number,
+): Promise<Record<string, unknown>> {
+  const { extra } = requirements;
+
+  const agent = new PumpAgentOffline(new PublicKey(extra.agentMint));
+  const instructions = await agent.buildAcceptPaymentInstructions({
+    user: new PublicKey(payer),
+    currencyMint: new PublicKey(requirements.asset),
+    amount: requirements.amount,
+    memo: extra.memo,
+    startTime: extra.startTime,
+    endTime: extra.endTime,
+  });
+
+  const { blockhash, lastValidBlockHeight } =
+    await connection.getLatestBlockhash("confirmed");
+
+  const tx = new Transaction();
+  tx.recentBlockhash = blockhash;
+  tx.lastValidBlockHeight = lastValidBlockHeight;
+  tx.feePayer = new PublicKey(payer);
+  tx.add(...instructions);
+
+  const txBase64 = Buffer.from(
+    tx.serialize({ requireAllSignatures: false }),
+  ).toString("base64");
+
+  const signedTxBase64 = await signTransaction(txBase64);
+  const signature = await sendTransaction(signedTxBase64);
+
+  await waitForConfirmation(
+    connection,
+    signature,
+    lastValidBlockHeight,
+    confirmationTimeoutMs,
+  );
+
+  return {
+    signature,
+    payer,
+    agentMint: extra.agentMint,
+    asset: requirements.asset,
+    amount: requirements.amount,
+    memo: extra.memo,
+    startTime: extra.startTime,
+    endTime: extra.endTime,
+  };
+}
+
+async function buildExactProof(
+  requirements: ExactPaymentRequirements,
+  payer: string,
+  connection: Connection,
+  signTransaction: (txBase64: string) => Promise<string>,
+  sendTransaction: (signedTxBase64: string) => Promise<string>,
+  confirmationTimeoutMs: number,
+): Promise<Record<string, unknown>> {
+  const payerPk = new PublicKey(payer);
+  const mint = new PublicKey(requirements.asset);
+  const payTo = new PublicKey(requirements.payTo);
+  const amount = BigInt(requirements.amount);
+
+  const mintInfo = await getMint(connection, mint);
+  const senderAta = getAssociatedTokenAddressSync(mint, payerPk, false, TOKEN_PROGRAM_ID, ASSOCIATED_TOKEN_PROGRAM_ID);
+  const receiverAta = getAssociatedTokenAddressSync(mint, payTo, false, TOKEN_PROGRAM_ID, ASSOCIATED_TOKEN_PROGRAM_ID);
+
+  const { blockhash, lastValidBlockHeight } = await connection.getLatestBlockhash("confirmed");
+
+  const tx = new Transaction();
+  tx.recentBlockhash = blockhash;
+  tx.lastValidBlockHeight = lastValidBlockHeight;
+  tx.feePayer = payerPk;
+
+  const receiverInfo = await connection.getAccountInfo(receiverAta);
+  if (!receiverInfo) {
+    tx.add(createAssociatedTokenAccountInstruction(
+      payerPk, receiverAta, payTo, mint,
+      TOKEN_PROGRAM_ID, ASSOCIATED_TOKEN_PROGRAM_ID,
+    ));
+  }
+
+  tx.add(createTransferCheckedInstruction(
+    senderAta, mint, receiverAta, payerPk,
+    amount, mintInfo.decimals, [], TOKEN_PROGRAM_ID,
+  ));
+
+  const txBase64 = Buffer.from(tx.serialize({ requireAllSignatures: false })).toString("base64");
+  const signedTxBase64 = await signTransaction(txBase64);
+  const signature = await sendTransaction(signedTxBase64);
+
+  await waitForConfirmation(connection, signature, lastValidBlockHeight, confirmationTimeoutMs);
+
+  return { signature, network: requirements.network };
+}
+
+// ─── Confirmation Helper ────────────────────────────────────────────────────
+
+async function waitForConfirmation(
+  connection: Connection,
+  signature: string,
+  lastValidBlockHeight: number,
+  timeoutMs: number,
+): Promise<void> {
+  const start = Date.now();
+  while (Date.now() - start < timeoutMs) {
+    const status = await connection.getSignatureStatus(signature);
+    const value = status?.value;
+    if (
+      value?.confirmationStatus === "confirmed" ||
+      value?.confirmationStatus === "finalized"
+    ) {
+      if (value.err)
+        throw new Error(`Transaction failed: ${JSON.stringify(value.err)}`);
+      return;
+    }
+    const blockHeight = await connection.getBlockHeight();
+    if (blockHeight > lastValidBlockHeight) {
+      throw new Error("Transaction expired (blockhash no longer valid)");
+    }
+    await new Promise((r) => setTimeout(r, 2_000));
+  }
+  throw new Error("Transaction confirmation timed out");
+}

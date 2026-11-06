@@ -1,0 +1,584 @@
+// Consolidated OAuth 2.1 endpoints dispatcher.
+// Routes: /oauth/authorize, /oauth/consent (post-login redirect alias for authorize),
+//         /oauth/token, /oauth/register, /oauth/revoke, /oauth/introspect
+
+import { sql } from '../_lib/db.js';
+import {
+	getSessionUser, csrfTokenFor, verifyCsrfToken, isSameSiteOrigin,
+	mintAccessToken, issueRefreshToken, rotateRefreshToken,
+	revokeRefreshToken, verifyAccessToken, revokeClientGrant, oauthGrantRevoked,
+} from '../_lib/auth.js';
+import { randomToken, sha256, sha256Base64Url, constantTimeEquals } from '../_lib/crypto.js';
+import { cors, method, wrap, error, redirect, readForm, readJson, json, rateLimited } from '../_lib/http.js';
+import { limits, clientIp } from '../_lib/rate-limit.js';
+import { env } from '../_lib/env.js';
+import { z } from 'zod';
+import { parse } from '../_lib/validate.js';
+import { filterRegisterableScope, splitSpendScope } from '../_lib/oauth-scopes.js';
+import { SCOPE_LABELS, CONNECTION_SCOPES, groupsForScope, grantedScopeFromGroups } from '../_lib/oauth-grant-groups.js';
+import { requireCsrf } from '../_lib/csrf.js';
+import { canonicalMcpResource, allMcpAudiences } from '../_lib/mcp-resources.js';
+
+// ── authorize ─────────────────────────────────────────────────────────────────
+
+// RFC 8252 §7.3: for a loopback IP redirect the authorization server MUST allow
+// any port at request time, because a native app (the `three-ws` CLI, a desktop
+// client) binds whatever ephemeral port the OS hands it and cannot know it when
+// it registers. Exact port matching forced such a client to re-register on every
+// login and burn the per-IP registration budget doing it. Only the IP literals
+// qualify: `localhost` can resolve somewhere else, so it keeps exact matching.
+const LOOPBACK_IP_HOSTS = new Set(['127.0.0.1', '[::1]']);
+
+function redirectUriMatches(requested, registered) {
+	let reqUrl;
+	try { reqUrl = new URL(requested); } catch { return false; }
+	if (reqUrl.hash || reqUrl.search) return false;
+	return registered.some((entry) => {
+		let regUrl;
+		try { regUrl = new URL(entry); } catch { return false; }
+		if (reqUrl.protocol !== regUrl.protocol || reqUrl.hostname !== regUrl.hostname || reqUrl.pathname !== regUrl.pathname) return false;
+		if (reqUrl.protocol === 'http:' && LOOPBACK_IP_HOSTS.has(regUrl.hostname)) return true;
+		return reqUrl.port === regUrl.port;
+	});
+}
+
+function parseQuery(url) {
+	return Object.fromEntries(new URL(url, 'http://x').searchParams);
+}
+
+function intersectScopes(requested, allowed) {
+	const a = new Set(allowed.split(/\s+/).filter(Boolean));
+	return requested.split(/\s+/).filter((s) => a.has(s)).join(' ') || allowed;
+}
+
+// RFC 8707 §2: an authorization server that does not recognize the requested
+// `resource` MUST reject the request with `invalid_target`. Honoring an
+// arbitrary resource minted a token that no endpoint here would ever accept:
+// the client got a 200 and a credential that failed everywhere, instead of one
+// clear error at the point the mistake was made. The recognized resources are
+// the platform resource and each hosted MCP server's own URL (an MCP client
+// asks for the server it connected to; ../_lib/mcp-resources.js), and the
+// token's `aud` is whichever one was granted.
+// Returns the canonical resource, or null when the request names another one.
+const canonicalResource = canonicalMcpResource;
+const INVALID_TARGET = 'unknown resource, this server issues tokens only for the three.ws MCP servers listed at /.well-known/mcp.json';
+
+// The registerable scope set and the filter that enforces it live in
+// ../_lib/oauth-scopes.js, shared with api/wk.js so the scopes this endpoint
+// keeps and the scopes /.well-known/oauth-protected-resource advertises are
+// read from one array and cannot drift apart.
+
+// Scope copy and the read / manage / trade / spend / launch grouping live in
+// ../_lib/oauth-grant-groups.js, next to the policy table that decides which
+// tool still asks the user first, so the consent screen cannot drift from what
+// the tools actually do.
+function scopeLabel(s) {
+	return SCOPE_LABELS[s] ? esc(SCOPE_LABELS[s]) : esc(s);
+}
+
+function esc(s) {
+	return String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
+}
+
+// client_host in handleGrants (Connected apps) reads the registered site, not
+// the redirect_uri (an OAuth client's redirect can differ from its own domain).
+function hostOf(uri) {
+	try { return new URL(uri).host || null; } catch { return null; }
+}
+
+// The registrable-ish domain of a host: its last two labels. Good enough to
+// tell "app.example.com" from "example.com.evil.test"; never used to grant
+// anything, only to decide whether a self-declared site may be shown.
+function siteDomain(host) {
+	return host.split('.').slice(-2).join('.');
+}
+
+// Host a person can check against what they expect: where the code will be
+// sent, which is the only fact dynamic registration cannot fake. The client's
+// self-declared site (client_uri, never verified) is shown beside it only when
+// it is on the same domain as that redirect host, so a client cannot dress an
+// attacker redirect up as a site the person trusts.
+export function clientHost(client, redirectUri) {
+	let redirectHost = null;
+	try { redirectHost = new URL(redirectUri).host || null; } catch { /* no usable redirect */ }
+	let siteHost = null;
+	try { siteHost = new URL(client.client_uri).host || null; } catch { /* no usable site */ }
+	if (!redirectHost) return 'unknown host';
+	if (siteHost && siteHost !== redirectHost && siteDomain(siteHost.split(':')[0]) === siteDomain(redirectHost.split(':')[0])) {
+		return `${redirectHost} (registered as ${siteHost})`;
+	}
+	return redirectHost;
+}
+
+// Design rule 2: a token a cloud agent holds unattended does not spend. The
+// statement describes THIS request honestly: wallet:write authorizes moving
+// funds out, wallet:trade and wallet:launch authorize value-changing actions
+// that stay inside the agent wallet (api/_lib/spend-scope.js). The person can
+// still untick any of those groups below before authorizing.
+function spendStatement(name, scopeList) {
+	if (scopeList.includes('wallet:write')) {
+		return `<b>${esc(name)}</b> is asking to spend from your agent wallet. Every spend stays inside your caps, every transfer out still asks you first, and you can revoke this at any time.`;
+	}
+	if (scopeList.includes('wallet:trade') || scopeList.includes('wallet:launch')) {
+		return `<b>${esc(name)}</b> cannot move funds out of your agent wallet. It is asking to ${scopeList.includes('wallet:trade') ? 'trade' : ''}${scopeList.includes('wallet:trade') && scopeList.includes('wallet:launch') ? ' and ' : ''}${scopeList.includes('wallet:launch') ? 'launch coins' : ''} inside it, within your caps, and you can revoke this at any time.`;
+	}
+	return `<b>${esc(name)}</b> can never spend from a wallet, trade, or move funds. Payments only happen when you confirm them yourself on three.ws.`;
+}
+
+// One tickable row per grant group. Read is the floor of every connection and
+// stays on; the others default to on (the client asked for them) but a person
+// can untick any group and the issued code carries only what stayed ticked.
+function renderGroup(g) {
+	const scopes = g.scopes.map((s) => `<li>${scopeLabel(s)}</li>`).join('');
+	const confirms = g.confirms.length ? `<p class="asks"><b>Still asks you first:</b> ${g.confirms.map(esc).join(', ')}.</p>` : '';
+	const implied = g.implied ? '<p class="asks">Included because Spend is ticked. Untick Spend to grant only this.</p>' : '';
+	const locked = g.required ? ' disabled' : '';
+	const hidden = g.required ? `<input type="hidden" name="grant_${esc(g.id)}" value="on">` : '';
+	return `<label class="group${g.required ? ' locked' : ''}"><span class="tick"><input type="checkbox" name="grant_${esc(g.id)}" value="on" checked${locked}>${hidden}</span><span class="body"><span class="name">${esc(g.label)}${g.required ? ' <small>always on</small>' : ''}</span><span class="blurb">${esc(g.blurb)}</span><ul>${scopes}</ul>${confirms}${implied}</span></label>`;
+}
+
+function renderConsent(res, { client, user, params, csrf, grantedScope }) {
+	res.statusCode = 200;
+	res.setHeader('content-type', 'text/html; charset=utf-8');
+	res.setHeader('cache-control', 'no-store');
+	// form-action governs the WHOLE submission redirect chain, not just the POST
+	// target. The form posts to /api/oauth/authorize ('self'), which then 302s to
+	// the client's redirect_uri (e.g. https://claude.ai/...). Without the client
+	// origin here, that cross-origin hop is blocked and the OAuth code never
+	// reaches the client. redirect_uri is already validated against the client's
+	// registered URIs before we render, so trusting its origin is safe.
+	let redirectOrigin = '';
+	try { redirectOrigin = ` ${new URL(params.redirect_uri).origin}`; } catch { /* validated upstream */ }
+	res.setHeader('content-security-policy', `default-src 'none'; style-src 'unsafe-inline'; form-action 'self'${redirectOrigin}; frame-ancestors 'none'; base-uri 'none'`);
+	res.setHeader('x-frame-options', 'DENY');
+	res.setHeader('x-content-type-options', 'nosniff');
+	res.setHeader('referrer-policy', 'strict-origin-when-cross-origin');
+	res.setHeader('strict-transport-security', 'max-age=63072000; includeSubDomains; preload');
+	// List exactly what the POST branch will grant, never the raw `scope` the
+	// client asked for. They diverge whenever a client requests a scope it did
+	// not register: intersectScopes drops it and falls back to the client's
+	// registered scope, so showing the request itself made the consent screen
+	// promise one set of permissions and the issued code carry another.
+	const scopeList = grantedScope.split(/\s+/).filter(Boolean);
+	const groups = groupsForScope(grantedScope);
+	const connection = scopeList.filter((s) => CONNECTION_SCOPES.includes(s));
+	const connectionNote = connection.length ? `<p class="conn">${connection.map(scopeLabel).join('. ')}. Revoking from Settings ends that on the app's next request.</p>` : '';
+	res.end(`<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Authorize ${esc(client.name)} · three.ws</title><style>:root{color-scheme:light dark}body{font:16px/1.5 -apple-system,system-ui,Segoe UI,Roboto,sans-serif;background:#0b0b10;color:#eee;margin:0;min-height:100vh;display:grid;place-items:center;padding:24px}.card{background:#14141c;border:1px solid #2a2a36;border-radius:16px;padding:28px 28px 24px;max-width:440px;width:100%;box-shadow:0 10px 40px rgba(0,0,0,.4)}h1{font-size:20px;margin:0 0 8px}.sub{color:#aaa;margin:0 0 20px}.who{display:flex;align-items:center;gap:10px;margin-bottom:16px;padding:10px 12px;background:#1b1b25;border-radius:10px}.dot{width:32px;height:32px;border-radius:50%;background:linear-gradient(135deg,#6a5cff,#ff5ca8);display:grid;place-items:center;color:#fff;font-weight:600}ul{margin:12px 0 20px;padding-left:0;list-style:none}li{padding:8px 0;border-bottom:1px solid #22222e;display:flex;gap:10px}li:last-child{border:0}li::before{content:"✓";color:#6a5cff}.actions{display:flex;gap:10px}button{flex:1;padding:12px 16px;border-radius:10px;border:0;font-size:15px;font-weight:600;cursor:pointer}.allow{background:#6a5cff;color:#fff}.deny{background:transparent;color:#aaa;border:1px solid #2a2a36}.foot{margin-top:16px;font-size:12px;color:#777}.host{display:block;font-size:13px;color:#aaa;word-break:break-all}.warn{margin:0 0 12px;padding:10px 12px;border-radius:10px;background:#1b1b25;border:1px solid #2a2a36;font-size:13px;color:#bbb}.nospend{margin:0 0 20px;padding:10px 12px;border-radius:10px;background:#12201a;border:1px solid #1f3a2c;font-size:13px;color:#b9e6cc}a{color:#9a8cff}.group{display:flex;gap:12px;padding:12px;margin:0 0 10px;border:1px solid #2a2a36;border-radius:12px;background:#10101a;cursor:pointer;transition:border-color .15s,background .15s}.group:hover{border-color:#6a5cff}.group:focus-within{outline:2px solid #6a5cff;outline-offset:2px}.group.locked{cursor:default;opacity:.9}.group:has(input:not(:checked)){background:transparent;opacity:.7}.tick{padding-top:2px}.tick input{width:18px;height:18px;accent-color:#6a5cff;cursor:inherit}.body{flex:1;min-width:0}.name{display:block;font-weight:600}.name small{font-weight:400;color:#888;font-size:12px}.blurb{display:block;color:#aaa;font-size:13px;margin:2px 0 4px}.group ul{margin:0}.group li{padding:4px 0;border:0;font-size:14px}.asks{margin:6px 0 0;font-size:12px;color:#c9b8ff}.conn{margin:0 0 12px;font-size:12px;color:#888}</style></head><body><form class="card" method="post" action="/api/oauth/authorize"><h1>Authorize <b>${esc(client.name)}</b></h1><p class="sub">Grant this application access to your three.ws account.</p><p class="warn"><b>${esc(client.name)}</b><span class="host">Site: ${esc(clientHost(client, params.redirect_uri))}</span>This app registered itself. Only continue if you started this connection and you recognize the site.</p><div class="who"><div class="dot">${esc((user.display_name || user.email)[0].toUpperCase())}</div><div><div>${esc(user.display_name || user.email)}</div><div style="color:#888;font-size:13px">${esc(user.email)}</div></div></div><p style="margin:0 0 10px"><b>${esc(client.name)}</b> is asking to:</p>${groups.map(renderGroup).join('')}${connectionNote}<p class="nospend">${spendStatement(client.name, scopeList)}</p><input type="hidden" name="csrf" value="${esc(csrf || '')}"> ${Object.entries(params).filter(([k]) => k !== 'csrf' && k !== 'decision' && !k.startsWith('grant_')).map(([k, v]) => `<input type="hidden" name="${esc(k)}" value="${esc(v)}">`).join('')}<div class="actions"><button class="deny" type="submit" name="decision" value="deny">Cancel</button><button class="allow" type="submit" name="decision" value="allow">Authorize</button></div><p class="foot">You can revoke access any time from <a href="/dashboard/settings#connected-apps">Settings, Connected apps</a>.</p></form></body></html>`);
+}
+
+async function handleAuthorize(req, res) {
+	if (cors(req, res, { methods: 'GET,POST,OPTIONS', credentials: true })) return;
+	if (!method(req, res, ['GET', 'POST'])) return;
+	const rl = await limits.authIp(clientIp(req));
+	if (!rl.success) return rateLimited(res, rl);
+	const params = req.method === 'POST' ? await readForm(req) : parseQuery(req.url);
+	const { response_type, client_id, redirect_uri, scope, state, code_challenge, code_challenge_method, resource } = params;
+	if (response_type !== 'code') return error(res, 400, 'unsupported_response_type', 'only response_type=code supported');
+	if (!client_id) return error(res, 400, 'invalid_request', 'client_id required');
+	if (!redirect_uri) return error(res, 400, 'invalid_request', 'redirect_uri required');
+	if (!code_challenge) return error(res, 400, 'invalid_request', 'code_challenge required (PKCE)');
+	if (!code_challenge_method) return error(res, 400, 'invalid_request', 'code_challenge_method required (must be S256)');
+	if (code_challenge_method !== 'S256') return error(res, 400, 'invalid_request', 'code_challenge_method must be S256');
+	const targetResource = canonicalResource(resource);
+	if (!targetResource) return error(res, 400, 'invalid_target', INVALID_TARGET);
+	const rows = await sql`select * from oauth_clients where client_id = ${client_id} limit 1`;
+	const client = rows[0];
+	if (!client) return error(res, 400, 'invalid_client', 'unknown client');
+	if (!redirectUriMatches(redirect_uri, client.redirect_uris)) return error(res, 400, 'invalid_redirect_uri', 'redirect_uri not registered');
+	const user = await getSessionUser(req);
+	if (!user) {
+		const next = encodeURIComponent(`/oauth/consent?${new URLSearchParams(params).toString()}`);
+		return redirect(res, `/login?next=${next}`);
+	}
+	const grantedScope = intersectScopes(scope || client.scope, client.scope);
+	if (req.method === 'GET') {
+		const csrf = await csrfTokenFor(req);
+		return renderConsent(res, { client, user, params, csrf, grantedScope });
+	}
+	if (!isSameSiteOrigin(req)) return error(res, 403, 'forbidden', 'cross-site request blocked');
+	if (!(await verifyCsrfToken(req, params.csrf))) return error(res, 403, 'forbidden', 'invalid csrf token');
+	if (params.decision !== 'allow') {
+		const denied = new URL(redirect_uri);
+		denied.searchParams.set('error', 'access_denied');
+		if (state) denied.searchParams.set('state', state);
+		return redirect(res, denied.toString());
+	}
+	// The person may have unticked a grant group on the consent screen: the code
+	// carries only what stayed ticked (read and the connection scopes always do).
+	const ticked = Object.keys(params).filter((k) => k.startsWith('grant_') && params[k]).map((k) => k.slice('grant_'.length));
+	const issuedScope = grantedScopeFromGroups(grantedScope, ticked);
+	const code = randomToken(24);
+	await sql`insert into oauth_auth_codes (code, client_id, user_id, redirect_uri, scope, resource, code_challenge, code_challenge_method, expires_at) values (${code}, ${client_id}, ${user.id}, ${redirect_uri}, ${issuedScope}, ${targetResource}, ${code_challenge}, 'S256', now() + ${'60 seconds'}::interval)`;
+	const back = new URL(redirect_uri);
+	back.searchParams.set('code', code);
+	if (state) back.searchParams.set('state', state);
+	return redirect(res, back.toString());
+}
+
+// ── token ─────────────────────────────────────────────────────────────────────
+
+// RFC 6749 §2.3.1 credentials from the Authorization header, or null when the
+// header is absent or carries no `id:secret` pair.
+function basicAuthCredentials(req) {
+	const h = req.headers.authorization || '';
+	if (!h.toLowerCase().startsWith('basic ')) return null;
+	let decoded;
+	try { decoded = Buffer.from(h.slice(6), 'base64').toString('utf8'); } catch { return null; }
+	const sep = decoded.indexOf(':');
+	if (sep < 0) return null;
+	return { id: decoded.slice(0, sep), secret: decoded.slice(sep + 1) };
+}
+
+function resolveClientId(req, form) {
+	return form.client_id || basicAuthCredentials(req)?.id || null;
+}
+
+// RFC 7009 §2.1 (revoke) and RFC 7662 §2.1 (introspect) both require a client to
+// authenticate exactly as it does at the token endpoint. Only the token endpoint
+// read the Authorization header, so a client that registered with
+// `token_endpoint_auth_method=client_secret_basic` and then sent its credentials
+// the only way that method allows got a 400 for a missing client_id at both
+// other endpoints, and a 401 the moment it added client_id to the form: it had
+// no way to revoke or introspect a token it owned. One resolver for all three.
+// Returns { ok: true, client, clientId } or { ok: false, reason, clientId },
+// where reason is 'no_client_id' | 'unknown_client' | 'bad_credentials'; each
+// caller maps the failure to the status its RFC prescribes.
+async function authenticateClient(req, form) {
+	const clientId = resolveClientId(req, form);
+	if (!clientId) return { ok: false, reason: 'no_client_id', clientId: null };
+	const rows = await sql`select * from oauth_clients where client_id = ${clientId} limit 1`;
+	const client = rows[0];
+	if (!client) return { ok: false, reason: 'unknown_client', clientId };
+	if (client.client_type === 'confidential') {
+		const secret = form.client_secret || basicAuthCredentials(req)?.secret || '';
+		const providedHash = await sha256(secret);
+		if (!client.client_secret_hash || !constantTimeEquals(providedHash, client.client_secret_hash)) {
+			return { ok: false, reason: 'bad_credentials', clientId };
+		}
+	}
+	return { ok: true, client, clientId };
+}
+
+// RFC 6749 §5.2: when a client authenticated with the Authorization header and
+// the credentials are rejected, the 401 MUST carry a WWW-Authenticate challenge
+// naming the same scheme. Without it the response is a malformed 401, and the
+// HTTP clients that enforce that (fetch wrappers and OAuth libraries that retry
+// on a challenge) either loop on the same bad secret or surface a transport
+// error instead of "your client secret is wrong".
+function invalidClientCredentials(req, res) {
+	if (String(req.headers.authorization || '').toLowerCase().startsWith('basic ')) {
+		res.setHeader('www-authenticate', 'Basic realm="oauth", error="invalid_client", error_description="bad client credentials"');
+	}
+	return error(res, 401, 'invalid_client', 'bad client credentials');
+}
+
+function isSubsetScope(requested, stored) {
+	const allowed = new Set(stored.split(/\s+/).filter(Boolean));
+	const asked = requested.split(/\s+/).filter(Boolean);
+	return asked.length > 0 && asked.every((s) => allowed.has(s));
+}
+
+async function handleToken(req, res) {
+	if (cors(req, res, { methods: 'POST,OPTIONS' })) return;
+	if (!method(req, res, ['POST'])) return;
+	const form = await readForm(req);
+	const clientId = resolveClientId(req, form);
+	if (!clientId) return error(res, 400, 'invalid_client', 'client_id required');
+	const rl = await limits.oauthToken(clientId);
+	if (!rl.success) return rateLimited(res, rl, 'too many token requests');
+	// RFC 8707 §2.2: the token request MAY repeat `resource`, and a server that
+	// does not recognize the one it names MUST answer `invalid_target`. /oauth/
+	// authorize has enforced that since the audience bug; the token endpoint
+	// ignored the parameter, which reintroduced the exact failure canonicalResource
+	// exists to prevent: a client naming another resource got a 200 and a token
+	// whose `aud` was this server's, then hit 401s at every endpoint it tried.
+	// Checked before the client lookup, exactly as authorize does it: the answer
+	// is the same for every caller and it is already public in the well-known
+	// metadata, so there is nothing to gain from spending a query first.
+	if (!canonicalResource(form.resource)) return error(res, 400, 'invalid_target', INVALID_TARGET);
+	const auth = await authenticateClient(req, form);
+	if (!auth.ok) {
+		if (auth.reason === 'unknown_client') return error(res, 400, 'invalid_client', 'unknown client');
+		return invalidClientCredentials(req, res);
+	}
+	const client = auth.client;
+	const grantType = form.grant_type;
+	if (grantType === 'authorization_code') {
+		const { code, redirect_uri, code_verifier } = form;
+		if (!code || !redirect_uri || !code_verifier) return error(res, 400, 'invalid_request', 'code, redirect_uri, code_verifier required');
+		const r = await sql`select * from oauth_auth_codes where code = ${code} limit 1`;
+		const row = r[0];
+		if (!row) return error(res, 400, 'invalid_grant', 'unknown code');
+		if (row.consumed_at) {
+			await sql`update oauth_refresh_tokens set revoked_at = now() where user_id = ${row.user_id} and client_id = ${client.client_id} and revoked_at is null`;
+			return error(res, 400, 'invalid_grant', 'authorization code already used');
+		}
+		if (new Date(row.expires_at) < new Date()) return error(res, 400, 'invalid_grant', 'code expired');
+		if (row.client_id !== client.client_id) return error(res, 400, 'invalid_grant', 'client mismatch');
+		if (row.redirect_uri !== redirect_uri) return error(res, 400, 'invalid_grant', 'redirect_uri mismatch');
+		if (await sha256Base64Url(code_verifier) !== row.code_challenge) return error(res, 400, 'invalid_grant', 'PKCE verification failed');
+		// Consume atomically: the consumed_at check above + this update was a TOCTOU
+		// window where two concurrent requests with the same code + verifier could both
+		// mint tokens (OAuth 2.1 §4.1.3 requires single use). Only the request whose
+		// conditional UPDATE returns a row proceeds; a lost race means the code was just
+		// used — revoke any tokens already issued from it and reject.
+		const consumed = await sql`update oauth_auth_codes set consumed_at = now() where code = ${code} and consumed_at is null returning code`;
+		if (!consumed[0]) {
+			await sql`update oauth_refresh_tokens set revoked_at = now() where user_id = ${row.user_id} and client_id = ${client.client_id} and revoked_at is null`;
+			return error(res, 400, 'invalid_grant', 'authorization code already used');
+		}
+		const accessToken = await mintAccessToken({ userId: row.user_id, clientId: client.client_id, scope: row.scope, resource: row.resource || env.MCP_RESOURCE });
+		const wantsRefresh = client.grant_types.includes('refresh_token');
+		const refresh = wantsRefresh ? await issueRefreshToken({ userId: row.user_id, clientId: client.client_id, scope: row.scope, resource: row.resource }) : null;
+		return json(res, 200, { access_token: accessToken, token_type: 'Bearer', expires_in: 3600, scope: row.scope, ...(refresh ? { refresh_token: refresh.token } : {}) });
+	}
+	if (grantType === 'refresh_token') {
+		const { refresh_token, scope } = form;
+		if (!refresh_token) return error(res, 400, 'invalid_request', 'refresh_token required');
+		let result;
+		try {
+			result = await rotateRefreshToken({ oldSecret: refresh_token, clientId: client.client_id, narrowScope: (stored) => { if (!scope) return stored; if (!isSubsetScope(scope, stored)) throw Object.assign(new Error('requested scope exceeds granted scope'), { status: 400, code: 'invalid_scope' }); return scope.split(/\s+/).filter(Boolean).join(' '); } });
+		} catch (err) { return error(res, err.status || 400, err.code || 'invalid_grant', err.message); }
+		const accessToken = await mintAccessToken({ userId: result.userId, clientId: client.client_id, scope: result.scope, resource: result.resource || env.MCP_RESOURCE });
+		return json(res, 200, { access_token: accessToken, token_type: 'Bearer', expires_in: 3600, scope: result.scope, refresh_token: result.next.token });
+	}
+	return error(res, 400, 'unsupported_grant_type', `grant_type=${grantType} not supported`);
+}
+
+// ── register (dynamic client registration) ────────────────────────────────────
+
+const registerSchema = z.object({
+	redirect_uris: z.array(z.string().url()).min(1).max(10),
+	client_name: z.string().trim().min(1).max(120).optional(),
+	client_uri: z.string().url().optional(),
+	logo_uri: z.string().url().optional(),
+	scope: z.string().max(500).optional(),
+	grant_types: z.array(z.string()).min(1).max(8).optional(),
+	response_types: z.array(z.string()).min(1).max(8).optional(),
+	token_endpoint_auth_method: z.enum(['none', 'client_secret_basic', 'client_secret_post']).optional(),
+	software_id: z.string().max(120).optional(),
+	software_version: z.string().max(60).optional(),
+});
+
+// Schemes a browser or OS handler EXECUTES rather than navigates to. Zod's
+// .url() is a bare `new URL()` check, so `javascript:alert(document.cookie)` and
+// `data:text/html,<script>…` both pass it: without this list a self-registering
+// client could park a script URL in oauth_clients, and the consent page would
+// then splice its "origin" (the literal string `null`) into the CSP form-action
+// allowlist and 302 the browser at it after approval.
+const EXECUTABLE_URI_SCHEMES = new Set(['javascript:', 'data:', 'vbscript:', 'blob:', 'file:', 'about:', 'filesystem:', 'view-source:']);
+// Network schemes that would carry the code to a remote host without TLS, or
+// to something that is not a browser redirect at all. A cloud connector (Grok
+// Bot, claude.ai) redirects to an https host we cannot predict, which is why
+// any https URI is accepted; these are the plain-text and non-redirect
+// neighbours that the private-use rule below would otherwise let through.
+const NETWORK_URI_SCHEMES = new Set(['ftp:', 'ftps:', 'sftp:', 'ws:', 'wss:', 'ssh:', 'telnet:', 'gopher:', 'ldap:', 'ldaps:', 'smb:', 'nntp:', 'irc:', 'mailto:', 'tel:', 'sms:', 'news:']);
+// RFC 8252 §8.3 permits loopback redirects over plain http, IPv6 included.
+const LOOPBACK_HOSTS = new Set(['localhost', '127.0.0.1', '[::1]']);
+
+// Returns a rejection reason, or null when the URI is an acceptable target.
+function redirectUriRejection(uri) {
+	let u;
+	try { u = new URL(uri); } catch { return 'redirect_uri must be an absolute URI'; }
+	const scheme = u.protocol.toLowerCase();
+	if (EXECUTABLE_URI_SCHEMES.has(scheme) || NETWORK_URI_SCHEMES.has(scheme)) return `redirect URI scheme "${scheme}" is not allowed`;
+	if (scheme === 'https:') return null;
+	if (scheme === 'http:') return LOOPBACK_HOSTS.has(u.hostname) ? null : 'non-https redirect URIs only allowed for localhost';
+	// A private-use scheme (RFC 8252 §7.1) is how native clients receive the
+	// code: `com.example.app:/oauth2redirect` or `myapp://callback`. The slash
+	// after the colon is what separates a navigable target from an inline
+	// payload, so require it for any scheme outside http/https.
+	if (!/^[a-z][a-z0-9+.-]*:\//i.test(uri)) return 'a private-use redirect URI needs a path, e.g. com.example.app:/callback';
+	return null;
+}
+
+// Mirrors what /.well-known/oauth-authorization-server advertises (api/wk.js).
+// RFC 7591 §3.2.2: metadata naming a grant or response type the server does not
+// support is rejected, rather than stored as a promise the token endpoint would
+// break later with `unsupported_grant_type`.
+const SUPPORTED_GRANT_TYPES = new Set(['authorization_code', 'refresh_token']);
+const SUPPORTED_RESPONSE_TYPES = new Set(['code']);
+
+async function handleRegister(req, res) {
+	if (cors(req, res, { methods: 'POST,OPTIONS' })) return;
+	if (!method(req, res, ['POST'])) return;
+	const rl = await limits.oauthRegisterIp(clientIp(req));
+	if (!rl.success) return rateLimited(res, rl, 'too many registrations from this IP');
+	const body = parse(registerSchema, await readJson(req));
+	for (const uri of body.redirect_uris) {
+		const rejection = redirectUriRejection(uri);
+		if (rejection) return error(res, 400, 'invalid_redirect_uri', rejection);
+	}
+	if (body.grant_types) {
+		const unsupported = body.grant_types.filter((g) => !SUPPORTED_GRANT_TYPES.has(g));
+		if (unsupported.length) return error(res, 400, 'invalid_client_metadata', `unsupported grant_types: ${unsupported.join(', ')}`);
+		if (!body.grant_types.includes('authorization_code')) return error(res, 400, 'invalid_client_metadata', 'grant_types must include authorization_code');
+	}
+	if (body.response_types) {
+		const unsupported = body.response_types.filter((r) => !SUPPORTED_RESPONSE_TYPES.has(r));
+		if (unsupported.length) return error(res, 400, 'invalid_client_metadata', `unsupported response_types: ${unsupported.join(', ')}`);
+	}
+	const authMethod = body.token_endpoint_auth_method ?? 'none';
+	const clientType = authMethod === 'none' ? 'public' : 'confidential';
+	const clientId = `mcp_${randomToken(18)}`;
+	let clientSecret = null, secretHash = null;
+	if (clientType === 'confidential') { clientSecret = randomToken(32); secretHash = await sha256(clientSecret); }
+	const scope = filterRegisterableScope(body.scope ?? 'avatars:read');
+	const grantTypes = body.grant_types ?? ['authorization_code', 'refresh_token'];
+	const responseTypes = body.response_types ?? ['code'];
+	await sql`insert into oauth_clients (client_id, client_secret_hash, client_type, name, logo_uri, client_uri, redirect_uris, grant_types, response_types, token_endpoint_auth, scope, software_id, software_version, dynamically_registered) values (${clientId}, ${secretHash}, ${clientType}, ${body.client_name ?? 'MCP Client'}, ${body.logo_uri ?? null}, ${body.client_uri ?? null}, ${body.redirect_uris}, ${grantTypes}, ${responseTypes}, ${authMethod}, ${scope}, ${body.software_id ?? null}, ${body.software_version ?? null}, true)`;
+	// RFC 7591 §3.2.1 makes client_secret_expires_at REQUIRED whenever a secret is
+	// issued, with 0 meaning "never expires". Omitting it left a spec-following
+	// client with no way to tell a non-expiring secret from a missing field, and
+	// the secrets minted here genuinely have no expiry.
+	//
+	// The same section makes the response the authoritative record of what was
+	// registered, so it echoes every optional field that was actually stored.
+	// Dropping logo_uri, client_uri, software_id and software_version told a
+	// client its metadata had been rejected when the row above had just saved it,
+	// and a client that re-registers to "fix" that gets a second client_id.
+	return json(res, 201, {
+		client_id: clientId,
+		...(clientSecret ? { client_secret: clientSecret, client_secret_expires_at: 0 } : {}),
+		client_id_issued_at: Math.floor(Date.now() / 1000),
+		token_endpoint_auth_method: authMethod,
+		redirect_uris: body.redirect_uris,
+		grant_types: grantTypes,
+		response_types: responseTypes,
+		scope,
+		client_name: body.client_name ?? 'MCP Client',
+		...(body.client_uri ? { client_uri: body.client_uri } : {}),
+		...(body.logo_uri ? { logo_uri: body.logo_uri } : {}),
+		...(body.software_id ? { software_id: body.software_id } : {}),
+		...(body.software_version ? { software_version: body.software_version } : {}),
+	});
+}
+
+// ── revoke ────────────────────────────────────────────────────────────────────
+
+async function handleRevoke(req, res) {
+	if (cors(req, res, { methods: 'POST,OPTIONS' })) return;
+	if (!method(req, res, ['POST'])) return;
+	const form = await readForm(req);
+	const { token } = form;
+	const clientId = resolveClientId(req, form);
+	if (!token || !clientId) return error(res, 400, 'invalid_request', 'token and client_id required');
+	// Rate-limit per IP: revocation is unauthenticated for public clients, so cap
+	// it to deny a token-probing oracle / brute-force surface (RFC 7009 hardening).
+	const rlRevoke = await limits.authIp(clientIp(req));
+	if (!rlRevoke.success) return rateLimited(res, rlRevoke);
+	const auth = await authenticateClient(req, form);
+	if (!auth.ok) {
+		if (auth.reason === 'unknown_client') return json(res, 200, {});
+		return invalidClientCredentials(req, res);
+	}
+	// `token_type_hint` is advisory and RFC 7009 §2.1 requires extending the
+	// search when the token is not found under the hinted type. Access tokens
+	// here are stateless JWTs with no server-side record to revoke, so the
+	// refresh-token lookup IS the whole search: skipping it on
+	// `token_type_hint=access_token` answered 200 OK to a client revoking a
+	// refresh token under a wrong hint while leaving that token live for its
+	// full 30-day life.
+	await revokeRefreshToken(token, auth.clientId);
+	return json(res, 200, {});
+}
+
+// ── introspect ────────────────────────────────────────────────────────────────
+
+async function handleIntrospect(req, res) {
+	if (cors(req, res, { methods: 'POST,OPTIONS' })) return;
+	if (!method(req, res, ['POST'])) return;
+	const form = await readForm(req);
+	const { token } = form;
+	const requestedClientId = resolveClientId(req, form);
+	if (!token || !requestedClientId) return error(res, 400, 'invalid_request', 'token and client_id required');
+	// Rate-limit per IP: introspection is unauthenticated for public clients
+	// (RFC 7662 §2.1). Capping it denies a token validity/scope/sub probing oracle.
+	const rlIntrospect = await limits.authIp(clientIp(req));
+	if (!rlIntrospect.success) return rateLimited(res, rlIntrospect);
+	const auth = await authenticateClient(req, form);
+	if (!auth.ok) {
+		if (auth.reason === 'unknown_client') return json(res, 200, { active: false });
+		return invalidClientCredentials(req, res);
+	}
+	const clientId = auth.clientId;
+	try {
+		const payload = await verifyAccessToken(token, { audience: allMcpAudiences() });
+		if (payload.client_id && payload.client_id !== clientId) return json(res, 200, { active: false });
+		if (payload.client_id && await oauthGrantRevoked(payload)) return json(res, 200, { active: false });
+		return json(res, 200, { active: true, scope: payload.scope, client_id: payload.client_id, sub: payload.sub, aud: payload.aud, iss: payload.iss, exp: payload.exp, iat: payload.iat, token_type: 'Bearer' });
+	} catch {
+		const h = await sha256(token);
+		const r = await sql`select user_id, scope, expires_at, revoked_at from oauth_refresh_tokens where token_hash = ${h} and client_id = ${clientId} limit 1`;
+		const row = r[0];
+		if (!row || row.revoked_at || new Date(row.expires_at) < new Date()) return json(res, 200, { active: false });
+		return json(res, 200, { active: true, scope: row.scope, client_id: clientId, sub: row.user_id, token_type: 'refresh_token' });
+	}
+}
+
+// ── grants (connected apps) ───────────────────────────────────────────────────
+// The apps a person has authorized: the desktop console, the CLI, every editor
+// that signed in over MCP. GET lists one row per client holding a live refresh
+// token; DELETE ?client_id= revokes all of that client's refresh tokens.
+// Session only, on purpose: a bearer token must not be able to list or revoke
+// the other apps on the account, including itself.
+// Revoking is effective on the app's very next request: revokeClientGrant also
+// records a cutoff that authenticateBearer checks against every access token's
+// issue time, so the stateless JWT stops working immediately rather than at expiry.
+
+async function handleGrants(req, res) {
+	if (cors(req, res, { methods: 'GET,DELETE,OPTIONS', credentials: true })) return;
+	if (!method(req, res, ['GET', 'DELETE'])) return;
+	const user = await getSessionUser(req, res);
+	if (!user) return error(res, 401, 'unauthorized', 'sign in to manage connected apps');
+	if (req.method === 'GET') {
+		const rows = await sql`
+			select c.client_id, c.name, c.client_uri, c.logo_uri, c.software_id, c.software_version,
+				min(t.created_at) as authorized_at, max(coalesce(t.last_used_at, t.created_at)) as last_used_at,
+				string_agg(distinct t.scope, ' ') as scopes
+			from oauth_refresh_tokens t
+			join oauth_clients c on c.client_id = t.client_id
+			where t.user_id = ${user.id} and t.revoked_at is null and t.expires_at > now()
+			group by c.client_id, c.name, c.client_uri, c.logo_uri, c.software_id, c.software_version
+			order by last_used_at desc
+		`;
+		return json(res, 200, {
+			grants: rows.map((r) => ({
+				client_id: r.client_id,
+				name: r.name,
+				client_uri: r.client_uri,
+				client_host: hostOf(r.client_uri),
+				logo_uri: r.logo_uri,
+				software: r.software_id ? `${r.software_id}${r.software_version ? ` ${r.software_version}` : ''}` : null,
+				scopes: [...new Set(String(r.scopes || '').split(/\s+/).filter(Boolean))],
+				can_spend: splitSpendScope(r.scopes).spend,
+				authorized_at: r.authorized_at,
+				last_used_at: r.last_used_at,
+			})),
+		});
+	}
+	if (!(await requireCsrf(req, res, user.id))) return;
+	const clientId = new URL(req.url, 'http://x').searchParams.get('client_id');
+	if (!clientId) return error(res, 400, 'invalid_request', 'client_id required');
+	const revoked = await revokeClientGrant({ userId: user.id, clientId });
+	return json(res, 200, { client_id: clientId, revoked });
+}
+
+// ── dispatcher ────────────────────────────────────────────────────────────────
+
+const DISPATCH = {
+	authorize:  handleAuthorize,
+	consent:    handleAuthorize,
+	token:      handleToken,
+	register:   handleRegister,
+	revoke:     handleRevoke,
+	introspect: handleIntrospect,
+	grants:     handleGrants,
+};
+
+export default wrap(async (req, res) => {
+	const action = req.query?.action ?? new URL(req.url, 'http://x').pathname.split('/').pop();
+	const fn = DISPATCH[action];
+	if (!fn) return error(res, 404, 'not_found', `unknown oauth action: ${action}`);
+	return fn(req, res);
+});

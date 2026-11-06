@@ -1,0 +1,739 @@
+"""
+Pure glTF/geometry operations for the garment forge: no network, no GCP, no
+GPU, so every function here is unit-testable (see test_garment_glb.py).
+
+The pipeline (main.py) composes these into:
+
+  1. compose_scene()    garment mesh + reference body → one GLB for model-rig.
+                        The garment is scaled/placed into the region box its
+                        wardrobe slot occupies on the reference body, so the
+                        rigger predicts its weights with full-body context.
+  2. extract_garment()  rigged composite → garment-only skinned GLB. Strips
+                        the reference body, canonicalizes bone names, and
+                        repacks the binary buffer so none of the body's
+                        geometry or textures ship inside the published asset.
+  3. skin_stats()       weight mass per canonical bone + bind coverage: the
+                        number attachGarment() (src/avatar-garment.js) will
+                        gate on at runtime.
+  4. derive_occludes()  REGION_BONES weight mass → `occludes` declaration.
+  5. validate_manifest() the 6 validation rules from specs/GARMENT_MANIFEST.md.
+
+Geometry constants (slot boxes) are measured against the reference body baked
+into this worker's image: public/avatars/parametric-base.glb, an A-pose,
+1.667 m tall canonical humanoid whose front faces +Z.
+"""
+
+from __future__ import annotations
+
+import hashlib
+import io
+import re
+
+import numpy as np
+import pygltflib
+import trimesh
+
+from canonical_bones import (
+    BODY_REGIONS,
+    CANONICAL_BONES,
+    GARMENT_SLOTS,
+    MIN_BIND_COVERAGE,
+    canonicalize_bone_name,
+    region_of_bone,
+)
+
+SPEC_URI = "https://three.ws/specs/garment-manifest-v1"
+
+# SPDX identifiers the catalog accepts (validation rule 6: recognised SPDX,
+# commercial use permitted). Kept in exact lockstep with COMMERCIAL_LICENSES
+# in src/garment-catalog.js: publishing anything the runtime consumer would
+# reject is a dead catalog entry.
+COMMERCIAL_SPDX = frozenset({
+    "CC0-1.0", "CC-BY-4.0", "MIT", "Apache-2.0", "BSD-2-Clause", "BSD-3-Clause",
+})
+
+# A region must carry at least this share of the garment's total skin weight
+# to be declared in `occludes`. Weight share is a proxy for coverage, and a
+# LOW threshold over-declares catastrophically: a shirt whose waistband picks
+# up 1-2% of its weight on Hips would hide the avatar's entire pelvis and legs
+# (verified live: the first seeded shirt amputated the lower body). 10%
+# requires the garment to genuinely dress a region before hiding its skin;
+# the per-slot plausibility clamp below is the second gate.
+OCCLUDES_MIN_SHARE = 0.10
+
+# Regions a garment in a given slot is ALLOWED to occlude, regardless of how
+# its skin weight spreads. Evidence (weight share) decides within this set; a
+# top can never hide feet no matter what the skinning says. `top` includes
+# hips/upperLegs because dresses and long jackets ship under that slot.
+SLOT_OCCLUDABLE = {
+    "top": ("torso", "upperArms", "lowerArms", "neck", "hips", "upperLegs"),
+    "outerwear": ("torso", "upperArms", "lowerArms", "neck", "hips", "upperLegs"),
+    "bottom": ("hips", "upperLegs", "lowerLegs"),
+    "footwear": ("feet", "lowerLegs"),
+    # scalp is NEVER occludable: it resolves to the Head bone, and Head-bone
+    # occlusion cannot separate scalp from face, so culling it deletes the
+    # avatar's face. Caps and hair simply cover; they hide nothing.
+    "hair": (),
+    "headwear": (),
+    "glasses": (),
+    "accessory": (),
+}
+
+# A canonical bone enters the manifest's rig.bones list above this weight
+# share: enough to filter numeric noise without dropping real influences.
+RIG_BONES_MIN_SHARE = 0.001
+
+# ── Slot placement boxes on the reference body ──────────────────────────────
+# center (x, y, z) and size (w, h, d) in reference-body meters; `fit` is the
+# axis (0=x, 1=y, 2=z) whose extent the garment is scaled to match. Height-fit
+# for body-length garments, width-fit for items whose height varies wildly
+# with style (hair, glasses). Footwear is DEPTH-fit: a product-photo pair has
+# its shoes nearly touching, so pair width says nothing about shoe size, while
+# foot length is invariant to the pair gap. (Refbody feet, measured from skin
+# weights: length 0.243, per-foot width 0.096, centers at x = +/-0.222.)
+#
+# Each slot's fit axis is the dimension that is INVARIANT for that kind of
+# item, which is why they differ and why contain-fit is not the universal
+# answer (it was the right fix for headwear alone, see below):
+#   hair     width tracks head width; length varies hugely by style, so a
+#            contain-fit would crush shoulder-length hair into the box.
+#   glasses  width tracks face width; long temples would shrink a contain-fit
+#            pair until it no longer spans the face.
+#   accessory width is the least style-dependent axis (a bag's strap length is
+#            not a size signal).
+# The walk-gait audit (npm run audit:garments) is the detector if any of these
+# ever drifts: 2026-07-27 baseline has all three comfortably inside their
+# ceilings (hair p95 13.4 of 20 cm, glasses 10.9 of 12, accessory 8.0 of 25).
+# `max_extent` (optional) is the plausibility envelope for the FINISHED,
+# placed mesh, in the same meters. The fit axis pins the invariant dimension
+# but nothing else bounds the others, so a generator that renders hair
+# streaming dramatically produced a mesh 1.43 m DEEP whose width was still a
+# perfect 0.30 (live defect 2026-07-27: it floated 36 cm above the crown and
+# measured p95 53 cm / max 78 cm off the body in the gait audit). A mesh that
+# far outside its envelope is malformed, not mis-scaled, and no placement math
+# rescues it, so the job FAILS with the numbers instead of publishing it. This
+# is the geometric sibling of the MIN_BIND_COVERAGE gate.
+#
+# `anchor` (optional, per axis) controls how the mesh lands in the box.
+# Hair hangs DOWN from the crown, so centering a tall hairstyle on the box
+# center pushes half of it above the head; anchoring its top to the top of the
+# box is what "sits on the head" actually means.
+SLOT_BOXES = {
+    "top":       {"center": (0.0, 1.14, 0.03),  "size": (0.90, 0.56, 0.45), "fit": 1},
+    "outerwear": {"center": (0.0, 1.05, 0.03),  "size": (1.00, 0.80, 0.50), "fit": 1},
+    "bottom":    {"center": (0.0, 0.50, 0.02),  "size": (0.50, 0.90, 0.35), "fit": 1},
+    "footwear":  {"center": (0.0, 0.09, 0.07),  "size": (0.60, 0.18, 0.30), "fit": 2},
+    # Hair: width tracks head width (fit 0), the envelope allows everything
+    # from a pixie to waist-length (0.80 m tall), and the top anchors to the
+    # crown so length hangs down the back instead of floating overhead.
+    "hair":      {"center": (0.0, 1.58, 0.03),  "size": (0.30, 0.25, 0.30), "fit": 0,
+                  "max_extent": (0.34, 0.80, 0.40), "anchor_y": "top"},
+    # Headwear is CONTAIN-fit (bounded on every axis): generated caps carry
+    # deep brims, so scaling by width alone let a 2:1 depth:width cap jut some
+    # 30 cm past the face (walk-gait audit 2026-07-26: cap p95 21-23 cm vs the
+    # 15 cm slot ceiling). Containing the whole mesh in the box sizes the dome
+    # to the skull and the brim comes along at cap proportions.
+    "headwear":  {"center": (0.0, 1.60, 0.03),  "size": (0.30, 0.22, 0.30), "fit": "contain"},
+    "glasses":   {"center": (0.0, 1.547, 0.11), "size": (0.18, 0.08, 0.12), "fit": 0},
+    "accessory": {"center": (0.0, 1.20, 0.05),  "size": (0.35, 0.35, 0.25), "fit": 0},
+}
+
+# Where each foot's center sits on the reference body (x), for snapping a
+# placed shoe pair onto the actual stance. Measured with the box numbers above.
+FOOT_CENTERS_X = (-0.222, 0.222)
+
+GARMENT_PREFIX = "garment"
+REFBODY_PREFIX = "refbody"
+
+# glTF componentType → numpy dtype / byte size.
+_COMPONENT_DTYPES = {
+    5120: np.int8, 5121: np.uint8, 5122: np.int16,
+    5123: np.uint16, 5125: np.uint32, 5126: np.float32,
+}
+_TYPE_COUNTS = {"SCALAR": 1, "VEC2": 2, "VEC3": 3, "VEC4": 4, "MAT2": 4, "MAT3": 9, "MAT4": 16}
+
+
+# ────────────────────────────────────────────────────────────────────────────
+# Scene composition
+# ────────────────────────────────────────────────────────────────────────────
+
+def _scene_meshes(data: bytes) -> list[trimesh.Trimesh]:
+    """Load a GLB into world-space trimesh geometries (transforms baked)."""
+    loaded = trimesh.load(io.BytesIO(data), file_type="glb", process=False)
+    if isinstance(loaded, trimesh.Trimesh):
+        return [loaded]
+    meshes = []
+    for node_name in loaded.graph.nodes_geometry:
+        transform, geom_name = loaded.graph[node_name]
+        geom = loaded.geometry[geom_name]
+        if not isinstance(geom, trimesh.Trimesh):
+            continue
+        mesh = geom.copy()
+        mesh.apply_transform(transform)
+        meshes.append(mesh)
+    if not meshes:
+        raise ValueError("GLB contains no triangle meshes")
+    return meshes
+
+
+def _bounds(meshes: list[trimesh.Trimesh]) -> tuple[np.ndarray, np.ndarray]:
+    lo = np.min([m.bounds[0] for m in meshes], axis=0)
+    hi = np.max([m.bounds[1] for m in meshes], axis=0)
+    return lo, hi
+
+
+def garment_placement(meshes: list[trimesh.Trimesh], slot: str, yaw_deg: float = 0.0) -> np.ndarray:
+    """4x4 transform that carries a normalized generator-output garment into
+    its slot's region box on the reference body: yaw to face +Z, uniform
+    scale to the slot's fit-axis extent, translate to the box center."""
+    box = SLOT_BOXES[slot]
+    rot = trimesh.transformations.rotation_matrix(np.radians(yaw_deg), [0, 1, 0])
+
+    rotated = [m.copy() for m in meshes]
+    for m in rotated:
+        m.apply_transform(rot)
+    lo, hi = _bounds(rotated)
+    extent = hi - lo
+    fit = box["fit"]
+    if fit == "contain":
+        # Uniform scale bounded by EVERY axis: the largest scale at which the
+        # whole mesh still fits inside the slot box, whatever its aspect.
+        if np.any(extent <= 1e-9):
+            raise ValueError("degenerate garment mesh (zero extent on a contain axis)")
+        scale = float(np.min(np.asarray(box["size"], dtype=np.float64) / extent))
+    else:
+        if extent[fit] <= 1e-9:
+            raise ValueError(f"degenerate garment mesh (zero extent on fit axis {fit})")
+        scale = box["size"][fit] / extent[fit]
+
+    center = (lo + hi) / 2.0
+    target = np.array(box["center"], dtype=np.float64)
+    offset = target - center * scale
+    if box.get("anchor_y") == "top":
+        # Land the mesh's top on the top of the box rather than its center on
+        # the center: hair hangs down from the crown, it does not straddle it.
+        box_top = box["center"][1] + box["size"][1] / 2.0
+        offset[1] = box_top - hi[1] * scale
+    move = trimesh.transformations.translation_matrix(offset)
+    scale_m = np.eye(4)
+    scale_m[:3, :3] *= scale
+    return move @ scale_m @ rot
+
+
+def assert_plausible_extents(meshes: list[trimesh.Trimesh], slot: str,
+                             placement: np.ndarray) -> np.ndarray:
+    """Reject a placed mesh that falls outside its slot's size envelope.
+
+    The fit axis pins one dimension; a generator can still hand back geometry
+    whose OTHER axes are wildly out of proportion (dramatically streaming
+    hair, a prop rendered with its packaging). Such a mesh is malformed rather
+    than mis-scaled: rescaling it to fit would shrink the invariant dimension
+    into uselessness, so the honest response is to fail the job with the
+    measurement, exactly as a sub-threshold bind coverage does.
+
+    Returns the placed extents (for logging) or raises ValueError.
+    """
+    box = SLOT_BOXES[slot]
+    placed = [m.copy() for m in meshes]
+    for m in placed:
+        m.apply_transform(placement)
+    lo, hi = _bounds(placed)
+    extent = hi - lo
+    limit = box.get("max_extent")
+    if limit is None:
+        return extent
+    limit = np.asarray(limit, dtype=np.float64)
+    over = extent > limit + 1e-9
+    if np.any(over):
+        axes = "xyz"
+        detail = ", ".join(
+            f"{axes[i]}={extent[i]:.3f}m (max {limit[i]:.3f}m)"
+            for i in range(3) if over[i]
+        )
+        raise ValueError(
+            f"generated {slot} mesh is out of proportion for its slot: {detail}. "
+            "The mesh is malformed rather than mis-scaled (rescaling it to fit "
+            "would shrink the fitted dimension into uselessness); regenerate."
+        )
+    return extent
+
+
+def compose_scene(garment_bytes: bytes, refbody_bytes: bytes, slot: str,
+                  yaw_deg: float = 0.0) -> bytes:
+    """One GLB holding the reference body plus the garment placed into its
+    slot box. Mesh names carry the garment/refbody split through the rigger,
+    which preserves names, so extract_garment() can tell them apart."""
+    if slot not in SLOT_BOXES:
+        raise ValueError(f"unknown slot: {slot}")
+    garment = _scene_meshes(garment_bytes)
+    body = _scene_meshes(refbody_bytes)
+
+    placement = garment_placement(garment, slot, yaw_deg)
+    # Fail here, before a malformed mesh burns GPU minutes in the rigger and
+    # lands in the public catalog.
+    assert_plausible_extents(garment, slot, placement)
+    placed_garment = []
+    for m in garment:
+        placed = m.copy()
+        placed.apply_transform(placement)
+        placed_garment.append(placed)
+    if slot == "footwear":
+        placed_garment = snap_pair_to_feet(placed_garment)
+
+    scene = trimesh.Scene()
+    for i, m in enumerate(body):
+        scene.add_geometry(m, node_name=f"{REFBODY_PREFIX}_{i}", geom_name=f"{REFBODY_PREFIX}_{i}")
+    for i, m in enumerate(placed_garment):
+        scene.add_geometry(m, node_name=f"{GARMENT_PREFIX}_{i}", geom_name=f"{GARMENT_PREFIX}_{i}")
+    return scene.export(file_type="glb")
+
+
+def snap_pair_to_feet(meshes: list[trimesh.Trimesh]) -> list[trimesh.Trimesh]:
+    """Move each shoe of a placed pair onto its foot. Product-photo pairs sit
+    nearly touching at the midline; depth-fit sizes them right but leaves both
+    shoes bunched around x=0 while the refbody's stance is wide. Split the
+    geometry into connected components, classify each by centroid side, and
+    translate each side group so its center lands on that foot's x. A mesh
+    with no clear left/right split (a single shoe, sandals fused at a strap)
+    is left where placement put it."""
+    components: list[trimesh.Trimesh] = []
+    for m in meshes:
+        try:
+            components.extend(m.split(only_watertight=False))
+        except Exception:  # noqa: BLE001: splitting is best-effort
+            components.append(m)
+    if len(components) < 2:
+        return meshes
+    left = [c for c in components if c.centroid[0] < 0]
+    right = [c for c in components if c.centroid[0] >= 0]
+    if not left or not right:
+        return meshes
+    out = []
+    for group, target_x in ((left, FOOT_CENTERS_X[0]), (right, FOOT_CENTERS_X[1])):
+        lo = np.min([c.bounds[0] for c in group], axis=0)
+        hi = np.max([c.bounds[1] for c in group], axis=0)
+        dx = target_x - (lo[0] + hi[0]) / 2.0
+        for c in group:
+            c.apply_translation((dx, 0.0, 0.0))
+            out.append(c)
+    return out
+
+
+# ────────────────────────────────────────────────────────────────────────────
+# glTF accessor plumbing
+# ────────────────────────────────────────────────────────────────────────────
+
+def _accessor_array(glb: pygltflib.GLTF2, blob: bytes, idx: int) -> np.ndarray:
+    """Decode accessor `idx` to a (count, components) float/int array. Handles
+    tightly packed and interleaved (byteStride) layouts."""
+    acc = glb.accessors[idx]
+    dtype = _COMPONENT_DTYPES[acc.componentType]
+    ncomp = _TYPE_COUNTS[acc.type]
+    elem = np.dtype(dtype).itemsize * ncomp
+    bv = glb.bufferViews[acc.bufferView]
+    base = (bv.byteOffset or 0) + (acc.byteOffset or 0)
+    stride = bv.byteStride or elem
+    if stride == elem:
+        raw = np.frombuffer(blob, dtype=dtype, count=acc.count * ncomp, offset=base)
+        return raw.reshape(acc.count, ncomp)
+    rows = np.frombuffer(blob, dtype=np.uint8, count=stride * acc.count, offset=base)
+    rows = rows.reshape(acc.count, stride)[:, :elem].copy()
+    return rows.view(dtype).reshape(acc.count, ncomp)
+
+
+def _accessor_bytes(glb: pygltflib.GLTF2, blob: bytes, idx: int) -> bytes:
+    """Raw, tightly packed bytes of accessor `idx` (de-interleaved if needed)."""
+    return np.ascontiguousarray(_accessor_array(glb, blob, idx)).tobytes()
+
+
+def _prim_attribute_indices(prim) -> dict[str, int]:
+    """Attribute name → accessor index for every set attribute of a primitive."""
+    out = {}
+    for name, value in vars(prim.attributes).items():
+        if isinstance(value, int):
+            out[name] = value
+    return out
+
+
+def _material_texture_slots(material) -> list:
+    """The texture-info objects a standard PBR material can reference."""
+    slots = []
+    if material.pbrMetallicRoughness:
+        slots += [material.pbrMetallicRoughness.baseColorTexture,
+                  material.pbrMetallicRoughness.metallicRoughnessTexture]
+    slots += [material.normalTexture, material.occlusionTexture, material.emissiveTexture]
+    return [s for s in slots if s is not None]
+
+
+# ────────────────────────────────────────────────────────────────────────────
+# Garment extraction (strip reference body + repack)
+# ────────────────────────────────────────────────────────────────────────────
+
+def extract_garment(rigged_bytes: bytes, keep_prefix: str = GARMENT_PREFIX) -> bytes:
+    """From a rigged composite GLB, keep only the garment meshes, the skeleton
+    and its skin, and the resources they reference. Joint node names are
+    canonicalized (mixamorig:LeftArm → LeftArm). The binary buffer is rebuilt
+    from scratch so none of the reference body's geometry or textures survive
+    into the published asset."""
+    glb = pygltflib.GLTF2.load_from_bytes(rigged_bytes)
+    blob = glb.binary_blob() or b""
+
+    keep_meshes = {i for i, m in enumerate(glb.meshes)
+                   if (m.name or "").startswith(keep_prefix)}
+    if not keep_meshes:
+        raise ValueError(f"no mesh named '{keep_prefix}*' in rigged GLB")
+
+    # Skins still referenced once the body meshes are gone.
+    keep_skins = set()
+    for node in glb.nodes:
+        if node.mesh in keep_meshes and node.skin is not None:
+            keep_skins.add(node.skin)
+    if not keep_skins:
+        raise ValueError("garment mesh carries no skin: rigging did not bind it")
+
+    # ── collect used resources ──
+    used_accessors: set[int] = set()
+    used_materials: set[int] = set()
+    for mi in keep_meshes:
+        for prim in glb.meshes[mi].primitives:
+            used_accessors.update(_prim_attribute_indices(prim).values())
+            if prim.indices is not None:
+                used_accessors.add(prim.indices)
+            if prim.material is not None:
+                used_materials.add(prim.material)
+            for target in (prim.targets or []):
+                for value in vars(target).values():
+                    if isinstance(value, int):
+                        used_accessors.add(value)
+    for si in keep_skins:
+        if glb.skins[si].inverseBindMatrices is not None:
+            used_accessors.add(glb.skins[si].inverseBindMatrices)
+
+    used_textures: set[int] = set()
+    for mati in used_materials:
+        for slot in _material_texture_slots(glb.materials[mati]):
+            used_textures.add(slot.index)
+    used_images: set[int] = set()
+    used_samplers: set[int] = set()
+    for ti in used_textures:
+        tex = glb.textures[ti]
+        if tex.source is not None:
+            used_images.add(tex.source)
+        if tex.sampler is not None:
+            used_samplers.add(tex.sampler)
+
+    # ── rebuild the binary buffer: one tight bufferView per used accessor,
+    #    plus one per used embedded image ──
+    new_blob = bytearray()
+    new_views: list[pygltflib.BufferView] = []
+    new_accessors: list[pygltflib.Accessor] = []
+    accessor_remap: dict[int, int] = {}
+
+    def _append_view(data: bytes, target: int | None = None) -> int:
+        while len(new_blob) % 4:
+            new_blob.append(0)
+        view = pygltflib.BufferView(buffer=0, byteOffset=len(new_blob), byteLength=len(data))
+        if target is not None:
+            view.target = target
+        new_blob.extend(data)
+        new_views.append(view)
+        return len(new_views) - 1
+
+    for old_idx in sorted(used_accessors):
+        acc = glb.accessors[old_idx]
+        clone = pygltflib.Accessor(
+            componentType=acc.componentType, count=acc.count, type=acc.type,
+            normalized=acc.normalized, min=acc.min, max=acc.max, name=acc.name,
+        )
+        if acc.bufferView is not None:
+            old_target = glb.bufferViews[acc.bufferView].target
+            clone.bufferView = _append_view(_accessor_bytes(glb, blob, old_idx), old_target)
+            clone.byteOffset = 0
+        accessor_remap[old_idx] = len(new_accessors)
+        new_accessors.append(clone)
+
+    image_remap: dict[int, int] = {}
+    new_images = []
+    for old_idx in sorted(used_images):
+        img = glb.images[old_idx]
+        clone = pygltflib.Image(mimeType=img.mimeType, name=img.name)
+        if img.bufferView is not None:
+            bv = glb.bufferViews[img.bufferView]
+            start = bv.byteOffset or 0
+            clone.bufferView = _append_view(bytes(blob[start:start + bv.byteLength]))
+        elif img.uri:
+            clone.uri = img.uri
+        image_remap[old_idx] = len(new_images)
+        new_images.append(clone)
+
+    sampler_remap = {old: new for new, old in enumerate(sorted(used_samplers))}
+    new_samplers = [glb.samplers[i] for i in sorted(used_samplers)]
+
+    texture_remap: dict[int, int] = {}
+    new_textures = []
+    for old_idx in sorted(used_textures):
+        tex = glb.textures[old_idx]
+        clone = pygltflib.Texture(
+            source=image_remap.get(tex.source) if tex.source is not None else None,
+            sampler=sampler_remap.get(tex.sampler) if tex.sampler is not None else None,
+            name=tex.name,
+        )
+        texture_remap[old_idx] = len(new_textures)
+        new_textures.append(clone)
+
+    material_remap: dict[int, int] = {}
+    new_materials = []
+    for old_idx in sorted(used_materials):
+        mat = glb.materials[old_idx]
+        for slot in _material_texture_slots(mat):
+            slot.index = texture_remap[slot.index]
+        material_remap[old_idx] = len(new_materials)
+        new_materials.append(mat)
+
+    mesh_remap: dict[int, int] = {}
+    new_meshes = []
+    for old_idx in sorted(keep_meshes):
+        mesh = glb.meshes[old_idx]
+        for prim in mesh.primitives:
+            for name, value in _prim_attribute_indices(prim).items():
+                setattr(prim.attributes, name, accessor_remap[value])
+            if prim.indices is not None:
+                prim.indices = accessor_remap[prim.indices]
+            if prim.material is not None:
+                prim.material = material_remap[prim.material]
+            for target in (prim.targets or []):
+                for name, value in list(vars(target).items()):
+                    if isinstance(value, int):
+                        setattr(target, name, accessor_remap[value])
+        mesh_remap[old_idx] = len(new_meshes)
+        new_meshes.append(mesh)
+
+    skin_remap: dict[int, int] = {}
+    new_skins = []
+    for old_idx in sorted(keep_skins):
+        skin = glb.skins[old_idx]
+        if skin.inverseBindMatrices is not None:
+            skin.inverseBindMatrices = accessor_remap[skin.inverseBindMatrices]
+        skin_remap[old_idx] = len(new_skins)
+        new_skins.append(skin)
+
+    # ── nodes: drop mesh/skin refs to removed resources, remap the kept ones,
+    #    canonicalize joint names. Node indices are untouched (joint hierarchy,
+    #    scene lists and skin.joints stay valid). ──
+    joint_nodes = set()
+    for skin in new_skins:
+        joint_nodes.update(skin.joints or [])
+    for ni, node in enumerate(glb.nodes):
+        if node.mesh is not None:
+            node.mesh = mesh_remap.get(node.mesh)
+            if node.mesh is None:
+                node.skin = None
+        if node.skin is not None:
+            node.skin = skin_remap.get(node.skin)
+        if ni in joint_nodes:
+            canonical = canonicalize_bone_name(node.name)
+            if canonical:
+                node.name = canonical
+
+    glb.meshes = new_meshes
+    glb.skins = new_skins
+    glb.materials = new_materials
+    glb.textures = new_textures
+    glb.images = new_images
+    glb.samplers = new_samplers
+    glb.accessors = new_accessors
+    glb.bufferViews = new_views
+    glb.animations = []
+
+    glb.set_binary_blob(bytes(new_blob))
+    if not glb.buffers:
+        glb.buffers.append(pygltflib.Buffer())
+    glb.buffers = [glb.buffers[0]]
+    glb.buffers[0].byteLength = len(new_blob)
+    glb.buffers[0].uri = None
+    out = glb.save_to_bytes()
+    return b"".join(out) if isinstance(out, (list, tuple)) else out
+
+
+# ────────────────────────────────────────────────────────────────────────────
+# Skin statistics, coverage, occlusion
+# ────────────────────────────────────────────────────────────────────────────
+
+def skin_stats(glb_bytes: bytes) -> dict:
+    """Weight mass per canonical bone across every skinned primitive, plus the
+    bind coverage the runtime will measure: the share of total skin weight
+    carried by joints that canonicalize into CANONICAL_BONES."""
+    glb = pygltflib.GLTF2.load_from_bytes(glb_bytes)
+    blob = glb.binary_blob() or b""
+
+    bone_mass: dict[str, float] = {}
+    unresolved_mass = 0.0
+    total_mass = 0.0
+    triangles = 0
+
+    for mesh in glb.meshes:
+        for prim in mesh.primitives:
+            attrs = _prim_attribute_indices(prim)
+            if "POSITION" in attrs:
+                if prim.indices is not None:
+                    triangles += glb.accessors[prim.indices].count // 3
+                else:
+                    triangles += glb.accessors[attrs["POSITION"]].count // 3
+            if "JOINTS_0" not in attrs or "WEIGHTS_0" not in attrs:
+                continue
+
+            node_skin = None
+            for node in glb.nodes:
+                if node.mesh is not None and glb.meshes[node.mesh] is mesh and node.skin is not None:
+                    node_skin = glb.skins[node.skin]
+                    break
+            if node_skin is None:
+                continue
+            joint_names = [glb.nodes[j].name or "" for j in node_skin.joints]
+            canonical = [canonicalize_bone_name(n) for n in joint_names]
+
+            joints = _accessor_array(glb, blob, attrs["JOINTS_0"]).astype(np.int64)
+            weights = _accessor_array(glb, blob, attrs["WEIGHTS_0"]).astype(np.float64)
+            acc = glb.accessors[attrs["WEIGHTS_0"]]
+            if acc.componentType == 5121:
+                weights /= 255.0
+            elif acc.componentType == 5123:
+                weights /= 65535.0
+
+            flat_j = joints.reshape(-1)
+            flat_w = weights.reshape(-1)
+            positive = flat_w > 0
+            per_joint = np.bincount(flat_j[positive], weights=flat_w[positive],
+                                    minlength=len(joint_names))
+            for ji, mass in enumerate(per_joint):
+                if mass <= 0:
+                    continue
+                total_mass += float(mass)
+                name = canonical[ji] if ji < len(canonical) else None
+                if name:
+                    bone_mass[name] = bone_mass.get(name, 0.0) + float(mass)
+                else:
+                    unresolved_mass += float(mass)
+
+    coverage = (total_mass - unresolved_mass) / total_mass if total_mass > 0 else 0.0
+    return {
+        "coverage": coverage,
+        "total_mass": total_mass,
+        "bone_mass": bone_mass,
+        "unresolved_mass": unresolved_mass,
+        "triangle_count": triangles,
+    }
+
+
+def derive_occludes(bone_mass: dict[str, float], total_mass: float,
+                    min_share: float = OCCLUDES_MIN_SHARE,
+                    slot: str | None = None) -> list[str]:
+    """Body regions this garment hides, in BODY_REGIONS order. Two gates:
+    evidence (the region's bones carry ≥ min_share of the garment's skin
+    weight — weight is a proxy for where the cloth actually sits) and
+    plausibility (the region is in SLOT_OCCLUDABLE for the slot — a shirt
+    whose waistband grazes the hip bones must not amputate the legs)."""
+    if total_mass <= 0:
+        return []
+    region_mass: dict[str, float] = {}
+    for bone, mass in bone_mass.items():
+        region = region_of_bone(bone)
+        if region:
+            region_mass[region] = region_mass.get(region, 0.0) + mass
+    allowed = set(SLOT_OCCLUDABLE.get(slot, BODY_REGIONS)) if slot else set(BODY_REGIONS)
+    return [r for r in BODY_REGIONS
+            if r in allowed and region_mass.get(r, 0.0) / total_mass >= min_share]
+
+
+def weighted_bones(bone_mass: dict[str, float], total_mass: float,
+                   min_share: float = RIG_BONES_MIN_SHARE) -> list[str]:
+    """Canonical bones carrying a real share of skin weight, in canonical order
+   : the manifest's rig.bones list."""
+    if total_mass <= 0:
+        return []
+    return [b for b in CANONICAL_BONES if bone_mass.get(b, 0.0) / total_mass >= min_share]
+
+
+# ────────────────────────────────────────────────────────────────────────────
+# Manifest
+# ────────────────────────────────────────────────────────────────────────────
+
+def slugify(text: str, max_words: int = 5) -> str:
+    words = re.findall(r"[a-z0-9]+", (text or "").lower())
+    return "-".join(words[:max_words]) or "garment"
+
+
+def sha256_hex(data: bytes) -> str:
+    return hashlib.sha256(data).hexdigest()
+
+
+def validate_manifest(manifest: dict, glb_bytes: bytes) -> dict:
+    """Enforce all 6 validation rules from specs/GARMENT_MANIFEST.md.
+    Returns {ok, failures, coverage}; a garment failing any rule must not be
+    published."""
+    failures: list[str] = []
+
+    if manifest.get("spec") != SPEC_URI:
+        failures.append(f"rule 1: spec is not {SPEC_URI}")
+    if manifest.get("slot") not in GARMENT_SLOTS:
+        failures.append(f"rule 2: slot {manifest.get('slot')!r} not in {GARMENT_SLOTS}")
+    bad_regions = [r for r in manifest.get("occludes", []) if r not in BODY_REGIONS]
+    if bad_regions:
+        failures.append(f"rule 3: unknown occludes regions {bad_regions}")
+    declared = (manifest.get("model") or {}).get("sha256")
+    if declared != sha256_hex(glb_bytes):
+        failures.append("rule 4: model.sha256 does not match the GLB bytes")
+
+    coverage = 0.0
+    try:
+        stats = skin_stats(glb_bytes)
+        coverage = stats["coverage"]
+        if stats["total_mass"] <= 0:
+            failures.append("rule 5: GLB has no skinned mesh")
+        elif coverage < MIN_BIND_COVERAGE:
+            failures.append(
+                f"rule 5: bind coverage {coverage:.3f} below MIN_BIND_COVERAGE {MIN_BIND_COVERAGE}")
+    except Exception as exc:  # noqa: BLE001: a GLB that fails to parse fails rule 5
+        failures.append(f"rule 5: GLB does not load ({exc})")
+
+    if manifest.get("license") not in COMMERCIAL_SPDX:
+        failures.append(
+            f"rule 6: license {manifest.get('license')!r} is not a recognised "
+            "commercial-use SPDX identifier")
+
+    return {"ok": not failures, "failures": failures, "coverage": coverage}
+
+
+def build_manifest(*, garment_id: str, name: str, slot: str, version: int,
+                   model_uri: str, glb_bytes: bytes, triangle_count: int,
+                   bones: list[str], occludes: list[str], prompt: str,
+                   mesh_model: str, thumb_uri: str) -> dict:
+    return {
+        "spec": SPEC_URI,
+        "id": garment_id,
+        "name": name,
+        "slot": slot,
+        "version": version,
+        "model": {
+            "uri": model_uri,
+            "format": "gltf-binary",
+            "sha256": sha256_hex(glb_bytes),
+            "sizeBytes": len(glb_bytes),
+            "triangleCount": triangle_count,
+        },
+        "rig": {
+            "skeleton": "three.ws-canonical-v1",
+            "bindPose": "a-pose",
+            "bones": bones,
+        },
+        "occludes": occludes,
+        "materials": {"tintable": False, "palette": "garment"},
+        "license": "CC0-1.0",
+        "source": {
+            "kind": "generated",
+            "prompt": prompt,
+            "model": mesh_model,
+            "pipeline": "garment-forge@1",
+        },
+        "preview": {"thumbnail": thumb_uri},
+    }

@@ -1,0 +1,68 @@
+name: Bug report
+description: Something on three.ws is broken or behaving incorrectly.
+title: "[Bug]: "
+labels: ["bug", "triage"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for taking the time to file a bug. Please fill out the sections below so we can reproduce and fix it fast.
+        For security vulnerabilities, **do not open an issue** — see our [security policy](https://github.com/nirholas/three.ws/security/policy).
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened?
+      description: A clear, concise description of the bug and what you expected instead.
+      placeholder: When I drag a GLB onto the viewer, the camera resets to origin instead of framing the model.
+    validations:
+      required: true
+  - type: textarea
+    id: repro
+    attributes:
+      label: Steps to reproduce
+      description: Numbered steps. Include a public glTF/GLB link or sample if the issue is asset-specific.
+      placeholder: |
+        1. Go to https://three.ws/...
+        2. Click on ...
+        3. See error
+    validations:
+      required: true
+  - type: input
+    id: url
+    attributes:
+      label: Affected URL or surface
+      description: The exact page, API route, SDK package, or MCP server where this occurs.
+      placeholder: https://three.ws/studio
+    validations:
+      required: false
+  - type: textarea
+    id: console
+    attributes:
+      label: Console / network errors
+      description: Paste any browser console errors or failing network responses. This will be rendered as code.
+      render: shell
+    validations:
+      required: false
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area
+      description: Which part of the platform?
+      options:
+        - Web app (viewer / studio / dashboard)
+        - API (api/ functions)
+        - SDK (avatar / payments / protocol / ui)
+        - MCP server
+        - Wallet / payments (x402)
+        - Docs / changelog
+        - Other / not sure
+    validations:
+      required: true
+  - type: textarea
+    id: environment
+    attributes:
+      label: Environment
+      description: Browser + version, OS, device, and wallet (if relevant).
+      placeholder: Chrome 126, macOS 14.5, Phantom wallet
+    validations:
+      required: false

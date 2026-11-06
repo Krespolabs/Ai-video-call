@@ -1,0 +1,14 @@
+// Vendored minimal stub of google/protobuf/any.proto so the Audio2Face-3D
+// descriptor is self-contained (the upstream ACE protos import this well-known
+// type for the opaque `metadata` map<string, Any> fields). We never decode the
+// Any payloads — they stay packed bytes — so the canonical two-field layout is
+// all proto-loader needs to walk an AnimationData message without erroring.
+// SPDX-License-Identifier: Apache-2.0
+syntax = "proto3";
+
+package google.protobuf;
+
+message Any {
+  string type_url = 1;
+  bytes value = 2;
+}

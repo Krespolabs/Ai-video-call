@@ -1,0 +1,326 @@
+// Unit tests for the shared selfie → 3D finalize stage: the rig-or-materialize
+// decision, the auto-rig chain, and the never-empty-handed fallbacks. Providers
+// and storage are mocked so the control flow is exercised without live ML.
+
+import { describe, it, expect, vi, beforeEach } from 'vitest';
+
+// ── mocks ──────────────────────────────────────────────────────────────────
+const sqlMock = vi.fn(async () => []);
+vi.mock('../../api/_lib/db.js', () => ({ sql: (...args) => sqlMock(...args), isDbUnavailableError: () => false, isDbCapacityError: () => false }));
+
+const putObjectMock = vi.fn(async () => undefined);
+// Mirrors the real publicUrl(): an absolute key is passed straight through, so a
+// mesh served from the provider's own bucket resolves to itself.
+const publicUrlMock = vi.fn((key) => (/^https?:\/\//i.test(key) ? key : `https://cdn.test/${key}`));
+vi.mock('../../api/_lib/r2.js', () => ({
+	putObject: (...a) => putObjectMock(...a),
+	publicUrl: (...a) => publicUrlMock(...a),
+	// The real classifier, narrowed to the shapes these tests raise.
+	isStorageInfrastructureError: (err) =>
+		/signaturedoesnotmatch|unauthorized|nosuchbucket|access denied|econnrefused/i.test(
+			[err?.name, err?.Code, err?.message].filter(Boolean).join(' '),
+		),
+}));
+
+// The fault a rejected R2 token actually raises.
+function signatureError() {
+	return Object.assign(new Error('The request signature we calculated does not match the signature you provided.'), {
+		name: 'SignatureDoesNotMatch',
+	});
+}
+
+const createAvatarMock = vi.fn(async ({ input }) => ({ id: 'avatar-1', name: input.name, slug: input.slug }));
+vi.mock('../../api/_lib/avatars.js', () => ({
+	storageKeyFor: ({ userId, slug }) => `u/${userId}/${slug}/m.glb`,
+	createAvatar: (...a) => createAvatarMock(...a),
+}));
+
+const inspectGlbMock = vi.fn();
+vi.mock('../../api/_lib/glb-inspect.js', () => ({
+	inspectGlb: (...a) => inspectGlbMock(...a),
+	isValidGlbHeader: () => true,
+}));
+
+vi.mock('../../api/_lib/webhook-dispatch.js', () => ({ dispatchWebhooks: async () => {} }));
+
+// Every terminal materialize also registers the result in the Forge store so
+// galleries/share pages see reconstructions; mocked here so the control flow
+// (and its never-blocks-delivery contract) is what's under test.
+const registerReconstructionCreationMock = vi.fn(async () => 'creation-1');
+vi.mock('../../api/_lib/forge-store.js', () => ({
+	registerReconstructionCreation: (...a) => registerReconstructionCreationMock(...a),
+}));
+
+// Roadmap Phase 1 draft mint fires on every materialize; mocked here so the
+// finalize control flow is what's under test (the mint orchestration itself is
+// covered by tests/api/draft-mint.test.js).
+const mintDraftAgentIdentityMock = vi.fn(async () => ({ status: 'ok' }));
+vi.mock('../../api/_lib/draft-mint.js', () => ({
+	mintDraftAgentIdentity: (...a) => mintDraftAgentIdentityMock(...a),
+}));
+
+const providerMock = { name: 'replicate', instance: null };
+vi.mock('../../api/_lib/regen-provider.js', () => ({
+	getRegenProvider: async () => providerMock,
+	// Mirror the real resolver: return the provider only when it supports the mode.
+	getRegenProviderForMode: async (mode) =>
+		providerMock.instance?.supportsMode?.(mode) ? providerMock : { name: 'none', instance: null },
+}));
+
+// Provider/result GLBs (the reconstruct output, the rigged result, and the bare
+// unrigged mesh) are now fetched through the shared guard, which uses raw node
+// http rather than the global fetch — so we mock the guarded helper. The real
+// host-allowlist + extract logic is covered by tests/provider-result-url.test.js.
+const fetchProviderGlbBufferMock = vi.fn(async () => Buffer.from(new Uint8Array([0x67, 0x6c, 0x54, 0x46])));
+vi.mock('../../api/_lib/provider-result-url.js', async (importOriginal) => {
+	const actual = await importOriginal();
+	return { ...actual, fetchProviderGlbBuffer: (...a) => fetchProviderGlbBufferMock(...a) };
+});
+
+const { finalizeReconstructStage, pollRiggingStage, describeDraftMint } = await import('../../api/_lib/reconstruct-finalize.js');
+
+const RIGGED = { isRigged: true, skinCount: 1, skeletonJointCount: 30, nodeCount: 40, meshCount: 1, animationCount: 0, generator: 'test' };
+const UNRIGGED = { isRigged: false, skinCount: 0, skeletonJointCount: 0, nodeCount: 2, meshCount: 1, animationCount: 0, generator: 'test' };
+
+const baseJob = { provider: 'replicate', params: { name: 'Me', visibility: 'private' } };
+
+beforeEach(() => {
+	vi.clearAllMocks();
+	providerMock.instance = null;
+});
+
+describe('finalizeReconstructStage', () => {
+	it('materializes immediately when the mesh is already rigged', async () => {
+		inspectGlbMock.mockReturnValue(RIGGED);
+		const out = await finalizeReconstructStage({ userId: 'u1', jobId: 'j1', job: baseJob, glbUrl: 'https://x/m.glb' });
+		expect(out).toEqual({ status: 'done', resultAvatarId: 'avatar-1' });
+		expect(createAvatarMock).toHaveBeenCalledOnce();
+		// No 'unrigged' tag on a rigged mesh.
+		expect(createAvatarMock.mock.calls[0][0].input.tags).not.toContain('unrigged');
+	});
+
+	it('materializes unrigged (tagged) when no rig model is configured', async () => {
+		inspectGlbMock.mockReturnValue(UNRIGGED);
+		providerMock.instance = { supportsMode: () => false }; // rerig unavailable
+		const out = await finalizeReconstructStage({ userId: 'u1', jobId: 'j1', job: baseJob, glbUrl: 'https://x/m.glb' });
+		expect(out.status).toBe('done');
+		expect(createAvatarMock.mock.calls[0][0].input.tags).toContain('unrigged');
+	});
+
+	it('chains an auto-rig job when the mesh is unrigged and a rig model exists', async () => {
+		inspectGlbMock.mockReturnValue(UNRIGGED);
+		const submit = vi.fn(async () => ({ extJobId: 'rig-ext-1' }));
+		providerMock.instance = { supportsMode: (m) => m === 'rerig', submit };
+		const out = await finalizeReconstructStage({ userId: 'u1', jobId: 'j1', job: baseJob, glbUrl: 'https://x/m.glb' });
+		expect(out).toEqual({ status: 'rigging' });
+		expect(submit).toHaveBeenCalledOnce();
+		expect(submit.mock.calls[0][0].mode).toBe('rerig');
+		// Bare mesh stored so the rig model can fetch it, but NO avatar yet.
+		expect(putObjectMock).toHaveBeenCalled();
+		expect(createAvatarMock).not.toHaveBeenCalled();
+	});
+
+	it('falls back to delivering the bare mesh if the rig job cannot be submitted', async () => {
+		inspectGlbMock.mockReturnValue(UNRIGGED);
+		providerMock.instance = { supportsMode: () => true, submit: vi.fn(async () => { throw new Error('rig down'); }) };
+		const out = await finalizeReconstructStage({ userId: 'u1', jobId: 'j1', job: baseJob, glbUrl: 'https://x/m.glb' });
+		expect(out.status).toBe('done');
+		expect(createAvatarMock.mock.calls[0][0].input.tags).toContain('unrigged');
+	});
+
+	it('registers the delivered avatar in the Forge store with its visibility mirrored', async () => {
+		inspectGlbMock.mockReturnValue(RIGGED);
+		await finalizeReconstructStage({
+			userId: 'u1',
+			jobId: 'j1',
+			job: { provider: 'gcp', params: { name: 'Me', visibility: 'unlisted' } },
+			glbUrl: 'https://x/m.glb',
+		});
+		expect(registerReconstructionCreationMock).toHaveBeenCalledOnce();
+		const reg = registerReconstructionCreationMock.mock.calls[0][0];
+		expect(reg.userId).toBe('u1');
+		expect(reg.avatarId).toBe('avatar-1');
+		expect(reg.jobId).toBe('j1');
+		expect(reg.provider).toBe('gcp');
+		expect(reg.visibility).toBe('unlisted');
+		expect(reg.glbUrl).toMatch(/^https:\/\/cdn\.test\/u\/u1\//);
+		// The selfie lane has no prompt: the honest display line is the name.
+		expect(reg.prompt).toBe('Me');
+	});
+
+	it('still delivers the avatar when Forge-store registration throws', async () => {
+		inspectGlbMock.mockReturnValue(RIGGED);
+		registerReconstructionCreationMock.mockRejectedValueOnce(new Error('store down'));
+		const out = await finalizeReconstructStage({ userId: 'u1', jobId: 'j1', job: baseJob, glbUrl: 'https://x/m.glb' });
+		expect(out).toEqual({ status: 'done', resultAvatarId: 'avatar-1' });
+	});
+
+	it('fires the draft agent mint for the delivered avatar', async () => {
+		inspectGlbMock.mockReturnValue(RIGGED);
+		const out = await finalizeReconstructStage({ userId: 'u1', jobId: 'j1', job: baseJob, glbUrl: 'https://x/m.glb' });
+		expect(out.status).toBe('done');
+		expect(mintDraftAgentIdentityMock).toHaveBeenCalledOnce();
+		expect(mintDraftAgentIdentityMock.mock.calls[0][0]).toEqual({ userId: 'u1', avatarId: 'avatar-1', jobId: 'j1' });
+	});
+
+	it('still delivers the avatar when the draft mint throws', async () => {
+		inspectGlbMock.mockReturnValue(RIGGED);
+		mintDraftAgentIdentityMock.mockRejectedValueOnce(new Error('mint down'));
+		const out = await finalizeReconstructStage({ userId: 'u1', jobId: 'j1', job: baseJob, glbUrl: 'https://x/m.glb' });
+		expect(out).toEqual({ status: 'done', resultAvatarId: 'avatar-1' });
+	});
+
+	it('logs the draft mint outcome instead of discarding it', async () => {
+		inspectGlbMock.mockReturnValue(RIGGED);
+		mintDraftAgentIdentityMock.mockResolvedValueOnce({
+			status: 'ok',
+			agentId: 'agent-1',
+			solana: { status: 'skipped', reason: 'authority_unconfigured', network: 'devnet' },
+			evm: null,
+		});
+		const log = vi.spyOn(console, 'log').mockImplementation(() => {});
+		await finalizeReconstructStage({ userId: 'u1', jobId: 'j1', job: baseJob, glbUrl: 'https://x/m.glb' });
+		const line = log.mock.calls.map((c) => c.join(' ')).find((l) => l.includes('draft agent mint'));
+		expect(line).toContain('solana=skipped:authority_unconfigured');
+		expect(line).toContain('evm=off');
+		log.mockRestore();
+	});
+});
+
+// A leg that quietly reports 'skipped' is the state a deployment with no mint
+// credentials sits in, and it used to be indistinguishable in the logs from the
+// mint never running at all.
+describe('describeDraftMint', () => {
+	it('names the reason a leg was skipped', () => {
+		expect(
+			describeDraftMint({ status: 'ok', agentId: 'a1', solana: { status: 'skipped', reason: 'authority_unconfigured' }, evm: null }),
+		).toBe('agent=a1 solana=skipped:authority_unconfigured evm=off');
+	});
+
+	it('carries the signature of each leg that wrote to a chain', () => {
+		expect(
+			describeDraftMint({
+				status: 'ok',
+				agentId: 'a1',
+				solana: { status: 'minted', signature: 'sig-1' },
+				evm: { status: 'minted', txHash: '0xabc' },
+			}),
+		).toBe('agent=a1 solana=minted:sig-1 evm=minted:0xabc');
+	});
+
+	it('reports a non-ok orchestration without pretending it had legs', () => {
+		expect(describeDraftMint({ status: 'no_agent' })).toBe('status=no_agent');
+		expect(describeDraftMint(null)).toBe('no result');
+	});
+});
+
+describe('pollRiggingStage', () => {
+	const rigJob = {
+		provider: 'replicate',
+		params: { name: 'Me', visibility: 'private', rig: { extJobId: 'rig-ext-1', storageKey: 'u/u1/selfie-x/m.glb', slug: 'selfie-x', unriggedUrl: 'https://cdn.test/bare.glb' } },
+	};
+
+	it('materializes the rigged GLB when the rig job completes', async () => {
+		inspectGlbMock.mockReturnValue(RIGGED);
+		providerMock.instance = { supportsMode: (m) => m === 'rerig', status: vi.fn(async () => ({ status: 'done', resultGlbUrl: 'https://x/rigged.glb' })) };
+		const out = await pollRiggingStage({ userId: 'u1', jobId: 'j1', job: rigJob });
+		expect(out).toEqual({ status: 'done', resultAvatarId: 'avatar-1' });
+		expect(createAvatarMock.mock.calls[0][0].input.source_meta.rigged).toBe(true);
+	});
+
+	it('falls back to the bare mesh when the rig job fails', async () => {
+		inspectGlbMock.mockReturnValue(UNRIGGED);
+		providerMock.instance = { supportsMode: (m) => m === 'rerig', status: vi.fn(async () => ({ status: 'failed', error: 'rig oom' })) };
+		const out = await pollRiggingStage({ userId: 'u1', jobId: 'j1', job: rigJob });
+		expect(out.status).toBe('done');
+		expect(createAvatarMock.mock.calls[0][0].input.tags).toContain('unrigged');
+	});
+
+	it('stays in rigging while the rig job is still running', async () => {
+		providerMock.instance = { supportsMode: (m) => m === 'rerig', status: vi.fn(async () => ({ status: 'running' })) };
+		const out = await pollRiggingStage({ userId: 'u1', jobId: 'j1', job: rigJob });
+		expect(out).toEqual({ status: 'rigging' });
+		expect(createAvatarMock).not.toHaveBeenCalled();
+	});
+});
+
+// A rejected object-storage credential took the whole selfie flow down twice in
+// three days (2026-09-09, then 2026-09-11 03:15 UTC): the mesh finished on the
+// GPU and was discarded at the bucket write, so the user was told their avatar
+// "could not be saved" while a perfectly good copy sat in the provider's own
+// public bucket. Storage is allowed to lose the durable copy; it is not allowed
+// to lose the reconstruction.
+describe('object storage outage', () => {
+	it('keeps the avatar, served from the provider copy, when the bucket rejects the write', async () => {
+		inspectGlbMock.mockReturnValue(RIGGED);
+		putObjectMock.mockRejectedValueOnce(signatureError());
+
+		const out = await finalizeReconstructStage({
+			userId: 'u1',
+			jobId: 'j1',
+			job: baseJob,
+			glbUrl: 'https://storage.googleapis.com/three-ws-avatar-reconstructions/avatars/abc.glb',
+		});
+
+		expect(out).toEqual({ status: 'done', resultAvatarId: 'avatar-1' });
+		const created = createAvatarMock.mock.calls[0][0];
+		expect(created.storageKey).toBe('https://storage.googleapis.com/three-ws-avatar-reconstructions/avatars/abc.glb');
+		// Flagged for a later re-copy rather than silently diverging from the bucket.
+		expect(created.input.source_meta.servedFrom).toBe('provider');
+		expect(created.input.source_meta.pendingBucketKey).toBe('u/u1/' + created.input.slug + '/m.glb');
+	});
+
+	it('registers the Forge creation against the URL actually serving the mesh', async () => {
+		inspectGlbMock.mockReturnValue(RIGGED);
+		putObjectMock.mockRejectedValueOnce(signatureError());
+
+		await finalizeReconstructStage({
+			userId: 'u1',
+			jobId: 'j1',
+			job: baseJob,
+			glbUrl: 'https://storage.googleapis.com/three-ws-avatar-reconstructions/avatars/abc.glb',
+		});
+
+		const reg = registerReconstructionCreationMock.mock.calls[0][0];
+		expect(reg.glbUrl).toBe('https://storage.googleapis.com/three-ws-avatar-reconstructions/avatars/abc.glb');
+		expect(reg.glbKey).toBe(reg.glbUrl);
+	});
+
+	it('still rigs an unrigged mesh, handing the rig model the provider copy', async () => {
+		inspectGlbMock.mockReturnValue(UNRIGGED);
+		putObjectMock.mockRejectedValueOnce(signatureError());
+		const submit = vi.fn(async () => ({ extJobId: 'rig-ext-1' }));
+		providerMock.instance = { supportsMode: (m) => m === 'rerig', submit };
+
+		const out = await finalizeReconstructStage({
+			userId: 'u1',
+			jobId: 'j1',
+			job: baseJob,
+			glbUrl: 'https://storage.googleapis.com/three-ws-avatar-reconstructions/avatars/abc.glb',
+		});
+
+		expect(out).toEqual({ status: 'rigging' });
+		expect(submit.mock.calls[0][0].sourceUrl).toBe(
+			'https://storage.googleapis.com/three-ws-avatar-reconstructions/avatars/abc.glb',
+		);
+	});
+
+	it('still throws on a fault that is not storage infrastructure', async () => {
+		inspectGlbMock.mockReturnValue(RIGGED);
+		putObjectMock.mockRejectedValueOnce(new TypeError('body is not a Buffer'));
+
+		await expect(
+			finalizeReconstructStage({ userId: 'u1', jobId: 'j1', job: baseJob, glbUrl: 'https://x/m.glb' }),
+		).rejects.toThrow('body is not a Buffer');
+		expect(createAvatarMock).not.toHaveBeenCalled();
+	});
+
+	it('refuses to degrade when there is no provider URL to fall back to', async () => {
+		inspectGlbMock.mockReturnValue(RIGGED);
+		putObjectMock.mockRejectedValueOnce(signatureError());
+
+		await expect(
+			finalizeReconstructStage({ userId: 'u1', jobId: 'j1', job: baseJob, glbUrl: 'http://insecure/m.glb' }),
+		).rejects.toThrow(/signature/i);
+	});
+});

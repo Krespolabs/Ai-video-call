@@ -1,0 +1,169 @@
+{
+	"id": "prompt-library",
+	"scenarioHash": "43324849d97b28fa52176f2c6d1719d264f18003b047fc414a14cb26d725966e",
+	"ranAt": "2026-09-30T08:07:31.871Z",
+	"target": {
+		"commit": "955623897",
+		"revision": "three-ws-api-00464-mbw"
+	},
+	"passed": true,
+	"steps": [
+		{
+			"index": 1,
+			"kind": "goto",
+			"target": "https://three.ws/prompts",
+			"detail": "loaded https://three.ws/prompts",
+			"ok": true,
+			"ms": 10302,
+			"frames": 0
+		},
+		{
+			"index": 2,
+			"kind": "hold",
+			"target": "1600",
+			"detail": "1600 ms",
+			"ok": true,
+			"ms": 14344,
+			"frames": 48
+		},
+		{
+			"index": 3,
+			"kind": "read",
+			"target": "nosetup",
+			"detail": "nosetup = \"15\"",
+			"ok": true,
+			"ms": 6,
+			"frames": 0
+		},
+		{
+			"index": 4,
+			"kind": "scroll",
+			"target": "Search prompts",
+			"detail": "scrolled 1089 px",
+			"ok": true,
+			"ms": 15751,
+			"frames": 54
+		},
+		{
+			"index": 5,
+			"kind": "read",
+			"target": "prompts",
+			"detail": "prompts = \"24\"",
+			"ok": true,
+			"ms": 12,
+			"frames": 0
+		},
+		{
+			"index": 6,
+			"kind": "click",
+			"target": "Make 3D things",
+			"detail": "clicked",
+			"ok": true,
+			"ms": 6324,
+			"frames": 21
+		},
+		{
+			"index": 7,
+			"kind": "read",
+			"target": "making",
+			"detail": "making = \"10\"",
+			"ok": true,
+			"ms": 9,
+			"frames": 0
+		},
+		{
+			"index": 8,
+			"kind": "hold",
+			"target": "1200",
+			"detail": "1200 ms",
+			"ok": true,
+			"ms": 9346,
+			"frames": 36
+		},
+		{
+			"index": 9,
+			"kind": "type",
+			"target": "rig",
+			"detail": "typed 3 characters",
+			"ok": true,
+			"ms": 6017,
+			"frames": 22
+		},
+		{
+			"index": 10,
+			"kind": "hold",
+			"target": "1000",
+			"detail": "1000 ms",
+			"ok": true,
+			"ms": 7736,
+			"frames": 30
+		},
+		{
+			"index": 11,
+			"kind": "scroll",
+			"target": "Generate a rigged avatar from a description",
+			"detail": "scrolled 255 px",
+			"ok": true,
+			"ms": 13399,
+			"frames": 45
+		},
+		{
+			"index": 12,
+			"kind": "hold",
+			"target": "2200",
+			"detail": "2200 ms",
+			"ok": true,
+			"ms": 18693,
+			"frames": 66
+		},
+		{
+			"index": 13,
+			"kind": "click",
+			"target": "Copy prompt",
+			"detail": "clicked",
+			"ok": true,
+			"ms": 6104,
+			"frames": 21
+		},
+		{
+			"index": 14,
+			"kind": "expect",
+			"target": "Copied",
+			"detail": "appeared after 0.0 s",
+			"ok": true,
+			"ms": 48,
+			"frames": 0
+		},
+		{
+			"index": 15,
+			"kind": "hold",
+			"target": "2600",
+			"detail": "2600 ms",
+			"ok": true,
+			"ms": 22162,
+			"frames": 78
+		}
+	],
+	"facts": {
+		"nosetup": "15",
+		"prompts": "24",
+		"making": "10"
+	},
+	"saw": [
+		"Copied"
+	],
+	"responses": [],
+	"cuts": [],
+	"video": {
+		"path": "public/x-media/prompt-library/reel.mp4",
+		"sha256": "97d1169c5ef9054c4c9b1dcfa0d69d98cb239a903dd0b64f8792e376eb8fd655",
+		"frames": 421,
+		"motion": 0.386,
+		"durationSec": 14.03,
+		"width": 1080,
+		"height": 1080,
+		"fps": 30,
+		"videoCodec": "h264",
+		"pixFmt": "yuv420p"
+	}
+}

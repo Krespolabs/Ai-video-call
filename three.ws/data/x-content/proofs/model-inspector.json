@@ -1,0 +1,188 @@
+{
+	"id": "model-inspector",
+	"scenarioHash": "dc1216077fee18e711607de1677e2dbc7badec76600ae55cacbb14ed24f669f3",
+	"ranAt": "2026-10-01T07:59:50.873Z",
+	"target": {
+		"commit": "e6f175ac2",
+		"revision": "three-ws-api-00472-jqb"
+	},
+	"passed": true,
+	"steps": [
+		{
+			"index": 1,
+			"kind": "goto",
+			"target": "https://three.ws/inspect",
+			"detail": "loaded https://three.ws/inspect",
+			"ok": true,
+			"ms": 7055,
+			"frames": 0
+		},
+		{
+			"index": 2,
+			"kind": "hold",
+			"target": "1500",
+			"detail": "1500 ms",
+			"ok": true,
+			"ms": 4625,
+			"frames": 45
+		},
+		{
+			"index": 3,
+			"kind": "click",
+			"target": "Mannequin",
+			"detail": "clicked",
+			"ok": true,
+			"ms": 4722,
+			"frames": 21
+		},
+		{
+			"index": 4,
+			"kind": "expect",
+			"target": "short of the catalog bar",
+			"detail": "appeared after 0 filmed frames",
+			"ok": true,
+			"ms": 3,
+			"frames": 0
+		},
+		{
+			"index": 5,
+			"kind": "read",
+			"target": "failed",
+			"detail": "failed = \"2\"",
+			"ok": true,
+			"ms": 1,
+			"frames": 0
+		},
+		{
+			"index": 6,
+			"kind": "read",
+			"target": "meshes",
+			"detail": "meshes = \"22\"",
+			"ok": true,
+			"ms": 1,
+			"frames": 0
+		},
+		{
+			"index": 7,
+			"kind": "read",
+			"target": "meshLimit",
+			"detail": "meshLimit = \"8\"",
+			"ok": true,
+			"ms": 1,
+			"frames": 0
+		},
+		{
+			"index": 8,
+			"kind": "read",
+			"target": "vertices",
+			"detail": "vertices = \"5,196\"",
+			"ok": true,
+			"ms": 1,
+			"frames": 0
+		},
+		{
+			"index": 9,
+			"kind": "drag",
+			"target": "0.012,0.5,0.012,0.5",
+			"detail": "dragged over 6 frames",
+			"ok": true,
+			"ms": 3724,
+			"frames": 24
+		},
+		{
+			"index": 10,
+			"kind": "scroll",
+			"target": "520",
+			"detail": "scrolled 520 px",
+			"ok": true,
+			"ms": 4640,
+			"frames": 27
+		},
+		{
+			"index": 11,
+			"kind": "drag",
+			"target": "0.36,0.55,0.66,0.55",
+			"detail": "dragged over 66 frames",
+			"ok": true,
+			"ms": 14968,
+			"frames": 84
+		},
+		{
+			"index": 12,
+			"kind": "hold",
+			"target": "600",
+			"detail": "600 ms",
+			"ok": true,
+			"ms": 3381,
+			"frames": 18
+		},
+		{
+			"index": 13,
+			"kind": "drag",
+			"target": "0.012,0.5,0.012,0.5",
+			"detail": "dragged over 6 frames",
+			"ok": true,
+			"ms": 4236,
+			"frames": 24
+		},
+		{
+			"index": 14,
+			"kind": "scroll",
+			"target": "500",
+			"detail": "scrolled 500 px",
+			"ok": true,
+			"ms": 5040,
+			"frames": 30
+		},
+		{
+			"index": 15,
+			"kind": "hold",
+			"target": "2600",
+			"detail": "2600 ms",
+			"ok": true,
+			"ms": 11466,
+			"frames": 78
+		},
+		{
+			"index": 16,
+			"kind": "scroll",
+			"target": "330",
+			"detail": "scrolled 330 px",
+			"ok": true,
+			"ms": 4432,
+			"frames": 30
+		},
+		{
+			"index": 17,
+			"kind": "hold",
+			"target": "3600",
+			"detail": "3600 ms",
+			"ok": true,
+			"ms": 15183,
+			"frames": 108
+		}
+	],
+	"facts": {
+		"failed": "2",
+		"meshes": "22",
+		"meshLimit": "8",
+		"vertices": "5,196"
+	},
+	"saw": [
+		"short of the catalog bar"
+	],
+	"responses": [],
+	"cuts": [],
+	"video": {
+		"path": "public/x-media/model-inspector/reel.mp4",
+		"sha256": "90aac037e3484f77eab7fdd77c30e0fb8b993aea48cccd879dd8f37605b2e046",
+		"frames": 489,
+		"motion": 0.508,
+		"durationSec": 16.3,
+		"width": 1080,
+		"height": 1080,
+		"fps": 30,
+		"videoCodec": "h264",
+		"pixFmt": "yuv420p"
+	}
+}

@@ -1,0 +1,6 @@
+--- text-to-3d ---
+valid: False | network: None | asset: None | amount: None | tokenResolveError: none
+--- avatar ---
+valid: False | network: None | asset: None | amount: None | tokenResolveError: none
+--- pose-seed ---
+valid: False | network: None | asset: None | amount: None | tokenResolveError: none

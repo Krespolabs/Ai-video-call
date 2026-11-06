@@ -1,0 +1,43 @@
+{
+	"$schema": "https://docs.renovatebot.com/renovate-schema.json",
+	"description": "Grouped, scheduled dependency updates gated by the Tests workflow. Dependabot was removed after ungated bumps broke the cron jobs and avatar baker; every Renovate PR now has to pass vitest + e2e before it can merge.",
+	"extends": ["config:recommended", ":semanticCommitsDisabled"],
+	"timezone": "America/New_York",
+	"schedule": ["before 8am on monday"],
+	"prConcurrentLimit": 3,
+	"prHourlyLimit": 2,
+	"rangeStrategy": "bump",
+	"minimumReleaseAge": "7 days",
+	"lockFileMaintenance": {
+		"enabled": true,
+		"schedule": ["before 8am on the first day of the month"]
+	},
+	"packageRules": [
+		{
+			"description": "Group all non-major updates into one weekly PR — one CI run, one review.",
+			"matchUpdateTypes": ["minor", "patch"],
+			"groupName": "weekly non-major dependencies"
+		},
+		{
+			"description": "Majors stay individual PRs — they need real review, not a rubber stamp.",
+			"matchUpdateTypes": ["major"],
+			"dependencyDashboardApproval": true
+		},
+		{
+			"description": "Solana/web3 + pump.fun SDKs move APIs aggressively and touch money paths; never auto-group, always wait longer.",
+			"matchPackagePatterns": ["^@solana/", "^@pump-fun/", "^@coinbase/", "^@x402/"],
+			"groupName": null,
+			"minimumReleaseAge": "14 days"
+		},
+		{
+			"description": "three.js minor releases routinely break examples/jsm imports — treat like majors.",
+			"matchPackageNames": ["three"],
+			"dependencyDashboardApproval": true
+		}
+	],
+	"vulnerabilityAlerts": {
+		"enabled": true,
+		"schedule": ["at any time"],
+		"minimumReleaseAge": null
+	}
+}

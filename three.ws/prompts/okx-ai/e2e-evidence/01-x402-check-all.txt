@@ -1,0 +1,9 @@
+text-to-3d: valid=True net=eip155:196 amt=10000 payTo=0x75d00a2713 err=
+text-to-3d-pro: valid=True net=eip155:196 amt=300000 payTo=0x75d00a2713 err=
+image-to-3d: valid=True net=eip155:196 amt=300000 payTo=0x75d00a2713 err=
+rig: valid=True net=eip155:196 amt=250000 payTo=0x75d00a2713 err=
+avatar: valid=True net=eip155:196 amt=500000 payTo=0x75d00a2713 err=
+retarget: valid=True net=eip155:196 amt=100000 payTo=0x75d00a2713 err=
+pose-seed: valid=True net=eip155:196 amt=20000 payTo=0x75d00a2713 err=
+fbx-export: valid=True net=eip155:196 amt=100000 payTo=0x75d00a2713 err=
+identity-studio: valid=True net=solana:5eykt4UsFv8P8NJdTREpY1vzqKqZKvdp amt=1000 payTo=wwwwwDxFWRn7 err=

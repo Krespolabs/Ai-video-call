@@ -1,0 +1,42 @@
+{
+  "private": true,
+  "name": "@three-ws/agent-sdk",
+  "version": "0.0.1",
+  "description": "3D-Agent JavaScript SDK — minimal chat + embed helpers for the three.ws agent fabric.",
+  "type": "module",
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "require": "./dist/index.cjs",
+      "default": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist",
+    "src",
+    "README.md"
+  ],
+  "scripts": {
+    "build": "tsup src/index.ts --format cjs,esm --dts --out-dir dist --clean",
+    "prepublishOnly": "npm run build",
+    "dev": "tsup src/index.ts --format cjs,esm --dts --out-dir dist --watch",
+    "test": "vitest"
+  },
+  "author": "three.ws",
+  "license": "Apache-2.0",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/nirholas/three.ws.git",
+    "directory": "sdk/agent-sdk"
+  },
+  "homepage": "https://three.ws",
+  "devDependencies": {
+    "tsup": "^8.0.2",
+    "typescript": "^5.4.5",
+    "vitest": "^4.1.12"
+  }
+}

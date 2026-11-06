@@ -1,0 +1,193 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title data-i18n="changelog_entry_index.meta_title">Changelog · three.ws</title>
+<meta name="description" content="three.ws changelog entry"  data-i18n-attr="content:changelog_entry_index.meta_description"/>
+<link rel="canonical" href="https://three.ws/changelog" />
+<link rel="alternate" type="application/rss+xml" title="three.ws changelog" href="/changelog.xml" />
+<link rel="stylesheet" href="/nav.css" />
+<link rel="stylesheet" href="/footer.css" />
+<style>
+	:root { color-scheme: dark; }
+	body { margin: 0; background: #000000; color: #e7e7e7; font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; -webkit-font-smoothing: antialiased; }
+	.ce-wrap { max-width: 720px; margin: 0 auto; padding: 96px 24px 80px; }
+	.ce-back { display: inline-flex; align-items: center; gap: 6px; color: #777777; font-size: 13px; text-decoration: none; margin-bottom: 40px; transition: color var(--duration-fast); }
+	.ce-back:hover { color: #ffffff; }
+	.ce-back svg { width: 14px; height: 14px; }
+	.ce-meta { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 16px; }
+	.ce-date { font-size: 13px; color: #777777; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; letter-spacing: 0.04em; }
+	.ce-tag { display: inline-block; font-size: 10px; font-weight: 700; letter-spacing: 0.05em; text-transform: uppercase; border-radius: 999px; padding: 2px 8px; border: 1px solid #2a2a2a; color: #9a9a9a; background: #111111; }
+	.ce-tag-launch { color: #66ffaa; border-color: #1f4a3f; background: #0c1c14; }
+	.ce-tag-feature { color: #7ec8ff; border-color: #1d3a52; background: #0b141d; }
+	.ce-tag-improvement { color: #d8b4ff; border-color: #3a2752; background: #150d1d; }
+	.ce-tag-fix { color: #ffd27e; border-color: #523f1d; background: #1d150b; }
+	.ce-tag-security { color: #ff8e8e; border-color: #521d1d; background: #1d0b0b; }
+	.ce-tag-sdk { color: #8effd9; border-color: #1d5240; background: #0b1d16; }
+	.ce-tag-infra { color: #c0c0c0; border-color: #3a3a3a; background: #111111; }
+	.ce-tag-docs { color: #c0c0c0; border-color: #3a3a3a; background: #111111; }
+	h1.ce-title { font-size: clamp(24px, 4vw, 38px); font-weight: 700; letter-spacing: -0.02em; line-height: 1.2; margin: 0 0 28px; color: #ffffff; }
+	.ce-summary { font-size: 17px; line-height: 1.7; color: #c8c8c8; white-space: pre-line; }
+	.ce-link { display: inline-flex; align-items: center; gap: 8px; margin-top: 36px; padding: 11px 20px; background: #0d0d0d; border: 1px solid #2a2a2a; border-radius: 10px; color: #e7e7e7; font-size: 14px; font-weight: 600; text-decoration: none; transition: border-color var(--duration-fast), transform var(--duration-fast); }
+	.ce-link:hover { border-color: #ffffff; transform: translateY(-1px); }
+	.ce-link svg { width: 14px; height: 14px; opacity: .6; }
+	.ce-share { margin-top: 48px; padding-top: 32px; border-top: 1px solid #1d1d1d; display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+	.ce-share-label { font-size: 13px; color: #555555; }
+	.ce-share-btn { display: inline-flex; align-items: center; gap: 6px; padding: 7px 14px; background: #0d0d0d; border: 1px solid #1d1d1d; border-radius: 8px; color: #b6b6b6; font-size: 13px; font-weight: 500; text-decoration: none; cursor: pointer; transition: border-color var(--duration-fast), color var(--duration-fast); }
+	.ce-share-btn:hover { border-color: #555555; color: #ffffff; }
+	.ce-share-btn svg { width: 13px; height: 13px; }
+	.ce-copy-btn.copied { color: #66ffaa; border-color: #1f4a3f; }
+	.ce-not-found { color: #777777; font-size: 15px; padding: 40px 0; }
+	.ce-not-found a { color: #cccccc; }
+	.ce-skeleton { opacity: .4; }
+	.ce-skeleton-title { height: 38px; background: #1a1a1a; border-radius: 6px; margin-bottom: 28px; width: 80%; }
+	.ce-skeleton-line { height: 16px; background: #1a1a1a; border-radius: 4px; margin-bottom: 12px; }
+	.ce-skeleton-line:last-child { width: 60%; }
+</style>
+</head>
+<body>
+	<div id="nav-container"></div>
+	<script src="/nav.js"></script>
+	<main class="ce-wrap">
+		<a class="ce-back" href="/changelog">
+			<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M10 3L5 8l5 5"/></svg>
+			Changelog
+		</a>
+		<div id="ce-content">
+			<div class="ce-skeleton">
+				<div class="ce-skeleton-title"></div>
+				<div class="ce-skeleton-line"></div>
+				<div class="ce-skeleton-line"></div>
+				<div class="ce-skeleton-line"></div>
+				<div class="ce-skeleton-line"></div>
+			</div>
+		</div>
+	</main>
+
+	<script type="module">
+		function slugify(title, date) {
+			const slug = title
+				.toLowerCase()
+				.replace(/[^a-z0-9]+/g, '-')
+				.replace(/^-+|-+$/g, '')
+				.slice(0, 80);
+			return date + '-' + slug;
+		}
+
+		function fmtDate(iso) {
+			try {
+				return new Date(iso + 'T00:00:00Z').toLocaleDateString(undefined, {
+					year: 'numeric', month: 'long', day: 'numeric', timeZone: 'UTC',
+				});
+			} catch { return iso; }
+		}
+
+		const esc = (s) => String(s ?? '').replace(/[<>&"]/g, (c) => ({ '<': '&lt;', '>': '&gt;', '&': '&amp;', '"': '&quot;' })[c]);
+
+		function entryTags(e) {
+			return e.type === 'launch' ? ['launch'] : (e.tags || []);
+		}
+
+		function render(entry) {
+			const tags = entryTags(entry).map((t) => `<span class="ce-tag ce-tag-${esc(t)}">${esc(t)}</span>`).join('');
+			const featureLink = entry.link
+				? `<a class="ce-link" href="${esc(entry.link)}">
+						View feature
+						<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 8h10M9 4l4 4-4 4"/></svg>
+					</a>`
+				: '';
+
+			const pageUrl = window.location.href;
+
+			document.getElementById('ce-content').innerHTML = `
+				<div class="ce-meta">
+					<span class="ce-date">${fmtDate(entry.date)}</span>
+					${tags}
+				</div>
+				<h1 class="ce-title">${esc(entry.title)}</h1>
+				<p class="ce-summary">${esc(entry.summary)}</p>
+				${featureLink}
+				<div class="ce-share">
+					<span class="ce-share-label">Share</span>
+					<a class="ce-share-btn" href="https://x.com/intent/tweet?text=${encodeURIComponent(entry.title + ' — three.ws changelog')}&url=${encodeURIComponent(pageUrl)}" target="_blank" rel="noopener">
+						<svg viewBox="0 0 24 24" fill="currentColor"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-4.714-6.231-5.401 6.231H2.747l7.73-8.835L1.254 2.25H8.08l4.259 5.629 5.905-5.629Zm-1.161 17.52h1.833L7.084 4.126H5.117z"/></svg>
+						X / Twitter
+					</a>
+					<button class="ce-share-btn ce-copy-btn" type="button" id="ce-copy">
+						<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="4" width="9" height="9" rx="1.5"/><path d="M3 12H2a1 1 0 01-1-1V2a1 1 0 011-1h9a1 1 0 011 1v1"/></svg>
+						Copy link
+					</button>
+				</div>`;
+
+			document.getElementById('ce-copy').addEventListener('click', async () => {
+				try {
+					await navigator.clipboard.writeText(pageUrl);
+					const btn = document.getElementById('ce-copy');
+					btn.classList.add('copied');
+					btn.textContent = 'Copied!';
+					setTimeout(() => { btn.classList.remove('copied'); btn.innerHTML = '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="4" width="9" height="9" rx="1.5"/><path d="M3 12H2a1 1 0 01-1-1V2a1 1 0 011-1h9a1 1 0 011 1v1"/></svg> Copy link'; }, 2000);
+				} catch { /* clipboard blocked */ }
+			});
+
+			// Update page title and meta
+			document.title = entry.title + ' · three.ws Changelog';
+			document.querySelector('meta[name="description"]').setAttribute('content', entry.summary.slice(0, 160));
+			document.querySelector('link[rel="canonical"]').setAttribute('href', pageUrl);
+		}
+
+		function renderNotFound(slug) {
+			document.getElementById('ce-content').innerHTML = `<p class="ce-not-found">Entry not found. <a href="/changelog">Back to changelog →</a></p>`;
+		}
+
+		// Extract slug from path: /changelog/:slug
+		const pathParts = window.location.pathname.replace(/\/$/, '').split('/');
+		const slug = pathParts[pathParts.length - 1];
+
+		if (!slug || slug === 'entry') {
+			window.location.replace('/changelog');
+		} else {
+			// A detail page needs exactly one entry, and almost every link that
+			// reaches one (Telegram, RSS, the changelog's own first screen) points
+			// at something recent. Read the small feed first and only fall back to
+			// the full 870 KB history when the slug is older than that window, so
+			// the common case downloads ~138 KB instead of all of it.
+			async function feedEntries(url) {
+				const res = await fetch(url, { headers: { accept: 'application/json' } });
+				if (!res.ok) throw new Error('feed ' + res.status);
+				const data = await res.json();
+				return { entries: data.entries || [], complete: data.complete === true || !('complete' in data) };
+			}
+			try {
+				let found = null;
+				let complete = false;
+				try {
+					const recent = await feedEntries('/changelog-recent.json');
+					found = recent.entries.find((e) => slugify(e.title, e.date) === slug) || null;
+					complete = recent.complete;
+				} catch {
+					found = null;
+					complete = false;
+				}
+				if (!found && !complete) {
+					const full = await feedEntries('/changelog.json');
+					found = full.entries.find((e) => slugify(e.title, e.date) === slug) || null;
+				}
+				if (found) {
+					render(found);
+				} else {
+					renderNotFound(slug);
+				}
+			} catch (err) {
+				document.getElementById('ce-content').innerHTML = `<p class="ce-not-found">Couldn't load changelog. <a href="/changelog">Back →</a></p>`;
+				console.error('[changelog/entry]', err);
+			}
+		}
+	</script>
+	<script src="/brand.js" defer></script>
+	<div id="footer-container"></div>
+	<script src="/footer.js"></script>
+	<!-- Runtime i18n: detects locale, swaps annotated copy, mounts <lang-switcher>. -->
+	<script type="module" src="/i18n.js"></script>
+</body>
+</html>

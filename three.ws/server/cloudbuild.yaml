@@ -1,0 +1,129 @@
+# Fast Cloud Build pipeline for the three-ws-api Cloud Run service.
+# ------------------------------------------------------------------
+# Why not `gcloud run deploy --source`? That path uses the default (small)
+# build VM and the classic Docker builder — no BuildKit, no layer cache, so
+# every deploy re-runs the full workspace `npm ci` (~10 min). This pipeline:
+#   - runs on a 32-vCPU machine (E2_HIGHCPU_32)
+#   - builds with BuildKit + inline cache pulled from the previous image, so
+#     an unchanged package-lock.json skips `npm ci` entirely
+#   - deploys the image to Cloud Run in the same run
+#
+# Usage (repo root):
+#   npm run deploy:gcp
+#   # or directly:
+#   gcloud builds submit --config server/cloudbuild.yaml \
+#     --region us-central1 --project aerial-vehicle-466722-p5
+
+steps:
+    # Validate the UPLOADED context before spending a build on it.
+    #
+    # The root Dockerfile does `COPY . .` and never rebuilds the frontend, so
+    # whatever `dist/` is in the tarball is exactly what production serves. That
+    # makes the submit directory load-bearing: on 2026-08-01 a `gcloud builds
+    # submit` run straight from the shared worktree (where a concurrent agent had
+    # left a partial build) uploaded a dist/ whose pages were two days old and
+    # missing /economy-lab, /bundles, /walkthroughs and /embed-doctor entirely,
+    # while dist/build-info.json claimed that day's commit. It was caught by
+    # eye, mid-upload, and cancelled.
+    #
+    # `npm run deploy:gcp` already gates on these two checks, but a direct
+    # `gcloud builds submit` (the form this file's own usage note documents)
+    # bypasses npm and therefore bypasses them. Running them here instead puts
+    # the gate on the one path EVERY deploy takes. Both scripts import only node
+    # builtins and read only uploaded paths (scripts/, data/, vercel.json,
+    # dist/), so they need no node_modules and add seconds to a ~20 min build.
+    - id: verify-context
+      name: node:24-slim
+      entrypoint: bash
+      args: ['-c', 'node scripts/check-dist.mjs && node scripts/check-pages.mjs']
+
+    # Warm the layer cache from the last successful image (best-effort).
+    - id: pull-cache
+      name: gcr.io/cloud-builders/docker
+      entrypoint: bash
+      args: ['-c', 'docker pull $_IMAGE || exit 0']
+
+    - id: build
+      name: gcr.io/cloud-builders/docker
+      env: ['DOCKER_BUILDKIT=1']
+      args:
+          [
+              'build',
+              '-t',
+              '$_IMAGE',
+              '--cache-from',
+              '$_IMAGE',
+              '--build-arg',
+              'BUILDKIT_INLINE_CACHE=1',
+              '.',
+          ]
+
+    - id: push
+      name: gcr.io/cloud-builders/docker
+      args: ['push', '$_IMAGE']
+
+    - id: deploy
+      name: gcr.io/google.com/cloudsdktool/cloud-sdk:slim
+      entrypoint: gcloud
+      args:
+          [
+              'run',
+              'deploy',
+              'three-ws-api',
+              '--image',
+              '$_IMAGE',
+              '--project',
+              '$PROJECT_ID',
+              '--region',
+              'us-central1',
+              '--allow-unauthenticated',
+              # 8Gi. Two independent reasons, both measured:
+              #   1. The headless-chromium GLB renderer (api/render/glb) peaks well
+              #      past 2Gi under a burst of parallel renders and OOM-killed the
+              #      container mid-request (2026-07-18 502 incident). The renderer
+              #      now caps its own concurrency, but headroom is the
+              #      defense-in-depth floor.
+              #   2. The Home lane holds up to HOME_MAX_CONNECTIONS (600) live
+              #      WebSockets to real houses, about 500MB of RSS at the measured
+              #      per-connection cost. Cloud Monitoring, 24h of per-minute p99
+              #      memory utilization, read 2026-09-09: max 0.859 of a 4Gi limit
+              #      (3.44GiB) with zero home connections held. 3.44 + 0.5 is 98% of
+              #      4Gi, and an OOM here kills the whole API container rather than
+              #      one lane. At 8Gi the same peak is 43%.
+              # Pinned here because it was NOT: the service was updated to 8Gi on
+              # 2026-09-03 (revision 00411) and the very next full deploy silently
+              # put it back to 4Gi (00412), because this file said 4Gi.
+              # Runbook: docs/ops/gcp-production.md, docs/ops/home-operations.md.
+              '--memory',
+              '8Gi',
+              '--cpu',
+              '2',
+              '--timeout',
+              '900',
+              '--service-account',
+              'three-ws@aerial-vehicle-466722-p5.iam.gserviceaccount.com',
+              # Reach Memorystore Redis (private IP) via the internal LB
+              # 10.128.15.228 → serverless NEG → three-ws-redis-proxy (SRH) →
+              # Memorystore three-ws-redis. private-ranges-only egress keeps every
+              # external call (RPC, LLM APIs) on the direct public path — only
+              # RFC1918 destinations traverse the connector. Pinned here so a
+              # full-config deploy can never silently drop Redis back to the
+              # (capped) Upstash free tier. Runbook: docs/ops/gcp-production.md.
+              '--vpc-connector',
+              'three-ws-vpc',
+              '--vpc-egress',
+              'private-ranges-only',
+          ]
+
+substitutions:
+    _IMAGE: us-central1-docker.pkg.dev/aerial-vehicle-466722-p5/cloud-run-source-deploy/three-ws-api:latest
+
+options:
+    machineType: E2_HIGHCPU_32
+    logging: CLOUD_LOGGING_ONLY
+
+serviceAccount: projects/aerial-vehicle-466722-p5/serviceAccounts/three-ws-build@aerial-vehicle-466722-p5.iam.gserviceaccount.com
+
+timeout: 2400s
+
+images: ['$_IMAGE']

@@ -1,0 +1,77 @@
+<!doctype html>
+<html lang="en">
+	<head>
+		<style>/* three.ws hidden-guard — make the `hidden` attribute authoritative; see scripts/lib/hidden-guard.mjs */[hidden]{display:none!important}</style>
+		<script>/* three.ws theme boot — no-flash; runtime in /theme-switcher.js */(function(){try{var m=localStorage.getItem('twx_theme');var l=m==='auto'?(window.matchMedia&&window.matchMedia('(prefers-color-scheme: light)').matches):m==='light';document.documentElement.setAttribute('data-theme',l?'light':'dark');}catch(e){document.documentElement.setAttribute('data-theme','dark');}})();</script>
+		<meta charset="utf-8" />
+		<link rel="icon" href="/favicon.ico" sizes="any" />
+		<link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+		<link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png" />
+		<link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png" />
+		<link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+		<link rel="manifest" href="/manifest.webmanifest" />
+		<meta name="viewport" content="width=device-width, initial-scale=1" />
+		<title data-i18n="launchpad.meta_title">Launchpad Studio — three.ws</title>
+		<meta
+			name="description"
+			content="Build a white-label 3D token launchpad in minutes. Fill in wallet, brand, and avatar — get a hosted page, an x402 agent skill, and a Pump.fun-powered mint flow you can resell."
+		 data-i18n-attr="content:launchpad.meta_description"/>
+		<style>
+			html,
+			body {
+				margin: 0;
+				padding: 0;
+				min-height: 100%;
+				background: #0b0d10;
+				color: #fff;
+				font-family: system-ui, sans-serif;
+			}
+			#root {
+				min-height: 100vh;
+			}
+		</style>
+			<link rel="stylesheet" href="/mobile.css" />
+
+	<link rel="canonical" href="https://three.ws/launchpad">
+	<meta property="og:type" content="website">
+	<meta property="og:site_name" content="three.ws">
+	<meta property="og:title" content="Launchpad Studio · three.ws" data-i18n-attr="content:launchpad.meta_og_title">
+	<meta property="og:description" content="Build a hosted 3D launchpad, token page, concierge, or showroom on a three.ws subdomain." data-i18n-attr="content:launchpad.meta_og_description">
+	<meta property="og:url" content="https://three.ws/launchpad">
+	<meta property="og:image" content="https://three.ws/api/page-og?s=labs&amp;t=Launchpad+Studio&amp;d=Build+a+hosted+3D+launchpad%2C+token+page%2C+concierge%2C+or+showroom+on+a+three.ws+subdomain.&amp;p=%2Flaunchpad">
+	<meta property="og:image:width" content="1200">
+	<meta property="og:image:height" content="630">
+	<meta name="twitter:card" content="summary_large_image">
+	<meta name="twitter:title" content="Launchpad Studio · three.ws" data-i18n-attr="content:launchpad.meta_twitter_title">
+	<meta name="twitter:description" content="Build a hosted 3D launchpad, token page, concierge, or showroom on a three.ws subdomain." data-i18n-attr="content:launchpad.meta_twitter_description">
+	<meta name="twitter:image" content="https://three.ws/api/page-og?s=labs&amp;t=Launchpad+Studio&amp;d=Build+a+hosted+3D+launchpad%2C+token+page%2C+concierge%2C+or+showroom+on+a+three.ws+subdomain.&amp;p=%2Flaunchpad">
+	<script type="application/ld+json">{"@context":"https://schema.org","@type":"WebPage","name":"Launchpad Studio","description":"Build a hosted 3D launchpad, token page, concierge, or showroom on a three.ws subdomain.","url":"https://three.ws/launchpad","isPartOf":{"@type":"WebSite","name":"three.ws","url":"https://three.ws"}}</script>
+
+	<meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1">
+	<meta property="og:locale" content="en_US">
+	<meta property="og:image:alt" content="Launchpad Studio — three.ws">
+	<meta name="twitter:site" content="@trythreews">
+</head>
+	<body>
+		<div id="root">
+			<noscript>
+				<div style="max-width:560px;margin:15vh auto 0;padding:0 24px;text-align:center;font:15px/1.6 system-ui,sans-serif;color:#a1a1aa">
+					<h1 style="font-size:22px;color:#fff;margin:0 0 10px">Launchpad Studio needs JavaScript</h1>
+					<p style="margin:0">The studio is an interactive 3D editor and cannot run with JavaScript disabled. Enable JavaScript and reload, or browse published pages from the <a href="/launches" style="color:#ec4899">launches feed</a>.</p>
+				</div>
+			</noscript>
+		</div>
+		<script type="module">
+			// The landing decides what to show: a live discovery front door, or —
+			// when the URL deep-links the editor (?slug, ?template, ?wallet, ?avatar,
+			// ?build, ?studio) — the Launchpad Studio mounted straight away.
+			import { mountLaunchpadLanding } from '/src/launchpad/landing.js';
+			mountLaunchpadLanding(document.getElementById('root'));
+		</script>
+		<script src="/brand.js" defer></script>
+		<div id="footer-container"></div>
+		<script src="/footer.js"></script>
+	<!-- Runtime i18n: detects locale, swaps annotated copy, mounts <lang-switcher>. -->
+	<script type="module" src="/i18n.js"></script>
+</body>
+</html>

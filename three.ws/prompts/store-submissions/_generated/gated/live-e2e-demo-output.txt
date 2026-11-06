@@ -1,0 +1,115 @@
+[env] JWT_SECRET not set locally — using a demo-only value for this run.
+
+=== Token-gated 3D embeds — live e2e evidence ===
+
+[0] Creating disposable owner + avatar + a second (non-owner) user …
+    owner user: 6cfebe01-43c3-436f-88be-31c2a233aecf  stranger user: 3629e0f4-c4d3-48cd-9a09-da20b3522656  asset: avatar:d35a8664-46fb-4370-8026-d8d9e7cf0e36 
+
+[0b] checkAssetOwnership() — the real owner passes, an unrelated user is refused …
+    owner  → { ok: true }
+    stranger → { ok: false, reason: 'not_owner' } 
+
+[1] Creating a real gate row (embed_gates) via createEmbedGate() …
+    gate: {
+  gateId: 'qEalx5D617y0',
+  assetId: 'avatar:d35a8664-46fb-4370-8026-d8d9e7cf0e36',
+  ownerUserId: '6cfebe01-43c3-436f-88be-31c2a233aecf',
+  chain: 'solana',
+  mint: 'FeMbDoX7R1Psc4GEcvJdsbNbZA3bfztcyDCatJVJpump',
+  minAmount: 1
+}
+    readEmbedGateByAsset() confirms it persisted: true 
+
+[2] Generating a fresh, never-funded Solana keypair (guaranteed 0 balance) …
+    wallet: FSSBk7JQzCR6kwAjA8bRkbuQEcHLa3oVyD8CUmbrKv2U 
+
+[3] POST /api/embed/gate-verify — phase 1 (nonce) …
+    status: 200 body: {
+  message: 'three.ws token-gated embed verification.\n' +
+    '\n' +
+    'Asset: avatar:d35a8664-46fb-4370-8026-d8d9e7cf0e36\n' +
+    'Wallet: FSSBk7JQzCR6kwAjA8bRkbuQEcHLa3oVyD8CUmbrKv2U\n' +
+    'Nonce: 9djq1FBPUO2q8j9P\n' +
+    'Issued At: 2026-07-08T01:25:18.833Z',
+  chain: 'solana',
+  gate: {
+    mint: 'FeMbDoX7R1Psc4GEcvJdsbNbZA3bfztcyDCatJVJpump',
+    minAmount: 1
+  }
+} 
+
+[4] Signing the challenge with a REAL ed25519 signature (no wallet extension needed — same primitive Phantom uses) …
+    signature (base64, first 24 chars): ivJlRZ7FLHc9C6e7tbe6cGlI…
+
+[5] POST /api/embed/gate-verify — phase 2 (verify signature + REAL Solana RPC balance read) …
+    took 461 ms (real network RPC call)
+    status: 200 body: {
+  allowed: false,
+  reason: 'insufficient balance: hold 1, have 0',
+  amount: 0,
+  minAmount: 1,
+  mint: 'FeMbDoX7R1Psc4GEcvJdsbNbZA3bfztcyDCatJVJpump'
+}
+    → signature verified for real; balance is 0 (never funded) so allowed:false — the LOCKED path, proven live.
+
+[6] GET /api/embed/resolve — no gate_token → must be locked, never leak glbUrl …
+    status: 200 body: {
+  kind: 'avatar',
+  id: 'avatar:d35a8664-46fb-4370-8026-d8d9e7cf0e36',
+  name: 'Gate Demo Avatar',
+  description: '',
+  poster: null,
+  gated: true,
+  locked: true,
+  gate: {
+    gateId: 'qEalx5D617y0',
+    mint: 'FeMbDoX7R1Psc4GEcvJdsbNbZA3bfztcyDCatJVJpump',
+    symbol: '$THREE',
+    minAmount: 1,
+    chain: 'solana'
+  }
+} 
+
+[7] GET /api/embed/resolve — forged gate_token → still locked (never trusts a client token) …
+    status: 200 body: {
+  kind: 'avatar',
+  id: 'avatar:d35a8664-46fb-4370-8026-d8d9e7cf0e36',
+  name: 'Gate Demo Avatar',
+  description: '',
+  poster: null,
+  gated: true,
+  locked: true,
+  gate: {
+    gateId: 'qEalx5D617y0',
+    mint: 'FeMbDoX7R1Psc4GEcvJdsbNbZA3bfztcyDCatJVJpump',
+    symbol: '$THREE',
+    minAmount: 1,
+    chain: 'solana'
+  }
+} 
+
+[7b] Simulating what phase 2 would return if this wallet DID clear the bar —
+     minting a real access token via signEmbedGateToken() (the exact function gate-verify.js
+     calls on a passing balance) and feeding it into the REAL resolve.js handler …
+    status: 200 body: {
+  kind: 'avatar',
+  id: 'avatar:d35a8664-46fb-4370-8026-d8d9e7cf0e36',
+  name: 'Gate Demo Avatar',
+  description: '',
+  glbUrl: 'https://pub-2534e921bf9c4314addcd4d8a6e98b7b.r2.dev/demo/gate-demo-mrbebmfp.glb',
+  poster: null,
+  has3d: true,
+  x402: false,
+  passportUrl: '/avatars/d35a8664-46fb-4370-8026-d8d9e7cf0e36',
+  gated: true,
+  unlocked: true
+}
+    → a valid access token unlocks resolve.js for real (glbUrl present, unlocked:true).
+
+[7c] A corrupted (tampered payload) token must NOT unlock — HMAC signature check rejects it …
+    tampered token → status: 200 locked: true 
+
+[8] Cleaning up every disposable row this script created …
+    deleted gate, avatar, and both demo users
+
+=== Done. Every network/DB call above was real — no mocks. ===

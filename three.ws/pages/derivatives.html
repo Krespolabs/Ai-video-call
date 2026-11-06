@@ -1,0 +1,135 @@
+<!doctype html>
+<html lang="en" class="cv-page">
+	<head>
+		<script>
+			/* three.ws theme boot — no-flash; runtime in /theme-switcher.js */ (function () {
+				try {
+					var m = localStorage.getItem('twx_theme');
+					var l =
+						m === 'auto'
+							? window.matchMedia &&
+								window.matchMedia('(prefers-color-scheme: light)').matches
+							: m === 'light';
+					document.documentElement.setAttribute('data-theme', l ? 'light' : 'dark');
+				} catch (e) {
+					document.documentElement.setAttribute('data-theme', 'dark');
+				}
+			})();
+		</script>
+		<meta charset="utf-8" />
+		<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+		<title data-i18n="derivatives.meta_title">Crypto Derivatives · three.ws</title>
+		<meta
+			name="description"
+			content="Live perpetual futures markets across the major crypto exchanges — price, 24h move, funding rate, open interest, and 24h volume. Filter by index. Real CoinGecko data."
+		 data-i18n-attr="content:derivatives.meta_description"/>
+		<meta property="og:type" content="website" />
+		<meta property="og:site_name" content="three.ws" />
+		<meta property="og:url" content="https://three.ws/derivatives" />
+		<meta property="og:title" content="Crypto Derivatives · three.ws"  data-i18n-attr="content:derivatives.meta_og_title"/>
+		<meta
+			property="og:description"
+			content="Live perpetual futures markets — price, 24h move, funding rate, open interest, and 24h volume across the major exchanges."
+		 data-i18n-attr="content:derivatives.meta_og_description"/>
+		<meta
+			property="og:image"
+			content="https://three.ws/api/page-og?s=crypto&amp;t=Crypto+Derivatives+%26+Perpetual+Futures&amp;d=Live+perpetual-futures+markets+across+exchanges%3A+price%2C+24h+change%2C+funding+rate%2C+open+interest%2C+and+volume+for+every+major+contract.+Filter+by+underlying&amp;p=%2Fderivatives"
+		/>
+		<meta property="og:image:width" content="1200" />
+		<meta property="og:image:height" content="630" />
+		<meta name="twitter:card" content="summary_large_image" />
+		<meta name="twitter:site" content="@trythreews" />
+		<meta name="twitter:title" content="Crypto Derivatives · three.ws"  data-i18n-attr="content:derivatives.meta_twitter_title"/>
+		<meta
+			name="twitter:description"
+			content="Live perpetual futures markets — price, 24h move, funding rate, open interest, and 24h volume."
+		 data-i18n-attr="content:derivatives.meta_twitter_description"/>
+		<meta
+			name="twitter:image"
+			content="https://three.ws/api/page-og?s=crypto&amp;t=Crypto+Derivatives+%26+Perpetual+Futures&amp;d=Live+perpetual-futures+markets+across+exchanges%3A+price%2C+24h+change%2C+funding+rate%2C+open+interest%2C+and+volume+for+every+major+contract.+Filter+by+underlying&amp;p=%2Fderivatives"
+		/>
+		<meta name="theme-color" content="#09090b" />
+		<link rel="icon" href="/favicon.ico" sizes="any" />
+		<link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+		<link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+		<link rel="manifest" href="/manifest.webmanifest" />
+		<link rel="stylesheet" href="/fonts/fonts.css" />
+		<link rel="stylesheet" href="/nav.css" />
+		<link rel="stylesheet" href="/src/coin-pages.css" />
+		<link rel="stylesheet" href="/src/derivatives.css" />
+		<link rel="stylesheet" href="/footer.css" />
+		<link rel="canonical" href="https://three.ws/derivatives" />
+		<meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1" />
+		<meta property="og:locale" content="en_US" />
+		<meta property="og:image:alt" content="Crypto Derivatives — three.ws" />
+
+		<script type="application/ld+json">
+			{
+				"@context": "https://schema.org",
+				"@graph": [
+					{
+						"@type": "WebPage",
+						"name": "Crypto Derivatives",
+						"description": "Live perpetual futures markets across the major crypto exchanges — price, 24h move, funding rate, open interest, and 24h volume, filterable by underlying index. Real CoinGecko data, refreshed automatically, no API key required.",
+						"url": "https://three.ws/derivatives",
+						"isPartOf": {
+							"@type": "WebSite",
+							"name": "three.ws",
+							"url": "https://three.ws"
+						},
+						"primaryImageOfPage": "https://three.ws/api/page-og?s=crypto&amp;t=Crypto+Derivatives&amp;d=Live+perpetual+futures+markets+across+the+major+crypto+exchanges+%E2%80%94+price%2C+24h+move%2C+funding+rate%2C+open+interest%2C+and+24h+volume.+Filter+by+index&amp;p=%2Fderivatives"
+					}
+				]
+			}
+		</script>
+	</head>
+	<body>
+		<header><div id="nav-container"></div></header>
+		<script src="/nav.js"></script>
+
+		<main class="cv-container">
+			<nav class="cv-crumbs" aria-label="Breadcrumb">
+				<a href="/markets" data-i18n="derivatives.markets">Markets</a><span class="sep">/</span
+				><span class="here" data-i18n="derivatives.derivatives">Derivatives</span>
+			</nav>
+			<h1 class="cv-h1" data-i18n="derivatives.crypto_derivatives">Crypto Derivatives</h1>
+			<p class="cv-sub" data-i18n="derivatives.live_perpetual_futures_markets_across_the_ma">
+				Live perpetual futures markets across the major exchanges — funding rate, open
+				interest, and 24h volume for every contract. Positive funding means longs pay
+				shorts; negative means shorts pay longs.
+			</p>
+			<p class="cv-sub" style="margin-top:-1.25rem" data-i18n="derivatives.open_any_contract_for_its_full_detail_page">
+				Open any contract for its full detail page: basis against its own index, what
+				the funding rate costs on a position you size yourself, and the same underlying
+				priced on every other venue.
+			</p>
+
+			<!-- Header stat cards. Hydrated by src/derivatives.js. -->
+			<section
+				id="dv-stats"
+				class="cv-section"
+				aria-label="Derivatives market summary"
+			></section>
+
+			<!-- Index filter chips. Hydrated by src/derivatives.js. -->
+			<div
+				class="hm-seg"
+				role="group"
+				aria-label="Filter by index"
+				id="dv-filters"
+				hidden
+			></div>
+
+			<!-- Sortable perpetuals table. Hydrated by src/derivatives.js. -->
+			<section id="dv-market" aria-label="Perpetual futures markets"></section>
+			<p class="cv-updated" id="dv-updated"></p>
+		</main>
+
+		<script type="module" src="/src/derivatives.js"></script>
+		<script src="/brand.js" defer></script>
+		<div id="footer-container"></div>
+		<script src="/footer.js"></script>
+		<!-- Runtime i18n: detects locale, swaps annotated copy, mounts <lang-switcher>. -->
+	<script type="module" src="/i18n.js"></script>
+</body>
+</html>

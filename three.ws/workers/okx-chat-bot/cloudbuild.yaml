@@ -1,0 +1,170 @@
+# Cloud Build → Cloud Run for the OKX.AI marketplace chat bot host
+# (workers/okx-chat-bot). Build context is the REPO ROOT.
+#
+# Deploy with ONE command, which provisions the gateway lane, builds from a
+# clean worktree, submits this config and verifies the rollout:
+#
+#   npm run okx:bot:deploy
+#
+# (scripts/okx-bot-deploy.mjs). A hand submit needs _GATEWAY_AGENT, the metering
+# agent `node scripts/okx-bot-llm-gateway.mjs --verify` prints:
+#
+#   gcloud builds submit --config workers/okx-chat-bot/cloudbuild.yaml \
+#     --region us-central1 --project aerial-vehicle-466722-p5 \
+#     --substitutions=SHORT_SHA=manual$(date +%s),_GATEWAY_AGENT=<agent-id> .
+#
+# ── WHY --max-instances=1 IS LOAD-BEARING, AND WHY IT IS NOT ENOUGH ──────────
+# The bot's wallet/XMTP identity is a single GCS state object that this service
+# reads on boot and overwrites on a timer. Two concurrent instances would
+# interleave those writes and corrupt the identity, which costs a human OTP to
+# recover. min=1 keeps the XMTP connection held open between requests (this is a
+# daemon, not a request handler), and --no-cpu-throttling keeps it ticking when
+# no HTTP request is in flight.
+#
+# max-instances is PER REVISION, though, and a rollout runs the new revision's
+# instance beside the old one until it is Ready. The worker's single-writer
+# lease (workers/okx-chat-bot/lease.js) closes that window: the new instance
+# passes its startup probe, then waits to restore state or start the daemon
+# until the old one has snapshotted and released the lease (or, for a revision
+# built before the lease, until its heartbeat has gone quiet).
+#
+# ── ONE-TIME SETUP: DONE (2026-09-02 / 2026-09-04) ───────────────────────────
+# Nothing below needs running again; it is recorded so the next reader knows
+# what the deploy depends on.
+#   1. State bucket (versioning is the undo button for a torn snapshot):
+#      gcloud storage buckets create gs://three-ws-okx-bot-state \
+#        --location=us-central1 --uniform-bucket-level-access --project aerial-vehicle-466722-p5
+#      gcloud storage buckets update gs://three-ws-okx-bot-state --versioning
+#      gcloud storage buckets add-iam-policy-binding gs://three-ws-okx-bot-state \
+#        --member=serviceAccount:three-ws@aerial-vehicle-466722-p5.iam.gserviceaccount.com \
+#        --role=roles/storage.objectAdmin
+#   2. Heartbeat DB secret, copied from the project's own DATABASE_URL so the two
+#      cannot drift, with secretAccessor granted to three-ws@:
+#      printf '%s' "$DATABASE_URL" | gcloud secrets create okx-chat-bot-database-url --data-file=-
+#   3. The AI credential. There is no secret to create: three-ws@ already holds
+#      roles/aiplatform.user, so CLAUDE_CODE_USE_VERTEX below authenticates the
+#      spawned Claude Code subsession with the runtime service account through
+#      ADC. Nothing to mint, rotate, or forget.
+#
+# ── WHY THIS DEPLOYS WITHOUT AN AI SECRET ────────────────────────────────────
+# It used to demand an `anthropic-api-key` secret and fail loudly without one, on
+# the reasoning that a bot receiving buyer chat it can never answer is worse than
+# a refused deploy. That reasoning was right about the failure and wrong about the
+# remedy: the key was never minted, so the deploy simply never happened and chat
+# was delivered by a codespace that dies every night.
+#
+# Vertex removes the trade. The credential IS the runtime service account, so it
+# cannot be missing, and the case the old gate really guarded against (a
+# credential that is present but refused) is now caught at runtime instead:
+# provider.js asks the provider on every boot and every 15 minutes, and a refusal
+# reports `ai_provider_unauthorized`, fails /readyz, pages ops, and puts the three
+# ways out in the /readyz `remedy`. Measured on 2026-09-04, both of this project's
+# existing credentials are present and refused (Vertex answers "Lightning dunning
+# decision is deny", a billing hold; the openai-api-key account answers
+# billing_not_active), which is exactly the state a presence check calls green.
+#
+# ── AFTER THE FIRST DEPLOY ────────────────────────────────────────────────────
+# The bot boots logged out (there is no snapshot yet) and pages for a human OTP.
+# Read the exact commands off the service itself:
+#   curl -s -H "Authorization: Bearer $(gcloud auth print-identity-token)" \
+#     "$(gcloud run services describe okx-chat-bot --region us-central1 \
+#        --format='value(status.url)')/readyz" | jq .remedy
+
+substitutions:
+  _REGION: us-central1
+  _SERVICE: okx-chat-bot
+  _REPO: workers
+  # Deliberately not parameterised: see the max-instances note above.
+  _STATE_BUCKET: three-ws-okx-bot-state
+  # The three.ws agent the gateway lane meters its AI calls against: the
+  # dedicated, platform-owned, unpublished agent scripts/okx-bot-llm-gateway.mjs
+  # provisions. Required: an empty value builds a base URL no probe accepts, so
+  # the lane would simply never be elected.
+  _GATEWAY_AGENT: ''
+  _GATEWAY_MODEL: nvidia/nemotron-3-super-120b-a12b
+
+steps:
+  - id: build
+    name: gcr.io/cloud-builders/docker
+    args:
+      - build
+      - --file
+      - workers/okx-chat-bot/Dockerfile
+      - --tag
+      - ${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO}/${_SERVICE}:$SHORT_SHA
+      - --tag
+      - ${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO}/${_SERVICE}:latest
+      - --cache-from
+      - ${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO}/${_SERVICE}:latest
+      - .
+    timeout: 1800s
+
+  - id: push
+    name: gcr.io/cloud-builders/docker
+    args:
+      - push
+      - --all-tags
+      - ${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO}/${_SERVICE}
+
+  - id: deploy
+    name: gcr.io/google.com/cloudsdktool/cloud-sdk:slim
+    entrypoint: gcloud
+    args:
+      - run
+      - deploy
+      - ${_SERVICE}
+      - --image=${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO}/${_SERVICE}:$SHORT_SHA
+      - --region=${_REGION}
+      - --platform=managed
+      - --no-cpu-throttling
+      - --cpu=2
+      - --memory=4Gi
+      # The state tree lives on the in-memory filesystem and the AI subsession
+      # is a whole CLI process; 4Gi leaves headroom for both.
+      - --min-instances=1
+      - --max-instances=1
+      - --timeout=3600
+      - --no-allow-unauthenticated
+      - --service-account=three-ws@$PROJECT_ID.iam.gserviceaccount.com
+      # OKX_A2A_AI_PERMISSION_PRESET is load-bearing on a headless host: without
+      # bypass the spawned subsession stalls on a tool-approval prompt nobody is
+      # there to answer, and the buyer experiences that as an unresponsive bot.
+      # CLAUDE_CODE_USE_VERTEX points the subsession at Vertex AI, authenticated
+      # by three-ws@ through ADC (roles/aiplatform.user, already granted).
+      #
+      # OKX_BOT_ANTHROPIC_* is the gateway rung of the AI chain (providerLanes in
+      # config.js): an Anthropic-wire-format endpoint the same `claude` CLI is
+      # pointed at, so a lane change never costs the task lifecycle. It points at
+      # three.ws's OWN we-pay proxy, at the agent-scoped base URL an SDK client
+      # appends /v1/messages to, which serves the free model chain: no GCP billing
+      # and no third-party account. Vertex still leads the chain, so the day the
+      # billing hold clears the next 15-minute election moves back to Claude on
+      # Vertex by itself. Measured 2026-09-18: the CLI's full agentic request (22
+      # tools, streaming, a real Bash tool call) answered through this proxy on
+      # nvidia/nemotron-3-super-120b-a12b.
+      - --set-env-vars=NODE_ENV=production,OKX_BOT_HOME=/state,OKX_BOT_REPO_ROOT=/app,OKX_BOT_AGENT_ID=2632,OKX_BOT_STATE_BUCKET=${_STATE_BUCKET},OKX_A2A_AI_PERMISSION_PRESET=bypass,CLAUDE_CODE_USE_VERTEX=1,ANTHROPIC_VERTEX_PROJECT_ID=$PROJECT_ID,CLOUD_ML_REGION=global,OKX_BOT_ANTHROPIC_BASE_URL=https://three.ws/api/llm/anthropic/agents/${_GATEWAY_AGENT},OKX_BOT_ANTHROPIC_MODEL=${_GATEWAY_MODEL}
+      # An API key, if one is ever preferred over Vertex, belongs HERE and not
+      # patched on afterwards: --set-secrets replaces the whole secret set, so a
+      # hand-added key is silently stripped by the next deploy. Add
+      # ANTHROPIC_API_KEY=anthropic-api-key:latest (or, for codex,
+      # OPENAI_API_KEY=openai-api-key:latest) once the secret exists; the chain
+      # ranks Vertex above both, and pinning is only needed to force one lane.
+      # The gateway token is a three.ws API key for a service account that owns
+      # only the metering agent, so the reply subsession (which can read its own
+      # environment) holds a credential worth one agent's AI budget and nothing
+      # else. scripts/okx-bot-llm-gateway.mjs mints it straight into this secret.
+      - --set-secrets=DATABASE_URL=okx-chat-bot-database-url:latest,OKX_BOT_ANTHROPIC_AUTH_TOKEN=okx-chat-bot-llm-gateway-token:latest
+      # Liveness only. Readiness is deliberately NOT wired to Cloud Run: a
+      # logged-out session fails /readyz and no restart can fix it, so probing it
+      # here would put the service in a crash loop instead of paging a human.
+      - --startup-probe=httpGet.path=/healthz,initialDelaySeconds=20,periodSeconds=10,failureThreshold=30
+
+images:
+  - ${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO}/${_SERVICE}:$SHORT_SHA
+  - ${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO}/${_SERVICE}:latest
+
+serviceAccount: projects/aerial-vehicle-466722-p5/serviceAccounts/three-ws-build@aerial-vehicle-466722-p5.iam.gserviceaccount.com
+options:
+  machineType: E2_HIGHCPU_8
+  logging: CLOUD_LOGGING_ONLY
+timeout: 2400s

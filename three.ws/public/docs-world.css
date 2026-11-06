@@ -1,0 +1,993 @@
+/* Docs World (/docs/world): HUD, overlays, and reader styles.
+   Theme mirrors the classic docs (near-black + purple accent) via the shared
+   tokens where possible, with docs-local accent values matching docs/index.html. */
+
+/* Author display values (flex/grid) beat the UA's [hidden] rule; without this
+   guard a hidden overlay still covers the page and eats every click. Same
+   guard public/tokens.css carries platform-wide. */
+[hidden] {
+	display: none !important;
+}
+
+:root {
+	--dw-accent: #8b5cf6;
+	--dw-accent-soft: rgba(139, 92, 246, 0.14);
+	--dw-bg: #09090f;
+	--dw-panel-bg: rgba(12, 12, 20, 0.92);
+	--dw-border: rgba(255, 255, 255, 0.09);
+	--dw-text: rgba(232, 230, 245, 0.92);
+	--dw-text-muted: rgba(224, 224, 240, 0.6);
+}
+
+html,
+body {
+	margin: 0;
+	height: 100%;
+	overflow: hidden;
+	background: var(--dw-bg);
+	color: var(--dw-text);
+	font-family: var(--font-body, Inter, system-ui, sans-serif);
+}
+
+.dw-stage {
+	position: fixed;
+	inset: 0;
+}
+
+#dw-canvas {
+	width: 100%;
+	height: 100%;
+	display: block;
+	touch-action: none;
+	cursor: grab;
+}
+#dw-canvas:active {
+	cursor: grabbing;
+}
+
+/* ── Chips & buttons ─────────────────────────────────────────────────────── */
+.dw-chip {
+	display: inline-flex;
+	align-items: center;
+	gap: 6px;
+	padding: 8px 14px;
+	border-radius: 999px;
+	background: var(--dw-panel-bg);
+	border: 1px solid var(--dw-border);
+	color: var(--dw-text);
+	font-size: 13px;
+	font-weight: 500;
+	text-decoration: none;
+	cursor: pointer;
+	backdrop-filter: blur(12px);
+	-webkit-backdrop-filter: blur(12px);
+	transition: border-color var(--duration-fast) var(--ease-standard), background var(--duration-fast) var(--ease-standard), transform var(--duration-fast) var(--ease-standard);
+}
+.dw-chip:hover {
+	border-color: rgba(139, 92, 246, 0.5);
+	background: rgba(20, 18, 34, 0.95);
+}
+.dw-chip:active {
+	transform: scale(0.97);
+}
+.dw-chip:focus-visible {
+	outline: 2px solid var(--dw-accent);
+	outline-offset: 2px;
+}
+
+.dw-btn {
+	padding: 8px 16px;
+	border-radius: 8px;
+	border: 1px solid rgba(139, 92, 246, 0.45);
+	background: var(--dw-accent-soft);
+	color: #d6c9ff;
+	font-size: 13px;
+	font-weight: 600;
+	cursor: pointer;
+	text-decoration: none;
+	transition: background var(--duration-fast) var(--ease-standard), color var(--duration-fast) var(--ease-standard);
+}
+.dw-btn:hover {
+	background: rgba(139, 92, 246, 0.28);
+	color: #ede9fe;
+}
+.dw-btn:focus-visible {
+	outline: 2px solid var(--dw-accent);
+	outline-offset: 2px;
+}
+.dw-btn.ghost {
+	background: transparent;
+	border-color: var(--dw-border);
+	color: var(--dw-text-muted);
+}
+.dw-btn.ghost:hover {
+	color: var(--dw-text);
+	border-color: rgba(255, 255, 255, 0.2);
+}
+.dw-btn:disabled {
+	opacity: 0.35;
+	cursor: default;
+}
+
+/* ── HUD layout ──────────────────────────────────────────────────────────── */
+/* The HUD is an explicit overlay layer, not a bare wrapper. Its children are
+   each position:fixed, so without this the container collapses to a zero-height
+   box in normal flow: invisible to hit-testing and to anything that measures it.
+   It never swallows pointer events; each child opts back in. */
+#dw-hud {
+	position: fixed;
+	inset: 0;
+	z-index: 20;
+	pointer-events: none;
+}
+#dw-hud[hidden] {
+	display: none;
+}
+
+.dw-hud-top {
+	position: fixed;
+	top: 14px;
+	left: 14px;
+	right: 14px;
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	z-index: 20;
+	pointer-events: none;
+}
+.dw-hud-top > * {
+	pointer-events: auto;
+}
+.dw-hud-spacer {
+	flex: 1;
+}
+
+.dw-prompt {
+	position: fixed;
+	bottom: 92px;
+	left: 50%;
+	transform: translateX(-50%);
+	z-index: 20;
+	display: inline-flex;
+	align-items: center;
+	gap: 8px;
+	padding: 10px 18px;
+	border-radius: 12px;
+	background: var(--dw-panel-bg);
+	border: 1px solid rgba(139, 92, 246, 0.5);
+	color: var(--dw-text);
+	font-size: 14px;
+	cursor: pointer;
+	backdrop-filter: blur(12px);
+	-webkit-backdrop-filter: blur(12px);
+	animation: dw-pulse 2.2s ease-in-out infinite;
+}
+.dw-prompt kbd {
+	padding: 2px 7px;
+	border-radius: 5px;
+	border: 1px solid var(--dw-border);
+	background: rgba(255, 255, 255, 0.06);
+	font-size: 11px;
+	font-family: inherit;
+}
+@keyframes dw-pulse {
+	0%,
+	100% {
+		box-shadow: 0 0 0 0 rgba(139, 92, 246, 0.35);
+	}
+	50% {
+		box-shadow: 0 0 0 7px rgba(139, 92, 246, 0);
+	}
+}
+
+.dw-hint {
+	position: fixed;
+	bottom: 18px;
+	left: 50%;
+	transform: translateX(-50%);
+	z-index: 15;
+	font-size: 12px;
+	color: var(--dw-text-muted);
+	background: rgba(9, 9, 15, 0.65);
+	border-radius: 999px;
+	padding: 6px 14px;
+	pointer-events: none;
+	white-space: nowrap;
+}
+
+/* ── Virtual joystick (touch) ────────────────────────────────────────────── */
+.dw-joystick {
+	position: fixed;
+	width: 104px;
+	height: 104px;
+	margin: -52px 0 0 -52px;
+	border-radius: 50%;
+	border: 1.5px solid rgba(139, 92, 246, 0.4);
+	background: rgba(139, 92, 246, 0.07);
+	z-index: 18;
+	pointer-events: none;
+}
+.dw-joystick-thumb {
+	position: absolute;
+	inset: 50%;
+	width: 44px;
+	height: 44px;
+	margin: -22px 0 0 -22px;
+	border-radius: 50%;
+	background: rgba(139, 92, 246, 0.35);
+	border: 1.5px solid rgba(196, 181, 253, 0.6);
+}
+
+/* ── Overlay panels (index, section list, help) ──────────────────────────── */
+.dw-panel,
+.dw-index,
+.dw-help {
+	position: fixed;
+	z-index: 30;
+	background: var(--dw-panel-bg);
+	border: 1px solid var(--dw-border);
+	border-radius: 16px;
+	backdrop-filter: blur(18px);
+	-webkit-backdrop-filter: blur(18px);
+	box-shadow: 0 18px 50px rgba(0, 0, 0, 0.55);
+}
+
+.dw-panel {
+	top: 70px;
+	right: 14px;
+	bottom: 14px;
+	width: min(340px, calc(100vw - 28px));
+	display: flex;
+	flex-direction: column;
+	opacity: 0;
+	transform: translateX(14px);
+	transition: opacity var(--duration-base) var(--ease-standard), transform var(--duration-base) var(--ease-standard);
+}
+.dw-panel.open {
+	opacity: 1;
+	transform: none;
+}
+
+.dw-panel-head,
+.dw-index-head {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 10px;
+	padding: 14px 16px;
+	border-bottom: 1px solid var(--dw-border);
+}
+.dw-panel-head h2,
+.dw-index-head h2 {
+	margin: 0;
+	font-size: 15px;
+	font-weight: 600;
+}
+
+.dw-close {
+	width: 28px;
+	height: 28px;
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	border-radius: 8px;
+	border: 1px solid transparent;
+	background: transparent;
+	color: var(--dw-text-muted);
+	font-size: 16px;
+	cursor: pointer;
+	transition: color var(--duration-fast), background var(--duration-fast);
+}
+.dw-close:hover {
+	color: #fff;
+	background: rgba(255, 255, 255, 0.07);
+}
+.dw-close:focus-visible {
+	outline: 2px solid var(--dw-accent);
+}
+
+.dw-panel-list {
+	overflow-y: auto;
+	padding: 8px;
+	scrollbar-width: thin;
+}
+.dw-panel-link {
+	display: block;
+	padding: 9px 12px;
+	border-radius: 9px;
+	color: var(--dw-text-muted);
+	font-size: 13.5px;
+	text-decoration: none;
+	transition: color var(--duration-fast), background var(--duration-fast);
+}
+.dw-panel-link:hover,
+.dw-panel-link:focus-visible {
+	color: #fff;
+	background: var(--dw-accent-soft);
+	outline: none;
+}
+.dw-panel-link.external::after {
+	content: ' ↗';
+	opacity: 0.6;
+}
+
+.dw-index {
+	top: 70px;
+	left: 14px;
+	width: min(300px, calc(100vw - 28px));
+	max-height: calc(100vh - 100px);
+	display: flex;
+	flex-direction: column;
+}
+.dw-index-list {
+	overflow-y: auto;
+	padding: 8px;
+	scrollbar-width: thin;
+}
+.dw-index-item {
+	display: flex;
+	align-items: center;
+	gap: 10px;
+	width: 100%;
+	padding: 9px 12px;
+	border: 0;
+	border-radius: 9px;
+	background: transparent;
+	color: var(--dw-text-muted);
+	font-size: 13.5px;
+	font-family: inherit;
+	text-align: left;
+	cursor: pointer;
+	transition: color var(--duration-fast), background var(--duration-fast);
+}
+.dw-index-item:hover,
+.dw-index-item:focus-visible {
+	color: #fff;
+	background: var(--dw-accent-soft);
+	outline: none;
+}
+.dw-index-item > span:nth-child(2) {
+	flex: 1;
+}
+.dw-index-dot {
+	width: 9px;
+	height: 9px;
+	border-radius: 50%;
+	flex: none;
+}
+.dw-index-count {
+	font-size: 11px;
+	opacity: 0.55;
+}
+
+.dw-help {
+	top: 70px;
+	left: 50%;
+	transform: translateX(-50%);
+	width: min(380px, calc(100vw - 28px));
+	padding: 18px 20px;
+}
+.dw-help h2 {
+	margin: 0 0 10px;
+	font-size: 15px;
+}
+.dw-help table {
+	width: 100%;
+	border-collapse: collapse;
+	font-size: 13px;
+	color: var(--dw-text-muted);
+}
+.dw-help td {
+	padding: 5px 0;
+}
+.dw-help td:first-child {
+	width: 46%;
+	color: var(--dw-text);
+}
+.dw-help .dw-close {
+	position: absolute;
+	top: 12px;
+	right: 12px;
+}
+
+/* ── Reader ──────────────────────────────────────────────────────────────── */
+.dw-reader {
+	position: fixed;
+	inset: 0;
+	z-index: 40;
+	display: flex;
+	align-items: stretch;
+	justify-content: flex-end;
+	background: rgba(5, 5, 10, 0.45);
+	opacity: 0;
+	transition: opacity var(--duration-base) var(--ease-standard);
+}
+.dw-reader.open {
+	opacity: 1;
+}
+.dw-reader-card {
+	width: min(720px, 100vw);
+	display: flex;
+	flex-direction: column;
+	background: rgba(11, 11, 18, 0.97);
+	border-left: 1px solid var(--dw-border);
+	transform: translateX(24px);
+	transition: transform var(--duration-base) var(--ease-standard);
+}
+.dw-reader.open .dw-reader-card {
+	transform: none;
+}
+.dw-reader-head {
+	display: flex;
+	align-items: center;
+	gap: 12px;
+	padding: 14px 18px;
+	border-bottom: 1px solid var(--dw-border);
+}
+.dw-reader-crumb {
+	flex: 1;
+	font-size: 13px;
+	color: var(--dw-text-muted);
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+.dw-reader-classic {
+	font-size: 12.5px;
+	color: var(--accent-violet);
+	text-decoration: none;
+	white-space: nowrap;
+}
+.dw-reader-classic:hover {
+	color: #ede9fe;
+	text-decoration: underline;
+}
+.dw-reader-body {
+	flex: 1;
+	overflow-y: auto;
+	padding: 22px 28px 30px;
+	font-size: 14.5px;
+	line-height: 1.7;
+	color: var(--dw-text);
+	scrollbar-width: thin;
+	overscroll-behavior: contain;
+}
+.dw-reader-body h1 {
+	font-size: 26px;
+	margin: 0 0 14px;
+}
+.dw-reader-body h2 {
+	font-size: 19px;
+	margin: 26px 0 10px;
+	padding-top: 14px;
+	border-top: 1px solid var(--dw-border);
+}
+.dw-reader-body h3 {
+	font-size: 16px;
+	margin: 20px 0 8px;
+}
+.dw-reader-body a {
+	color: var(--accent-violet);
+}
+.dw-reader-body a:hover {
+	color: #ede9fe;
+}
+.dw-code {
+	background: #0d0d16;
+	border: 1px solid var(--dw-border);
+	border-radius: 10px;
+	padding: 14px 16px;
+	overflow-x: auto;
+	font-size: 13px;
+	line-height: 1.55;
+}
+.dw-ic {
+	background: rgba(139, 92, 246, 0.12);
+	border-radius: 5px;
+	padding: 1.5px 6px;
+	font-size: 0.9em;
+}
+.dw-md-table {
+	width: 100%;
+	border-collapse: collapse;
+	font-size: 13.5px;
+	margin: 14px 0;
+	display: block;
+	overflow-x: auto;
+}
+.dw-md-table th,
+.dw-md-table td {
+	border: 1px solid var(--dw-border);
+	padding: 7px 10px;
+	text-align: left;
+}
+.dw-quote {
+	margin: 14px 0;
+	padding: 4px 16px;
+	border-left: 3px solid var(--dw-accent);
+	color: var(--dw-text-muted);
+}
+.dw-reader-foot {
+	display: flex;
+	justify-content: space-between;
+	gap: 10px;
+	padding: 12px 18px;
+	border-top: 1px solid var(--dw-border);
+}
+.dw-reader-foot .dw-btn {
+	max-width: 46%;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+/* ── Loading / error / fallback states ───────────────────────────────────── */
+.dw-center {
+	position: fixed;
+	inset: 0;
+	z-index: 50;
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	justify-content: center;
+	gap: 14px;
+	text-align: center;
+	padding: 24px;
+	background: var(--dw-bg);
+}
+.dw-center h1 {
+	margin: 0;
+	font-size: 22px;
+}
+.dw-center p {
+	margin: 0;
+	max-width: 400px;
+	color: var(--dw-text-muted);
+	font-size: 14px;
+	line-height: 1.6;
+}
+.dw-fallback-actions {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 10px;
+	justify-content: center;
+}
+
+.dw-spinner {
+	width: 34px;
+	height: 34px;
+	border-radius: 50%;
+	border: 3px solid rgba(139, 92, 246, 0.2);
+	border-top-color: var(--dw-accent);
+	animation: dw-spin 0.9s linear infinite;
+}
+@keyframes dw-spin {
+	to {
+		transform: rotate(360deg);
+	}
+}
+
+.dw-skeleton {
+	display: flex;
+	flex-direction: column;
+	gap: 12px;
+	padding-top: 6px;
+}
+.dw-skeleton span {
+	height: 14px;
+	border-radius: 6px;
+	background: linear-gradient(
+		100deg,
+		rgba(255, 255, 255, 0.05) 40%,
+		rgba(255, 255, 255, 0.12) 50%,
+		rgba(255, 255, 255, 0.05) 60%
+	);
+	background-size: 220% 100%;
+	animation: dw-shimmer 1.4s ease infinite;
+}
+.dw-skeleton span.short {
+	width: 55%;
+}
+@keyframes dw-shimmer {
+	to {
+		background-position: -120% 0;
+	}
+}
+
+.dw-error {
+	display: flex;
+	flex-direction: column;
+	gap: 12px;
+	align-items: flex-start;
+	padding: 8px 0;
+	color: var(--dw-text-muted);
+}
+
+/* ── Search palette ──────────────────────────────────────────────────────── */
+.dw-chip-search {
+	border-color: rgba(139, 92, 246, 0.34);
+}
+.dw-chip-kbd {
+	font: 600 11px/1 ui-monospace, SFMono-Regular, Menlo, monospace;
+	padding: 2px 6px;
+	margin-left: 2px;
+	border-radius: 5px;
+	background: rgba(255, 255, 255, 0.08);
+	border: 1px solid var(--dw-border);
+	color: var(--dw-text-muted);
+}
+
+.dw-search {
+	position: fixed;
+	inset: 0;
+	z-index: 60;
+	display: flex;
+	justify-content: center;
+	align-items: flex-start;
+	padding: max(10vh, 60px) 16px 16px;
+	background: rgba(6, 6, 12, 0.62);
+	backdrop-filter: blur(6px);
+	opacity: 0;
+	transition: opacity var(--duration-fast) var(--ease-standard);
+}
+.dw-search.open {
+	opacity: 1;
+}
+
+.dw-search-card {
+	width: min(620px, 100%);
+	max-height: min(70vh, 560px);
+	display: flex;
+	flex-direction: column;
+	background: var(--dw-panel-bg);
+	border: 1px solid var(--dw-border);
+	border-radius: 16px;
+	box-shadow: 0 26px 70px rgba(0, 0, 0, 0.6);
+	overflow: hidden;
+	transform: translateY(-8px) scale(0.985);
+	transition:
+		transform var(--duration-fast) var(--ease-standard),
+		opacity var(--duration-fast) var(--ease-standard);
+}
+.dw-search.open .dw-search-card {
+	transform: none;
+}
+
+.dw-search-head {
+	display: flex;
+	align-items: center;
+	gap: 10px;
+	padding: 12px 12px 12px 16px;
+	border-bottom: 1px solid var(--dw-border);
+}
+.dw-search-icon {
+	font-size: 19px;
+	color: var(--dw-accent);
+	line-height: 1;
+}
+#dw-search-input {
+	flex: 1;
+	min-width: 0;
+	background: none;
+	border: 0;
+	outline: none;
+	color: var(--dw-text);
+	font-family: inherit;
+	font-size: 16px; /* 16px stops iOS Safari zooming the viewport on focus */
+	padding: 4px 0;
+}
+#dw-search-input::placeholder {
+	color: rgba(224, 224, 240, 0.42);
+}
+
+.dw-search-results {
+	overflow-y: auto;
+	overscroll-behavior: contain;
+	padding: 6px;
+	scrollbar-width: thin;
+}
+
+.dw-sr {
+	display: flex;
+	align-items: stretch;
+	gap: 4px;
+	border-radius: 10px;
+}
+.dw-sr.active {
+	background: rgba(139, 92, 246, 0.15);
+}
+
+.dw-sr-open {
+	flex: 1;
+	min-width: 0;
+	display: flex;
+	align-items: center;
+	gap: 11px;
+	padding: 10px 12px;
+	background: none;
+	border: 0;
+	border-radius: 10px;
+	color: var(--dw-text);
+	font: inherit;
+	font-size: 14px;
+	text-align: left;
+	cursor: pointer;
+}
+.dw-sr-open:focus-visible,
+.dw-sr-walk:focus-visible {
+	outline: 2px solid var(--dw-accent);
+	outline-offset: -2px;
+}
+
+.dw-sr-dot {
+	flex: none;
+	width: 9px;
+	height: 9px;
+	border-radius: 50%;
+	box-shadow: 0 0 10px currentColor;
+}
+.dw-sr-text {
+	min-width: 0;
+	display: flex;
+	flex-direction: column;
+	gap: 2px;
+}
+.dw-sr-label {
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
+}
+.dw-sr-label mark {
+	background: rgba(139, 92, 246, 0.32);
+	color: #fff;
+	border-radius: 3px;
+	padding: 0 1px;
+}
+.dw-sr-section {
+	font-size: 11.5px;
+	color: var(--dw-text-muted);
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
+}
+
+.dw-sr-walk {
+	flex: none;
+	align-self: center;
+	margin-right: 8px;
+	padding: 6px 12px;
+	border-radius: 999px;
+	background: transparent;
+	border: 1px solid var(--dw-border);
+	color: var(--dw-text-muted);
+	font: inherit;
+	font-size: 12px;
+	cursor: pointer;
+	opacity: 0;
+	transition:
+		opacity var(--duration-fast) var(--ease-standard),
+		color var(--duration-fast) var(--ease-standard),
+		border-color var(--duration-fast) var(--ease-standard);
+}
+/* Revealed on the active row and on hover, so the palette stays quiet while
+   scanning but the second action is never more than one keystroke away. Always
+   visible to keyboard focus and on touch, where there is no hover to reveal it. */
+.dw-sr.active .dw-sr-walk,
+.dw-sr:hover .dw-sr-walk,
+.dw-sr-walk:focus-visible {
+	opacity: 1;
+}
+.dw-sr-walk:hover {
+	color: var(--dw-text);
+	border-color: rgba(139, 92, 246, 0.5);
+}
+
+.dw-search-empty {
+	margin: 0;
+	padding: 22px 18px 26px;
+	color: var(--dw-text-muted);
+	font-size: 13.5px;
+	text-align: center;
+}
+.dw-search-empty a {
+	color: var(--dw-accent);
+}
+
+.dw-search-foot {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 6px 16px;
+	padding: 10px 16px;
+	border-top: 1px solid var(--dw-border);
+	color: var(--dw-text-muted);
+	font-size: 11.5px;
+}
+.dw-search-foot kbd {
+	font: 600 10.5px/1 ui-monospace, SFMono-Regular, Menlo, monospace;
+	padding: 2px 5px;
+	margin-right: 3px;
+	border-radius: 4px;
+	background: rgba(255, 255, 255, 0.07);
+	border: 1px solid var(--dw-border);
+}
+
+/* ── Wayfinder readout ───────────────────────────────────────────────────── */
+.dw-way {
+	position: absolute;
+	left: 50%;
+	transform: translateX(-50%);
+	bottom: 82px;
+	z-index: 25;
+	display: flex;
+	align-items: center;
+	gap: 11px;
+	max-width: min(520px, calc(100vw - 28px));
+	padding: 9px 10px 9px 14px;
+	border-radius: 999px;
+	background: var(--dw-panel-bg);
+	border: 1px solid rgba(139, 92, 246, 0.34);
+	box-shadow: 0 14px 40px rgba(0, 0, 0, 0.5);
+	pointer-events: auto;
+	animation: dw-way-in 0.22s cubic-bezier(0.2, 0.8, 0.3, 1);
+}
+@keyframes dw-way-in {
+	from {
+		opacity: 0;
+		transform: translateX(-50%) translateY(8px);
+	}
+	to {
+		opacity: 1;
+		transform: translateX(-50%);
+	}
+}
+.dw-way-dot {
+	flex: none;
+	width: 10px;
+	height: 10px;
+	border-radius: 50%;
+	box-shadow: 0 0 12px currentColor;
+	animation: dw-way-pulse 1.6s ease-in-out infinite;
+}
+@keyframes dw-way-pulse {
+	0%,
+	100% {
+		opacity: 1;
+	}
+	50% {
+		opacity: 0.42;
+	}
+}
+.dw-way-text {
+	min-width: 0;
+	display: flex;
+	flex-direction: column;
+	gap: 1px;
+}
+.dw-way-label {
+	font-size: 13.5px;
+	font-weight: 600;
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
+}
+.dw-way-sub {
+	font-size: 11.5px;
+	color: var(--dw-text-muted);
+	white-space: nowrap;
+}
+.dw-way-act {
+	flex: none;
+	padding: 6px 13px;
+	border-radius: 999px;
+	background: var(--dw-accent-soft);
+	border: 1px solid rgba(139, 92, 246, 0.4);
+	color: var(--dw-text);
+	font: inherit;
+	font-size: 12.5px;
+	cursor: pointer;
+	transition: background var(--duration-fast) var(--ease-standard);
+}
+.dw-way-act:hover {
+	background: rgba(139, 92, 246, 0.26);
+}
+.dw-way-cancel {
+	flex: none;
+	width: 28px;
+	height: 28px;
+	border-radius: 50%;
+	background: none;
+	border: 1px solid var(--dw-border);
+	color: var(--dw-text-muted);
+	font-size: 12px;
+	line-height: 1;
+	cursor: pointer;
+}
+.dw-way-cancel:hover {
+	color: var(--dw-text);
+}
+.dw-way-act:focus-visible,
+.dw-way-cancel:focus-visible {
+	outline: 2px solid var(--dw-accent);
+	outline-offset: 2px;
+}
+
+#dw-tour-replay {
+	margin-top: 16px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+	.dw-prompt {
+		animation: none;
+	}
+	.dw-skeleton span {
+		animation: none;
+	}
+	.dw-panel,
+	.dw-reader,
+	.dw-reader-card,
+	.dw-chip,
+	.dw-search,
+	.dw-search-card {
+		transition: none;
+	}
+	.dw-way,
+	.dw-way-dot {
+		animation: none;
+	}
+}
+
+@media (max-width: 700px) {
+	.dw-reader-card {
+		width: 100vw;
+		border-left: 0;
+	}
+	.dw-hint {
+		display: none;
+	}
+	.dw-chip span.dw-chip-label {
+		display: none;
+	}
+	/* The keyboard hint on the search chip is meaningless without a keyboard,
+	   and the chip is the touch affordance for the same palette. */
+	.dw-chip-kbd {
+		display: none;
+	}
+	.dw-search {
+		padding-top: 8vh;
+	}
+	/* Hover cannot reveal the second action on touch, and the active row is not
+	   a concept a finger has: show every walk button. */
+	.dw-sr-walk {
+		opacity: 1;
+	}
+	.dw-way {
+		bottom: 92px;
+		left: 14px;
+		right: 14px;
+		max-width: none;
+		transform: none;
+		animation: none;
+	}
+}
+
+/* ── Interactive states (QB-07) ────────────────────────────────────────────
+   The floating prompt and the search-open control both set cursor: pointer
+   with no hover. The prompt is the page's own instruction to click it, which
+   made the missing feedback especially confusing. */
+.dw-prompt,
+.dw-sr-open {
+	transition:
+		background var(--duration-fast) var(--ease-standard),
+		border-color var(--duration-fast) var(--ease-standard),
+		color var(--duration-fast) var(--ease-standard);
+}
+
+.dw-prompt:hover {
+	border-color: var(--accent-violet);
+	color: var(--ink-bright);
+}
+
+.dw-sr-open:hover {
+	color: var(--ink-bright);
+	border-color: var(--stroke-strong);
+}

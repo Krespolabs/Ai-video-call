@@ -1,0 +1,865 @@
+<!doctype html>
+<html lang="en">
+	<head>
+		<script>
+			/* three.ws theme boot — no-flash; runtime in /theme-switcher.js */ (function () {
+				document.documentElement.classList.add('js');
+				try {
+					var m = localStorage.getItem('twx_theme');
+					var l =
+						m === 'auto'
+							? window.matchMedia &&
+								window.matchMedia('(prefers-color-scheme: light)').matches
+							: m === 'light';
+					document.documentElement.setAttribute('data-theme', l ? 'light' : 'dark');
+				} catch (e) {
+					document.documentElement.setAttribute('data-theme', 'dark');
+				}
+			})();
+		</script>
+		<meta charset="utf-8" />
+		<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+		<title data-i18n="sperax.meta_title">Sperax × three.ws — Free AI credits on SperaxOS · three.ws</title>
+		<meta
+			name="description"
+			content="three.ws is live inside SperaxOS. Connect your three.ws agent to chat.sperax.io to give it an embodied 3D body — and claim free AI credits as part of the partnership. Here's what the integration is and how to claim."
+		 data-i18n-attr="content:sperax.meta_description"/>
+		<meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1" />
+		<meta property="og:type" content="website" />
+		<meta property="og:site_name" content="three.ws" />
+		<meta property="og:url" content="https://three.ws/sperax" />
+		<meta property="og:title" content="Sperax × three.ws — Free AI credits on SperaxOS"  data-i18n-attr="content:sperax.meta_og_title"/>
+		<meta
+			property="og:description"
+			content="three.ws is live inside SperaxOS. Connect your agent to chat.sperax.io for an embodied 3D body — and claim free AI credits as part of the partnership."
+		 data-i18n-attr="content:sperax.meta_og_description"/>
+		<meta property="og:locale" content="en_US" />
+		<meta
+			property="og:image"
+			content="https://three.ws/api/page-og?s=crypto&amp;t=Sperax+on+three.ws&amp;d=Free+AI+credits+for+three.ws+users+on+chat.sperax.io%3A+what+the+integration+is+and+how+to+claim+it.&amp;p=%2Fsperax"
+		/>
+		<meta property="og:image:width" content="1200" />
+		<meta property="og:image:height" content="630" />
+		<meta property="og:image:alt" content="Sperax × three.ws — free AI credits on SperaxOS" />
+		<meta name="twitter:card" content="summary_large_image" />
+		<meta name="twitter:site" content="@trythreews" />
+		<meta name="twitter:title" content="Sperax × three.ws — Free AI credits on SperaxOS"  data-i18n-attr="content:sperax.meta_twitter_title"/>
+		<meta
+			name="twitter:description"
+			content="Connect your three.ws agent to SperaxOS for an embodied 3D body — and claim free AI credits as part of the partnership."
+		 data-i18n-attr="content:sperax.meta_twitter_description"/>
+		<meta name="theme-color" content="#0a0a0a" />
+		<link rel="canonical" href="https://three.ws/sperax" />
+		<link rel="icon" href="/favicon.ico" sizes="any" />
+		<link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+		<link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+		<link rel="manifest" href="/manifest.webmanifest" />
+		<link rel="stylesheet" href="/style.css" />
+		<link rel="stylesheet" href="/nav.css" />
+		<link rel="stylesheet" href="/footer.css" />
+		<link rel="stylesheet" href="/fonts/fonts.css" />
+		<link rel="stylesheet" href="/mobile.css" />
+		<script type="application/ld+json">
+			{
+				"@context": "https://schema.org",
+				"@graph": [
+					{
+						"@type": "WebPage",
+						"name": "Sperax × three.ws — Free AI credits on SperaxOS",
+						"description": "three.ws is live inside SperaxOS. Connect your three.ws agent to chat.sperax.io for an embodied 3D body — and claim free AI credits as part of the partnership.",
+						"url": "https://three.ws/sperax",
+						"isPartOf": { "@type": "WebSite", "name": "three.ws", "url": "https://three.ws" }
+					},
+					{
+						"@type": "FAQPage",
+						"mainEntity": [
+							{
+								"@type": "Question",
+								"name": "How do I claim the free credits?",
+								"acceptedAnswer": {
+									"@type": "Answer",
+									"text": "Install the three.ws plugin inside SperaxOS at chat.sperax.io, then bind it to your three.ws Agent ID from your dashboard. Credits apply to your SperaxOS account once your agent is connected."
+								}
+							},
+							{
+								"@type": "Question",
+								"name": "Do I need a three.ws account?",
+								"acceptedAnswer": {
+									"@type": "Answer",
+									"text": "Yes. You need a three.ws agent so the plugin has an identity to bind to. Your Agent ID is a UUID or @handle you copy from your three.ws dashboard."
+								}
+							},
+							{
+								"@type": "Question",
+								"name": "Which chain does this settle on?",
+								"acceptedAnswer": {
+									"@type": "Answer",
+									"text": "SperaxOS is EVM-native and settles agent payments via x402 over USDC on Base, which matches the three.ws Base x402 rail. The avatar panel itself is chain-agnostic and renders regardless of which chain your agent transacts on."
+								}
+							}
+						]
+					}
+				]
+			}
+		</script>
+		<style>
+			.spx {
+				--spx-max: 1040px;
+			}
+			.spx main {
+				max-width: var(--spx-max);
+				width: 100%;
+				min-width: 0;
+				margin: 0 auto;
+				padding: clamp(1.25rem, 4vw, 3rem) 1.25rem 5rem;
+			}
+
+			/* ── Hero ─────────────────────────────────────────────── */
+			.spx-hero {
+				position: relative;
+				text-align: center;
+				padding: clamp(2.5rem, 7vw, 5rem) 0 clamp(2rem, 5vw, 3.5rem);
+			}
+			.spx-lockup {
+				display: inline-flex;
+				align-items: center;
+				gap: 0.75rem;
+				font-family: var(--font-mono);
+				font-size: var(--text-sm);
+				letter-spacing: 0.04em;
+				text-transform: uppercase;
+				color: var(--ink-dim);
+				margin-bottom: 1.25rem;
+			}
+			.spx-lockup img {
+				width: 22px;
+				height: 22px;
+				border-radius: 6px;
+				display: block;
+			}
+			.spx-lockup .x {
+				opacity: 0.5;
+			}
+			.spx-hero h1 {
+				font-family: var(--font-display);
+				font-weight: 600;
+				font-size: clamp(2rem, 6vw, 3.4rem);
+				line-height: 1.05;
+				letter-spacing: -0.02em;
+				margin: 0 auto 1rem;
+				max-width: 16ch;
+				color: var(--ink-bright);
+			}
+			.spx-hero p.lede {
+				font-size: clamp(1rem, 2.4vw, 1.25rem);
+				line-height: 1.55;
+				color: var(--ink-dim);
+				max-width: 56ch;
+				margin: 0 auto 2rem;
+			}
+			.spx-cta-row {
+				display: flex;
+				flex-wrap: wrap;
+				gap: 0.75rem;
+				justify-content: center;
+			}
+			.spx-btn {
+				display: inline-flex;
+				align-items: center;
+				gap: 0.5rem;
+				font-family: var(--font-body);
+				font-size: 0.95rem;
+				font-weight: 550;
+				line-height: 1;
+				padding: 0.85rem 1.4rem;
+				border-radius: var(--radius-pill);
+				border: 1px solid transparent;
+				cursor: pointer;
+				text-decoration: none;
+				transition:
+					transform var(--duration-fast) var(--ease-standard),
+					background var(--duration-fast) var(--ease-standard),
+					border-color var(--duration-fast) var(--ease-standard),
+					box-shadow var(--duration-fast) var(--ease-standard);
+			}
+			.spx-btn:focus-visible {
+				outline: var(--focus-ring-width) solid var(--focus-ring-color);
+				outline-offset: var(--focus-ring-offset);
+			}
+			.spx-btn-primary {
+				background: var(--ink-bright);
+				color: var(--bg-0);
+				box-shadow: var(--shadow-2);
+			}
+			.spx-btn-primary:hover {
+				transform: translateY(-1px);
+				box-shadow: var(--shadow-3);
+			}
+			.spx-btn-primary:active {
+				transform: translateY(0);
+			}
+			.spx-btn-secondary {
+				background: var(--surface-2);
+				color: var(--ink);
+				border-color: var(--stroke-strong);
+			}
+			.spx-btn-secondary:hover {
+				background: var(--surface-3);
+				border-color: var(--stroke-strong);
+				transform: translateY(-1px);
+			}
+			.spx-btn-secondary:active {
+				transform: translateY(0);
+			}
+
+			/* ── Offer banner ─────────────────────────────────────── */
+			.spx-offer {
+				position: relative;
+				display: flex;
+				flex-wrap: wrap;
+				align-items: center;
+				gap: 1rem 1.5rem;
+				justify-content: center;
+				text-align: center;
+				margin: 0 auto clamp(2.5rem, 6vw, 4rem);
+				padding: clamp(1.25rem, 3vw, 1.75rem) clamp(1.25rem, 4vw, 2.5rem);
+				border-radius: var(--radius-lg);
+				border: 1px solid rgba(52, 211, 153, 0.32);
+				background:
+					radial-gradient(120% 140% at 50% 0%, rgba(52, 211, 153, 0.12), transparent 70%),
+					var(--surface-1);
+			}
+			.spx-offer .tag {
+				display: inline-flex;
+				align-items: center;
+				gap: 0.4rem;
+				font-family: var(--font-mono);
+				font-size: var(--text-sm);
+				text-transform: uppercase;
+				letter-spacing: 0.05em;
+				color: #34d399;
+				padding: 0.25rem 0.7rem;
+				border-radius: var(--radius-pill);
+				border: 1px solid rgba(52, 211, 153, 0.32);
+				background: rgba(52, 211, 153, 0.1);
+			}
+			.spx-offer p {
+				margin: 0;
+				font-size: 1.02rem;
+				line-height: 1.5;
+				color: var(--ink);
+				max-width: 60ch;
+			}
+			.spx-offer strong {
+				color: var(--ink-bright);
+			}
+
+			/* ── Section scaffolding ──────────────────────────────── */
+			.spx-section {
+				margin: clamp(3rem, 8vw, 5rem) 0;
+			}
+			.spx-eyebrow {
+				font-family: var(--font-mono);
+				font-size: var(--text-sm);
+				letter-spacing: 0.06em;
+				text-transform: uppercase;
+				color: var(--ink-dim);
+				margin: 0 0 0.6rem;
+			}
+			.spx-section h2 {
+				font-family: var(--font-display);
+				font-weight: 600;
+				font-size: clamp(1.5rem, 3.6vw, 2.1rem);
+				letter-spacing: -0.015em;
+				line-height: 1.15;
+				margin: 0 0 0.85rem;
+				color: var(--ink-bright);
+				max-width: 24ch;
+			}
+			.spx-section > p.intro {
+				font-size: 1.05rem;
+				line-height: 1.6;
+				color: var(--ink-dim);
+				max-width: 62ch;
+				margin: 0 0 2rem;
+			}
+
+			/* ── Steps ────────────────────────────────────────────── */
+			.spx-steps {
+				display: grid;
+				grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+				gap: 1rem;
+				counter-reset: step;
+			}
+			.spx-step {
+				position: relative;
+				padding: 1.5rem 1.4rem 1.4rem;
+				border-radius: var(--radius-lg);
+				border: 1px solid var(--stroke);
+				background: var(--surface-glass);
+			}
+			.spx-step::before {
+				counter-increment: step;
+				content: counter(step);
+				display: grid;
+				place-items: center;
+				width: 34px;
+				height: 34px;
+				margin-bottom: 1rem;
+				font-family: var(--font-mono);
+				font-size: 0.95rem;
+				color: var(--bg-0);
+				background: var(--ink-bright);
+				border-radius: var(--radius-pill);
+			}
+			.spx-step h3 {
+				font-size: 1.05rem;
+				font-weight: 600;
+				margin: 0 0 0.4rem;
+				color: var(--ink-bright);
+			}
+			.spx-step p {
+				margin: 0;
+				font-size: 0.94rem;
+				line-height: 1.55;
+				color: var(--ink-dim);
+			}
+			.spx-step a {
+				color: var(--ink);
+				text-decoration: underline;
+				text-underline-offset: 2px;
+				text-decoration-color: var(--stroke-strong);
+			}
+			.spx-step a:hover {
+				text-decoration-color: currentColor;
+			}
+			.spx-step code {
+				font-family: var(--font-mono);
+				font-size: 0.85em;
+				background: var(--surface-3);
+				border-radius: var(--radius-sm);
+				padding: 0.1em 0.4em;
+				overflow-wrap: anywhere;
+			}
+
+			/* Copy control for the manifest URL in step 1 */
+			.spx-copy-row {
+				display: flex;
+				flex-wrap: wrap;
+				align-items: center;
+				gap: 0.5rem 0.75rem;
+				margin-top: 0.9rem;
+			}
+			.spx-copy {
+				display: inline-flex;
+				align-items: center;
+				gap: 0.4rem;
+				font-family: var(--font-body);
+				font-size: 0.85rem;
+				font-weight: 550;
+				line-height: 1;
+				padding: 0.55rem 0.9rem;
+				border-radius: var(--radius-pill);
+				border: 1px solid var(--stroke-strong);
+				background: var(--surface-2);
+				color: var(--ink);
+				cursor: pointer;
+				transition:
+					background var(--duration-fast) var(--ease-standard),
+					border-color var(--duration-fast) var(--ease-standard),
+					color var(--duration-fast) var(--ease-standard),
+					transform var(--duration-fast) var(--ease-standard);
+			}
+			.spx-copy:hover {
+				background: var(--surface-3);
+				transform: translateY(-1px);
+			}
+			.spx-copy:active {
+				transform: translateY(0);
+			}
+			.spx-copy:focus-visible {
+				outline: var(--focus-ring-width) solid var(--focus-ring-color);
+				outline-offset: var(--focus-ring-offset);
+			}
+			.spx-copy.is-done {
+				border-color: rgba(52, 211, 153, 0.5);
+				color: #34d399;
+			}
+			.spx-copy-status {
+				font-size: 0.85rem;
+				line-height: 1.4;
+				color: var(--ink-dim);
+			}
+			.spx-copy-status:empty {
+				display: none;
+			}
+
+			/* ── Capability grid ──────────────────────────────────── */
+			.spx-grid {
+				display: grid;
+				grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+				gap: 1rem;
+			}
+			.spx-card {
+				padding: 1.4rem;
+				border-radius: var(--radius-lg);
+				border: 1px solid var(--stroke);
+				background: var(--surface-1);
+				transition:
+					border-color var(--duration-fast) var(--ease-standard),
+					transform var(--duration-fast) var(--ease-standard);
+			}
+			.spx-card:hover {
+				border-color: var(--stroke-strong);
+				transform: translateY(-2px);
+			}
+			.spx-card .ico {
+				font-size: 1.4rem;
+				line-height: 1;
+				margin-bottom: 0.85rem;
+			}
+			.spx-card h3 {
+				font-size: 1rem;
+				font-weight: 600;
+				margin: 0 0 0.4rem;
+				color: var(--ink-bright);
+			}
+			.spx-card h3 code {
+				font-family: var(--font-mono);
+				font-size: 0.8em;
+				color: var(--ink-dim);
+				font-weight: 400;
+			}
+			.spx-card p {
+				margin: 0;
+				font-size: 0.92rem;
+				line-height: 1.55;
+				color: var(--ink-dim);
+			}
+
+			/* ── Flow diagram ─────────────────────────────────────── */
+			.spx-flow {
+				border-radius: var(--radius-lg);
+				border: 1px solid var(--stroke);
+				background: var(--surface-glass);
+				padding: clamp(1.25rem, 3vw, 2rem);
+				overflow-x: auto;
+			}
+			.spx-flow pre {
+				margin: 0;
+				font-family: var(--font-mono);
+				font-size: 0.82rem;
+				line-height: 1.7;
+				color: var(--ink-dim);
+				white-space: pre;
+			}
+			.spx-flow pre b {
+				color: var(--ink-bright);
+				font-weight: 600;
+			}
+
+			/* ── Chain note ───────────────────────────────────────── */
+			.spx-note {
+				display: flex;
+				gap: 1rem;
+				align-items: flex-start;
+				padding: 1.25rem 1.4rem;
+				border-radius: var(--radius-lg);
+				border: 1px solid var(--stroke);
+				background: var(--surface-1);
+			}
+			.spx-note .ico {
+				font-size: 1.25rem;
+				line-height: 1.4;
+			}
+			.spx-note p {
+				margin: 0;
+				font-size: 0.95rem;
+				line-height: 1.6;
+				color: var(--ink-dim);
+			}
+			.spx-note strong {
+				color: var(--ink);
+			}
+
+			/* ── FAQ ──────────────────────────────────────────────── */
+			.spx-faq {
+				display: grid;
+				gap: 0.6rem;
+			}
+			.spx-faq details {
+				border-radius: var(--radius-md);
+				border: 1px solid var(--stroke);
+				background: var(--surface-1);
+				overflow: hidden;
+			}
+			.spx-faq summary {
+				cursor: pointer;
+				list-style: none;
+				padding: 1rem 1.2rem;
+				font-weight: 550;
+				font-size: 0.98rem;
+				color: var(--ink-bright);
+				display: flex;
+				justify-content: space-between;
+				align-items: center;
+				gap: 1rem;
+			}
+			.spx-faq summary::-webkit-details-marker {
+				display: none;
+			}
+			.spx-faq summary::after {
+				content: '+';
+				font-family: var(--font-mono);
+				color: var(--ink-dim);
+				transition: transform var(--duration-base) var(--ease-standard);
+			}
+			.spx-faq details[open] summary::after {
+				transform: rotate(45deg);
+			}
+			.spx-faq summary:focus-visible {
+				outline: var(--focus-ring-width) solid var(--focus-ring-color);
+				outline-offset: -2px;
+			}
+			.spx-faq details p {
+				margin: 0;
+				padding: 0 1.2rem 1.1rem;
+				font-size: 0.94rem;
+				line-height: 1.6;
+				color: var(--ink-dim);
+			}
+			.spx-faq details a {
+				color: var(--ink);
+				text-decoration: underline;
+				text-underline-offset: 2px;
+			}
+
+			/* ── Final CTA ────────────────────────────────────────── */
+			.spx-final {
+				text-align: center;
+				margin: clamp(3.5rem, 9vw, 6rem) 0 0;
+				padding: clamp(2.5rem, 6vw, 4rem) 1.5rem;
+				border-radius: var(--radius-lg);
+				border: 1px solid var(--stroke);
+				background:
+					radial-gradient(120% 140% at 50% 0%, var(--accent-soft), transparent 65%),
+					var(--surface-1);
+			}
+			.spx-final h2 {
+				font-family: var(--font-display);
+				font-weight: 600;
+				font-size: clamp(1.6rem, 4vw, 2.4rem);
+				letter-spacing: -0.015em;
+				margin: 0 auto 0.85rem;
+				max-width: 20ch;
+				color: var(--ink-bright);
+			}
+			.spx-final p {
+				color: var(--ink-dim);
+				font-size: 1.05rem;
+				line-height: 1.55;
+				max-width: 48ch;
+				margin: 0 auto 1.75rem;
+			}
+
+			@media (prefers-reduced-motion: reduce) {
+				.spx-btn,
+				.spx-card,
+				.spx-copy,
+				.spx-faq summary::after {
+					transition: none;
+				}
+				.spx-btn:hover,
+				.spx-card:hover,
+				.spx-copy:hover {
+					transform: none;
+				}
+			}
+		</style>
+	
+	<meta name="twitter:image" content="https://three.ws/api/page-og?s=crypto&amp;t=Sperax+on+three.ws&amp;d=Free+AI+credits+for+three.ws+users+on+chat.sperax.io%3A+what+the+integration+is+and+how+to+claim+it.&amp;p=%2Fsperax">
+</head>
+	<body class="spx">
+		<a href="#main-content" class="h-skip-link" data-i18n="sperax.skip_to_main_content">Skip to main content</a>
+		<header><div id="nav-container"></div></header>
+		<script src="/nav.js"></script>
+
+		<main id="main-content">
+			<!-- ── Hero ─────────────────────────────────────────── -->
+			<section class="spx-hero" aria-labelledby="spx-title">
+				<span class="spx-lockup">
+					<img src="/favicon.svg" alt="" aria-hidden="true" />
+					three.ws
+					<span class="x" aria-hidden="true">×</span>
+					<img src="/sperax/icon-256.svg" alt="" aria-hidden="true" />
+					Sperax
+				</span>
+				<h1 id="spx-title" data-i18n="sperax.three_ws_is_live_inside_speraxos">three.ws is live inside SperaxOS</h1>
+				<p class="lede" data-i18n-html="sperax.give_your_speraxos_agent_a_body_a">
+					Give your SperaxOS agent a body — a rigged 3D avatar that speaks, gestures, and
+					reacts to on-chain events in real time. To launch the partnership, Sperax is
+					handing three.ws users <strong>free AI credits</strong> on
+					<a href="https://chat.sperax.io" rel="noopener">chat.sperax.io</a>.
+				</p>
+				<div class="spx-cta-row">
+					<a class="spx-btn spx-btn-primary" href="https://chat.sperax.io" rel="noopener" data-i18n="sperax.claim_your_credits_on_speraxos">
+						Claim your credits on SperaxOS →
+					</a>
+					<a class="spx-btn spx-btn-secondary" href="/blog/three-ws-speraxusd-integration" data-i18n="sperax.read_the_integration">
+						Read the integration
+					</a>
+				</div>
+			</section>
+
+			<!-- ── Offer banner ─────────────────────────────────── -->
+			<div class="spx-offer" role="note">
+				<span class="tag" data-i18n="sperax.launch_offer">◆ Launch offer</span>
+				<p data-i18n-html="sperax.connect_a_three_ws_agent_to_speraxos">
+					Connect a three.ws agent to SperaxOS and
+					<strong>free AI credits</strong> land on your SperaxOS account — enough to put
+					your embodied agent to work across the Sperax DeFi stack before you spend a cent.
+				</p>
+			</div>
+
+			<!-- ── How to claim ─────────────────────────────────── -->
+			<section class="spx-section" aria-labelledby="spx-claim">
+				<p class="spx-eyebrow" data-i18n="sperax.claim_in_three_steps">Claim in three steps</p>
+				<h2 id="spx-claim" data-i18n="sperax.from_zero_to_an_embodied_agent_in">From zero to an embodied agent in a minute</h2>
+				<p class="intro" data-i18n="sperax.the_integration_ships_as_a_standalone_sperax">
+					The integration ships as a standalone SperaxOS plugin — no SDK to vendor, no
+					bundle to submit. Install it, point it at your three.ws identity, and the credits
+					follow.
+				</p>
+				<ol class="spx-steps" style="list-style: none; padding: 0; margin: 0">
+					<li class="spx-step">
+						<h3 data-i18n="sperax.add_the_plugin">Add the plugin</h3>
+						<p data-i18n-html="sperax.in_speraxos_open_plugins_add_plugin_custom">
+							In SperaxOS, open <strong>Plugins → Add Plugin → Custom Plugin</strong> and
+							paste the manifest URL:
+							<code>https://three.ws/.well-known/sperax-plugin.json</code>
+						</p>
+						<div class="spx-copy-row">
+							<button
+								type="button"
+								class="spx-copy"
+								id="spx-copy-manifest"
+								data-url="https://three.ws/.well-known/sperax-plugin.json"
+								data-label-copied="Copied"
+								data-label-failed="Select the URL above and copy it"
+								data-i18n-attr="data-label-copied:sperax.copied;data-label-failed:sperax.select_the_url_above_and_copy_it"
+							>
+								<span data-i18n="sperax.copy_manifest_url">Copy manifest URL</span>
+							</button>
+							<span class="spx-copy-status" id="spx-copy-status" role="status" aria-live="polite"></span>
+						</div>
+					</li>
+					<li class="spx-step">
+						<h3 data-i18n="sperax.bind_your_agent">Bind your agent</h3>
+						<p data-i18n-html="sperax.set_your_agent_id_a_uuid_or">
+							Set your <strong>Agent ID</strong> — a UUID or <code>@handle</code> you copy
+							from <a href="/dashboard">your three.ws dashboard</a>. The avatar binds to
+							that on-chain identity when the panel opens.
+						</p>
+					</li>
+					<li class="spx-step">
+						<h3 data-i18n="sperax.credits_apply">Credits apply</h3>
+						<p data-i18n-html="sperax.with_your_agent_connected_your_free_ai">
+							With your agent connected, your <strong>free AI credits</strong> are active
+							on <a href="https://chat.sperax.io" rel="noopener">chat.sperax.io</a>. Start
+							chatting — the avatar speaks, gestures, and emotes as it works.
+						</p>
+					</li>
+				</ol>
+			</section>
+
+			<!-- ── What you get ─────────────────────────────────── -->
+			<section class="spx-section" aria-labelledby="spx-caps">
+				<p class="spx-eyebrow" data-i18n="sperax.what_the_avatar_does">What the avatar does</p>
+				<h2 id="spx-caps" data-i18n="sperax.a_face_for_defi_driven_by_the">A face for DeFi, driven by the model</h2>
+				<p class="intro" data-i18n="sperax.your_agent_s_llm_calls_four_tools">
+					Your agent's LLM calls four tools. Each one drives the visible avatar in the chat
+					panel and returns a concise result the model reads back into the conversation —
+					so the body language always matches what's happening on-chain.
+				</p>
+				<div class="spx-grid">
+					<article class="spx-card">
+						<div class="ico" aria-hidden="true">🧍</div>
+						<h3 data-i18n-html="sperax.render">Render <code>render_agent</code></h3>
+						<p data-i18n="sperax.mount_or_swap_the_3d_avatar_to">
+							Mount or swap the 3D avatar to a specific three.ws agent — bound to its
+							ERC-8004 identity.
+						</p>
+					</article>
+					<article class="spx-card">
+						<div class="ico" aria-hidden="true">🗣️</div>
+						<h3 data-i18n-html="sperax.speak">Speak <code>speak</code></h3>
+						<p data-i18n="sperax.say_a_line_out_loud_with_emotional">
+							Say a line out loud with emotional valence — greetings, narrating an action,
+							reacting to you.
+						</p>
+					</article>
+					<article class="spx-card">
+						<div class="ico" aria-hidden="true">👋</div>
+						<h3 data-i18n-html="sperax.gesture">Gesture <code>gesture</code></h3>
+						<p data-i18n="sperax.punctuate_a_message_with_a_physical_gesture">
+							Punctuate a message with a physical gesture: wave, nod, point, or shrug.
+						</p>
+					</article>
+					<article class="spx-card">
+						<div class="ico" aria-hidden="true">💗</div>
+						<h3 data-i18n-html="sperax.emote">Emote <code>emote</code></h3>
+						<p data-i18n="sperax.blend_an_emotion_into_the_continuous_empathy">
+							Blend an emotion into the continuous Empathy Layer — concern as a position
+							nears liquidation, celebration when a yield target hits.
+						</p>
+					</article>
+				</div>
+			</section>
+
+			<!-- ── How it works ─────────────────────────────────── -->
+			<section class="spx-section" aria-labelledby="spx-how">
+				<p class="spx-eyebrow" data-i18n="sperax.under_the_hood">Under the hood</p>
+				<h2 id="spx-how" data-i18n="sperax.two_halves_per_tool_call">Two halves per tool call</h2>
+				<p class="intro" data-i18n="sperax.the_host_frames_a_hosted_iframe_for">
+					The host frames a hosted iframe for the visible avatar and, in parallel, POSTs the
+					tool arguments to the three.ws gateway for the model-facing result. Both run on
+					every call.
+				</p>
+				<div class="spx-flow" role="img" tabindex="0" aria-label="Diagram: a SperaxOS tool call fans out to the avatar iframe and the three.ws gateway endpoint">
+<pre><b>SperaxOS host</b>
+  │  1. LLM calls a tool (speak / gesture / emote / render_agent)
+  │
+  ├─ 2a. frames <b>/sperax/iframe/</b> and posts the call
+  │        └─▶ &lt;agent-3d&gt; animates the avatar in the chat panel
+  │
+  └─ 2b. gateway POSTs the arguments to the tool endpoint
+           └─▶ <b>/api/chat-plugin/speak</b> → { ok: true, spoken: "…" }</pre>
+				</div>
+			</section>
+
+			<!-- ── Chain note ───────────────────────────────────── -->
+			<section class="spx-section" aria-labelledby="spx-chain">
+				<p class="spx-eyebrow" data-i18n="sperax.payments">Payments</p>
+				<h2 id="spx-chain" data-i18n="sperax.base_x402_natively">Base x402, natively</h2>
+				<div class="spx-note">
+					<span class="ico" aria-hidden="true">⛓️</span>
+					<p data-i18n-html="sperax.speraxos_is_evm_native_and_settles_agent">
+						SperaxOS is EVM-native and settles agent payments via <strong>x402 over USDC on
+						Base</strong> (<code>x402.sperax.io</code>) — the same Base x402 rail three.ws
+						already runs. The avatar panel is chain-agnostic: it renders and animates
+						regardless of which chain your bound agent transacts on.
+					</p>
+				</div>
+			</section>
+
+			<!-- ── FAQ ──────────────────────────────────────────── -->
+			<section class="spx-section" aria-labelledby="spx-faq-h">
+				<p class="spx-eyebrow" data-i18n="sperax.questions">Questions</p>
+				<h2 id="spx-faq-h" data-i18n="sperax.good_to_know">Good to know</h2>
+				<div class="spx-faq">
+					<details>
+						<summary data-i18n="sperax.do_i_need_a_three_ws_account">Do I need a three.ws account?</summary>
+						<p data-i18n-html="sperax.yes_the_plugin_binds_to_a_three">
+							Yes — the plugin binds to a three.ws agent, so it needs an identity to render.
+							Your Agent ID is a UUID or <code>@handle</code> you copy from
+							<a href="/dashboard">your dashboard</a>. Don't have one?
+							<a href="/create">Create an agent</a> first, then come back.
+						</p>
+					</details>
+					<details>
+						<summary data-i18n="sperax.does_the_plugin_cost_anything_or_need">Does the plugin cost anything or need an API key?</summary>
+						<p data-i18n="sperax.no_the_only_setting_is_your_public">
+							No. The only setting is your public Agent ID — there's no API key to paste. The
+							free credits cover your usage on SperaxOS while the launch offer runs.
+						</p>
+					</details>
+					<details>
+						<summary data-i18n="sperax.which_chain_does_this_settle_on">Which chain does this settle on?</summary>
+						<p data-i18n-html="sperax.speraxos_settles_agent_payments_via_x402_ove">
+							SperaxOS settles agent payments via x402 over USDC on Base, matching three.ws's
+							Base x402 rail. The avatar itself renders regardless of chain — see
+							<a href="#spx-chain">Base x402, natively</a> above.
+						</p>
+					</details>
+					<details>
+						<summary data-i18n="sperax.where_s_the_technical_detail">Where's the technical detail?</summary>
+						<p data-i18n-html="sperax.the_full_plugin_reference_manifest_tools_and">
+							The full plugin reference — manifest, tools, and local testing — lives in the
+							<a href="/sperax/manifest.json" rel="noopener">manifest</a> and the integration
+							write-up at
+							<a href="/blog/three-ws-speraxusd-integration">three.ws Ships Inside SperaxUSD</a>.
+						</p>
+					</details>
+				</div>
+			</section>
+
+			<!-- ── Final CTA ────────────────────────────────────── -->
+			<section class="spx-final" aria-labelledby="spx-final-h">
+				<h2 id="spx-final-h" data-i18n="sperax.give_your_agent_a_body">Give your agent a body</h2>
+				<p data-i18n="sperax.install_the_plugin_connect_your_three_ws">
+					Install the plugin, connect your three.ws identity, and claim your free credits on
+					SperaxOS.
+				</p>
+				<div class="spx-cta-row">
+					<a class="spx-btn spx-btn-primary" href="https://chat.sperax.io" rel="noopener" data-i18n="sperax.open_speraxos">
+						Open SperaxOS →
+					</a>
+					<a class="spx-btn spx-btn-secondary" href="/dashboard" data-i18n="sperax.get_your_agent_id">Get your Agent ID</a>
+				</div>
+			</section>
+		</main>
+
+		<script>
+			(function () {
+				var btn = document.getElementById('spx-copy-manifest');
+				var label = btn.querySelector('span');
+				var status = document.getElementById('spx-copy-status');
+				var timer = null;
+				var idleLabel = '';
+				function selectUrl() {
+					var code = btn.closest('.spx-step').querySelector('code');
+					if (!code || !window.getSelection) return;
+					var range = document.createRange();
+					range.selectNodeContents(code);
+					var sel = window.getSelection();
+					sel.removeAllRanges();
+					sel.addRange(range);
+				}
+				function settle(text, done) {
+					label.textContent = text;
+					status.textContent = text;
+					btn.classList.toggle('is-done', done);
+					clearTimeout(timer);
+					timer = setTimeout(function () {
+						timer = null;
+						label.textContent = idleLabel;
+						status.textContent = '';
+						btn.classList.remove('is-done');
+					}, 1800);
+				}
+				btn.addEventListener('click', function () {
+					if (timer === null) idleLabel = label.textContent;
+					var url = btn.getAttribute('data-url');
+					var write =
+						navigator.clipboard && navigator.clipboard.writeText
+							? navigator.clipboard.writeText(url)
+							: Promise.reject(new Error('clipboard unavailable'));
+					write.then(
+						function () {
+							settle(btn.getAttribute('data-label-copied'), true);
+						},
+						function () {
+							selectUrl();
+							settle(btn.getAttribute('data-label-failed'), false);
+						},
+					);
+				});
+			})();
+		</script>
+		<script src="/brand.js" defer></script>
+		<div id="footer-container"></div>
+		<script src="/footer.js"></script>
+		<!-- Runtime i18n: detects locale, swaps annotated copy, mounts <lang-switcher>. -->
+	<script type="module" src="/i18n.js"></script>
+</body>
+</html>

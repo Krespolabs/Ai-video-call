@@ -1,0 +1,9 @@
+{
+	"out": "public/x-media/community-growth/marketplace.png",
+	"headline": "3,150 agents.\nEach with a body.",
+	"body": "Browse the marketplace, talk to any agent before you fork it, and add skills from a library of 152.",
+	"frame": "browser",
+	"shot": "https://three.ws/marketplace",
+	"label": "three.ws/marketplace",
+	"settleMs": 15000
+}

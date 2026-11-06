@@ -1,0 +1,153 @@
+<!doctype html>
+<html lang="en" class="cv-page">
+	<head>
+		<script>
+			/* three.ws theme boot — no-flash; runtime in /theme-switcher.js */ (function () {
+				try {
+					var m = localStorage.getItem('twx_theme');
+					var l =
+						m === 'auto'
+							? window.matchMedia &&
+								window.matchMedia('(prefers-color-scheme: light)').matches
+							: m === 'light';
+					document.documentElement.setAttribute('data-theme', l ? 'light' : 'dark');
+				} catch (e) {
+					document.documentElement.setAttribute('data-theme', 'dark');
+				}
+			})();
+		</script>
+		<meta charset="utf-8" />
+		<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+		<title data-i18n="compare.meta_title">Compare Coins · three.ws</title>
+		<meta
+			name="description"
+			content="Compare cryptocurrencies side by side: overlay price performance and line up market cap, volume, supply, and all-time-high stats for up to four coins at once."
+		 data-i18n-attr="content:compare.meta_description"/>
+		<meta property="og:type" content="website" />
+		<meta property="og:site_name" content="three.ws" />
+		<meta property="og:url" content="https://three.ws/compare" />
+		<meta property="og:title" content="Compare Coins · three.ws"  data-i18n-attr="content:compare.meta_og_title"/>
+		<meta
+			property="og:description"
+			content="Overlay price performance and line up market cap, volume, supply, and ATH stats for up to four coins at once."
+		 data-i18n-attr="content:compare.meta_og_description"/>
+		<meta
+			property="og:image"
+			content="https://three.ws/api/page-og?s=crypto&amp;t=Compare+Crypto+Side+by+Side&amp;d=Compare+cryptocurrencies+head+to+head%3A+overlay+normalized+price+performance+and+line+up+market+cap%2C+volume%2C+FDV%2C+supply%2C+and+all-time-high+stats+for+up+to+four&amp;p=%2Fcompare"
+		/>
+		<meta property="og:image:width" content="1200" />
+		<meta property="og:image:height" content="630" />
+		<meta name="twitter:card" content="summary_large_image" />
+		<meta name="twitter:site" content="@trythreews" />
+		<meta name="twitter:title" content="Compare Coins · three.ws"  data-i18n-attr="content:compare.meta_twitter_title"/>
+		<meta
+			name="twitter:description"
+			content="Overlay price performance and line up market cap, volume, supply, and ATH stats for up to four coins at once."
+		 data-i18n-attr="content:compare.meta_twitter_description"/>
+		<meta
+			name="twitter:image"
+			content="https://three.ws/api/page-og?s=crypto&amp;t=Compare+Crypto+Side+by+Side&amp;d=Compare+cryptocurrencies+head+to+head%3A+overlay+normalized+price+performance+and+line+up+market+cap%2C+volume%2C+FDV%2C+supply%2C+and+all-time-high+stats+for+up+to+four&amp;p=%2Fcompare"
+		/>
+		<meta name="theme-color" content="#09090b" />
+		<link rel="icon" href="/favicon.ico" sizes="any" />
+		<link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+		<link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+		<link rel="manifest" href="/manifest.webmanifest" />
+		<link rel="stylesheet" href="/fonts/fonts.css" />
+		<link rel="stylesheet" href="/nav.css" />
+		<link rel="stylesheet" href="/src/coin-pages.css" />
+		<link rel="stylesheet" href="/footer.css" />
+		<link rel="canonical" href="https://three.ws/compare" />
+		<meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1" />
+		<meta property="og:locale" content="en_US" />
+		<meta property="og:image:alt" content="Compare Crypto Side by Side - three.ws" />
+	
+	<script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"WebPage","name":"Compare Crypto Side by Side","description":"Compare cryptocurrencies head to head - overlay normalized price performance and line up market cap, volume, FDV, supply, and all-time-high stats for up to four coins at once. The selection is saved to the URL so any matchup is shareable.","url":"https://three.ws/compare","isPartOf":{"@type":"WebSite","name":"three.ws","url":"https://three.ws"},"primaryImageOfPage":"https://three.ws/api/page-og?s=crypto&t=Compare+Crypto+Side+by+Side&d=Compare+cryptocurrencies+head+to+head+-+overlay+normalized+price+performance+and+line+up+market+cap%2C+volume%2C+FDV%2C+supply%2C+and+all-time-high+stats+for+up+to+four&p=%2Fcompare"}]}</script>
+</head>
+	<body>
+		<header><div id="nav-container"></div></header>
+		<script src="/nav.js"></script>
+
+		<main class="cv-container">
+			<nav class="cv-crumbs" aria-label="Breadcrumb">
+				<a href="/markets" data-i18n="compare.markets">Markets</a><span class="sep">/</span
+				><span class="here" data-i18n="compare.compare">Compare</span>
+			</nav>
+			<h1 class="cv-h1" data-i18n="compare.compare_coins">Compare Coins</h1>
+			<p class="cv-sub" data-i18n="compare.put_up_to_four_coins_head_to">
+				Put up to four coins head to head: overlay how they've performed and line up the
+				numbers that matter. Add coins with the search box; the URL updates so you can share
+				the matchup.
+			</p>
+
+			<div class="cmp-picker">
+				<div class="cv-search" id="cmp-search" style="max-width: 24rem">
+					<span class="mag" aria-hidden="true">
+						<svg
+							viewBox="0 0 24 24"
+							fill="none"
+							stroke="currentColor"
+							stroke-width="2"
+							stroke-linecap="round"
+							stroke-linejoin="round"
+						>
+							<circle cx="11" cy="11" r="8" />
+							<path d="m21 21-4.3-4.3" />
+						</svg>
+					</span>
+					<input
+						id="cmp-search-input"
+						type="search"
+						placeholder="Add a coin to compare (up to 4)…"
+						autocomplete="off"
+						spellcheck="false"
+						role="combobox"
+						aria-expanded="false"
+						aria-controls="cmp-search-pop"
+						aria-label="Search coins to add to the comparison"
+					/>
+					<div id="cmp-search-pop" class="cv-search-pop" role="listbox" hidden></div>
+				</div>
+				<div class="cmp-chips" id="cmp-chips" role="list" aria-label="Selected coins"></div>
+				<button type="button" class="cmp-share" id="cmp-share" disabled>
+					<svg
+						viewBox="0 0 24 24"
+						width="14"
+						height="14"
+						fill="none"
+						stroke="currentColor"
+						stroke-width="2"
+						stroke-linecap="round"
+						stroke-linejoin="round"
+						aria-hidden="true"
+					>
+						<path d="M10 13a5 5 0 0 0 7.5.5l3-3a5 5 0 0 0-7-7l-1.7 1.7" />
+						<path d="M14 11a5 5 0 0 0-7.5-.5l-3 3a5 5 0 0 0 7 7l1.7-1.7" />
+					</svg>
+					Copy link
+				</button>
+			</div>
+			<p class="cmp-hint" id="cmp-limit-hint" hidden>
+				Four coins is the maximum. Remove one to add another.
+			</p>
+			<p class="cmp-hint" id="cmp-status" role="status" aria-live="polite"></p>
+
+			<!-- Overlay performance chart. Hydrated by src/compare.js. -->
+			<section
+				id="cmp-chart"
+				class="cv-section"
+				aria-label="Performance comparison"
+			></section>
+
+			<!-- Side-by-side stats table. Hydrated by src/compare.js. -->
+			<section id="cmp-table" class="cv-section" aria-label="Statistics comparison"></section>
+		</main>
+
+		<script type="module" src="/src/compare.js"></script>
+		<script src="/brand.js" defer></script>
+		<div id="footer-container"></div>
+		<script src="/footer.js"></script>
+		<!-- Runtime i18n: detects locale, swaps annotated copy, mounts <lang-switcher>. -->
+	<script type="module" src="/i18n.js"></script>
+</body>
+</html>

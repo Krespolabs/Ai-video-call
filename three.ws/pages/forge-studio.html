@@ -1,0 +1,4284 @@
+<!doctype html>
+<html lang="en">
+	<head>
+		<script>/* three.ws theme boot — no-flash; runtime in /theme-switcher.js */(function(){try{var m=localStorage.getItem('twx_theme');var l=m==='auto'?(window.matchMedia&&window.matchMedia('(prefers-color-scheme: light)').matches):m==='light';document.documentElement.setAttribute('data-theme',l?'light':'dark');}catch(e){document.documentElement.setAttribute('data-theme','dark');}})();</script>
+		<meta charset="UTF-8" />
+		<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+		<title data-i18n="forge_studio.meta_title">Studio · Object + Avatar from text · three.ws</title>
+		<meta
+			name="description"
+			content="One place to turn text into 3D: forge a textured object (GLB) or describe a character and get a rigged avatar. Two pipelines, one canvas."
+		 data-i18n-attr="content:forge_studio.meta_description"/>
+		<meta property="og:title" content="Studio — Object + Avatar from text · three.ws"  data-i18n-attr="content:forge_studio.meta_og_title"/>
+		<meta
+			property="og:description"
+			content="Forge a textured object from a prompt, or describe a character and get a rigged avatar — in one place."
+		 data-i18n-attr="content:forge_studio.meta_og_description"/>
+		<meta property="og:type" content="website" />
+		<meta property="og:site_name" content="three.ws" />
+		<meta property="og:url" content="https://three.ws/forge-studio" />
+		<meta property="og:image" content="https://three.ws/api/page-og?s=build&amp;t=Studio%3A+Object+%2B+Avatar+from+text&amp;d=One+canvas+for+both+text-to-3D+pipelines%3A+forge+a+textured+object+%28GLB%29+in+the+Object+tab%2C+or+describe+a+character+and+get+a+rigged+avatar+in+the+Avatar+tab.&amp;p=%2Fforge-studio" />
+		<meta property="og:image:width" content="1200" />
+		<meta property="og:image:height" content="630" />
+		<meta name="twitter:card" content="summary_large_image" />
+		<meta name="twitter:site" content="@trythreews" />
+		<meta name="twitter:title" content="Studio · Object + Avatar from text · three.ws"  data-i18n-attr="content:forge_studio.meta_twitter_title"/>
+		<meta
+			name="twitter:description"
+			content="One place to turn text into 3D: forge a textured object (GLB) or describe a character and get a rigged avatar."
+		 data-i18n-attr="content:forge_studio.meta_twitter_description"/>
+		<meta name="twitter:image" content="https://three.ws/api/page-og?s=build&amp;t=Studio%3A+Object+%2B+Avatar+from+text&amp;d=One+canvas+for+both+text-to-3D+pipelines%3A+forge+a+textured+object+%28GLB%29+in+the+Object+tab%2C+or+describe+a+character+and+get+a+rigged+avatar+in+the+Avatar+tab.&amp;p=%2Fforge-studio" />
+		<meta name="theme-color" content="#080814" />
+		<link rel="icon" href="/favicon.ico" sizes="any" />
+		<link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+		<link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png" />
+		<link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png" />
+		<link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+		<link rel="manifest" href="/manifest.webmanifest" />
+		<link rel="stylesheet" href="/style.css" />
+		<link rel="preconnect" href="https://cdn.jsdelivr.net" />
+		<script
+			type="module"
+			src="https://cdn.jsdelivr.net/npm/@google/model-viewer@4.4.0/dist/model-viewer.min.js"
+			integrity="sha384-wjsPzEO+lXOf7d9csIDfAQpPt2OKuUU3m0K9qsdKIuzX4N8czSF6hdh23eAbZa3p"
+			crossorigin="anonymous"
+		></script>
+		<style>
+			/* No per-surface accent override — forge uses the global monochrome tokens. */
+
+			.forge-main {
+				max-width: none;
+				margin: 0;
+				padding: var(--space-md) clamp(var(--space-md), 4vw, var(--space-2xl)) var(--space-2xl);
+			}
+			.forge-head {
+				/* Reset the global site-nav `header` rule from style.css —
+				   this is an in-page hero, not the top bar. */
+				display: flex;
+				align-items: baseline;
+				gap: var(--space-md);
+				height: auto;
+				padding: 0 0 var(--space-md);
+				background: none;
+				backdrop-filter: none;
+				-webkit-backdrop-filter: none;
+				border-bottom: 1px solid var(--stroke);
+				overflow: visible;
+				white-space: normal;
+				line-height: var(--leading-normal);
+				z-index: auto;
+				-webkit-app-region: no-drag;
+				margin-bottom: var(--space-lg);
+			}
+
+			/* ── Workspace: composer rail + stage side by side on desktop ────── */
+			.forge-workspace {
+				display: grid;
+				/* Default (mobile / <1080px): one full-width column that may shrink
+				   below its content's min-content width, so the rail and stage stack
+				   vertically without forcing horizontal scroll. The 1080px query
+				   below restores the two-column desktop layout. */
+				grid-template-columns: minmax(0, 1fr);
+				gap: var(--space-lg);
+				align-items: start;
+			}
+			@media (min-width: 1080px) {
+				.forge-workspace {
+					grid-template-columns: minmax(380px, 440px) minmax(0, 1fr);
+					gap: var(--space-xl);
+				}
+				.forge-rail {
+					position: sticky;
+					top: 84px;
+				}
+			}
+			/* Stage column — the viewer/result, your creations, and the showcase.
+			   min-width:0 lets the 3D canvas shrink to its grid cell instead of
+			   forcing the rail narrow; the sections stack with even spacing. */
+			.forge-stage {
+				min-width: 0;
+				display: flex;
+				flex-direction: column;
+				gap: var(--space-lg);
+			}
+			/* forge-eyebrow removed — header is now inline h1 + tagline */
+			.forge-head h1 {
+				font-family: var(--font-display);
+				font-size: var(--text-xl);
+				line-height: 1;
+				margin: 0;
+				color: var(--ink);
+				flex: none;
+			}
+			.forge-head p {
+				color: var(--ink-dim);
+				font-size: var(--text-sm);
+				margin: 0;
+				line-height: var(--leading-normal);
+			}
+
+			/* Composer ---------------------------------------------------- */
+			.composer {
+				background: var(--surface-glass);
+				border: 1px solid var(--stroke-strong);
+				border-radius: var(--radius-lg);
+				padding: var(--space-md);
+				box-shadow: 0 24px 60px -30px rgba(0, 0, 0, 0.8);
+			}
+			.composer textarea {
+				width: 100%;
+				min-height: 120px;
+				resize: vertical;
+				background: transparent;
+				border: none;
+				outline: none;
+				color: var(--ink);
+				font-family: var(--font-body);
+				font-size: var(--text-lg);
+				line-height: var(--leading-normal);
+			}
+			.composer textarea::placeholder {
+				color: var(--ink-dim);
+			}
+			.composer-row {
+				display: flex;
+				align-items: center;
+				gap: var(--space-sm);
+				margin-top: var(--space-sm);
+				padding-top: var(--space-sm);
+				border-top: 1px solid var(--stroke);
+				flex-wrap: wrap;
+			}
+			.aspect {
+				display: inline-flex;
+				gap: 2px;
+				background: var(--surface-1);
+				border: 1px solid var(--stroke);
+				border-radius: var(--radius-md);
+				padding: 2px;
+			}
+			.aspect button {
+				background: transparent;
+				border: none;
+				color: var(--ink-dim);
+				font-family: var(--font-mono);
+				font-size: var(--text-xs);
+				padding: 0.32rem 0.55rem;
+				border-radius: var(--radius-sm);
+				cursor: pointer;
+				transition:
+					background var(--duration-fast),
+					color var(--duration-fast);
+			}
+			.aspect button:hover {
+				color: var(--ink);
+			}
+			.aspect button[aria-pressed='true'] {
+				background: var(--surface-3);
+				color: var(--ink);
+			}
+			/* Live backend health on the engine buttons: a throttled upstream gets
+			   an amber dot, a down/unconfigured one is disabled with the reason in
+			   its tooltip. Dots ride ::after so the label spacing stays put. */
+			.aspect button[data-health='degraded']::after {
+				content: '';
+				display: inline-block;
+				width: 0.4em;
+				height: 0.4em;
+				margin-left: 0.35em;
+				border-radius: 50%;
+				background: var(--warning, #e0a93e);
+				vertical-align: 0.08em;
+			}
+			.aspect button:disabled {
+				opacity: 0.45;
+				cursor: not-allowed;
+			}
+			/* Key glyph marks BYOK engines (Meshy/Tripo/Rodin/Stability/Replicate)
+			   so users see which lanes run on their own API key vs the free/included
+			   ones. Sits inside the button after the label; the health dot stays on
+			   ::after, so the two never collide. */
+			.aspect button .eng-key {
+				width: 0.82em;
+				height: 0.82em;
+				margin-left: 0.42em;
+				vertical-align: -0.13em;
+				opacity: 0.5;
+				transition: opacity var(--duration-fast);
+			}
+			.aspect button:hover .eng-key,
+			.aspect button[aria-pressed='true'] .eng-key {
+				opacity: 0.95;
+			}
+			/* "FREE" pill on zero-cost engines (catalog free:true). A quiet green
+			   accent so the free lanes read at a glance without shouting over the
+			   selected-state styling. Sits after the label, before the health dot. */
+			.aspect button .eng-free {
+				margin-left: 0.45em;
+				padding: 0.05em 0.4em;
+				border-radius: 999px;
+				font-size: 0.62em;
+				font-weight: 700;
+				letter-spacing: 0.04em;
+				line-height: 1.5;
+				vertical-align: 0.08em;
+				/* Dark theme is the default — a bright mint reads on the dark button. */
+				color: var(--success);
+				background: rgba(34, 197, 94, 0.14);
+				border: 1px solid rgba(74, 222, 128, 0.38);
+			}
+			html[data-theme='light'] .aspect button .eng-free {
+				color: #0a7d33;
+				background: rgba(34, 197, 94, 0.16);
+				border-color: rgba(34, 197, 94, 0.32);
+			}
+			.aspect button:disabled .eng-free {
+				opacity: 0.5;
+			}
+			/* Static legend decoding the engine-button affordances (FREE pill, key
+			   glyph, health dots) so the picker is self-explanatory at a glance. */
+			.engine-legend {
+				display: flex;
+				flex-wrap: wrap;
+				gap: var(--space-xs) var(--space-md);
+				margin: var(--space-2xs) 0 0;
+				font-size: var(--text-xs);
+				color: var(--ink-dim);
+			}
+			.engine-legend .el-item {
+				display: inline-flex;
+				align-items: center;
+				gap: 0.4em;
+				white-space: nowrap;
+			}
+			.engine-legend .el-free {
+				padding: 0.05em 0.4em;
+				border-radius: 999px;
+				font-size: 0.85em;
+				font-weight: 700;
+				letter-spacing: 0.04em;
+				color: var(--success);
+				background: rgba(34, 197, 94, 0.14);
+				border: 1px solid rgba(74, 222, 128, 0.38);
+			}
+			html[data-theme='light'] .engine-legend .el-free {
+				color: #0a7d33;
+				background: rgba(34, 197, 94, 0.16);
+				border-color: rgba(34, 197, 94, 0.32);
+			}
+			.engine-legend .el-key {
+				width: 0.92em;
+				height: 0.92em;
+				opacity: 0.6;
+			}
+			.engine-legend .el-dot {
+				width: 0.5em;
+				height: 0.5em;
+				border-radius: 50%;
+			}
+			.engine-legend .el-dot-busy {
+				background: var(--warning, #e0a93e);
+			}
+			.engine-legend .el-dot-down {
+				background: var(--danger, #e05a5a);
+				opacity: 0.7;
+			}
+			.aspect button:focus-visible,
+			.chip:focus-visible,
+			.btn:focus-visible {
+				outline: 2px solid var(--accent);
+				outline-offset: 2px;
+			}
+			.btn {
+				display: inline-flex;
+				align-items: center;
+				gap: 0.5rem;
+				font-family: var(--font-display);
+				font-weight: 600;
+				font-size: var(--text-base);
+				color: #0b0b0b;
+				background: var(--accent);
+				border: 1px solid var(--accent);
+				border-radius: var(--radius-md);
+				padding: 0.6rem 1.2rem;
+				cursor: pointer;
+				transition:
+					transform var(--duration-fast) var(--ease-standard),
+					opacity var(--duration-fast),
+					box-shadow var(--duration-fast);
+			}
+			.btn:hover {
+				box-shadow: 0 0 0 4px var(--accent-soft);
+			}
+			.btn:active {
+				transform: translateY(1px);
+			}
+			.btn[disabled] {
+				opacity: 0.45;
+				cursor: not-allowed;
+			}
+			.btn-ghost {
+				background: transparent;
+				color: var(--ink);
+				border: 1px solid var(--stroke-strong);
+			}
+			.btn-ghost:hover {
+				background: var(--surface-2);
+				box-shadow: none;
+			}
+			/* Primary action — full-width, monochrome fill. */
+			#generate {
+				width: 100%;
+				justify-content: center;
+				font-size: var(--text-lg);
+				padding: 0.75rem 1.2rem;
+				background: var(--btn-primary-bg);
+				border-color: transparent;
+				color: var(--btn-primary-fg);
+			}
+			#generate:hover {
+				box-shadow:
+					0 0 0 4px var(--accent-soft),
+					0 8px 28px -8px rgba(255, 255, 255, 0.15);
+			}
+			/* Gated (High needs $THREE): readable "locked perk" state, not a faded
+			   dead button — the lock panel above explains, this stays legible. */
+			#generate.is-gated,
+			#generate.is-gated:hover {
+				opacity: 1;
+				cursor: not-allowed;
+				background: var(--surface-2);
+				color: var(--muted);
+				border: 1px solid rgba(245, 196, 81, 0.4);
+				box-shadow: none;
+			}
+			.gen-kbd {
+				font-family: var(--font-mono);
+				font-size: 0.72em;
+				line-height: 1;
+				padding: 0.2em 0.4em;
+				border-radius: var(--radius-sm);
+				background: rgba(0, 0, 0, 0.16);
+				border: 1px solid rgba(0, 0, 0, 0.22);
+				color: inherit;
+				opacity: 0.85;
+			}
+			@media (max-width: 560px) {
+				.gen-kbd {
+					display: none;
+				}
+			}
+
+			/* Prompt tools — surprise · coach · counter -------------------- */
+			.prompt-tools {
+				display: flex;
+				align-items: center;
+				gap: var(--space-sm);
+				margin-top: var(--space-xs);
+				flex-wrap: wrap;
+			}
+			.ptool {
+				display: inline-flex;
+				align-items: center;
+				gap: 0.4rem;
+				background: var(--surface-1);
+				border: 1px solid var(--stroke);
+				border-radius: 999px;
+				color: var(--ink-dim);
+				font-family: var(--font-mono);
+				font-size: var(--text-xs);
+				letter-spacing: 0.02em;
+				padding: 0.32rem 0.72rem;
+				cursor: pointer;
+				transition:
+					color var(--duration-fast),
+					border-color var(--duration-fast),
+					background var(--duration-fast);
+			}
+			.ptool:hover {
+				color: var(--ink);
+				border-color: var(--stroke-strong);
+				background: var(--surface-2);
+			}
+			.ptool:focus-visible {
+				outline: 2px solid var(--accent);
+				outline-offset: 2px;
+			}
+			.ptool svg {
+				width: 14px;
+				height: 14px;
+			}
+			.ptool.is-rolling svg {
+				animation: dice-roll 0.5s cubic-bezier(0.3, 0.7, 0.3, 1);
+			}
+			@keyframes dice-roll {
+				from {
+					transform: rotate(0);
+				}
+				to {
+					transform: rotate(360deg);
+				}
+			}
+			@media (prefers-reduced-motion: reduce) {
+				.ptool.is-rolling svg {
+					animation: none;
+				}
+			}
+			.prompt-coach {
+				display: inline-flex;
+				align-items: center;
+				gap: 0.45rem;
+				font-size: var(--text-xs);
+				color: var(--ink-dim);
+				line-height: 1.4;
+				min-height: 1.2em;
+				flex: 1 1 12rem;
+				min-width: 0;
+			}
+			.prompt-coach::before {
+				content: '';
+				width: 6px;
+				height: 6px;
+				border-radius: 50%;
+				background: var(--ink-dim);
+				flex: none;
+				transition:
+					background var(--duration-base),
+					box-shadow var(--duration-base);
+			}
+			.prompt-coach[data-grade='strong'] {
+				color: var(--success);
+			}
+			.prompt-coach[data-grade='strong']::before {
+				background: var(--success);
+				box-shadow: 0 0 8px var(--success);
+			}
+			.prompt-coach[data-grade='warn'] {
+				color: var(--warning, #e0a93e);
+			}
+			.prompt-coach[data-grade='warn']::before {
+				background: var(--warning, #e0a93e);
+			}
+			.prompt-coach[data-grade='tip']::before {
+				background: var(--accent);
+			}
+			.prompt-count {
+				font-family: var(--font-mono);
+				font-size: var(--text-xs);
+				color: var(--ink-dim);
+				flex: none;
+				font-variant-numeric: tabular-nums;
+				margin-left: auto;
+			}
+			.prompt-count[data-near='true'] {
+				color: var(--warning, #e0a93e);
+			}
+			.chips-more {
+				background: transparent;
+				border: 1px dashed var(--stroke-strong);
+				border-radius: 999px;
+				color: var(--ink-dim);
+				font-family: var(--font-mono);
+				font-size: var(--text-xs);
+				letter-spacing: 0.04em;
+				padding: 0.4rem 0.85rem;
+				cursor: pointer;
+				transition:
+					color var(--duration-fast),
+					border-color var(--duration-fast),
+					transform var(--duration-slow) var(--ease-standard);
+			}
+			.chips-more:hover {
+				color: var(--ink);
+				border-color: var(--accent);
+			}
+			.chips-more:focus-visible {
+				outline: 2px solid var(--accent);
+				outline-offset: 2px;
+			}
+			.chips-more.is-rolling {
+				transform: rotate(180deg);
+			}
+			@media (prefers-reduced-motion: reduce) {
+				.chips-more.is-rolling {
+					transform: none;
+				}
+			}
+			.chip.is-swapping {
+				opacity: 0;
+			}
+
+			/* Quality tier + engine + BYOK --------------------------------- */
+			.forge-quality {
+				display: flex;
+				flex-direction: column;
+				gap: var(--space-sm);
+				margin-top: var(--space-sm);
+				padding-top: var(--space-sm);
+				border-top: 1px solid var(--stroke);
+			}
+			.forge-quality-error {
+				margin-top: var(--space-sm);
+				padding-top: var(--space-sm);
+				border-top: 1px solid var(--stroke);
+			}
+			.forge-quality-error .tws-es {
+				padding: var(--space-sm) 0;
+				text-align: left;
+				align-items: flex-start;
+			}
+			.forge-quality-error .tws-es-icon { display: none; }
+			.forge-quality-error .tws-es-title { font-size: var(--text-sm); }
+			.forge-quality-error .tws-es-body { font-size: var(--text-xs); }
+			/* The retry holds the block open while the catalog round trip runs, so
+			   the button needs a pending look the shared state-kit does not carry. */
+			.forge-quality-error .tws-es-btn:disabled {
+				opacity: 0.55;
+				cursor: progress;
+			}
+			.forge-quality-error[aria-busy='true'] .tws-es-title::after {
+				content: '';
+				display: inline-block;
+				width: 0.7em;
+				height: 0.7em;
+				margin-left: 0.5em;
+				border: 2px solid currentColor;
+				border-right-color: transparent;
+				border-radius: 50%;
+				vertical-align: -1px;
+				animation: studioSpin 0.7s linear infinite;
+			}
+			@media (prefers-reduced-motion: reduce) {
+				.forge-quality-error[aria-busy='true'] .tws-es-title::after { animation: none; }
+			}
+			.fq-row {
+				display: flex;
+				align-items: center;
+				gap: var(--space-sm);
+				flex-wrap: wrap;
+			}
+			.fq-label {
+				font-family: var(--font-mono);
+				font-size: var(--text-xs);
+				text-transform: uppercase;
+				letter-spacing: 0.04em;
+				color: var(--ink-dim);
+				min-width: 4.2rem;
+			}
+			/* forge.js hides the #aspect control itself when the mode makes it
+			   irrelevant — collapse the labeled row with it, no orphan label. */
+			/* High is a $THREE holder perk — a small lock pill on the button makes
+			   the premium nature legible before the user selects it (a quality
+			   signal, not a nag). Gold while locked, green once the viewer holds
+			   $THREE. forge.js (applyHighAffordances) flips data-state from the
+			   live /api/three/access read. */
+			#tier button[data-tier='high'] {
+				display: inline-flex;
+				align-items: center;
+				gap: 0.4rem;
+			}
+			.tier-lock {
+				display: inline-flex;
+				align-items: center;
+				gap: 0.22rem;
+				font-family: var(--font-mono);
+				font-size: 0.68em;
+				line-height: 1;
+				padding: 0.18em 0.42em;
+				border-radius: 999px;
+				color: #f0d488;
+				background: rgba(245, 196, 81, 0.12);
+				border: 1px solid rgba(245, 196, 81, 0.32);
+				transition:
+					color var(--duration-fast),
+					background var(--duration-fast),
+					border-color var(--duration-fast);
+			}
+			.tier-lock-ico {
+				width: 0.92em;
+				height: 0.92em;
+			}
+			.tier-lock[data-state='unlocked'] {
+				color: #6ee7a8;
+				background: rgba(110, 231, 168, 0.13);
+				border-color: rgba(110, 231, 168, 0.34);
+			}
+			#tier button[data-tier='high']:hover .tier-lock,
+			#tier button[data-tier='high']:focus-visible .tier-lock {
+				border-color: rgba(245, 196, 81, 0.55);
+			}
+			#tier button[data-tier='high']:hover .tier-lock[data-state='unlocked'],
+			#tier button[data-tier='high']:focus-visible .tier-lock[data-state='unlocked'] {
+				border-color: rgba(110, 231, 168, 0.55);
+			}
+			#tier button[data-tier='high'][aria-pressed='true'] .tier-lock {
+				background: rgba(245, 196, 81, 0.2);
+			}
+			#tier button[data-tier='high'][aria-pressed='true'] .tier-lock[data-state='unlocked'] {
+				background: rgba(110, 231, 168, 0.2);
+			}
+			/* Inline holder note under the Quality row — links to /three. forge.js
+			   hides it while High is selected (the full in-place lock panel takes
+			   over) and swaps the copy once the viewer is a holder. */
+			.fq-holder-note {
+				display: flex;
+				align-items: center;
+				gap: 0.4rem;
+				margin: 0.1rem 0 0;
+				font-size: var(--text-xs);
+				line-height: 1.5;
+				color: var(--ink-dim);
+			}
+			.fq-holder-note a {
+				color: var(--accent);
+				text-decoration: none;
+				font-weight: 500;
+				white-space: nowrap;
+				transition: opacity var(--duration-fast);
+			}
+			.fq-holder-note a:hover {
+				text-decoration: underline;
+				opacity: 0.85;
+			}
+			.fq-holder-note a:focus-visible {
+				outline: 2px solid var(--accent);
+				outline-offset: 2px;
+				border-radius: 2px;
+			}
+			.fq-holder-note .fq-holder-ico {
+				color: #f5c451;
+				font-size: 0.9em;
+			}
+			.fq-holder-note[data-state='unlocked'] .fq-holder-ico {
+				color: #6ee7a8;
+			}
+			/* Quiet holder free-quota line under Generate + the Forge-local wallet
+			   connect chip (Part A). Token-only, matches the holder-note treatment. */
+			.fq-perk-row {
+				display: flex;
+				align-items: center;
+				gap: 0.6rem;
+				flex-wrap: wrap;
+				margin: 0.6rem 0 0;
+			}
+			.fq-perk-line {
+				margin: 0;
+				font-size: var(--text-xs);
+				line-height: 1.5;
+				color: var(--ink-dim);
+				display: inline-flex;
+				align-items: center;
+				gap: 0.35rem;
+			}
+			.fq-perk-line[data-state='perk'] {
+				color: var(--ink);
+			}
+			.fq-perk-line .fq-perk-ico {
+				color: #6ee7a8;
+			}
+			.fq-perk-line strong {
+				color: #6ee7a8;
+				font-weight: 700;
+			}
+			.fq-perk-line a {
+				color: var(--accent);
+				text-decoration: none;
+				font-weight: 500;
+			}
+			.fq-perk-line a:hover {
+				text-decoration: underline;
+			}
+			.fq-perk-line a:focus-visible {
+				outline: 2px solid var(--accent);
+				outline-offset: 2px;
+				border-radius: 2px;
+			}
+			.fq-connect-btn {
+				display: inline-flex;
+				align-items: center;
+				gap: 0.35rem;
+				font-size: var(--text-xs);
+				font-weight: 600;
+				color: var(--ink);
+				background: var(--surface-2);
+				border: 1px solid var(--surface-3);
+				border-radius: var(--radius-pill);
+				padding: 5px 12px;
+				cursor: pointer;
+				transition: border-color var(--duration-fast), transform var(--duration-fast), background var(--duration-fast);
+			}
+			.fq-connect-btn:hover {
+				border-color: var(--accent);
+				transform: translateY(-1px);
+			}
+			.fq-connect-btn:focus-visible {
+				outline: 2px solid var(--accent);
+				outline-offset: 2px;
+			}
+			.fq-connect-btn.is-connected {
+				color: #6ee7a8;
+				border-color: rgba(110, 231, 168, 0.4);
+			}
+			.fq-connect-btn .fq-connect-ico {
+				font-size: 0.95em;
+				opacity: 0.8;
+			}
+			@media (prefers-reduced-motion: reduce) {
+				.tier-lock {
+					transition: none;
+				}
+				.fq-connect-btn {
+					transition: none;
+				}
+			}
+			.fq-row:has(> .aspect.is-hidden) {
+				display: none;
+			}
+			/* The key field appears only for bring-your-own-key engines, so it
+			   reads as a deliberate, self-contained zone — an inset panel with an
+			   accent edge that eases in when the engine is selected. */
+			.byok-row {
+				display: flex;
+				align-items: center;
+				gap: var(--space-sm);
+				flex-wrap: wrap;
+				position: relative;
+				padding: 0.7rem 0.8rem 0.7rem 1rem;
+				background: var(--surface-2);
+				border: 1px solid var(--stroke);
+				border-radius: var(--radius-md);
+			}
+			.byok-row::before {
+				content: '';
+				position: absolute;
+				left: 0;
+				top: 0.6rem;
+				bottom: 0.6rem;
+				width: 2px;
+				border-radius: 0 2px 2px 0;
+				background: var(--accent);
+				opacity: 0.7;
+			}
+			.byok-row:not(.is-hidden) {
+				animation: byok-reveal 0.22s ease both;
+			}
+			@keyframes byok-reveal {
+				from {
+					opacity: 0;
+					transform: translateY(-3px);
+				}
+				to {
+					opacity: 1;
+					transform: none;
+				}
+			}
+			@media (prefers-reduced-motion: reduce) {
+				.byok-row:not(.is-hidden) {
+					animation: none;
+				}
+			}
+			.byok-row .fq-label {
+				min-width: 0;
+				color: var(--ink);
+			}
+			.byok-input {
+				flex: 1 1 16rem;
+				min-width: 0;
+				background: var(--bg);
+				border: 1px solid var(--stroke);
+				border-radius: var(--radius-md);
+				color: var(--ink);
+				font-family: var(--font-mono);
+				font-size: var(--text-sm);
+				padding: 0.5rem 0.7rem;
+				outline: none;
+				transition:
+					border-color var(--duration-fast),
+					box-shadow var(--duration-fast),
+					background var(--duration-fast);
+			}
+			.byok-input:hover {
+				border-color: var(--stroke-strong);
+			}
+			.byok-input:focus-visible {
+				border-color: var(--accent);
+				box-shadow: 0 0 0 3px var(--accent-soft);
+			}
+			.byok-input[aria-invalid='true'] {
+				border-color: var(--danger);
+				box-shadow: 0 0 0 3px color-mix(in srgb, var(--danger) 22%, transparent);
+			}
+			.byok-hint {
+				flex-basis: 100%;
+				font-size: var(--text-xs);
+				line-height: 1.5;
+				color: var(--ink-dim);
+			}
+			.byok-hint a {
+				color: var(--accent);
+				text-decoration: none;
+				font-weight: 500;
+				white-space: nowrap;
+				transition: opacity var(--duration-fast);
+			}
+			.byok-hint a:hover {
+				text-decoration: underline;
+				opacity: 0.85;
+			}
+			.fq-estimate {
+				margin: 0;
+				font-family: var(--font-mono);
+				font-size: var(--text-xs);
+				color: var(--ink-dim);
+				min-height: 1.1em;
+			}
+			.fq-estimate strong {
+				color: var(--ink);
+				font-weight: 600;
+			}
+			.fq-estimate .est-free {
+				color: var(--success);
+				font-weight: 700;
+			}
+			.fq-estimate .est-cost {
+				color: var(--ink);
+				font-weight: 700;
+			}
+
+			/* Mode switch — now lives inside .composer as the first element */
+			.mode-switch-wrap {
+				display: flex;
+				margin: calc(-1 * var(--space-md)) calc(-1 * var(--space-md)) var(--space-sm);
+				border-bottom: 1px solid var(--stroke);
+			}
+			.mode-switch {
+				display: flex;
+				width: 100%;
+				gap: 0;
+				background: transparent;
+				border: none;
+				border-radius: 0;
+				padding: 0;
+			}
+			.mode-switch button {
+				flex: 1;
+				background: transparent;
+				border: none;
+				border-bottom: 2px solid transparent;
+				color: var(--ink-dim);
+				font-family: var(--font-display);
+				font-size: var(--text-sm);
+				font-weight: 600;
+				padding: 0.65rem 0.6rem;
+				border-radius: 0;
+				cursor: pointer;
+				transition:
+					color var(--duration-fast),
+					border-color var(--duration-fast);
+				margin-bottom: -1px;
+			}
+			.mode-switch button:hover {
+				color: var(--ink);
+			}
+			.mode-switch button[aria-selected='true'] {
+				background: transparent;
+				color: var(--ink);
+				border-bottom-color: var(--accent);
+			}
+			.mode-switch button:focus-visible {
+				outline: 2px solid var(--accent);
+				outline-offset: 2px;
+			}
+
+			/* View slots — image / multi-view mode ------------------------- */
+			.image-pane {
+				display: flex;
+				flex-direction: column;
+			}
+			.views-grid {
+				display: grid;
+				grid-template-columns: repeat(4, 1fr);
+				gap: var(--space-sm);
+			}
+			@media (max-width: 620px) {
+				.views-grid {
+					grid-template-columns: repeat(2, 1fr);
+				}
+			}
+			/* Sketch mode reuses the view-slot kit with a single, wider slot.
+			   Declared after both .views-grid rules so it wins at every width. */
+			.sketch-grid {
+				grid-template-columns: minmax(140px, 240px);
+			}
+			.view-slot {
+				position: relative;
+				aspect-ratio: 1 / 1;
+				border: 1px dashed var(--stroke-strong);
+				border-radius: var(--radius-md);
+				background: var(--surface-1);
+				overflow: hidden;
+				display: grid;
+				place-items: center;
+				cursor: pointer;
+				transition:
+					border-color var(--duration-fast),
+					background var(--duration-fast),
+					transform var(--duration-fast);
+			}
+			.view-slot:hover {
+				border-color: var(--accent);
+			}
+			.view-slot:focus-visible {
+				outline: 2px solid var(--accent);
+				outline-offset: 2px;
+			}
+			.view-slot.drop-target {
+				border-color: var(--accent);
+				border-style: solid;
+				background: var(--accent-soft);
+				transform: scale(1.02);
+			}
+			.view-slot[data-state='uploaded'] {
+				border-style: solid;
+				cursor: grab;
+			}
+			.view-slot[data-state='uploaded']:active {
+				cursor: grabbing;
+			}
+			.view-slot[data-state='error'] {
+				border-color: var(--danger);
+				border-style: solid;
+			}
+			.view-slot.dragging {
+				opacity: 0.4;
+			}
+			/* Inner regions toggled by the slot's data-state. */
+			.vs-empty,
+			.vs-uploading,
+			.vs-error {
+				display: none;
+				flex-direction: column;
+				align-items: center;
+				justify-content: center;
+				gap: 0.35rem;
+				color: var(--ink-dim);
+				font-size: var(--text-xs);
+				padding: 0.5rem;
+				text-align: center;
+			}
+			.vs-thumb,
+			.vs-remove,
+			.vs-badge {
+				display: none;
+			}
+			.view-slot[data-state='empty'] .vs-empty {
+				display: flex;
+			}
+			.view-slot[data-state='uploading'] .vs-uploading {
+				display: flex;
+			}
+			.view-slot[data-state='uploaded'] .vs-thumb {
+				display: block;
+			}
+			.view-slot[data-state='uploaded'] .vs-remove {
+				display: grid;
+			}
+			.view-slot[data-state='uploaded'] .vs-badge {
+				display: block;
+			}
+			.view-slot[data-state='error'] .vs-error {
+				display: flex;
+			}
+			.vs-icon {
+				font-size: 1.5rem;
+				line-height: 1;
+				color: var(--ink-dim);
+			}
+			.vs-label {
+				font-family: var(--font-mono);
+				letter-spacing: 0.08em;
+				text-transform: uppercase;
+			}
+			.vs-thumb {
+				width: 100%;
+				height: 100%;
+				object-fit: cover;
+				pointer-events: none;
+			}
+			.vs-remove {
+				position: absolute;
+				top: 5px;
+				right: 5px;
+				width: 22px;
+				height: 22px;
+				place-items: center;
+				border: none;
+				border-radius: 50%;
+				background: rgba(0, 0, 0, 0.6);
+				color: #fff;
+				font-size: 1rem;
+				line-height: 1;
+				cursor: pointer;
+				backdrop-filter: blur(4px);
+				transition: background var(--duration-fast);
+			}
+			.vs-remove:hover {
+				background: var(--danger);
+			}
+			.vs-badge {
+				position: absolute;
+				bottom: 5px;
+				left: 5px;
+				font-family: var(--font-mono);
+				font-size: 0.6rem;
+				text-transform: uppercase;
+				letter-spacing: 0.06em;
+				padding: 1px 6px;
+				border-radius: 999px;
+				background: rgba(0, 0, 0, 0.6);
+				color: var(--ink);
+				backdrop-filter: blur(4px);
+			}
+			.vs-uploading .shimmer {
+				position: absolute;
+				inset: 0;
+				background: linear-gradient(
+					100deg,
+					transparent 20%,
+					rgba(255, 255, 255, 0.06) 50%,
+					transparent 80%
+				);
+				background-size: 200% 100%;
+				animation: shimmer 1.4s linear infinite;
+			}
+			.vs-retry {
+				background: transparent;
+				border: 1px solid var(--stroke-strong);
+				color: var(--ink);
+				border-radius: var(--radius-sm);
+				font-size: var(--text-xs);
+				padding: 0.2rem 0.5rem;
+				cursor: pointer;
+			}
+			.vs-retry:hover {
+				border-color: var(--accent);
+			}
+			.views-hint {
+				color: var(--ink-dim);
+				font-size: var(--text-xs);
+				margin: var(--space-sm) 0 0;
+				text-align: center;
+			}
+
+			/* "Draw instead" CTA — opens the in-browser sketch canvas (src/forge-studio/
+			   sketch-canvas.js) as an alternative to uploading a photo/drawing. Lives
+			   under the views counter / sketch grid in both the image and sketch panes. */
+			.draw-cta-row {
+				display: flex;
+				justify-content: center;
+				margin-top: var(--space-sm);
+			}
+			.draw-cta {
+				display: inline-flex;
+				align-items: center;
+				gap: 0.4rem;
+				background: transparent;
+				border: 1px dashed var(--stroke-strong);
+				color: var(--ink-dim);
+				border-radius: var(--radius-sm, 8px);
+				padding: 0.4rem 0.8rem;
+				font-size: var(--text-xs);
+				cursor: pointer;
+				transition: border-color var(--duration-fast) var(--ease-standard), color var(--duration-fast) var(--ease-standard), background var(--duration-fast) var(--ease-standard);
+			}
+			.draw-cta svg {
+				width: 14px;
+				height: 14px;
+			}
+			.draw-cta:hover {
+				border-color: var(--accent);
+				color: var(--ink);
+				background: var(--surface-1, rgba(255, 255, 255, 0.04));
+			}
+			.draw-cta:focus-visible {
+				outline: 2px solid var(--accent);
+				outline-offset: 2px;
+			}
+
+			/* Voice dictation mic slot — mounted by src/voice/prompt-dictation.js next
+			   to each prompt textarea. Empty <span> until JS decides the browser can
+			   dictate (native SpeechRecognition or the free Riva ASR lane); otherwise
+			   stays empty so no dead button ships. */
+			.pd-slot {
+				display: inline-flex;
+				align-items: center;
+			}
+			.pd-slot:empty {
+				display: none;
+			}
+
+			/* Live multi-view counter — turns four anonymous empty boxes into a
+			   legible "0 of 4" progress with pips, and teaches that more views ⇒
+			   sharper mesh. Updated by src/forge.js as slots fill. */
+			.views-counter {
+				display: flex;
+				align-items: center;
+				justify-content: center;
+				gap: 0.55rem;
+				margin-top: var(--space-sm);
+				font-family: var(--font-mono);
+				font-size: var(--text-xs);
+				color: var(--ink-dim);
+			}
+			.views-pips {
+				display: inline-flex;
+				gap: 4px;
+			}
+			.views-pips i {
+				width: 9px;
+				height: 9px;
+				border-radius: 50%;
+				border: 1px solid var(--stroke-strong);
+				background: transparent;
+				transition:
+					background var(--duration-base) var(--ease-standard),
+					border-color var(--duration-base) var(--ease-standard),
+					transform var(--duration-base) var(--ease-standard);
+			}
+			.views-pips i[data-filled='true'] {
+				background: var(--accent);
+				border-color: var(--accent);
+				transform: scale(1.08);
+			}
+			.views-counter .vc-text strong {
+				color: var(--ink);
+				font-weight: 600;
+			}
+			.views-counter .vc-quality {
+				color: var(--accent);
+			}
+			@media (prefers-reduced-motion: reduce) {
+				.views-pips i {
+					transition: none;
+				}
+			}
+
+			/* Required-input cue for the sketch prompt — sketch mode can't generate
+			   without a description, so it earns a visible "Required" tag that turns
+			   to a danger tint when the user tries to submit empty. */
+			.req-tag {
+				display: inline-block;
+				margin-left: 0.4rem;
+				font-family: var(--font-mono);
+				font-size: 0.62rem;
+				letter-spacing: 0.06em;
+				text-transform: uppercase;
+				color: var(--ink-dim);
+				border: 1px solid var(--stroke);
+				border-radius: 999px;
+				padding: 1px 6px;
+				vertical-align: 0.1em;
+				transition:
+					color var(--duration-fast),
+					border-color var(--duration-fast),
+					background var(--duration-fast);
+			}
+			.image-prompt[aria-invalid='true'] {
+				border-color: var(--danger);
+			}
+			.image-prompt[aria-invalid='true'] + .views-hint .req-tag,
+			.req-tag[data-missing='true'] {
+				color: var(--danger);
+				border-color: var(--danger);
+				background: color-mix(in srgb, var(--danger) 14%, transparent);
+			}
+			.image-prompt {
+				width: 100%;
+				min-height: 52px;
+				resize: vertical;
+				margin-top: var(--space-sm);
+				background: transparent;
+				border: 1px solid var(--stroke);
+				border-radius: var(--radius-md);
+				outline: none;
+				color: var(--ink);
+				font-family: var(--font-body);
+				font-size: var(--text-base);
+				line-height: var(--leading-normal);
+				padding: 0.55rem 0.7rem;
+			}
+			.image-prompt:focus {
+				border-color: var(--stroke-strong);
+			}
+			.image-prompt::placeholder {
+				color: var(--ink-dim);
+			}
+			.views-badge {
+				font-family: var(--font-mono);
+				font-size: 0.62rem;
+				text-transform: uppercase;
+				letter-spacing: 0.06em;
+				color: var(--ink-dim);
+				border: 1px solid var(--stroke);
+				border-radius: 999px;
+				padding: 1px 7px;
+				margin-left: 0.5rem;
+			}
+
+			/* Example chips ------------------------------------------------ */
+			.chips {
+				display: flex;
+				flex-wrap: wrap;
+				gap: var(--space-xs);
+				margin-top: var(--space-sm);
+			}
+			.chip {
+				background: var(--surface-1);
+				border: 1px solid var(--stroke);
+				border-radius: 999px;
+				color: var(--ink-dim);
+				font-size: var(--text-sm);
+				padding: 0.4rem 0.85rem;
+				cursor: pointer;
+				transition:
+					color var(--duration-fast),
+					border-color var(--duration-fast),
+					background var(--duration-fast),
+					opacity var(--duration-fast) var(--ease-standard);
+			}
+			.chip:hover {
+				color: var(--ink);
+				border-color: var(--accent);
+				background: var(--accent-soft);
+			}
+
+			/* Workspace / states ------------------------------------------ */
+			.stage {
+				min-height: min(calc(100svh - 200px), 700px);
+				display: flex;
+				flex-direction: column;
+			}
+			.stage > .panel,
+			.stage > .forge-empty {
+				flex: 1;
+			}
+
+			/* Idle — a live model, not a void. The newest community forge (or a
+			   labeled first-party sample) stands here so the first thing a visitor
+			   sees is the product's output. Markup in #state-empty; data wiring in
+			   the inline idle-teaser module at the end of the page. */
+			.idle-viewer-wrap {
+				position: relative;
+			}
+			.idle-viewer-wrap model-viewer {
+				width: 100%;
+				height: min(52vh, 480px);
+				background: radial-gradient(120% 120% at 50% 0%, #1a1612 0%, #0b0a09 70%);
+				--poster-color: transparent;
+			}
+			html[data-theme='light'] .idle-viewer-wrap model-viewer {
+				background: radial-gradient(120% 120% at 50% 0%, #f3eee9 0%, #e7e2dc 70%);
+			}
+			.idle-tag {
+				position: absolute;
+				top: 10px;
+				left: 12px;
+				font-family: var(--font-mono);
+				font-size: 0.65rem;
+				text-transform: uppercase;
+				letter-spacing: 0.08em;
+				color: var(--ink-dim);
+				background: rgba(0, 0, 0, 0.45);
+				border: 1px solid var(--stroke);
+				border-radius: 999px;
+				padding: 2px 9px;
+				backdrop-filter: blur(4px);
+			}
+			.idle-bar {
+				display: flex;
+				align-items: center;
+				justify-content: space-between;
+				gap: var(--space-sm);
+				padding: var(--space-sm) var(--space-md);
+				border-top: 1px solid var(--stroke);
+				flex-wrap: wrap;
+			}
+			.idle-caption {
+				display: flex;
+				flex-direction: column;
+				gap: 0.15rem;
+				min-width: 0;
+				flex: 1 1 16rem;
+			}
+			.idle-kicker {
+				font-family: var(--font-mono);
+				font-size: var(--text-xs);
+				text-transform: uppercase;
+				letter-spacing: 0.06em;
+				color: var(--accent);
+			}
+			.idle-prompt {
+				color: var(--ink);
+				font-size: var(--text-sm);
+				overflow: hidden;
+				text-overflow: ellipsis;
+				white-space: nowrap;
+			}
+			.idle-hint {
+				flex-basis: 100%;
+				margin: 0;
+				color: var(--ink-dim);
+				font-size: var(--text-xs);
+				line-height: var(--leading-normal);
+			}
+			.panel {
+				background: var(--surface-glass);
+				border: 1px solid var(--stroke);
+				border-radius: var(--radius-lg);
+				overflow: hidden;
+			}
+			.is-hidden {
+				display: none !important;
+			}
+
+			/* Generating state */
+			.gen {
+				display: grid;
+				grid-template-columns: 1fr 1.1fr;
+				gap: var(--space-md);
+				padding: var(--space-md);
+			}
+			@media (max-width: 720px) {
+				.gen {
+					grid-template-columns: 1fr;
+				}
+				.composer-row {
+					justify-content: stretch;
+				}
+				.composer-row .btn {
+					width: 100%;
+					justify-content: center;
+				}
+			}
+			.gen-preview {
+				position: relative;
+				aspect-ratio: 1 / 1;
+				border-radius: var(--radius-md);
+				border: 1px solid var(--stroke);
+				background: var(--surface-1);
+				overflow: hidden;
+				display: grid;
+				place-items: center;
+			}
+			.gen-preview img {
+				width: 100%;
+				height: 100%;
+				object-fit: cover;
+				animation: paint-in 0.9s cubic-bezier(0.2, 0.7, 0.2, 1) both;
+			}
+			@keyframes paint-in {
+				from {
+					opacity: 0;
+					filter: blur(16px) saturate(0.7);
+					transform: scale(1.05);
+				}
+				to {
+					opacity: 1;
+					filter: blur(0) saturate(1);
+					transform: none;
+				}
+			}
+			/* Reconstruction scanline — sweeps the reference image while the mesh
+			   step is live, so the wait reads as work, not silence. */
+			.gen-preview.is-reconstructing::after {
+				content: '';
+				position: absolute;
+				inset: 0;
+				background: linear-gradient(
+					180deg,
+					transparent 0%,
+					color-mix(in srgb, var(--accent) 30%, transparent) 50%,
+					transparent 100%
+				);
+				background-size: 100% 34%;
+				background-repeat: no-repeat;
+				animation: forge-scan 2.6s ease-in-out infinite;
+				mix-blend-mode: screen;
+				pointer-events: none;
+			}
+			@keyframes forge-scan {
+				from {
+					background-position: 0 -40%;
+				}
+				to {
+					background-position: 0 140%;
+				}
+			}
+			@media (prefers-reduced-motion: reduce) {
+				.gen-preview img {
+					animation: none;
+				}
+				.gen-preview.is-reconstructing::after {
+					display: none;
+				}
+			}
+			.gen-preview .shimmer {
+				position: absolute;
+				inset: 0;
+				background: linear-gradient(
+					100deg,
+					transparent 20%,
+					rgba(255, 255, 255, 0.06) 50%,
+					transparent 80%
+				);
+				background-size: 200% 100%;
+				animation: shimmer 1.4s linear infinite;
+			}
+			@keyframes shimmer {
+				to {
+					background-position: -200% 0;
+				}
+			}
+			.gen-steps {
+				display: flex;
+				flex-direction: column;
+				justify-content: center;
+				gap: var(--space-sm);
+			}
+			.step {
+				display: flex;
+				align-items: center;
+				gap: 0.7rem;
+				color: var(--ink-dim);
+				font-size: var(--text-sm);
+			}
+			.step .dot {
+				width: 14px;
+				height: 14px;
+				border-radius: 50%;
+				border: 2px solid var(--stroke-strong);
+				flex: none;
+			}
+			.step[data-state='active'] {
+				color: var(--ink);
+			}
+			.step[data-state='active'] .dot {
+				border-color: var(--accent);
+				border-top-color: transparent;
+				animation: spin 0.8s linear infinite;
+			}
+			.step[data-state='done'] {
+				color: var(--ink);
+			}
+			.step[data-state='done'] .dot {
+				background: var(--success);
+				border-color: var(--success);
+			}
+			@keyframes spin {
+				to {
+					transform: rotate(360deg);
+				}
+			}
+			.gen-meta {
+				font-family: var(--font-mono);
+				font-size: var(--text-xs);
+				color: var(--ink-dim);
+				margin-top: var(--space-xs);
+			}
+			.gen-meta strong {
+				color: var(--ink);
+				font-weight: 600;
+			}
+
+			/* Honest elapsed-vs-typical meter. The fill maps real elapsed time
+			   against the engine's real catalog ETA on an asymptotic curve that
+			   never reaches 100% on its own — only a real finished GLB snaps it to
+			   full. Past the typical time it holds near the cap and recolours to
+			   amber ("longer than usual"), so the bar is informative, never faked. */
+			.gen-progress {
+				position: relative;
+				height: 5px;
+				margin-top: var(--space-sm);
+				border-radius: 999px;
+				background: var(--surface-1);
+				border: 1px solid var(--stroke);
+				overflow: hidden;
+			}
+			.gen-progress-fill {
+				position: absolute;
+				inset: 0;
+				width: 0%;
+				border-radius: inherit;
+				background: linear-gradient(
+					90deg,
+					color-mix(in srgb, var(--accent) 70%, transparent),
+					var(--accent)
+				);
+				transition: width var(--duration-slow) var(--ease-standard), background var(--duration-slow) var(--ease-standard);
+			}
+			/* Moving sheen reads as live work without implying a known finish. */
+			.gen-progress-fill::after {
+				content: '';
+				position: absolute;
+				inset: 0;
+				background: linear-gradient(
+					100deg,
+					transparent 30%,
+					rgba(255, 255, 255, 0.28) 50%,
+					transparent 70%
+				);
+				background-size: 220% 100%;
+				animation: gen-sheen 1.6s linear infinite;
+			}
+			.gen-progress[data-over='true'] .gen-progress-fill {
+				background: linear-gradient(
+					90deg,
+					color-mix(in srgb, var(--warning, #e0a93e) 70%, transparent),
+					var(--warning, #e0a93e)
+				);
+			}
+			.gen-progress[data-done='true'] .gen-progress-fill {
+				background: linear-gradient(
+					90deg,
+					color-mix(in srgb, var(--success) 70%, transparent),
+					var(--success)
+				);
+			}
+			.gen-progress[data-done='true'] .gen-progress-fill::after,
+			.gen-progress[data-indeterminate='true'] .gen-progress-fill::after {
+				animation-play-state: running;
+			}
+			/* No catalog ETA (unknown duration) — a slim travelling band instead of
+			   a measured fill, so we never imply a finish time we don't have. */
+			.gen-progress[data-indeterminate='true'] .gen-progress-fill {
+				width: 38% !important;
+				animation: gen-indeterminate 1.5s ease-in-out infinite;
+			}
+			@keyframes gen-sheen {
+				to {
+					background-position: -220% 0;
+				}
+			}
+			@keyframes gen-indeterminate {
+				0% {
+					transform: translateX(-120%);
+				}
+				100% {
+					transform: translateX(330%);
+				}
+			}
+			@media (prefers-reduced-motion: reduce) {
+				.gen-progress-fill::after {
+					animation: none;
+				}
+				.gen-progress[data-indeterminate='true'] .gen-progress-fill {
+					animation: none;
+					width: 100% !important;
+					opacity: 0.5;
+				}
+				.gen-progress-fill {
+					transition: none;
+				}
+			}
+
+			/* Result state */
+			.viewer-shell {
+				position: relative;
+			}
+			.viewer-shell .viewer-load-error {
+				display: none;
+				position: absolute;
+				inset: 0;
+				z-index: 4;
+				align-items: center;
+				justify-content: center;
+				flex-direction: column;
+				gap: var(--space-sm);
+				text-align: center;
+				background: radial-gradient(120% 120% at 50% 0%, #1a1612 0%, #0b0a09 70%);
+				padding: var(--space-xl);
+			}
+			html[data-theme='light'] .viewer-shell .viewer-load-error {
+				background: radial-gradient(120% 120% at 50% 0%, #f3eee9 0%, #e7e2dc 70%);
+			}
+			.viewer-shell.has-load-error .viewer-load-error {
+				display: flex;
+			}
+			.viewer-shell.has-load-error model-viewer {
+				opacity: 0;
+				pointer-events: none;
+			}
+			/* Load skeleton — covers the dark void between a result being revealed and
+			   the GLB actually painting. Shown while .is-loading is set, removed on the
+			   model-viewer 'load' event (or on load error, which has its own panel). */
+			.viewer-shell .viewer-skeleton {
+				display: none;
+				position: absolute;
+				inset: 0;
+				z-index: 3;
+				align-items: center;
+				justify-content: center;
+				overflow: hidden;
+				background: radial-gradient(120% 120% at 50% 0%, #1a1612 0%, #0b0a09 70%);
+			}
+			html[data-theme='light'] .viewer-shell .viewer-skeleton {
+				background: radial-gradient(120% 120% at 50% 0%, #f3eee9 0%, #e7e2dc 70%);
+			}
+			.viewer-shell.is-loading .viewer-skeleton {
+				display: flex;
+			}
+			.viewer-shell.is-loading.has-load-error .viewer-skeleton {
+				display: none;
+			}
+			.viewer-skeleton-sheen {
+				position: absolute;
+				inset: 0;
+				background: linear-gradient(
+					105deg,
+					transparent 30%,
+					color-mix(in srgb, var(--accent) 12%, transparent) 50%,
+					transparent 70%
+				);
+				transform: translateX(-100%);
+				animation: viewer-skeleton-sweep 1.6s ease-in-out infinite;
+			}
+			.viewer-skeleton-label {
+				position: relative;
+				z-index: 1;
+				font-family: var(--font-mono);
+				font-size: var(--text-xs);
+				color: var(--ink-dim);
+				letter-spacing: 0.04em;
+			}
+			@keyframes viewer-skeleton-sweep {
+				to {
+					transform: translateX(100%);
+				}
+			}
+			@media (prefers-reduced-motion: reduce) {
+				.viewer-skeleton-sheen {
+					animation: none;
+				}
+			}
+			.viewer-load-error-icon {
+				font-size: 2rem;
+				opacity: 0.5;
+			}
+			.viewer-load-error p {
+				color: var(--ink-dim);
+				font-size: var(--text-sm);
+				max-width: 28ch;
+				margin: 0;
+				line-height: var(--leading-normal);
+			}
+			.result model-viewer {
+				width: 100%;
+				height: min(62vh, 600px);
+				background: radial-gradient(120% 120% at 50% 0%, #1a1612 0%, #0b0a09 70%);
+				--poster-color: transparent;
+				transition: opacity var(--duration-slow) var(--ease-standard);
+			}
+			html[data-theme='light'] .result model-viewer {
+				background: radial-gradient(120% 120% at 50% 0%, #f3eee9 0%, #e7e2dc 70%);
+			}
+			/* Materialize reveal — the WebGL overlay src/forge-reveal.js plays the
+			   dissolve in, then crossfades away to the standing viewer beneath. */
+			.forge-reveal-overlay {
+				position: absolute;
+				inset: 0;
+				z-index: 2;
+				pointer-events: none;
+				transition: opacity var(--duration-slow) var(--ease-standard);
+			}
+			.forge-reveal-overlay canvas {
+				display: block;
+				width: 100%;
+				height: 100%;
+			}
+			.forge-reveal-overlay.is-fading {
+				opacity: 0;
+			}
+
+			/* Cinema mode — distraction-free fullscreen turntable (F / Esc).
+			   Built for screen recording: chrome hides until the pointer rests
+			   on the bottom bar. */
+			body.forge-cinema {
+				overflow: hidden;
+			}
+			.result.is-cinema {
+				position: fixed;
+				inset: 0;
+				z-index: 90;
+				border: none;
+				border-radius: 0;
+				display: flex;
+				flex-direction: column;
+				background: radial-gradient(120% 90% at 50% 10%, #181a1f 0%, #0a0b0d 60%, #060708 100%);
+			}
+			.result.is-cinema > :not(.viewer-shell):not(.result-bar) {
+				display: none;
+			}
+			.result.is-cinema .viewer-shell {
+				flex: 1;
+				min-height: 0;
+				display: flex;
+			}
+			.result.is-cinema model-viewer {
+				flex: 1;
+				height: 100%;
+				background: transparent;
+			}
+			.result.is-cinema .result-bar {
+				position: absolute;
+				left: 0;
+				right: 0;
+				bottom: 0;
+				border-top: none;
+				background: linear-gradient(transparent, rgba(0, 0, 0, 0.6));
+				opacity: 0;
+				transition: opacity var(--duration-base) var(--ease-standard);
+			}
+			.result.is-cinema .result-bar:hover,
+			.result.is-cinema .result-bar:focus-within {
+				opacity: 1;
+			}
+			.result.is-cinema::after {
+				content: 'F or Esc to exit · drag to orbit';
+				position: absolute;
+				top: 14px;
+				right: 16px;
+				font-family: var(--font-mono);
+				font-size: 12px;
+				color: rgba(255, 255, 255, 0.55);
+				pointer-events: none;
+				animation: cinema-hint 4.5s ease forwards;
+			}
+			@keyframes cinema-hint {
+				0%,
+				70% {
+					opacity: 1;
+				}
+				100% {
+					opacity: 0;
+				}
+			}
+			.result-bar {
+				display: flex;
+				align-items: center;
+				justify-content: space-between;
+				gap: var(--space-sm);
+				padding: var(--space-sm) var(--space-md);
+				border-top: 1px solid var(--stroke);
+				flex-wrap: wrap;
+			}
+			.result-bar .label {
+				font-size: var(--text-sm);
+				color: var(--ink-dim);
+				min-width: 0;
+				overflow: hidden;
+				text-overflow: ellipsis;
+				white-space: nowrap;
+			}
+			/* Auto-save confirmation chip — shown briefly after generation completes */
+			@keyframes saved-pop {
+				0%   { opacity: 0; transform: translateY(3px); }
+				20%  { opacity: 1; transform: translateY(0); }
+				80%  { opacity: 1; }
+				100% { opacity: 0; }
+			}
+			.saved-chip {
+				font-size: 0.7rem;
+				color: var(--accent);
+				background: var(--accent-soft);
+				border: 1px solid color-mix(in srgb, var(--accent) 40%, transparent);
+				border-radius: 999px;
+				padding: 1px 8px;
+				flex: none;
+				white-space: nowrap;
+				animation: saved-pop 3s ease forwards;
+			}
+			.saved-chip.is-hidden { display: none; }
+			.result-bar .actions {
+				display: flex;
+				gap: var(--space-xs);
+				flex: none;
+				align-items: center;
+				flex-wrap: wrap;
+				justify-content: flex-end;
+			}
+
+			/* Refine — re-run the same prompt/views one quality tier higher. An
+			   accent-tinted "level up" affordance: clearly more inviting than the
+			   ghost buttons, but it yields visual primacy to the solid "Make
+			   another" CTA beside it. Hidden by JS once the result is already High. */
+			.btn-refine {
+				color: var(--accent);
+				background: var(--accent-soft);
+				border: 1px solid color-mix(in srgb, var(--accent) 55%, transparent);
+			}
+			.btn-refine:hover {
+				background: color-mix(in srgb, var(--accent) 18%, transparent);
+				box-shadow: 0 0 0 3px var(--accent-soft);
+			}
+			.btn-refine .refine-arrow {
+				transition: transform var(--duration-fast) var(--ease-standard);
+			}
+			.btn-refine:hover .refine-arrow {
+				transform: translateY(-2px);
+			}
+			@media (prefers-reduced-motion: reduce) {
+				.btn-refine .refine-arrow {
+					transition: none;
+				}
+			}
+
+			/* On phones the action row is the most cramped surface — let it wrap
+			   into a tidy grid where the two primary CTAs (Refine + Make another)
+			   span full width and lead, with the secondary tools below them. */
+			@media (max-width: 560px) {
+				.result-bar {
+					flex-direction: column;
+					align-items: stretch;
+				}
+				.result-bar .actions {
+					display: grid;
+					grid-template-columns: 1fr 1fr;
+					gap: var(--space-xs);
+					justify-content: stretch;
+				}
+				.result-bar .actions > .btn {
+					width: 100%;
+					justify-content: center;
+				}
+				/* Primary CTAs first and full-bleed; the verdict pair spans too. */
+				.result-bar .actions #again,
+				.result-bar .actions #refine {
+					grid-column: 1 / -1;
+					order: -2;
+				}
+				.result-bar .actions #refine {
+					order: -3;
+				}
+				.result-bar .actions .verdict {
+					grid-column: 1 / -1;
+					order: -1;
+					justify-content: center;
+				}
+			}
+
+			/* Download stamping — dim the link while the GLB is being fetched + stamped */
+			#download[data-stamping] {
+				opacity: 0.5;
+				pointer-events: none;
+				cursor: wait;
+			}
+			#download[data-stamping]::after {
+				content: '…';
+			}
+
+			/* Category picker — appears below the result bar after generation */
+			.cat-picker {
+				display: flex;
+				align-items: center;
+				gap: var(--space-xs);
+				padding: var(--space-xs) var(--space-md);
+				border-top: 1px solid var(--stroke);
+				flex-wrap: wrap;
+			}
+			.cat-picker-label {
+				font-size: var(--text-xs);
+				color: var(--ink-dim);
+				font-family: var(--font-mono);
+				letter-spacing: 0.06em;
+				white-space: nowrap;
+				flex: none;
+			}
+			.forge-cat-btn {
+				background: var(--surface-1);
+				border: 1px solid var(--stroke);
+				border-radius: 999px;
+				color: var(--ink-dim);
+				font-size: var(--text-xs);
+				font-family: var(--font-mono);
+				padding: 0.25rem 0.7rem;
+				cursor: pointer;
+				transition: background var(--duration-fast), color var(--duration-fast), border-color var(--duration-fast);
+			}
+			.forge-cat-btn:hover {
+				color: var(--ink);
+				border-color: var(--stroke-strong);
+			}
+			.forge-cat-btn:focus-visible {
+				outline: 2px solid var(--accent);
+				outline-offset: 2px;
+			}
+			.forge-cat-btn.active {
+				background: var(--surface-3);
+				border-color: var(--stroke-strong);
+				color: var(--ink);
+			}
+			/* Destination row: shares the category picker's chip styling. */
+			.dest-picker-status {
+				font-size: var(--text-xs);
+				font-family: var(--font-mono);
+				color: var(--ink-dim);
+				margin-left: auto;
+				opacity: 0;
+				transition: opacity var(--duration-fast);
+			}
+			.dest-picker-status.is-visible {
+				opacity: 1;
+			}
+			.forge-cat-btn:active {
+				transform: translateY(1px);
+			}
+			@media (prefers-reduced-motion: reduce) {
+				.forge-cat-btn:active {
+					transform: none;
+				}
+				.dest-picker-status {
+					transition: none;
+				}
+			}
+			/* Two-class grouping inside the picker: "Agents" (can get a brain) vs
+			   "Items" (objects). Subtle labels + a divider keep it scannable. */
+			.cat-group-label {
+				font-size: var(--text-xs);
+				font-family: var(--font-mono);
+				color: var(--ink);
+				letter-spacing: 0.04em;
+				opacity: 0.75;
+				white-space: nowrap;
+				flex: none;
+			}
+			.cat-group-sep {
+				width: 1px;
+				align-self: stretch;
+				min-height: 18px;
+				background: var(--stroke);
+				margin: 0 0.25rem;
+				flex: none;
+			}
+			.cat-picker-help {
+				flex-basis: 100%;
+				margin: 0.35rem 0 0;
+				font-size: var(--text-xs);
+				color: var(--ink-dim);
+				line-height: 1.45;
+			}
+
+			/* Keep / discard verdict (the flywheel signal) */
+			.verdict {
+				display: inline-flex;
+				gap: 2px;
+				background: var(--surface-1);
+				border: 1px solid var(--stroke);
+				border-radius: var(--radius-md);
+				padding: 2px;
+			}
+			.verdict button {
+				background: transparent;
+				border: none;
+				color: var(--ink-dim);
+				font-size: var(--text-sm);
+				padding: 0.34rem 0.6rem;
+				border-radius: var(--radius-sm);
+				cursor: pointer;
+				transition:
+					background var(--duration-fast),
+					color var(--duration-fast);
+			}
+			.verdict button:hover {
+				color: var(--ink);
+			}
+			.verdict button:focus-visible {
+				outline: 2px solid var(--accent);
+				outline-offset: 2px;
+			}
+			.verdict button[aria-pressed='true'][data-outcome='accepted'] {
+				background: color-mix(in srgb, var(--success) 22%, transparent);
+				color: var(--success);
+			}
+			.verdict button[aria-pressed='true'][data-outcome='rejected'] {
+				background: color-mix(in srgb, var(--danger) 20%, transparent);
+				color: var(--danger);
+			}
+
+			/* Optimize / retopology panel --------------------------------- */
+			.optimize {
+				border-top: 1px solid var(--stroke);
+			}
+			.optimize-toggle {
+				width: 100%;
+				display: flex;
+				align-items: center;
+				justify-content: space-between;
+				gap: var(--space-sm);
+				background: transparent;
+				border: none;
+				color: var(--ink);
+				font-family: var(--font-display);
+				font-weight: 600;
+				font-size: var(--text-sm);
+				padding: var(--space-sm) var(--space-md);
+				cursor: pointer;
+			}
+			.optimize-toggle:hover {
+				background: var(--surface-2);
+			}
+			.optimize-toggle:focus-visible {
+				outline: 2px solid var(--accent);
+				outline-offset: -2px;
+			}
+			.optimize-toggle .chev {
+				transition: transform var(--duration-fast) var(--ease-standard);
+				color: var(--ink-dim);
+			}
+			.optimize[data-open='true'] .optimize-toggle .chev {
+				transform: rotate(180deg);
+			}
+			.optimize-body {
+				display: none;
+				flex-direction: column;
+				gap: var(--space-md);
+				padding: 0 var(--space-md) var(--space-md);
+			}
+			.optimize[data-open='true'] .optimize-body {
+				display: flex;
+			}
+			.opt-field {
+				display: flex;
+				flex-direction: column;
+				gap: 0.4rem;
+			}
+			.opt-field > span {
+				font-size: var(--text-xs);
+				color: var(--ink-dim);
+				font-family: var(--font-mono);
+				text-transform: uppercase;
+				letter-spacing: 0.04em;
+			}
+			.seg {
+				display: inline-flex;
+				flex-wrap: wrap;
+				gap: 2px;
+				background: var(--surface-1);
+				border: 1px solid var(--stroke);
+				border-radius: var(--radius-md);
+				padding: 2px;
+			}
+			.seg button {
+				flex: 1 1 auto;
+				background: transparent;
+				border: none;
+				color: var(--ink-dim);
+				font-family: var(--font-mono);
+				font-size: var(--text-xs);
+				padding: 0.4rem 0.7rem;
+				border-radius: var(--radius-sm);
+				cursor: pointer;
+				transition:
+					background var(--duration-fast),
+					color var(--duration-fast);
+			}
+			.seg button:hover {
+				color: var(--ink);
+			}
+			.seg button[aria-pressed='true'] {
+				background: var(--surface-3);
+				color: var(--ink);
+			}
+			.seg button:focus-visible {
+				outline: 2px solid var(--accent);
+				outline-offset: 2px;
+			}
+			.opt-mode-hint {
+				font-size: var(--text-xs);
+				color: var(--ink-dim);
+				line-height: 1.4;
+				min-height: 1.4em;
+			}
+			.opt-row {
+				display: flex;
+				gap: var(--space-md);
+				flex-wrap: wrap;
+			}
+			.opt-row .opt-field {
+				flex: 1 1 140px;
+			}
+			.opt-select {
+				background: var(--surface-1);
+				border: 1px solid var(--stroke);
+				border-radius: var(--radius-md);
+				color: var(--ink);
+				font-family: var(--font-mono);
+				font-size: var(--text-xs);
+				padding: 0.45rem 0.6rem;
+			}
+			.opt-select:focus-visible {
+				outline: 2px solid var(--accent);
+				outline-offset: 1px;
+			}
+			.opt-actions {
+				display: flex;
+				align-items: center;
+				gap: var(--space-md);
+				flex-wrap: wrap;
+			}
+			.opt-status {
+				font-size: var(--text-xs);
+				font-family: var(--font-mono);
+				color: var(--ink-dim);
+			}
+			.opt-status[data-kind='error'] {
+				color: var(--danger);
+			}
+			.opt-status[data-kind='done'] {
+				color: var(--success);
+			}
+			.opt-stats {
+				display: flex;
+				gap: var(--space-md);
+				flex-wrap: wrap;
+				font-family: var(--font-mono);
+				font-size: var(--text-xs);
+				color: var(--ink-dim);
+			}
+			.opt-stats strong {
+				color: var(--ink);
+				font-weight: 600;
+			}
+
+			/* Stylize — one-click geometric filters ----------------------- */
+			.stylize {
+				border-top: 1px solid var(--stroke);
+				padding: var(--space-md);
+			}
+			.stylize-head h3 {
+				font-family: var(--font-display);
+				font-size: var(--text-base);
+				margin: 0 0 0.15rem;
+			}
+			.stylize-sub {
+				color: var(--ink-dim);
+				font-size: var(--text-sm);
+				line-height: var(--leading-normal);
+				margin: 0 0 var(--space-md);
+				max-width: 60ch;
+			}
+			.stylize-gallery {
+				display: grid;
+				grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+				gap: var(--space-sm);
+			}
+			.stylize-card {
+				display: flex;
+				flex-direction: column;
+				align-items: flex-start;
+				gap: 0.35rem;
+				text-align: left;
+				background: var(--surface-1);
+				border: 1px solid var(--stroke);
+				border-radius: var(--radius-md);
+				padding: var(--space-sm);
+				cursor: pointer;
+				color: var(--ink);
+				font: inherit;
+				transition:
+					border-color var(--duration-fast),
+					transform var(--duration-fast),
+					box-shadow var(--duration-fast),
+					background var(--duration-fast);
+			}
+			.stylize-card:hover {
+				border-color: var(--stroke-strong);
+				transform: translateY(-2px);
+				box-shadow: 0 16px 36px -26px rgba(0, 0, 0, 0.9);
+			}
+			.stylize-card:focus-visible {
+				outline: 2px solid var(--accent);
+				outline-offset: 2px;
+			}
+			.stylize-card:active {
+				transform: translateY(0);
+			}
+			.stylize-card[aria-pressed='true'] {
+				border-color: var(--accent);
+				background: var(--accent-soft);
+			}
+			.stylize-card[disabled] {
+				opacity: 0.5;
+				cursor: not-allowed;
+				transform: none;
+				box-shadow: none;
+			}
+			.stylize-thumb {
+				width: 100%;
+				aspect-ratio: 16 / 10;
+				display: grid;
+				place-items: center;
+				border-radius: var(--radius-sm);
+				background: radial-gradient(120% 120% at 50% 0%, #161616 0%, #0c0c0c 75%);
+				color: var(--ink-dim);
+				transition:
+					color var(--duration-fast),
+					transform var(--duration-base) var(--ease-standard);
+			}
+			.stylize-thumb svg {
+				width: 58%;
+				height: 58%;
+			}
+			.stylize-card:hover .stylize-thumb,
+			.stylize-card[aria-pressed='true'] .stylize-thumb {
+				color: var(--accent);
+			}
+			.stylize-card:hover .stylize-thumb svg {
+				transform: scale(1.08) rotate(-4deg);
+			}
+			.stylize-name {
+				font-family: var(--font-display);
+				font-weight: 600;
+				font-size: var(--text-sm);
+			}
+			.stylize-blurb {
+				color: var(--ink-dim);
+				font-size: var(--text-xs);
+				line-height: var(--leading-tight);
+			}
+			.stylize-controls {
+				display: flex;
+				align-items: center;
+				justify-content: space-between;
+				gap: var(--space-md);
+				margin-top: var(--space-md);
+				flex-wrap: wrap;
+			}
+			.stylize-slider {
+				display: inline-flex;
+				align-items: center;
+				gap: var(--space-sm);
+				font-family: var(--font-mono);
+				font-size: var(--text-xs);
+				color: var(--ink-dim);
+			}
+			.stylize-slider input[type='range'] {
+				accent-color: var(--accent);
+				width: 160px;
+				cursor: pointer;
+			}
+			.stylize-slider input[type='range']:focus-visible {
+				outline: 2px solid var(--accent);
+				outline-offset: 3px;
+			}
+			.stylize-slider output {
+				color: var(--ink);
+				min-width: 2.5ch;
+				text-align: right;
+			}
+			.stylize-actions {
+				display: inline-flex;
+				align-items: center;
+				gap: var(--space-xs);
+				flex-wrap: wrap;
+			}
+			.stylize-status {
+				margin-top: var(--space-sm);
+				font-family: var(--font-mono);
+				font-size: var(--text-xs);
+				color: var(--ink-dim);
+				min-height: 1.2em;
+			}
+			.stylize-status[data-kind='busy'] {
+				color: var(--accent);
+			}
+			.stylize-status[data-kind='error'] {
+				color: var(--danger);
+			}
+			.stylize-status[data-kind='done'] {
+				color: var(--success);
+			}
+			.stylize[data-busy='true'] .stylize-thumb svg {
+				animation: spin 1.1s linear infinite;
+			}
+
+			/* Your creations gallery -------------------------------------- */
+			.creations {
+				margin-top: var(--space-2xl);
+			}
+			.creations-head {
+				display: flex;
+				align-items: baseline;
+				justify-content: space-between;
+				gap: var(--space-sm);
+				margin-bottom: var(--space-md);
+			}
+			.creations-head h2 {
+				font-family: var(--font-display);
+				font-size: var(--text-lg);
+				margin: 0;
+			}
+			.creations-head .count {
+				font-family: var(--font-mono);
+				font-size: var(--text-xs);
+				color: var(--ink-dim);
+			}
+			.creations-grid {
+				display: grid;
+				grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+				gap: 12px;
+			}
+			/* Showcase uses larger cards — the section spans full width */
+			#showcase .creations-grid {
+				grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+				gap: 14px;
+			}
+			.creation {
+				position: relative;
+				display: flex;
+				flex-direction: column;
+				text-align: left;
+				background: var(--surface-1);
+				border: 1px solid var(--stroke);
+				border-radius: 12px;
+				overflow: hidden;
+				cursor: pointer;
+				padding: 0;
+				color: inherit;
+				font: inherit;
+				transition:
+					border-color var(--duration-fast),
+					transform var(--duration-fast),
+					box-shadow var(--duration-fast);
+			}
+			.creation:hover {
+				border-color: var(--stroke-strong);
+				transform: translateY(-2px);
+				box-shadow: 0 12px 32px -16px rgba(0, 0, 0, 0.7);
+			}
+			.creation:focus-visible {
+				outline: 2px solid var(--accent);
+				outline-offset: 2px;
+			}
+			/* Delete a saved creation. The control is a sibling of the card inside
+			   .creation-wrap (the card is itself a <button>, so nesting would be
+			   invalid HTML). Hidden until hover/focus on pointer devices; always
+			   visible on touch, where hover cannot reveal it. */
+			.creation-wrap {
+				position: relative;
+				display: flex;
+			}
+			.creation-wrap .creation {
+				width: 100%;
+			}
+			.creation-del {
+				position: absolute;
+				top: 6px;
+				right: 6px;
+				z-index: 2;
+				min-width: 22px;
+				height: 22px;
+				padding: 0 6px;
+				border: 1px solid var(--stroke-strong);
+				border-radius: 999px;
+				background: rgba(0, 0, 0, 0.55);
+				backdrop-filter: blur(4px);
+				color: var(--ink-dim);
+				font-size: 13px;
+				line-height: 1;
+				cursor: pointer;
+				opacity: 0;
+				transition:
+					opacity var(--duration-fast),
+					color var(--duration-fast),
+					border-color var(--duration-fast),
+					background var(--duration-fast);
+			}
+			.creation-wrap:hover .creation-del,
+			.creation-wrap:focus-within .creation-del {
+				opacity: 1;
+			}
+			.creation-del:hover,
+			.creation-del.is-armed {
+				color: var(--danger);
+				border-color: var(--danger);
+				background: rgba(0, 0, 0, 0.75);
+			}
+			.creation-del:focus-visible {
+				outline: 2px solid var(--accent);
+				outline-offset: 2px;
+			}
+			.creation-del.is-armed {
+				opacity: 1;
+				font-family: var(--font-mono);
+				font-size: 11px;
+			}
+			.creation-del:disabled {
+				cursor: default;
+				color: var(--ink-dim);
+			}
+			@media (hover: none) {
+				.creation-del {
+					opacity: 1;
+				}
+			}
+			.creation .thumb {
+				aspect-ratio: 1 / 1;
+				width: 100%;
+				object-fit: cover;
+				background: var(--surface-2);
+				display: block;
+			}
+			.creation .thumb.placeholder {
+				display: grid;
+				place-items: center;
+				color: var(--ink-dim);
+				font-size: 1.6rem;
+			}
+			.creation .thumb.gradient-ph {
+				display: flex;
+				align-items: center;
+				justify-content: center;
+				position: relative;
+				overflow: hidden;
+				padding: 1rem;
+			}
+			.creation .thumb .gradient-ph-text {
+				font-size: 12px;
+				line-height: 1.45;
+				color: rgba(255,255,255,0.5);
+				display: -webkit-box;
+				-webkit-line-clamp: 4;
+				-webkit-box-orient: vertical;
+				overflow: hidden;
+				text-align: center;
+				letter-spacing: 0.01em;
+			}
+			.creation .meta {
+				padding: 0.55rem 0.7rem;
+				font-size: 12.5px;
+				color: var(--ink-dim);
+				line-height: 1.4;
+				display: -webkit-box;
+				-webkit-line-clamp: 2;
+				-webkit-box-orient: vertical;
+				overflow: hidden;
+			}
+			.creation .badge {
+				position: absolute;
+				top: 6px;
+				right: 6px;
+				font-size: 0.65rem;
+				font-family: var(--font-mono);
+				padding: 1px 6px;
+				border-radius: 999px;
+				background: rgba(0, 0, 0, 0.55);
+				backdrop-filter: blur(4px);
+			}
+			.creation .badge[data-outcome='accepted'] {
+				color: var(--success);
+			}
+			.creation .badge[data-outcome='rejected'] {
+				color: var(--danger);
+			}
+
+			/* Fresh from the Forge — community showcase ------------------- */
+			/* Taller thumb area for showcase cards */
+			#showcase .creation .thumb {
+				aspect-ratio: unset;
+				min-height: 200px;
+				height: 200px;
+			}
+			/* Showcase cards get slightly larger meta text + 3-line clamp */
+			#showcase .creation .meta {
+				font-size: 0.8rem;
+				-webkit-line-clamp: 3;
+				padding: 0.6rem 0.75rem;
+			}
+			.showcase-head-right {
+				display: inline-flex;
+				align-items: center;
+				gap: var(--space-xs);
+			}
+			.showcase-refresh {
+				display: inline-grid;
+				place-items: center;
+				width: 26px;
+				height: 26px;
+				background: transparent;
+				border: 1px solid var(--stroke);
+				border-radius: 50%;
+				color: var(--ink-dim);
+				cursor: pointer;
+				transition:
+					color var(--duration-fast),
+					border-color var(--duration-fast),
+					transform var(--duration-base) var(--ease-standard);
+			}
+			.showcase-refresh:hover {
+				color: var(--ink);
+				border-color: var(--stroke-strong);
+				transform: rotate(90deg);
+			}
+			.showcase-refresh:focus-visible {
+				outline: 2px solid var(--accent);
+				outline-offset: 2px;
+			}
+			.showcase-sub {
+				margin: calc(-1 * var(--space-sm)) 0 var(--space-md);
+				color: var(--ink-dim);
+				font-size: var(--text-sm);
+			}
+			.showcase-sub strong {
+				color: var(--ink);
+			}
+			.showcase-view-all {
+				font-family: var(--font-mono);
+				font-size: var(--text-xs);
+				color: var(--ink-dim);
+				text-decoration: none;
+				letter-spacing: 0.03em;
+				transition: color var(--duration-fast);
+			}
+			.showcase-view-all:hover { color: var(--ink); }
+			/* Card footer: time-ago on the left, Remix on the right. */
+			.showcase-foot {
+				display: flex;
+				flex-direction: row;
+				align-items: center;
+				justify-content: space-between;
+				gap: var(--space-sm);
+				padding: 0.4rem 0.75rem 0.6rem;
+				margin-top: auto;
+				border-top: 1px solid var(--stroke);
+				/* Above .showcase-open so the vote/Remix/x402 controls stay clickable. */
+				position: relative;
+				z-index: 2;
+			}
+			/* Stretched primary card action (buildCard in forge-showcase.js): a real
+			   <button> instead of role="button" on the card, so the footer's own
+			   controls are not nested inside an interactive element (WCAG 4.1.2). */
+			.showcase-open {
+				position: absolute;
+				inset: 0;
+				z-index: 1;
+				background: transparent;
+				border: 0;
+				padding: 0;
+				margin: 0;
+				cursor: pointer;
+				border-radius: inherit;
+			}
+			.showcase-open:focus-visible {
+				outline: 2px solid var(--accent);
+				outline-offset: -2px;
+			}
+			.showcase-when {
+				font-family: var(--font-mono);
+				font-size: 0.7rem;
+				color: var(--ink-dim);
+				flex-shrink: 0;
+			}
+			.showcase-remix {
+				font-family: var(--font-mono);
+				white-space: nowrap;
+				flex-shrink: 0;
+				font-size: 11px;
+				letter-spacing: 0.04em;
+				padding: 3px 10px;
+				border-radius: 999px;
+				border: 1px solid var(--stroke);
+				background: transparent;
+				color: var(--ink-dim);
+				cursor: pointer;
+				transition:
+					color var(--duration-fast),
+					border-color var(--duration-fast),
+					background var(--duration-fast);
+			}
+			.showcase-card:hover .showcase-remix,
+			.showcase-remix:hover {
+				color: var(--ink);
+				border-color: var(--accent);
+			}
+			.showcase-remix:hover {
+				background: var(--accent-soft);
+			}
+			.showcase-remix:focus-visible {
+				outline: 2px solid var(--accent);
+				outline-offset: 2px;
+			}
+			.showcase-card:focus-visible {
+				outline: 2px solid var(--accent);
+				outline-offset: 2px;
+			}
+			/* Hover-to-spin: the card's real model, laid over the square thumb,
+			   faded in only after its GLB finishes loading. Ground must be OPAQUE
+			   (--surface-2 is 5% white): a translucent background lets the photo
+			   thumb bleed through the spinning render and the card reads as broken. */
+			.showcase-preview {
+				position: absolute;
+				top: 0;
+				left: 0;
+				right: 0;
+				aspect-ratio: 1 / 1;
+				width: 100%;
+				background: var(--bg-1, #1a1a1a);
+				opacity: 0;
+				pointer-events: none;
+				transition: opacity var(--duration-base) var(--ease-standard);
+			}
+			.showcase-card.is-previewing .showcase-preview {
+				opacity: 1;
+			}
+			@media (prefers-reduced-motion: reduce) {
+				.showcase-refresh,
+				.showcase-remix,
+				.showcase-preview {
+					transition: none;
+				}
+				.showcase-refresh:hover {
+					transform: none;
+				}
+			}
+
+			/* Remix flash: border pulse + glow on the prompt box when a prompt loads */
+			@keyframes prompt-remix-flash {
+				0%   {
+					box-shadow: 0 0 0 0 color-mix(in srgb, var(--accent) 60%, transparent);
+					border-color: var(--accent);
+					background: color-mix(in srgb, var(--accent) 6%, transparent);
+				}
+				30%  {
+					box-shadow: 0 0 0 5px color-mix(in srgb, var(--accent) 18%, transparent);
+					border-color: var(--accent);
+				}
+				100% {
+					box-shadow: 0 0 0 0 transparent;
+					border-color: var(--stroke);
+					background: var(--surface-2, transparent);
+				}
+			}
+			#prompt.remix-flash {
+				animation: prompt-remix-flash 0.9s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+			}
+
+			/* Remix toast — slides in from above, then fades out */
+			@keyframes toast-enter {
+				from { opacity: 0; transform: translateX(-50%) translateY(-10px); }
+				to   { opacity: 1; transform: translateX(-50%) translateY(0); }
+			}
+			.remix-toast {
+				position: fixed;
+				top: 5.5rem;
+				left: 50%;
+				transform: translateX(-50%) translateY(0);
+				background: color-mix(in srgb, var(--surface-3, #1a1a1a) 92%, transparent);
+				backdrop-filter: blur(12px);
+				-webkit-backdrop-filter: blur(12px);
+				border: 1px solid color-mix(in srgb, var(--accent) 55%, transparent);
+				color: var(--ink);
+				font-size: 0.78rem;
+				font-weight: 500;
+				letter-spacing: 0.01em;
+				padding: 0.45rem 1.1rem 0.45rem 0.9rem;
+				border-radius: 999px;
+				pointer-events: none;
+				white-space: nowrap;
+				z-index: 1000;
+				opacity: 1;
+				display: flex;
+				align-items: center;
+				gap: 0.45rem;
+				box-shadow: 0 4px 24px rgba(0, 0, 0, 0.4);
+				animation: toast-enter 0.3s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+				transition: opacity var(--duration-slow) var(--ease-standard), transform var(--duration-slow) var(--ease-standard);
+			}
+			.remix-toast .toast-dot {
+				width: 6px;
+				height: 6px;
+				border-radius: 50%;
+				background: var(--accent);
+				flex: none;
+			}
+			.remix-toast.fade-out {
+				opacity: 0;
+				transform: translateX(-50%) translateY(-8px);
+			}
+
+			/* Forge empty state — open canvas, not a boxed notice */
+			.forge-empty {
+				display: flex;
+				flex-direction: column;
+				align-items: center;
+				justify-content: center;
+				min-height: 420px;
+				gap: var(--space-md);
+				border: 1px dashed var(--stroke);
+				border-radius: var(--radius-lg);
+				background: var(--surface-1);
+			}
+			.forge-empty-art {
+				width: 140px;
+				color: var(--ink-dim);
+				opacity: 0.6;
+				animation: forge-cube-float 6s ease-in-out infinite;
+			}
+			@keyframes forge-cube-float {
+				0%, 100% { transform: translateY(0); }
+				50% { transform: translateY(-8px); }
+			}
+			@media (prefers-reduced-motion: reduce) {
+				.forge-empty-art { animation: none; }
+			}
+			.forge-empty-label {
+				font-family: var(--font-mono);
+				font-size: var(--text-xs);
+				letter-spacing: 0.08em;
+				text-transform: uppercase;
+				color: var(--ink-dim);
+				margin: 0;
+			}
+
+			/* Error + unconfigured notices */
+			.notice {
+				padding: var(--space-2xl) var(--space-lg);
+				text-align: center;
+				color: var(--ink-dim);
+			}
+			.notice h3 {
+				color: var(--ink);
+				font-family: var(--font-display);
+				margin: 0 0 var(--space-xs);
+			}
+			.notice p {
+				max-width: 48ch;
+				margin: 0 auto;
+				line-height: var(--leading-normal);
+			}
+			.notice .glyph {
+				font-size: 2.4rem;
+				opacity: 0.5;
+				display: block;
+				margin-bottom: var(--space-sm);
+			}
+			.notice.error h3 {
+				color: var(--danger);
+			}
+			.notice .actions {
+				margin-top: var(--space-md);
+				display: inline-flex;
+				gap: var(--space-xs);
+			}
+			.hint-foot {
+				text-align: center;
+				color: var(--ink-dim);
+				font-size: var(--text-xs);
+				margin-top: var(--space-lg);
+				line-height: var(--leading-normal);
+			}
+			.hint-foot a {
+				color: var(--ink);
+			}
+
+			/* ── Mobile polish (≤720px) ─────────────────────────────────────
+			   The rail and stage already stack via .forge-workspace's default
+			   single column; these rules keep the dense composer controls from
+			   overflowing the viewport and meet phone touch/zoom ergonomics. */
+			@media (max-width: 720px) {
+				/* Hero: stack the title above the tagline instead of a cramped
+				   baseline-aligned flex row that overflows narrow screens. */
+				.forge-head {
+					flex-direction: column;
+					align-items: flex-start;
+					gap: var(--space-xs);
+				}
+				.forge-head h1 {
+					font-size: var(--text-lg);
+				}
+				/* Engine / quality / tier / aspect button groups carry up to seven
+				   chips — let them wrap instead of forcing horizontal scroll. */
+				.aspect {
+					flex-wrap: wrap;
+				}
+				/* iOS zooms the page when a focused field is under 16px. Bump the
+				   few sub-16px controls in the rail to the reading baseline. */
+				.byok-input {
+					font-size: var(--text-base);
+				}
+				/* Comfortable tap targets for the small chip-style controls. */
+				.aspect button,
+				.seg button {
+					min-height: 44px;
+				}
+				.ptool,
+				.chip,
+				.chips-more,
+				.forge-cat-btn,
+				.verdict button {
+					min-height: 44px;
+				}
+				.opt-select {
+					font-size: var(--text-sm);
+					min-height: 44px;
+				}
+			}
+
+			/* Fullscreen cinema bar must clear the home-indicator / notch. */
+			.result.is-cinema .result-bar {
+				padding-bottom: calc(var(--space-sm) + env(safe-area-inset-bottom, 0px));
+				padding-left: max(var(--space-md), env(safe-area-inset-left, 0px));
+				padding-right: max(var(--space-md), env(safe-area-inset-right, 0px));
+			}
+
+			/* ========================================================================
+			   Studio merge — page-level Object / Avatar mode switch + the avatar
+			   (prompt → rigged avatar) pane. All avatar rules are scoped under
+			   #studio-avatar so they can never leak into the Forge (Object) pane.
+			   ======================================================================== */
+			.studio-tabs {
+				display: inline-flex;
+				gap: 4px;
+				padding: 4px;
+				border-radius: 999px;
+				border: 1px solid var(--border, #1a1a1a);
+				background: var(--surface-1, #0a0a0a);
+				margin-top: var(--space-md);
+			}
+			.studio-tabs button {
+				appearance: none;
+				border: 0;
+				background: transparent;
+				color: var(--text-muted, #888);
+				font: inherit;
+				font-weight: 600;
+				font-size: 14px;
+				padding: 8px 18px;
+				border-radius: 999px;
+				cursor: pointer;
+				display: inline-flex;
+				align-items: center;
+				gap: 8px;
+				transition: color var(--duration-fast), background var(--duration-fast), transform var(--duration-fast);
+			}
+			.studio-tabs button:hover { color: var(--text, #e8e8e8); }
+			.studio-tabs button:active { transform: translateY(1px); }
+			.studio-tabs button[aria-selected='true'] {
+				color: var(--accent-ink, #000);
+				background: var(--accent, #fff);
+			}
+			.studio-tabs button:focus-visible {
+				outline: 2px solid var(--accent, #fff);
+				outline-offset: 2px;
+			}
+			.studio-tabs button .dot {
+				width: 7px;
+				height: 7px;
+				border-radius: 50%;
+				background: currentColor;
+				opacity: 0.55;
+			}
+			.studio-pane[hidden] { display: none; }
+
+			/* ── Avatar pane (scoped copy of /create/prompt) ───────────────────── */
+			#studio-avatar {
+				--bg: #000000;
+				--panel: var(--bg-0);
+				--panel-elev: #111111;
+				--border: var(--stroke);
+				--border-strong: #2a2a2a;
+				--text: var(--ink);
+				--muted: var(--ink-dim);
+				--accent: #ffffff;
+				--accent-ink: #000000;
+				--danger: var(--danger);
+				--danger-dim: #4a1a1a;
+				max-width: 760px;
+				margin: 0 auto;
+				padding: 8px 20px 40px;
+				display: flex;
+				flex-direction: column;
+			}
+			@keyframes studioFade {
+				from { opacity: 0; transform: translateY(6px); }
+				to { opacity: 1; transform: none; }
+			}
+			@keyframes studioSpin { to { transform: rotate(360deg); } }
+			#studio-avatar .step { display: none; flex-direction: column; }
+			#studio-avatar .step.active { display: flex; animation: studioFade 0.35s ease; }
+			#studio-avatar h2 {
+				font-size: clamp(26px, 5vw, 36px);
+				line-height: 1.1;
+				margin: 12px 0 8px;
+				letter-spacing: -0.02em;
+				color: var(--text);
+			}
+			#studio-avatar .sub { color: var(--muted); margin: 0 0 24px; max-width: 56ch; }
+			#studio-avatar .composer {
+				border: 1px solid transparent;
+				border-radius: 16px;
+				background:
+					linear-gradient(var(--panel), var(--panel)) padding-box,
+					linear-gradient(120deg, var(--border-strong), var(--border-strong)) border-box;
+				padding: 6px 6px 14px;
+				transition: box-shadow var(--duration-base);
+			}
+			#studio-avatar .composer:focus-within {
+				background:
+					linear-gradient(var(--panel), var(--panel)) padding-box,
+					linear-gradient(
+							120deg,
+							rgba(255, 180, 84, 0.65),
+							rgba(255, 106, 213, 0.65) 38%,
+							rgba(139, 92, 246, 0.65) 64%,
+							rgba(79, 195, 255, 0.65)
+						)
+						border-box;
+				box-shadow: 0 0 24px rgba(139, 92, 246, 0.1);
+			}
+			#studio-avatar #cp-prompt {
+				width: 100%;
+				min-height: 120px;
+				resize: vertical;
+				border: 0;
+				background: transparent;
+				color: var(--text);
+				font: inherit;
+				line-height: 1.5;
+				padding: 14px 14px 6px;
+				outline: none;
+			}
+			#studio-avatar #cp-prompt::placeholder { color: var(--muted); }
+			#studio-avatar .composer-foot {
+				display: flex;
+				align-items: center;
+				justify-content: space-between;
+				gap: 12px;
+				padding: 0 10px;
+			}
+			#studio-avatar .counter { color: var(--muted); font-size: 12px; font-variant-numeric: tabular-nums; }
+			#studio-avatar .counter.warn { color: var(--danger); }
+			#studio-avatar .examples { display: flex; flex-wrap: wrap; gap: 8px; margin: 16px 0 4px; }
+			#studio-avatar .example {
+				border: 1px solid var(--border-strong);
+				background: var(--panel);
+				color: var(--muted);
+				border-radius: 999px;
+				padding: 7px 13px;
+				font-size: 13px;
+				cursor: pointer;
+				transition: border-color var(--duration-fast), color var(--duration-fast), background var(--duration-fast), transform var(--duration-fast);
+			}
+			#studio-avatar .example:hover { border-color: #444; color: var(--text); background: var(--panel-elev); }
+			#studio-avatar .example:active { transform: translateY(1px); }
+			#studio-avatar .example:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+			#studio-avatar .actions { display: flex; align-items: center; gap: 14px; margin-top: 22px; }
+			#studio-avatar .btn-primary {
+				display: inline-flex;
+				align-items: center;
+				gap: 9px;
+				background: var(--accent);
+				color: var(--accent-ink);
+				border: 0;
+				border-radius: 12px;
+				padding: 13px 22px;
+				font-size: 15px;
+				font-weight: 600;
+				cursor: pointer;
+				transition: opacity var(--duration-fast), transform var(--duration-fast);
+			}
+			#studio-avatar .btn-primary:hover { opacity: 0.9; }
+			#studio-avatar .btn-primary:active { transform: translateY(1px); }
+			#studio-avatar .btn-primary:disabled { opacity: 0.4; cursor: not-allowed; }
+			#studio-avatar .btn-primary:focus-visible { outline: 2px solid #fff; outline-offset: 3px; }
+			#studio-avatar .hint { color: var(--muted); font-size: 12.5px; }
+			#studio-avatar .hint .chip-auth { color: var(--text); }
+			#studio-avatar .note {
+				margin-top: 28px;
+				color: var(--muted);
+				font-size: 12.5px;
+				border-top: 1px solid var(--border);
+				padding-top: 16px;
+				max-width: 60ch;
+			}
+			#studio-avatar .note a {
+				color: #aaa;
+				text-decoration: underline;
+				text-underline-offset: 2px;
+				transition: color var(--duration-fast);
+			}
+			#studio-avatar .note a:hover { color: var(--text); }
+			#studio-avatar .note a:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 2px; }
+			#studio-avatar .build-wrap { align-items: center; text-align: center; padding-top: 24px; }
+			#studio-avatar .orb {
+				width: 132px;
+				height: 132px;
+				border-radius: 50%;
+				margin: 8px auto 26px;
+				background: radial-gradient(circle at 32% 30%, #2a2a2a, #0c0c0c 70%);
+				border: 1px solid var(--border-strong);
+				position: relative;
+				overflow: hidden;
+			}
+			#studio-avatar .orb::after {
+				content: '';
+				position: absolute;
+				inset: -40%;
+				background: conic-gradient(from 0deg, transparent 0 70%, rgba(255, 255, 255, 0.14) 85%, transparent 100%);
+				animation: studioSpin 1.5s linear infinite;
+			}
+			#studio-avatar .orb::before {
+				content: '';
+				position: absolute;
+				inset: 0;
+				border-radius: 50%;
+				box-shadow: inset 0 0 30px rgba(255, 255, 255, 0.05);
+				z-index: 1;
+			}
+			#studio-avatar .build-prompt {
+				color: var(--text);
+				font-size: 16px;
+				max-width: 46ch;
+				margin: 0 auto 6px;
+				font-style: italic;
+			}
+			#studio-avatar .build-status { color: var(--muted); font-size: 14px; margin-top: 12px; min-height: 20px; }
+			#studio-avatar .progress-track {
+				width: min(420px, 90%);
+				height: 4px;
+				border-radius: 4px;
+				background: var(--border-strong);
+				margin: 22px auto 0;
+				overflow: hidden;
+			}
+			#studio-avatar .progress-fill {
+				height: 100%;
+				width: 8%;
+				border-radius: 4px;
+				background: var(--accent);
+				transition: width var(--duration-slow) var(--ease-standard);
+			}
+			#studio-avatar .elapsed { color: var(--muted); font-size: 12px; margin-top: 14px; font-variant-numeric: tabular-nums; }
+			#studio-avatar .done-wrap { align-items: center; text-align: center; padding-top: 8px; }
+			#studio-avatar .done-viewer {
+				width: 100%;
+				max-width: 460px;
+				aspect-ratio: 4/5;
+				margin: 18px auto 0;
+				border: 1px solid var(--border-strong);
+				border-radius: 16px;
+				background: var(--panel);
+				overflow: hidden;
+			}
+			#studio-avatar .done-viewer model-viewer { width: 100%; height: 100%; --poster-color: transparent; }
+			#studio-avatar .done-tags { display: flex; gap: 8px; justify-content: center; margin: 16px 0 0; flex-wrap: wrap; }
+			#studio-avatar .tag {
+				font-size: 12px;
+				color: var(--muted);
+				border: 1px solid var(--border-strong);
+				border-radius: 999px;
+				padding: 5px 11px;
+			}
+			#studio-avatar .tag.ok { color: #6ee7a8; border-color: #1f3a2a; }
+			#studio-avatar .done-actions { display: flex; gap: 12px; justify-content: center; margin-top: 24px; flex-wrap: wrap; }
+			#studio-avatar .btn-ghost {
+				display: inline-flex;
+				align-items: center;
+				gap: 8px;
+				background: var(--panel);
+				color: var(--text);
+				border: 1px solid var(--border-strong);
+				border-radius: 12px;
+				padding: 12px 20px;
+				font-size: 15px;
+				font-weight: 500;
+				cursor: pointer;
+				transition: border-color var(--duration-fast), background var(--duration-fast), transform var(--duration-fast);
+				text-decoration: none;
+			}
+			#studio-avatar .btn-ghost:hover { border-color: #444; background: var(--panel-elev); }
+			#studio-avatar .btn-ghost:active { transform: translateY(1px); }
+			#studio-avatar .btn-ghost:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+			#studio-avatar .error-box {
+				display: none;
+				margin-top: 18px;
+				border: 1px solid var(--danger-dim);
+				background: rgba(248, 113, 113, 0.06);
+				border-radius: 12px;
+				padding: 14px 16px;
+				color: #f3b4b4;
+				font-size: 14px;
+			}
+			#studio-avatar .error-box.show { display: block; animation: studioFade 0.25s ease; }
+			#studio-avatar .error-box strong { color: var(--danger); }
+			@media (max-width: 520px) {
+				#studio-avatar .actions { flex-direction: column; align-items: stretch; }
+				#studio-avatar .btn-primary { justify-content: center; }
+				#studio-avatar .hint { text-align: center; }
+			}
+
+			/* ── Lab pane (free client-side 3D generators) ─────────────────────── */
+			#studio-lab {
+				--panel: var(--bg-0);
+				--panel-elev: #111111;
+				--border: var(--stroke);
+				--border-strong: #2a2a2a;
+				--text: var(--ink);
+				--muted: var(--ink-dim);
+				--accent: #ffffff;
+				--accent-ink: #000000;
+			}
+			#studio-lab .lab {
+				display: grid;
+				grid-template-columns: minmax(220px, 280px) 1fr;
+				gap: var(--space-lg, 20px);
+				align-items: start;
+				max-width: 1180px;
+				margin: 8px auto 0;
+			}
+			#studio-lab .lab-tools { display: flex; flex-direction: column; gap: 8px; }
+			#studio-lab .lab-tool {
+				text-align: left;
+				border: 1px solid var(--border-strong);
+				background: var(--panel);
+				color: var(--text);
+				border-radius: 12px;
+				padding: 12px 14px;
+				cursor: pointer;
+				display: flex;
+				flex-direction: column;
+				gap: 3px;
+				transition: border-color var(--duration-fast), background var(--duration-fast), transform var(--duration-fast);
+			}
+			#studio-lab .lab-tool:hover { border-color: #444; background: var(--panel-elev); }
+			#studio-lab .lab-tool:active { transform: translateY(1px); }
+			#studio-lab .lab-tool:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+			#studio-lab .lab-tool[aria-pressed='true'] { border-color: var(--accent); background: var(--panel-elev); }
+			#studio-lab .lab-tool-name { font-weight: 600; font-size: 14.5px; }
+			#studio-lab .lab-tool-blurb { font-size: 12px; color: var(--muted); line-height: 1.4; }
+			#studio-lab .lab-stage { display: flex; flex-direction: column; gap: 16px; min-width: 0; }
+			#studio-lab .lab-controls {
+				display: grid;
+				grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+				gap: 14px;
+				border: 1px solid var(--border-strong);
+				border-radius: 14px;
+				background: var(--panel);
+				padding: 16px;
+			}
+			#studio-lab .lab-field { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+			#studio-lab .lab-field[hidden] { display: none; }
+			#studio-lab .lab-field-label {
+				font-size: 12.5px;
+				color: var(--muted);
+				display: flex;
+				justify-content: space-between;
+				gap: 8px;
+				align-items: baseline;
+			}
+			#studio-lab .lab-field-out { font-size: 11.5px; color: var(--muted); font-variant-numeric: tabular-nums; }
+			#studio-lab .lab-field input[type='range'] { width: 100%; accent-color: var(--accent); }
+			#studio-lab .lab-field input[type='color'] {
+				width: 100%;
+				height: 36px;
+				padding: 2px;
+				border: 1px solid var(--border-strong);
+				border-radius: 10px;
+				background: var(--panel-elev);
+				cursor: pointer;
+			}
+			#studio-lab .lab-field input[type='text'],
+			#studio-lab .lab-field select,
+			#studio-lab .lab-field textarea,
+			#studio-lab .lab-field input[type='file'] {
+				width: 100%;
+				border: 1px solid var(--border-strong);
+				background: var(--panel-elev);
+				color: var(--text);
+				border-radius: 10px;
+				padding: 9px 11px;
+				font: inherit;
+				font-size: 13px;
+				outline: none;
+			}
+			#studio-lab .lab-field textarea { resize: vertical; font-family: ui-monospace, Menlo, Consolas, monospace; font-size: 12px; line-height: 1.5; }
+			#studio-lab .lab-field input:focus-visible,
+			#studio-lab .lab-field select:focus-visible,
+			#studio-lab .lab-field textarea:focus-visible { border-color: var(--accent); }
+			#studio-lab .lab-field-check { display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--text); cursor: pointer; }
+			#studio-lab .lab-field-check input { width: 16px; height: 16px; accent-color: var(--accent); }
+			#studio-lab .lab-preview {
+				position: relative;
+				width: 100%;
+				aspect-ratio: 16 / 10;
+				border: 1px solid var(--border-strong);
+				border-radius: 16px;
+				background: radial-gradient(circle at 50% 35%, #15151c, #060608 75%);
+				overflow: hidden;
+			}
+			#studio-lab .lab-preview model-viewer,
+			#studio-lab .lab-splat {
+				position: absolute;
+				inset: 0;
+				width: 100%;
+				height: 100%;
+			}
+			#studio-lab .lab-splat { cursor: grab; }
+			#studio-lab .lab-splat[hidden] { display: none; }
+			#studio-lab model-viewer[hidden] { display: none; }
+			#studio-lab .lab-actions { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+			#studio-lab .btn-primary {
+				display: inline-flex;
+				align-items: center;
+				gap: 9px;
+				background: var(--accent);
+				color: var(--accent-ink);
+				border: 0;
+				border-radius: 12px;
+				padding: 12px 22px;
+				font-size: 15px;
+				font-weight: 600;
+				cursor: pointer;
+				transition: opacity var(--duration-fast), transform var(--duration-fast);
+			}
+			#studio-lab .btn-primary:hover { opacity: 0.9; }
+			#studio-lab .btn-primary:active { transform: translateY(1px); }
+			#studio-lab .btn-primary:disabled { opacity: 0.45; cursor: progress; }
+			#studio-lab .btn-primary:focus-visible { outline: 2px solid #fff; outline-offset: 3px; }
+			#studio-lab .btn-ghost {
+				display: inline-flex;
+				align-items: center;
+				gap: 8px;
+				background: var(--panel);
+				color: var(--text);
+				border: 1px solid var(--border-strong);
+				border-radius: 12px;
+				padding: 11px 18px;
+				font-size: 14px;
+				font-weight: 500;
+				cursor: pointer;
+				text-decoration: none;
+				transition: border-color var(--duration-fast), background var(--duration-fast), transform var(--duration-fast), opacity var(--duration-fast);
+			}
+			#studio-lab .btn-ghost:hover { border-color: #444; background: var(--panel-elev); }
+			#studio-lab .btn-ghost.is-disabled { opacity: 0.4; pointer-events: none; }
+			#studio-lab .btn-ghost.is-hidden { display: none; }
+			#studio-lab .lab-status { font-size: 13px; color: var(--muted); }
+			#studio-lab .lab-status[data-kind='ok'] { color: #6ee7a8; }
+			#studio-lab .lab-status[data-kind='err'] { color: #f3b4b4; }
+			#studio-lab .lab-foot { font-size: 12px; color: var(--muted); margin: 0; max-width: 70ch; }
+			#studio-lab .lab-foot a { color: #aaa; text-decoration: underline; text-underline-offset: 2px; }
+			#studio-lab .lab-foot a:hover { color: var(--text); }
+			@media (max-width: 760px) {
+				#studio-lab .lab { grid-template-columns: 1fr; }
+				#studio-lab .lab-tools { flex-direction: row; flex-wrap: wrap; }
+				#studio-lab .lab-tool { flex: 1 1 140px; }
+			}
+		</style>
+
+	<link rel="canonical" href="https://three.ws/forge-studio">
+	<script type="application/ld+json">{"@context":"https://schema.org","@type":"WebPage","name":"Studio — Object + Avatar from text","description":"One place to turn text into 3D: forge a textured object (GLB) or describe a character and get a rigged avatar. Two pipelines, one canvas.","url":"https://three.ws/forge-studio","isPartOf":{"@type":"WebSite","name":"three.ws","url":"https://three.ws"}}</script>
+
+	<meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1">
+	<meta property="og:locale" content="en_US">
+	<meta property="og:image:alt" content="Forge — Text & Image to 3D — three.ws">
+	<script src="/model-viewer-meshopt.js"></script>
+</head>
+	<body class="forge-page">
+		<div id="nav-container"></div>
+
+		<main class="forge-main">
+			<header class="forge-head">
+				<h1 data-i18n="forge_studio.studio">Studio</h1>
+				<p data-i18n="forge_studio.text_3d_two_ways_forge_a_textured">Text → 3D, two ways. Forge a textured object, or describe a character and get a rigged avatar.</p>
+				<div class="studio-tabs" role="tablist" aria-label="Studio mode">
+					<button
+						type="button"
+						role="tab"
+						id="studio-tab-object"
+						data-studio-mode="object"
+						aria-selected="true"
+						aria-controls="studio-object"
+					 data-i18n-html="forge_studio.object">
+						<span class="dot" aria-hidden="true"></span>Object
+					</button>
+					<button
+						type="button"
+						role="tab"
+						id="studio-tab-avatar"
+						data-studio-mode="avatar"
+						aria-selected="false"
+						aria-controls="studio-avatar"
+					 data-i18n-html="forge_studio.avatar">
+						<span class="dot" aria-hidden="true"></span>Avatar
+					</button>
+					<button
+						type="button"
+						role="tab"
+						id="studio-tab-lab"
+						data-studio-mode="lab"
+						aria-selected="false"
+						aria-controls="studio-lab"
+					 data-i18n-html="forge_studio.lab">
+						<span class="dot" aria-hidden="true"></span>Lab
+					</button>
+				</div>
+			</header>
+
+			<section id="studio-object" class="studio-pane" role="tabpanel" aria-labelledby="studio-tab-object">
+			<div class="forge-workspace">
+				<div class="forge-rail">
+			<form class="composer" id="composer" autocomplete="off">
+				<div class="mode-switch-wrap">
+					<div
+						class="mode-switch"
+						role="tablist"
+						aria-label="Generation mode"
+						id="mode-switch"
+					>
+						<button type="button" role="tab" data-mode="text" aria-selected="true" data-i18n="forge_studio.describe_it">
+							Describe it
+						</button>
+						<button type="button" role="tab" data-mode="image" aria-selected="false" data-i18n="forge_studio.from_photos">
+							From photos
+						</button>
+						<!-- Hidden until the catalog reports a live sketch engine (TripoSG
+						     self-host) — no dead tab on deployments without the worker. -->
+						<button type="button" role="tab" data-mode="sketch" aria-selected="false" hidden data-i18n="forge_studio.from_a_sketch">
+							From a sketch
+						</button>
+					</div>
+				</div>
+				<!-- Text → 3D -->
+				<div id="text-pane">
+					<label for="prompt" class="is-hidden" data-i18n="forge_studio.describe_the_object_to_generate">Describe the object to generate</label>
+					<textarea
+						id="prompt"
+						name="prompt"
+						maxlength="1000"
+						placeholder="a worn leather armchair, studio lighting, plain background"
+						aria-describedby="prompt-coach"
+					></textarea>
+					<div class="prompt-tools" id="prompt-tools">
+						<button type="button" class="ptool" id="surprise" aria-label="Fill the box with a random vivid prompt" data-i18n-attr="aria-label:forge_studio.fill_the_box_with_a_random_v_arialabel">
+							<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+								<rect x="3" y="3" width="18" height="18" rx="3" />
+								<circle cx="8.5" cy="8.5" r="1.4" fill="currentColor" stroke="none" />
+								<circle cx="15.5" cy="15.5" r="1.4" fill="currentColor" stroke="none" />
+								<circle cx="15.5" cy="8.5" r="1.4" fill="currentColor" stroke="none" />
+								<circle cx="8.5" cy="15.5" r="1.4" fill="currentColor" stroke="none" />
+							</svg>
+							Surprise me
+						</button>
+						<span class="prompt-coach" id="prompt-coach" data-grade="tip" aria-live="polite"></span>
+						<span class="prompt-count" id="prompt-count">0 / 1000</span>
+						<span class="pd-slot" id="prompt-dictate-slot"></span>
+					</div>
+				</div>
+
+				<!-- Image / multi-view → 3D -->
+				<div id="image-pane" class="image-pane is-hidden">
+					<div
+						class="views-grid"
+						id="views-grid"
+						aria-label="Reference views — add up to four photos of the same object"
+					></div>
+					<div class="views-counter" id="views-counter" aria-live="polite">
+						<span class="views-pips" id="views-pips" aria-hidden="true"></span>
+						<span class="vc-text" id="views-counter-text"
+							 data-i18n-html="forge_studio.0_of_4_views"><strong>0</strong> of 4 views</span
+						>
+					</div>
+					<div class="draw-cta-row">
+						<button type="button" class="draw-cta" id="draw-view-btn">
+							<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>
+							Or draw it instead
+						</button>
+					</div>
+					<input
+						type="file"
+						id="view-file-input"
+						accept="image/png,image/jpeg,image/webp"
+						aria-label="Choose up to 4 photos of the same object"
+						multiple
+						hidden
+					/>
+					<label for="image-prompt" class="is-hidden"
+						 data-i18n="forge_studio.optional_guidance_for_reconstruction">Optional guidance for reconstruction</label
+					>
+					<textarea
+						id="image-prompt"
+						class="image-prompt"
+						maxlength="1000"
+						placeholder="Optional guidance — e.g. “matte plastic, neutral pose, no background”"
+					></textarea>
+					<span class="pd-slot" id="image-prompt-dictate-slot"></span>
+					<p class="views-hint" data-i18n-html="forge_studio.add_1_4_views_of_the_same">
+						Add 1–4 views of the <strong>same</strong> object (front · back · left ·
+						right). Drag to drop, click to browse, paste from the clipboard
+						(<kbd class="gen-kbd">⌘V</kbd> / <kbd class="gen-kbd">Ctrl+V</kbd>), drag a thumbnail to reorder.
+						PNG/JPG/WebP, up to 8&nbsp;MB each.
+					</p>
+				</div>
+
+				<!-- Sketch → 3D (TripoSG-scribble) -->
+				<div id="sketch-pane" class="image-pane is-hidden">
+					<div
+						class="views-grid sketch-grid"
+						id="sketch-grid"
+						aria-label="Your sketch — add one drawing"
+					></div>
+					<div class="draw-cta-row">
+						<button type="button" class="draw-cta" id="draw-sketch-btn">
+							<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>
+							Draw here instead
+						</button>
+					</div>
+					<input
+						type="file"
+						id="sketch-file-input"
+						accept="image/png,image/jpeg,image/webp"
+						aria-label="Choose a sketch image to reconstruct"
+						hidden
+					/>
+					<label for="sketch-prompt" class="is-hidden"
+						 data-i18n="forge_studio.what_does_the_sketch_depict_required">What does the sketch depict? (required)</label
+					>
+					<textarea
+						id="sketch-prompt"
+						class="image-prompt"
+						maxlength="1000"
+						aria-required="true"
+						placeholder="What is it? — e.g. “a cartoon rocket with two tail fins”"
+					></textarea>
+					<span class="pd-slot" id="sketch-prompt-dictate-slot"></span>
+					<p class="views-hint" data-i18n-html="forge_studio.drop_one_drawing_dark_strokes_on_a">
+						Drop one drawing — dark strokes on a light background work best — and say
+						what it depicts<span class="req-tag" id="sketch-req-tag">Required</span>.
+						PNG/JPG/WebP, up to 8&nbsp;MB. The result is untextured geometry: use
+						<strong>Stylize</strong> or <strong>Retexture</strong> on it after.
+					</p>
+				</div>
+
+				<!-- Reachable only when /api/forge?catalog=1 fails at the transport or
+				     HTTP layer. Holds the state-kit error block from forge.js so the
+				     engine picker never just vanishes on a bad network. -->
+				<div class="forge-quality-error is-hidden" id="forge-quality-error"></div>
+
+				<!-- Quality tier + generation engine + BYOK key -->
+				<div class="forge-quality" id="forge-quality">
+					<div class="fq-row">
+						<span class="fq-label" id="tier-label" data-i18n="forge_studio.quality">Quality</span>
+						<div class="aspect" role="group" aria-labelledby="tier-label" id="tier">
+							<button type="button" data-tier="draft" aria-pressed="false" data-i18n="forge_studio.draft">
+								Draft
+							</button>
+							<button type="button" data-tier="standard" aria-pressed="true" data-i18n="forge_studio.standard">
+								Standard
+							</button>
+							<button
+								type="button"
+								data-tier="high"
+								data-access="locked"
+								aria-pressed="false"
+								aria-label="High quality — $THREE holder feature"
+							 data-i18n-html="forge_studio.high_three" data-i18n-attr="aria-label:forge_studio.high_quality_three_holder_fe_arialabel">
+								<span class="tier-name">High</span>
+								<span class="tier-lock" data-state="locked" title="High quality is a $THREE holder feature">
+									<svg class="tier-lock-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg>
+									<span class="tier-lock-txt">$THREE</span>
+								</span>
+							</button>
+						</div>
+					</div>
+					<p class="fq-holder-note" id="fq-holder-note" data-state="locked" data-i18n-html="forge_studio.high_quality_is_a_three_holder_feature">
+						<span class="fq-holder-ico" aria-hidden="true">◆</span> High quality is a
+						<a href="/three-token">$THREE holder</a> feature — hold to unlock, or pay per generation.
+					</p>
+					<div class="fq-row">
+						<span class="fq-label" id="engine-label" data-i18n="forge_studio.engine">Engine</span>
+						<div
+							class="aspect"
+							role="group"
+							aria-labelledby="engine-label"
+							id="engine"
+						></div>
+					</div>
+					<p class="engine-legend" id="engine-legend" data-i18n-html="forge_studio.free_no_api_key_your_own_key">
+						<span class="el-item"><span class="el-free">FREE</span> no API key</span>
+						<span class="el-item"
+							><svg class="el-key" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="8" cy="15" r="4"/><path d="M10.85 12.15 19 4"/><path d="m18 5 2 2"/><path d="m15 8 2 2"/></svg>
+							your own key</span
+						>
+						<span class="el-item"><span class="el-dot el-dot-busy"></span> busy</span>
+						<span class="el-item"><span class="el-dot el-dot-down"></span> unavailable</span>
+					</p>
+					<div class="byok-row is-hidden" id="byok-row">
+						<label class="fq-label" for="provider-key" id="byok-label" data-i18n="forge_studio.api_key">API key</label>
+						<input
+							class="byok-input"
+							id="provider-key"
+							type="password"
+							autocomplete="off"
+							autocapitalize="off"
+							spellcheck="false"
+							placeholder="Your provider API key (kept in this browser)"
+							aria-describedby="byok-hint"
+						/>
+						<span class="byok-hint" id="byok-hint"></span>
+					</div>
+					<p class="fq-estimate" id="estimate" aria-live="polite"></p>
+				</div>
+
+				<div class="composer-row">
+					<div
+						class="aspect"
+						role="group"
+						aria-label="Reference image aspect ratio"
+						id="aspect"
+					>
+						<button type="button" data-aspect="1:1" aria-pressed="true">1:1</button>
+						<button type="button" data-aspect="4:3" aria-pressed="false">4:3</button>
+						<button type="button" data-aspect="3:4" aria-pressed="false">3:4</button>
+						<button type="button" data-aspect="16:9" aria-pressed="false">16:9</button>
+					</div>
+				</div>
+				<button class="btn" id="generate" type="submit" data-i18n-html="forge_studio.generate">
+					<span id="generate-label">Generate</span>
+					<kbd class="gen-kbd" aria-hidden="true">⌘↵</kbd>
+				</button>
+
+				<!-- Quiet holder line under Generate: an active free-quota perk for $THREE
+				     holders, or a non-blocking upsell + a reachable wallet connect so a
+				     holder who hasn't connected can reveal their perk. Filled by forge.js
+				     (updatePerkLine) from the wallet-aware access matrix. -->
+				<div class="fq-perk-row" id="forge-perk-row" hidden>
+					<p class="fq-perk-line" id="forge-perk-line" aria-live="polite"></p>
+					<button type="button" class="fq-connect-btn" id="connect-wallet-btn" hidden data-i18n-html="forge_studio.connect_wallet">
+						<span class="fq-connect-ico" aria-hidden="true">◎</span>
+						<span data-wallet-label>Connect wallet</span>
+					</button>
+				</div>
+
+			</form>
+
+			<div class="chips" id="examples" aria-label="Example prompts">
+				<button class="chip" type="button" data-i18n="forge_studio.a_low_poly_red_fox_sitting">a low-poly red fox, sitting</button>
+				<button class="chip" type="button" data-i18n="forge_studio.a_sci_fi_combat_helmet_brushed_metal">a sci-fi combat helmet, brushed metal</button>
+				<button class="chip" type="button" data-i18n="forge_studio.a_potted_monstera_plant">a potted monstera plant</button>
+				<button class="chip" type="button" data-i18n="forge_studio.a_vintage_film_camera">a vintage film camera</button>
+				<button class="chip" type="button" data-i18n="forge_studio.a_glazed_ceramic_teapot">a glazed ceramic teapot</button>
+				<button class="chips-more" type="button" id="chips-more" aria-label="Swap in a fresh set of example prompts" data-i18n="forge_studio.more_ideas" data-i18n-attr="aria-label:forge_studio.swap_in_a_fresh_set_of_examp_arialabel">↻ More ideas</button>
+			</div>
+				</div>
+				<!-- ── Stage column: viewer, your creations, community showcase ── -->
+				<div class="forge-stage">
+
+			<section class="stage" id="stage" aria-live="polite">
+				<!-- Empty / idle -->
+				<div class="forge-empty" id="state-empty">
+					<div class="forge-empty-art" aria-hidden="true">
+						<svg viewBox="0 0 240 200" fill="none" xmlns="http://www.w3.org/2000/svg">
+							<!-- isometric cube wireframe -->
+							<g stroke="currentColor" stroke-linecap="round" stroke-linejoin="round">
+								<!-- top face -->
+								<polygon points="120,24 190,64 120,104 50,64" stroke-width="1.5" opacity="0.5"/>
+								<!-- left face -->
+								<polygon points="50,64 120,104 120,168 50,128" stroke-width="1.5" opacity="0.3"/>
+								<!-- right face -->
+								<polygon points="190,64 120,104 120,168 190,128" stroke-width="1.5" opacity="0.3"/>
+								<!-- internal cross lines on top face -->
+								<line x1="120" y1="24" x2="120" y2="104" stroke-width="0.75" opacity="0.2"/>
+								<line x1="50" y1="64" x2="190" y2="64" stroke-width="0.75" opacity="0.2"/>
+								<!-- vertex dots -->
+								<circle cx="120" cy="24" r="2.5" fill="currentColor" opacity="0.5"/>
+								<circle cx="190" cy="64" r="2.5" fill="currentColor" opacity="0.4"/>
+								<circle cx="50" cy="64" r="2.5" fill="currentColor" opacity="0.4"/>
+								<circle cx="120" cy="104" r="2.5" fill="currentColor" opacity="0.6"/>
+								<circle cx="190" cy="128" r="2.5" fill="currentColor" opacity="0.3"/>
+								<circle cx="50" cy="128" r="2.5" fill="currentColor" opacity="0.3"/>
+								<circle cx="120" cy="168" r="2.5" fill="currentColor" opacity="0.4"/>
+							</g>
+						</svg>
+					</div>
+					<p class="forge-empty-label" data-i18n="forge_studio.enter_a_prompt_to_generate">Enter a prompt to generate</p>
+				</div>
+
+				<!-- Generating -->
+				<div class="panel gen is-hidden" id="state-generating">
+					<div class="gen-preview" id="gen-preview">
+						<div class="shimmer" aria-hidden="true"></div>
+					</div>
+					<div class="gen-steps">
+						<div class="step" id="step-image" data-state="active">
+							<span class="dot" aria-hidden="true"></span>
+							<span data-i18n="forge_studio.painting_reference_image">Painting reference image</span>
+						</div>
+						<div class="step" id="step-mesh" data-state="pending">
+							<span class="dot" aria-hidden="true"></span>
+							<span data-i18n="forge_studio.reconstructing_textured_mesh">Reconstructing textured mesh</span>
+						</div>
+						<div class="step" id="step-finish" data-state="pending">
+							<span class="dot" aria-hidden="true"></span>
+							<span data-i18n="forge_studio.finalizing_glb">Finalizing GLB</span>
+						</div>
+						<div
+							class="gen-progress"
+							id="gen-progress"
+							role="progressbar"
+							aria-label="Generation progress"
+							aria-valuemin="0"
+							aria-valuemax="100"
+							aria-valuenow="0"
+						>
+							<div class="gen-progress-fill" id="gen-progress-fill"></div>
+						</div>
+						<div class="gen-meta" id="gen-meta">Elapsed 0s</div>
+						<div style="margin-top: var(--space-sm)">
+							<button class="btn btn-ghost" type="button" id="cancel" data-i18n="forge_studio.cancel">Cancel</button>
+						</div>
+					</div>
+				</div>
+
+				<!-- Result -->
+				<div class="panel result is-hidden" id="state-result">
+					<div class="viewer-shell" id="viewer-shell">
+						<model-viewer
+							id="viewer"
+							camera-controls
+							auto-rotate
+							auto-rotate-delay="0"
+							rotation-per-second="18deg"
+							shadow-intensity="1.0"
+							shadow-softness="0.9"
+							exposure="1.5"
+							tone-mapping="aces"
+							environment-image="/environments/gallery/env.hdr"
+							ar
+							ar-modes="webxr scene-viewer quick-look"
+							interaction-prompt="none"
+							crossorigin="anonymous"
+							alt="Generated 3D model"
+						></model-viewer>
+						<div class="viewer-skeleton" id="viewer-skeleton" aria-hidden="true">
+							<span class="viewer-skeleton-sheen"></span>
+							<span class="viewer-skeleton-label" data-i18n="forge_studio.loading_model">Loading model…</span>
+						</div>
+						<div class="viewer-load-error" id="viewer-load-error" role="alert" aria-live="polite">
+							<span class="viewer-load-error-icon" aria-hidden="true">⚠</span>
+							<p data-i18n="forge_studio.model_failed_to_load_often_a_brief">Model failed to load — often a brief network hiccup on the file. Retry, or use the download button below to save it directly.</p>
+							<button type="button" class="btn ghost" id="viewer-retry" data-i18n="forge_studio.retry_loading">Retry loading</button>
+						</div>
+					</div>
+					<div class="result-bar">
+						<span class="label" id="result-label"></span>
+						<span class="saved-chip is-hidden" id="result-saved" aria-label="Auto-saved to gallery" data-i18n="forge_studio.saved" data-i18n-attr="aria-label:forge_studio.auto_saved_to_gallery_arialabel">Saved ✓</span>
+						<span
+							class="views-badge is-hidden"
+							id="result-views"
+							title="Reference views fused"
+						 data-i18n-attr="title:forge_studio.reference_views_fused_title"></span>
+						<div class="actions">
+							<button
+								class="btn btn-ghost"
+								type="button"
+								id="cinema"
+								aria-pressed="false"
+								title="Cinema mode — fullscreen turntable for recording (F)"
+							 data-i18n-attr="title:forge_studio.cinema_mode_fullscreen_turnt_title">
+								<svg
+									width="15"
+									height="15"
+									viewBox="0 0 24 24"
+									fill="none"
+									stroke="currentColor"
+									stroke-width="2"
+									stroke-linecap="round"
+									stroke-linejoin="round"
+									aria-hidden="true"
+								>
+									<path d="M8 3H5a2 2 0 0 0-2 2v3" />
+									<path d="M16 3h3a2 2 0 0 1 2 2v3" />
+									<path d="M8 21H5a2 2 0 0 1-2-2v-3" />
+									<path d="M16 21h3a2 2 0 0 0 2-2v-3" />
+								</svg>
+								Cinema
+							</button>
+							<div
+								class="verdict"
+								id="verdict"
+								role="group"
+								aria-label="Rate this model"
+							>
+								<button
+									type="button"
+									data-outcome="accepted"
+									aria-pressed="false"
+									title="Keep — good result"
+								 data-i18n="forge_studio.keep" data-i18n-attr="title:forge_studio.keep_good_result_title">
+									👍 Keep
+								</button>
+								<button
+									type="button"
+									data-outcome="rejected"
+									aria-pressed="false"
+									title="Discard — bad result"
+								 data-i18n="forge_studio.discard" data-i18n-attr="title:forge_studio.discard_bad_result_title">
+									👎 Discard
+								</button>
+							</div>
+							<button
+								class="btn btn-ghost"
+								type="button"
+								id="forge-share-btn"
+								aria-label="Share this creation"
+							 data-i18n-attr="aria-label:forge_studio.share_this_creation_arialabel">
+								<svg
+									width="15"
+									height="15"
+									viewBox="0 0 24 24"
+									fill="none"
+									stroke="currentColor"
+									stroke-width="2"
+									stroke-linecap="round"
+									stroke-linejoin="round"
+									aria-hidden="true"
+								>
+									<circle cx="18" cy="5" r="3" />
+									<circle cx="6" cy="12" r="3" />
+									<circle cx="18" cy="19" r="3" />
+									<line x1="8.59" y1="13.51" x2="15.42" y2="17.49" />
+									<line x1="15.41" y1="6.51" x2="8.59" y2="10.49" />
+								</svg>
+								Share
+							</button>
+							<a
+								class="btn btn-ghost"
+								id="forge-segment-btn"
+								title="Split this model into selectable parts"
+								 data-i18n="forge_studio.split_into_parts" data-i18n-attr="title:forge_studio.split_this_model_into_select_title">Split into parts</a
+							>
+							<button
+								class="btn btn-ghost"
+								type="button"
+								id="forge-gameready-btn"
+								aria-expanded="false"
+								title="Retopologize to a poly budget and export an engine-ready GLB + FBX"
+							 data-i18n-attr="title:forge_studio.retopologize_to_a_poly_budge_title">
+								<svg
+									width="15"
+									height="15"
+									viewBox="0 0 24 24"
+									fill="none"
+									stroke="currentColor"
+									stroke-width="2"
+									stroke-linecap="round"
+									stroke-linejoin="round"
+									aria-hidden="true"
+								>
+									<polygon points="12 2 2 7 12 12 22 7 12 2" />
+									<polyline points="2 17 12 22 22 17" />
+									<polyline points="2 12 12 17 22 12" />
+								</svg>
+								Game-Ready
+							</button>
+							<button
+								class="btn btn-ghost"
+								type="button"
+								id="forge-embed-btn"
+								title="Embed this model on any website"
+							 data-i18n-attr="title:forge_studio.embed_this_model_on_any_webs_title">
+								<svg
+									width="15"
+									height="15"
+									viewBox="0 0 24 24"
+									fill="none"
+									stroke="currentColor"
+									stroke-width="2"
+									stroke-linecap="round"
+									stroke-linejoin="round"
+									aria-hidden="true"
+								>
+									<polyline points="16 18 22 12 16 6" />
+									<polyline points="8 6 2 12 8 18" />
+								</svg>
+								Embed
+							</button>
+							<button
+								class="btn btn-ghost"
+								type="button"
+								id="forge-ar-btn"
+								title="View this model in AR — place it in your room"
+							 data-i18n-attr="title:forge_studio.view_this_model_in_ar_place_title">
+								<svg
+									width="15"
+									height="15"
+									viewBox="0 0 24 24"
+									fill="none"
+									stroke="currentColor"
+									stroke-width="2"
+									stroke-linecap="round"
+									stroke-linejoin="round"
+									aria-hidden="true"
+								>
+									<path d="M12 2 3 7v10l9 5 9-5V7l-9-5Z" />
+									<path d="m3 7 9 5 9-5" />
+									<path d="M12 12v10" />
+								</svg>
+								View in AR
+							</button>
+							<button
+								class="btn btn-refine is-hidden"
+								type="button"
+								id="refine"
+								title="Re-run this exact prompt at a higher quality tier"
+							 data-i18n-attr="title:forge_studio.re_run_this_exact_prompt_at_title">
+								<svg
+									class="refine-arrow"
+									width="15"
+									height="15"
+									viewBox="0 0 24 24"
+									fill="none"
+									stroke="currentColor"
+									stroke-width="2"
+									stroke-linecap="round"
+									stroke-linejoin="round"
+									aria-hidden="true"
+								>
+									<line x1="12" y1="19" x2="12" y2="5" />
+									<polyline points="5 12 12 5 19 12" />
+								</svg>
+								<span id="refine-label">Refine</span>
+							</button>
+							<a class="btn btn-ghost" id="open-in-composer" href="/compose" title="Open this model in Scene Composer to attach it to an avatar or place it in a scene" data-i18n="forge_studio.compose" data-i18n-attr="title:forge_studio.open_this_model_in_scene_com_title">Compose</a>
+							<a class="btn btn-ghost" id="download" download data-i18n="forge_studio.download_glb">Download GLB</a>
+							<button class="btn" type="button" id="again" data-i18n="forge_studio.make_another">Make another</button>
+						</div>
+					</div>
+
+					<!-- Destination: what the model is for. One tap, remembered in this
+					     browser and sent with every later generation, so the funnel report
+					     can say which use case Forge actually serves. The chip ids mirror
+					     src/shared/forge-destinations.js, the list the server validates
+					     against (tests/forge-funnel.test.js holds the two in step). Static
+					     markup so the i18n pass localizes it like every other control here.
+					     Optional and never blocks anything. -->
+					<div class="cat-picker dest-picker" id="forge-destination-picker" role="group" aria-labelledby="forge-destination-label" hidden>
+						<span class="cat-picker-label" id="forge-destination-label" data-i18n="forge.making_this_for">Making this for:</span>
+						<button class="forge-cat-btn" type="button" data-dest="game" aria-pressed="false" title="Unity, Unreal, Godot, a web game" data-i18n="forge.dest_game" data-i18n-attr="title:forge.dest_game_hint">Game</button>
+						<button class="forge-cat-btn" type="button" data-dest="web" aria-pressed="false" title="A site, a product page, a 3D embed" data-i18n="forge.dest_web" data-i18n-attr="title:forge.dest_web_hint">Web</button>
+						<button class="forge-cat-btn" type="button" data-dest="avatar" aria-pressed="false" title="A character to rig and animate" data-i18n="forge.dest_avatar" data-i18n-attr="title:forge.dest_avatar_hint">Avatar</button>
+						<button class="forge-cat-btn" type="button" data-dest="simulation" aria-pressed="false" title="Robotics, physics, synthetic data" data-i18n="forge.dest_simulation" data-i18n-attr="title:forge.dest_simulation_hint">Simulation</button>
+						<button class="forge-cat-btn" type="button" data-dest="print" aria-pressed="false" title="A physical 3D print" data-i18n="forge.dest_print" data-i18n-attr="title:forge.dest_print_hint">Print</button>
+						<button class="forge-cat-btn" type="button" data-dest="ar" aria-pressed="false" title="Placing it in a real room" data-i18n="forge.dest_ar" data-i18n-attr="title:forge.dest_ar_hint">AR</button>
+						<button class="forge-cat-btn" type="button" data-dest="play" aria-pressed="false" title="Exploring what it can do" data-i18n="forge.dest_play" data-i18n-attr="title:forge.dest_play_hint">Just playing</button>
+						<span class="dest-picker-status" id="forge-destination-status" role="status" aria-live="polite" data-saved="Saved. We will remember this for your next models." data-i18n-attr="data-saved:forge.destination_saved"></span>
+					</div>
+
+					<!-- Category picker — label your model so the gallery and explore feed
+					     can surface it under the right filter. Wired in forge.js via the
+					     forge-category-picker id; hidden by default, becomes visible when
+					     the user is signed in or when a creation_id is available. -->
+					<div class="cat-picker" id="forge-category-picker" hidden>
+						<span class="cat-picker-label" data-i18n="forge_studio.tag_as">Tag as:</span>
+						<span class="cat-group-label" title="Can be given a brain and become an agent" data-i18n="forge_studio.agents" data-i18n-attr="title:forge_studio.can_be_given_a_brain_and_bec_title">Agents</span>
+						<button class="forge-cat-btn" type="button" data-cat="avatar" data-i18n="forge_studio.avatar_2">Avatar</button>
+						<button class="forge-cat-btn" type="button" data-cat="creature" data-i18n="forge_studio.creature">Creature</button>
+						<span class="cat-group-sep" aria-hidden="true"></span>
+						<span class="cat-group-label" title="3D objects — props, not personalities" data-i18n="forge_studio.items" data-i18n-attr="title:forge_studio.3d_objects_props_not_persona_title">Items</span>
+						<button class="forge-cat-btn" type="button" data-cat="item" data-i18n="forge_studio.item">Item</button>
+						<button class="forge-cat-btn" type="button" data-cat="accessory" data-i18n="forge_studio.accessory">Accessory</button>
+						<button class="forge-cat-btn" type="button" data-cat="scene" data-i18n="forge_studio.scene">Scene</button>
+						<button class="forge-cat-btn" type="button" data-cat="vehicle" data-i18n="forge_studio.vehicle">Vehicle</button>
+						<p class="cat-picker-help" data-i18n="forge_studio.only_avatars_creatures_can_be_given_a">Only avatars &amp; creatures can be given a brain and become agents — everything else saves as a 3D item.</p>
+					</div>
+
+					<!-- Optimize topology panel (triangle / quad / low-poly remesh) is
+					     injected into this result panel by /src/forge-optimize.js. -->
+
+					<!-- Stylize — one-click geometric filters on the current model -->
+					<div class="stylize" id="stylize-panel" data-busy="false" hidden>
+						<div class="stylize-head">
+							<h3 data-i18n="forge_studio.stylize">Stylize</h3>
+							<p class="stylize-sub" data-i18n="forge_studio.one_click_geometric_filters_restyle_this_mod">
+								One-click geometric filters. Restyle this model as voxels, bricks,
+								an open lattice, or low-poly — source color is carried over where
+								the style allows.
+							</p>
+						</div>
+						<div
+							class="stylize-gallery"
+							id="stylize-gallery"
+							role="group"
+							aria-label="Stylization filters"
+						></div>
+						<div class="stylize-controls is-hidden" id="stylize-controls">
+							<div class="stylize-slider">
+								<label id="stylize-res-label" for="stylize-res" data-i18n="forge_studio.resolution">Resolution</label>
+								<input type="range" id="stylize-res" min="8" max="96" value="32" />
+								<output id="stylize-res-val" for="stylize-res">32</output>
+							</div>
+							<div class="stylize-actions">
+								<button class="btn btn-ghost" type="button" id="stylize-apply" data-i18n="forge_studio.re_apply">
+									Re-apply
+								</button>
+								<a class="btn btn-ghost" id="stylize-download" download hidden
+									 data-i18n="forge_studio.download_stylized_glb">Download stylized GLB</a
+								>
+								<button
+									class="btn btn-ghost"
+									type="button"
+									id="stylize-revert"
+									hidden
+								 data-i18n="forge_studio.revert_to_original">
+									Revert to original
+								</button>
+							</div>
+						</div>
+						<div
+							class="stylize-status"
+							id="stylize-status"
+							role="status"
+							aria-live="polite"
+						></div>
+					</div>
+				</div>
+
+				<!-- Error -->
+				<div class="panel notice error is-hidden" id="state-error">
+					<span class="glyph" aria-hidden="true">⚠</span>
+					<h3 data-i18n="forge_studio.generation_failed">Generation failed</h3>
+					<p id="error-message" data-i18n="forge_studio.something_went_wrong_try_a_simpler_single">
+						Something went wrong. Try a simpler, single-subject prompt.
+					</p>
+					<!-- One-click engine switches, populated only when a lane failed and
+					     other configured engines can still serve the same request. -->
+					<div class="actions is-hidden" id="error-lanes" role="group" aria-label="Retry on another engine"></div>
+					<div class="actions">
+						<button class="btn" type="button" id="retry" data-i18n="forge_studio.try_again">Try again</button>
+						<button class="btn btn-ghost is-hidden" type="button" id="refine-locally" data-i18n="forge_studio.refine_current_model_instead">Refine current model instead</button>
+						<button class="btn btn-ghost is-hidden" type="button" id="generate-anyway" data-i18n="forge_studio.generate_anyway">Generate anyway</button>
+					</div>
+				</div>
+
+				<!-- Unconfigured -->
+				<div class="panel notice is-hidden" id="state-unconfigured">
+					<span class="glyph" aria-hidden="true">◌</span>
+					<h3 data-i18n="forge_studio.generator_not_configured">Generator not configured</h3>
+					<p data-i18n-html="forge_studio.no_3d_engine_is_reachable_on_this">
+						No 3D engine is reachable on this deployment. Set any one of
+						<code>NVIDIA_API_KEY</code> or <code>HF_TOKEN</code> for the free lanes, or
+						<code>REPLICATE_API_TOKEN</code> for the flux → TRELLIS pipeline — Forge picks
+						up whichever is configured with no further changes.
+					</p>
+				</div>
+			</section>
+
+			<!-- Your creations — durable, reusable models tied to this browser -->
+			<section class="creations is-hidden" id="creations" aria-label="Your forged models">
+				<div class="creations-head">
+					<h2 data-i18n="forge_studio.your_creations">Your creations</h2>
+					<span class="count" id="creations-count"></span>
+				</div>
+				<div class="creations-grid" id="creations-grid"></div>
+			</section>
+
+			<!-- Fresh from the Forge — newest community models (src/forge-showcase.js).
+			     Hidden until the public feed returns real rows, so deployments without
+			     a durable store never show a hollow strip. -->
+			<section
+				class="creations showcase is-hidden"
+				id="showcase"
+				aria-label="Fresh from the Forge — recent community models"
+			>
+				<div class="creations-head">
+					<h2 data-i18n="forge_studio.fresh_from_the_forge">Fresh from the Forge</h2>
+					<div class="showcase-head-right">
+						<a href="/gallery#forge-section" class="showcase-view-all" data-i18n="forge_studio.view_all">View all →</a>
+						<span class="count" id="showcase-count"></span>
+						<button
+							type="button"
+							class="showcase-refresh"
+							id="showcase-refresh"
+							title="Refresh the community feed"
+							aria-label="Refresh the community feed"
+						 data-i18n-attr="aria-label:forge_studio.refresh_the_community_feed_arialabel;title:forge_studio.refresh_the_community_feed_title">
+							<svg
+								width="13"
+								height="13"
+								viewBox="0 0 24 24"
+								fill="none"
+								stroke="currentColor"
+								stroke-width="2"
+								stroke-linecap="round"
+								stroke-linejoin="round"
+								aria-hidden="true"
+							>
+								<path d="M21 12a9 9 0 1 1-2.64-6.36" />
+								<path d="M21 3v6h-6" />
+							</svg>
+						</button>
+					</div>
+				</div>
+				<p class="showcase-sub" data-i18n-html="forge_studio.what_other_people_just_forged_open_one">
+					What other people just forged. Open one in the viewer, or
+					<strong>Remix</strong> its prompt and make it yours.
+				</p>
+				<div class="creations-grid" id="showcase-grid"></div>
+			</section>
+
+			<p class="hint-foot" data-i18n-html="forge_studio.multi_engine_pipeline_free_uses_nvidia_hoste">
+				Multi-engine pipeline — Free uses NVIDIA-hosted generation; Fast, Meshy, Tripo, Rodin, Stability, and Replicate require an API key. Best results: one clearly described subject with a material and lighting cue. Photo mode accepts up to 4 views for multi-view reconstruction. The same pipeline is available to agents over MCP at <a href="/docs">/api/mcp-3d</a>.
+			</p>
+				</div><!-- /.forge-stage -->
+				</div><!-- /.forge-workspace -->
+			</section><!-- /#studio-object -->
+
+			<section id="studio-avatar" class="studio-pane" role="tabpanel" aria-labelledby="studio-tab-avatar" hidden>
+				<!-- Step 1: compose -->
+				<section class="step active" data-step="compose" aria-label="Describe your avatar">
+					<h2 data-i18n="forge_studio.describe_it_get_a_rigged_3d_avatar">Describe it. Get a rigged 3D avatar.</h2>
+					<p class="sub" data-i18n="forge_studio.type_what_you_want_a_character_a">
+						Type what you want — a character, a creature, a style. We render a clean
+						reference, reconstruct it into 3D, and add a skeleton so it can move.
+					</p>
+
+					<div class="composer">
+						<textarea
+							id="cp-prompt"
+							maxlength="600"
+							placeholder="A cyberpunk street samurai in a worn red coat, neon trim, calm expression…"
+							aria-label="Describe the avatar you want to generate"
+						></textarea>
+						<div class="composer-foot">
+							<span class="hint" id="cp-cost-hint" data-i18n="forge_studio.single_subject_full_body_works_best">Single subject, full body works best.</span>
+							<span class="counter" id="cp-counter">0 / 600</span>
+						</div>
+					</div>
+
+					<div class="examples" role="group" aria-label="Example prompts">
+						<button class="example" type="button" data-i18n="forge_studio.a_friendly_robot_mascot_rounded_white_shell">
+							A friendly robot mascot, rounded white shell, glowing blue eyes
+						</button>
+						<button class="example" type="button" data-i18n="forge_studio.a_medieval_knight_in_battered_steel_plate">
+							A medieval knight in battered steel plate, weathered cape
+						</button>
+						<button class="example" type="button" data-i18n="forge_studio.a_fox_eared_ranger_in_green_leather">
+							A fox-eared ranger in green leather, bow on the back
+						</button>
+						<button class="example" type="button" data-i18n="forge_studio.an_astronaut_in_a_sleek_matte_black">
+							An astronaut in a sleek matte-black suit, gold visor
+						</button>
+					</div>
+
+					<div class="actions">
+						<button class="btn-primary" id="cp-generate-btn" type="button" disabled>
+							<svg
+								width="17"
+								height="17"
+								viewBox="0 0 24 24"
+								fill="none"
+								stroke="currentColor"
+								stroke-width="2"
+								stroke-linecap="round"
+								stroke-linejoin="round"
+								aria-hidden="true"
+							>
+								<path d="M12 3l1.9 5.3L19 10l-5.1 1.7L12 17l-1.9-5.3L5 10l5.1-1.7z" />
+							</svg>
+							Generate avatar
+						</button>
+						<span class="hint"
+							 data-i18n-html="forge_studio.sign_in_required_1_min_rigged_glb"><span class="chip-auth">Sign-in required</span> · ~1 min · rigged GLB</span
+						>
+					</div>
+
+					<div class="error-box" id="cp-compose-error" role="alert"></div>
+
+					<p class="note" data-i18n-html="forge_studio.avatars_come_out_best_with_a_single">
+						Avatars come out best with a single, clearly described subject. Abstract scenes
+						or multiple characters reconstruct poorly. You can refine the face, outfit, and
+						animations in the editor afterward. Making an object, prop, or scene piece
+						instead of a character? Switch to the <strong>Object</strong> tab above.
+					</p>
+				</section>
+
+				<!-- Step 2: building -->
+				<section
+					class="step build-wrap"
+					data-step="building"
+					aria-label="Building your avatar"
+					aria-live="polite"
+				>
+					<div class="orb" aria-hidden="true"></div>
+					<p class="build-prompt" id="cp-build-prompt"></p>
+					<div class="progress-track" aria-hidden="true">
+						<div class="progress-fill" id="cp-progress-fill"></div>
+					</div>
+					<p class="build-status" id="cp-build-status" data-i18n="forge_studio.rendering_a_reference_image">Rendering a reference image…</p>
+					<p class="elapsed" id="cp-elapsed">0:00</p>
+					<div class="error-box" id="cp-build-error" role="alert"></div>
+				</section>
+
+				<!-- Step 3: done -->
+				<section class="step done-wrap" data-step="done" aria-label="Your avatar is ready">
+					<h2 data-i18n="forge_studio.your_avatar_is_ready">Your avatar is ready</h2>
+					<p class="sub" style="margin-bottom: 0" data-i18n="forge_studio.open_it_in_the_editor_to_animate">
+						Open it in the editor to animate, dress, and export.
+					</p>
+					<div class="done-viewer">
+						<model-viewer
+							id="cp-done-model"
+							auto-rotate
+							rotation-per-second="14deg"
+							interaction-prompt="none"
+							camera-controls
+							shadow-intensity="0.7"
+							shadow-softness="0.8"
+							environment-image="neutral"
+							exposure="0.95"
+							camera-orbit="0deg 80deg auto"
+							loading="eager"
+							alt="Your newly generated 3D avatar"
+						></model-viewer>
+					</div>
+					<div class="done-tags" id="cp-done-tags"></div>
+					<div class="done-actions">
+						<button class="btn-primary" id="cp-talk" type="button">
+							<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+								<path d="M21 11.5a8.38 8.38 0 0 1-8.5 8.5 9 9 0 0 1-3.9-.9L3 21l1.9-5.6A8.38 8.38 0 0 1 4 11.5 8.5 8.5 0 0 1 12.5 3 8.38 8.38 0 0 1 21 11.5z" />
+							</svg>
+							Talk to it
+						</button>
+						<a class="btn-ghost" id="cp-open-editor">
+							Open in editor
+							<svg
+								width="14"
+								height="14"
+								viewBox="0 0 24 24"
+								fill="none"
+								stroke="currentColor"
+								stroke-width="2.2"
+								stroke-linecap="round"
+								stroke-linejoin="round"
+								aria-hidden="true"
+							>
+								<line x1="5" y1="12" x2="19" y2="12" />
+								<polyline points="12 5 19 12 12 19" />
+							</svg>
+						</a>
+						<button class="btn-ghost" id="cp-make-another" type="button" data-i18n="forge_studio.make_another_2">Make another</button>
+					</div>
+				</section>
+			</section><!-- /#studio-avatar -->
+
+			<section id="studio-lab" class="studio-pane" role="tabpanel" aria-labelledby="studio-tab-lab" hidden>
+				<div class="lab">
+					<aside class="lab-tools" id="lab-tools" aria-label="3D tools"></aside>
+					<div class="lab-stage">
+						<div class="lab-controls" id="lab-controls"></div>
+						<div class="lab-preview">
+							<model-viewer
+								id="lab-viewer"
+								camera-controls
+								auto-rotate
+								rotation-per-second="18deg"
+								interaction-prompt="none"
+								shadow-intensity="0.6"
+								shadow-softness="0.8"
+								environment-image="neutral"
+								exposure="1.0"
+								loading="eager"
+								alt="Generated 3D model preview"
+							></model-viewer>
+							<div id="lab-splat" class="lab-splat" hidden></div>
+						</div>
+						<div class="lab-actions">
+							<button class="btn-primary" id="lab-generate" type="button" data-i18n="forge_studio.generate_model">Generate model</button>
+							<a class="btn-ghost is-disabled" id="lab-download" download aria-disabled="true" title="Generate something first, then download it as a file">
+								<span class="lab-dl-label" data-i18n="forge_studio.download">Download</span>
+								<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+									<path d="M12 3v12" /><polyline points="7 11 12 16 17 11" /><line x1="5" y1="20" x2="19" y2="20" />
+								</svg>
+							</a>
+							<button class="btn-ghost is-hidden" id="lab-talk" type="button" title="Talk to your creation with voice + an AI brain" data-i18n-attr="title:forge_studio.talk_to_your_creation_with_v_title">
+								<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+									<path d="M21 11.5a8.38 8.38 0 0 1-8.5 8.5 9 9 0 0 1-3.9-.9L3 21l1.9-5.6A8.38 8.38 0 0 1 4 11.5 8.5 8.5 0 0 1 12.5 3 8.38 8.38 0 0 1 21 11.5z" />
+								</svg>
+								Bring it alive
+							</button>
+							<span class="lab-status" id="lab-status" role="status" aria-live="polite"></span>
+						</div>
+						<p class="lab-foot" data-i18n-html="forge_studio.every_lab_tool_runs_entirely_in_your">
+							Every Lab tool runs entirely in your browser — no API key, no upload, no cost.
+							Mesh tools export a real binary <strong>GLB</strong>; the Gaussian-splat viewer
+							renders the photoreal radiance-field format. Powered by
+							<a href="https://threejs.org" rel="noopener" target="_blank">three.js</a> and
+							<a href="https://github.com/sparkjsdev/spark" rel="noopener" target="_blank">Spark</a>.
+						</p>
+					</div>
+				</div>
+			</section><!-- /#studio-lab -->
+		</main>
+
+		<script src="/nav.js" defer></script>
+		<script type="module" src="/src/forge-studio/forge.js"></script>
+		<script type="module" src="/src/forge-studio/forge-prompt-studio.js"></script>
+		<script type="module" src="/src/forge-studio/forge-enhance.js"></script>
+		<script type="module" src="/src/forge-studio/forge-iterate.js"></script>
+		<script type="module" src="/src/forge-studio/forge-remix.js"></script>
+		<script type="module" src="/src/forge-studio/forge-refine.js"></script>
+			<script type="module" src="/src/forge-studio/forge-stylize.js"></script>
+		<script type="module" src="/src/forge-studio/forge-optimize.js"></script>
+		<script type="module" src="/src/forge-studio/forge-gameready.js"></script>
+		<script type="module" src="/src/forge-studio/forge-export.js"></script>
+		<script type="module" src="/src/forge-studio/forge-embed-panel.js"></script>
+		<script type="module" src="/src/forge-studio/forge-ar.js"></script>
+		<script type="module" src="/src/forge-studio/forge-showcase.js"></script>
+		<script type="module" src="/src/forge-studio/forge-dropzone.js"></script>
+		<script type="module">
+			// Page-level Object / Avatar mode switch. Object (Forge) renders eagerly;
+			// the Avatar pane (prompt → rigged avatar) lazy-inits its controller the
+			// first time it's shown so it never competes with Forge on load.
+			import { initCreatePrompt, focusPrompt } from '/src/forge-studio/create-prompt.js';
+			import { initLab } from '/src/forge-studio/lab/lab.js';
+
+			const tabs = Array.from(document.querySelectorAll('.studio-tabs [data-studio-mode]'));
+			const panes = {
+				object: document.getElementById('studio-object'),
+				avatar: document.getElementById('studio-avatar'),
+				lab: document.getElementById('studio-lab'),
+			};
+
+			function setMode(mode, { focus = false } = {}) {
+				if (!panes[mode]) return;
+				for (const t of tabs) {
+					const on = t.dataset.studioMode === mode;
+					t.setAttribute('aria-selected', on ? 'true' : 'false');
+				}
+				for (const [key, pane] of Object.entries(panes)) pane.hidden = key !== mode;
+				if (mode === 'avatar') {
+					initCreatePrompt();
+					if (focus) focusPrompt();
+				} else if (mode === 'lab') {
+					initLab();
+				}
+				const url = new URL(window.location.href);
+				if (mode === 'object') url.searchParams.delete('mode');
+				else url.searchParams.set('mode', mode);
+				history.replaceState(null, '', url);
+			}
+
+			for (const t of tabs) {
+				t.addEventListener('click', () => setMode(t.dataset.studioMode, { focus: true }));
+			}
+
+			// Deep-link: /forge-studio?mode=avatar|lab opens straight into that pane.
+			const initial = new URLSearchParams(window.location.search).get('mode');
+			if (initial === 'avatar' || initial === 'lab') setMode(initial);
+		</script>
+		<div id="footer-container"></div>
+		<script src="/footer.js"></script>
+		<!-- Runtime i18n: detects locale, swaps annotated copy, mounts <lang-switcher>. -->
+	<script type="module" src="/i18n.js"></script>
+</body>
+</html>

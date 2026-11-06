@@ -1,0 +1,8 @@
+# TRELLIS dependencies are installed in layered order directly in the Dockerfile
+# (torch → basic → xformers/spconv/kaolin → compiled CUDA extensions → server →
+# TRELLIS source). They are NOT installed from this file — TRELLIS is not a
+# pip-installable package; it is cloned and imported via PYTHONPATH=/app/TRELLIS.
+#
+# This file is intentionally a pointer so the build order and the CUDA-extension
+# compiles (nvdiffrast / diffoctreerast / diff-gaussian-rasterization) stay
+# explicit and cacheable. See the Dockerfile for the authoritative list.

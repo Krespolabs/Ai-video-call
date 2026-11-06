@@ -1,0 +1,27 @@
+{
+	"//": "Type-checking ratchet for the vanilla-JS codebase. `npm run typecheck` runs tsc --noEmit over the include list; with checkJs off, ONLY files that opt in with a `// @ts-check` first-line pragma are type-checked (imports are still parsed for inference). Ratchet rule: new files get the pragma; when you bring an existing file clean, add `// @ts-check` to it — never remove the pragma from a file that has it. It already caught a real bug (elevenlabs.js reading voice_id off a camelCase SDK model).",
+	"compilerOptions": {
+		"target": "es2023",
+		"module": "nodenext",
+		"moduleResolution": "nodenext",
+		"checkJs": false,
+		"allowJs": true,
+		"noEmit": true,
+		"strict": false,
+		"strictNullChecks": false,
+		"skipLibCheck": true,
+		"resolveJsonModule": true,
+		"types": ["node"]
+	},
+	"include": [
+		"api/_lib/http.js",
+		"api/_lib/alerts.js",
+		"api/_lib/cache.js",
+		"api/_lib/sentry.js",
+		"api/_lib/elevenlabs.js",
+		"api/client-errors.js",
+		"api/status.js",
+		"api/cron/uptime-check.js",
+		"public/error-reporter.js"
+	]
+}

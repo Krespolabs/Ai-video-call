@@ -1,0 +1,33 @@
+# Docker build context excludes. The worker Dockerfiles build from the repo root
+# and install their own deps inside the image, so the host's node_modules (multi-GB)
+# must never be uploaded to the daemon. Secrets and local-only artifacts are
+# excluded too — they must never enter a build context.
+**/node_modules
+.git
+.env
+.env.*
+!.env.example
+*.log
+npm-debug.log*
+.DS_Store
+.vercel
+coverage
+playwright-report
+test-results
+*.local
+
+# Secrets and local dumps — never bake into an image. The root holds live config
+# JSON (vercel.json, cors.json, server*.json) the runtime needs, so exclude by
+# specific name/glob, never a blanket *.json.
+.x402-ring-secrets.json
+*-log-export-*.json
+three.ws-log-export-*.json
+*.pem
+*.key
+
+# Worker signing-key caches. A worker Dockerfile COPYs its own directory wholesale,
+# so a local .cache/ of raw secret keys (workers/agora-citizens/.cache holds one
+# devnet keypair per citizen) would be baked into the pushed image AND would make
+# the deployed fleet drive the same on-chain identities as the local one. They are
+# gitignored; they must be build-ignored too. The worker regenerates them at boot.
+workers/*/.cache

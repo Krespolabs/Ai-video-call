@@ -1,0 +1,435 @@
+// pump-fun-strategy — DSL runner + backtester. The `compileStrategy` evaluator
+// in dsl.js is the single source of truth: live runs and backtests share it,
+// so a backtest is a faithful preview of a live run.
+
+import {
+	compileStrategy,
+	buildView,
+	parsePredicate,
+	evalPredicate,
+	validateStrategySpec,
+	strategyErrors,
+} from './dsl.js';
+
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+
+// Patterns in a read-MCP error that mean a mint definitively does not exist
+// (as opposed to a transient upstream/RPC failure, which must NOT fail-closed
+// a structurally-valid strategy).
+const MINT_MISSING_RE = /not found|invalid mint|no .*found|account not found|does not exist/i;
+
+async function call(ctx, tool, args) {
+	const res = await ctx.skills.invoke(tool, args);
+	if (!res?.ok) throw new Error(`${tool}: ${res?.error ?? 'unknown'}`);
+	return res.data;
+}
+
+// validateStrategy — genuine semantic validation, not a syntax pass.
+//
+// Layer 1 (pure, always): validateStrategySpec — structure, predicate paths,
+// numeric domains, contradictory/unreachable rules, cap sanity.
+// Layer 2 (live, best-effort): for explicitly-listed mints, confirm they exist
+// and that their quote asset matches the strategy's SOL denomination.
+//   - `mintInfo[mint]` (supplied by the endpoint from launch records) is the
+//     authoritative agent-coin + quote-pairing source.
+//   - mints not in mintInfo are probed on-chain via ctx.skills.invoke.
+//   - A transient upstream failure downgrades to a warning so a working
+//     strategy is never falsely rejected; only a definitive "not found" or a
+//     confirmed quote mismatch is a hard error.
+export async function validateStrategy({ strategy, network = 'mainnet', mintInfo = null } = {}, ctx = null) {
+	const { issues, meta } = validateStrategySpec(strategy);
+
+	for (let i = 0; i < meta.mintList.length; i++) {
+		const mint = meta.mintList[i];
+		const field = `scan.mints[${i}]`;
+		const info = mintInfo?.[mint];
+
+		if (info?.isAgentCoin) {
+			if (info.quoteIsUsdc && meta.denominatedQuote === 'SOL') {
+				issues.push({
+					level: 'error',
+					field,
+					code: 'quote_asset_mismatch',
+					message: `${mint} is a ${info.quoteSymbol || 'USDC'}-paired agent coin, but this strategy denominates entry/exit in SOL (entry.amountSol, caps.*Sol). A live run would build a SOL trade against a ${info.quoteSymbol || 'USDC'} curve. Target a SOL-paired coin or re-denominate the strategy.`,
+				});
+			}
+			continue; // Known agent coin — it exists; no on-chain probe needed.
+		}
+
+		if (ctx?.skills?.invoke) {
+			let r;
+			try {
+				r = await ctx.skills.invoke('pump-fun.getTokenDetails', { mint, network });
+			} catch (e) {
+				r = { ok: false, error: e?.message };
+			}
+			if (r?.ok) {
+				if (info === undefined) {
+					issues.push({ level: 'info', field, code: 'not_agent_coin', message: `${mint} exists on ${network} but is not a three.ws agent coin — trading it is fine, but quote-asset pairing cannot be verified here.` });
+				}
+			} else if (MINT_MISSING_RE.test(String(r?.error ?? ''))) {
+				issues.push({ level: 'error', field, code: 'mint_not_found', message: `${mint} does not exist on ${network}. Check the address.` });
+			} else {
+				issues.push({ level: 'warning', field, code: 'mint_unverified', message: `Could not verify ${mint} right now (${r?.error || 'upstream unavailable'}). It is re-checked at run time.` });
+			}
+		}
+	}
+
+	// Final agreement guarantee: anything we deem valid must also compile for the
+	// runner. If compileStrategy disagrees, surface it rather than silently OK'ing.
+	const errors = issues.filter((x) => x.level === 'error');
+	if (!errors.length) {
+		try {
+			compileStrategy(strategy);
+		} catch (e) {
+			errors.push({ level: 'error', field: 'strategy', code: 'compile_failed', message: e.message });
+			issues.push(errors[errors.length - 1]);
+		}
+	}
+
+	const warnings = issues.filter((x) => x.level === 'warning');
+	const valid = errors.length === 0;
+	return {
+		ok: valid,
+		error: valid ? undefined : errors[0].message,
+		data: {
+			valid,
+			issues,
+			errorCount: errors.length,
+			warningCount: warnings.length,
+			filterCount: meta.filterCount,
+			exitCount: meta.exitCount,
+			filters: meta.filters,
+			exits: meta.exits,
+			summary: meta.summary,
+		},
+	};
+}
+
+async function fetchCandidates(ctx, scan) {
+	if (scan.kind === 'mintList') {
+		return (scan.mints ?? []).map((mint) => ({ mint }));
+	}
+	if (scan.kind === 'trending') {
+		const r = await call(ctx, 'pump-fun.getTrendingTokens', { limit: scan.limit ?? 20 });
+		return r?.tokens ?? r ?? [];
+	}
+	const r = await call(ctx, 'pump-fun.getNewTokens', { limit: scan.limit ?? 20 });
+	return r?.tokens ?? r ?? [];
+}
+
+async function snapshotMint(ctx, mint) {
+	const [details, holders, curve] = await Promise.all([
+		call(ctx, 'pump-fun.getTokenDetails', { mint }),
+		call(ctx, 'pump-fun.getTokenHolders', { mint, limit: 20 }),
+		call(ctx, 'pump-fun.getBondingCurve', { mint }).catch(() => null),
+	]);
+	const creatorAddr = details?.creator ?? details?.token?.creator;
+	const creator = creatorAddr
+		? await call(ctx, 'pump-fun.getCreatorProfile', { creator: creatorAddr }).catch(() => ({}))
+		: {};
+	return { details, holders, curve, creator };
+}
+
+async function maybeBuy(ctx, simulate, mint, amountSol) {
+	if (simulate) return { sig: `SIMULATED:buy:${mint}:${amountSol}`, simulated: true };
+	return call(ctx, 'pump-fun-trade.buyToken', { mint, amountSol });
+}
+async function maybeSell(ctx, simulate, args) {
+	if (simulate) return { sig: `SIMULATED:sell:${args.mint}`, simulated: true };
+	return call(ctx, 'pump-fun-trade.sellToken', args);
+}
+
+export async function runStrategy(args, ctx) {
+	// Pre-flight: refuse a semantically-broken spec before any RPC or signing,
+	// so validate and run can never disagree about what is runnable.
+	const fatal = strategyErrors(args.strategy);
+	if (fatal.length) throw new Error(`invalid strategy — ${fatal[0].message}`);
+	const compiled = compileStrategy(args.strategy);
+	const simulate = !!args.simulate;
+	const deadline = Date.now() + args.durationSec * 1000;
+	const cap = compiled.caps.sessionSpendCapSol ?? ctx?.skillConfig?.defaultSessionSpendCapSol ?? 1.0;
+	const perTrade = compiled.entry.amountSol ?? ctx?.skillConfig?.defaultPerTradeSol ?? 0.05;
+	const pollMs = ctx?.skillConfig?.defaultPollMs ?? 5000;
+	const onLog = typeof args.onLog === 'function' ? args.onLog : () => {};
+	// Optional async guard: returns null to allow, or { code, msg } to block.
+	const policyGuard = typeof args.policyGuard === 'function' ? args.policyGuard : null;
+	const policySettle = typeof args.policySettle === 'function' ? args.policySettle : null;
+	// Optional abort signal: when set, the loop terminates at the next safe point.
+	const abortSignal = args.abortSignal ?? null;
+
+	const seen = new Set();
+	const positions = new Map();
+	const log = [];
+	let spent = 0;
+
+	const emit = (entry) => { log.push(entry); try { onLog(entry); } catch {} };
+
+	while (Date.now() < deadline) {
+		if (abortSignal?.aborted) { emit({ action: 'aborted' }); break; }
+		emit({ action: 'tick', t: Date.now(), open: positions.size, spent });
+
+		// 1. Watch exits on open positions.
+		for (const [mint, pos] of positions) {
+			const snap = await snapshotMint(ctx, mint).catch((e) => {
+				emit({ mint, action: 'snapshot-error', error: e.message });
+				return null;
+			});
+			if (!snap) continue;
+			const view = buildView({ ...snap, position: pos });
+			const exit = compiled.shouldExit(view);
+			if (exit) {
+				try {
+					const r = await maybeSell(ctx, simulate, {
+						mint,
+						percent: exit.percent,
+						amountTokens: exit.amountTokens,
+					});
+					emit({ mint, action: 'exit', rule: exit, sig: r.sig, pnlPct: view.position?.pnlPct });
+					positions.delete(mint);
+				} catch (e) {
+					emit({ mint, action: 'exit-error', error: e.message });
+				}
+			}
+		}
+
+		// 2. Hunt for new entries while under cap.
+		if (spent + perTrade <= cap && positions.size < (compiled.caps.maxOpenPositions ?? Infinity)) {
+			const candidates = await fetchCandidates(ctx, compiled.scan).catch((e) => {
+				emit({ action: 'scan-error', error: e.message });
+				return [];
+			});
+			for (const t of candidates) {
+				const mint = t.mint ?? t.address;
+				if (!mint || seen.has(mint) || positions.has(mint)) continue;
+				seen.add(mint);
+				const snap = await snapshotMint(ctx, mint).catch(() => null);
+				if (!snap) continue;
+				const view = buildView(snap);
+				if (!compiled.passes(view)) {
+					emit({ mint, action: 'skip', view });
+					continue;
+				}
+				if (policyGuard && !simulate) {
+					const block = await policyGuard({ mint, amountSol: perTrade });
+					if (block) {
+						emit({ mint, action: 'policy-block', code: block.code, reason: block.msg });
+						continue;
+					}
+				}
+				try {
+					const buy = await maybeBuy(ctx, simulate, mint, perTrade);
+					if (policySettle && !simulate) await policySettle({ mint, ok: true, sig: buy.sig });
+					spent += perTrade;
+					positions.set(mint, {
+						amountTokens: buy.amountTokens ?? 0,
+						entryPriceSol: snap.curve?.priceSol ?? 0,
+						openedAt: Date.now(),
+					});
+					emit({ mint, action: 'enter', sig: buy.sig, spent, entryPriceSol: snap.curve?.priceSol ?? 0 });
+					if (spent + perTrade > cap) break;
+				} catch (e) {
+					if (policySettle && !simulate) await policySettle({ mint, ok: false }).catch(() => {});
+					emit({ mint, action: 'enter-error', error: e.message });
+				}
+			}
+		}
+
+		await sleep(pollMs);
+	}
+
+	return {
+		ok: true,
+		data: {
+			spent,
+			openPositions: [...positions.entries()].map(([mint, p]) => ({ mint, ...p })),
+			log,
+			simulate,
+		},
+	};
+}
+
+// ── Backtester ──────────────────────────────────────────────────────────────
+// Replays a strategy against historical trade arrays. No RPC, no signing.
+
+function priceFromTrade(t) {
+	// Best-effort across pump-fun shapes.
+	if (t.priceSol != null) return t.priceSol;
+	if (t.solAmount && t.tokenAmount) return t.solAmount / t.tokenAmount;
+	return null;
+}
+
+export async function backtestStrategy(args, ctx) {
+	const fatal = strategyErrors(args.strategy);
+	if (fatal.length) return { ok: false, error: fatal[0].message };
+	const compiled = compileStrategy(args.strategy);
+	const mints = args.mints ?? args.strategy?.scan?.mints ?? [];
+	if (!mints.length) return { ok: false, error: 'backtest requires mints (in args or strategy.scan.mints)' };
+	const sinceMs = args.sinceMs ?? 0;
+
+	const perTrade = compiled.entry.amountSol ?? 0.05;
+	const cap = compiled.caps.sessionSpendCapSol ?? Infinity;
+
+	const trades = [];
+	let spent = 0;
+	let realized = 0;
+
+	for (const mint of mints) {
+		if (spent + perTrade > cap) break;
+
+		const [details, holders, curve, history] = await Promise.all([
+			call(ctx, 'pump-fun.getTokenDetails', { mint }).catch(() => ({})),
+			call(ctx, 'pump-fun.getTokenHolders', { mint, limit: 20 }).catch(() => ({})),
+			call(ctx, 'pump-fun.getBondingCurve', { mint }).catch(() => null),
+			call(ctx, 'pump-fun.getTokenTrades', { mint, limit: 200 }).catch(() => ({ trades: [] })),
+		]);
+		const creatorAddr = details?.creator ?? details?.token?.creator;
+		const creator = creatorAddr
+			? await call(ctx, 'pump-fun.getCreatorProfile', { creator: creatorAddr }).catch(() => ({}))
+			: {};
+
+		// Entry view = state at the *first* trade after sinceMs.
+		const tradeList = (history?.trades ?? history ?? [])
+			.filter((t) => (t.timestamp ?? 0) >= sinceMs)
+			.sort((a, b) => (a.timestamp ?? 0) - (b.timestamp ?? 0));
+		if (!tradeList.length) continue;
+
+		const entryView = buildView({ details, holders, creator, curve });
+		if (!compiled.passes(entryView)) {
+			trades.push({ mint, action: 'skip', view: entryView });
+			continue;
+		}
+
+		const entryPrice = priceFromTrade(tradeList[0]);
+		if (!entryPrice) {
+			trades.push({ mint, action: 'skip', reason: 'no entry price' });
+			continue;
+		}
+
+		const tokens = perTrade / entryPrice;
+		spent += perTrade;
+
+		// Walk forward, evaluating exit predicates at each tick.
+		let exitedAt = null;
+		let exitReason = 'eod';
+		let exitPrice = priceFromTrade(tradeList[tradeList.length - 1]) ?? entryPrice;
+
+		const openedAt = tradeList[0].timestamp ?? Date.now();
+		for (const t of tradeList) {
+			const px = priceFromTrade(t);
+			if (!px) continue;
+			const view = buildView({
+				details, holders, creator,
+				curve: { ...curve, priceSol: px },
+				position: { entryPriceSol: entryPrice, amountTokens: tokens, openedAt },
+			});
+			const exit = compiled.shouldExit(view);
+			if (exit) {
+				exitPrice = px;
+				exitedAt = t.timestamp ?? Date.now();
+				exitReason = exit;
+				break;
+			}
+		}
+
+		const proceeds = tokens * exitPrice;
+		const pnl = proceeds - perTrade;
+		realized += pnl;
+
+		trades.push({
+			mint,
+			action: 'trade',
+			entryPrice,
+			exitPrice,
+			pnlSol: pnl,
+			pnlPct: ((exitPrice - entryPrice) / entryPrice) * 100,
+			heldSec: exitedAt ? (exitedAt - openedAt) / 1000 : null,
+			exitReason,
+		});
+	}
+
+	const completed = trades.filter((t) => t.action === 'trade');
+	const wins = completed.filter((t) => t.pnlSol > 0).length;
+	let peak = 0, trough = 0, runningPnl = 0, maxDrawdown = 0;
+	for (const t of completed) {
+		runningPnl += t.pnlSol;
+		if (runningPnl > peak) peak = runningPnl;
+		const dd = peak - runningPnl;
+		if (dd > maxDrawdown) { maxDrawdown = dd; trough = runningPnl; }
+	}
+
+	return {
+		ok: true,
+		data: {
+			spent,
+			realizedPnlSol: realized,
+			roiPct: spent > 0 ? (realized / spent) * 100 : 0,
+			tradeCount: completed.length,
+			winRate: completed.length ? wins / completed.length : 0,
+			maxDrawdownSol: maxDrawdown,
+			trades,
+		},
+	};
+}
+
+// ── Manual position close ───────────────────────────────────────────────────
+// Sell every SPL holding the agent currently has on-chain. Use to wind down
+// a strategy on demand or as a kill-switch when something goes wrong.
+//
+// Args:
+//   mints?: string[]   - if provided, only sell these mints; else sell all
+//                        positive-balance SPL holdings the wallet owns
+//   simulate?: boolean - dry-run; emit intended sells but skip signing
+//   onLog?: (e) => void
+//
+// Requires ctx.wallet (uses solana-wallet.getSplBalances under the hood).
+
+export async function closeAllPositions(args, ctx) {
+	const onLog = typeof args?.onLog === 'function' ? args.onLog : () => {};
+	const simulate = !!args?.simulate;
+	const log = [];
+	const emit = (e) => { log.push(e); try { onLog(e); } catch {} };
+
+	if (!ctx?.wallet?.publicKey && !simulate) {
+		return { ok: false, error: 'closeAllPositions requires ctx.wallet (or simulate:true)' };
+	}
+
+	let targets;
+	if (Array.isArray(args?.mints) && args.mints.length) {
+		targets = args.mints.map((mint) => ({ mint }));
+	} else {
+		const r = await ctx.skills.invoke('solana-wallet.getSplBalances', {});
+		if (!r?.ok) return { ok: false, error: `getSplBalances failed: ${r?.error}` };
+		targets = (r.data?.balances ?? []).filter((b) => (b.amount ?? 0) > 0);
+	}
+
+	let sold = 0, errors = 0;
+	for (const t of targets) {
+		try {
+			if (simulate) {
+				emit({ mint: t.mint, action: 'simulate-sell', amount: t.amount });
+				sold++;
+				continue;
+			}
+			const r = await ctx.skills.invoke('pump-fun-trade.sellToken', {
+				mint: t.mint,
+				percent: 100,
+			});
+			if (r?.ok) {
+				emit({ mint: t.mint, action: 'sold', sig: r.data.sig });
+				sold++;
+			} else {
+				emit({ mint: t.mint, action: 'sell-error', error: r?.error });
+				errors++;
+			}
+		} catch (e) {
+			emit({ mint: t.mint, action: 'sell-error', error: e.message });
+			errors++;
+		}
+	}
+
+	return { ok: true, data: { sold, errors, total: targets.length, simulate, log } };
+}
+
+// Re-exported for tests.
+export { parsePredicate, evalPredicate, buildView, compileStrategy, validateStrategySpec, strategyErrors };

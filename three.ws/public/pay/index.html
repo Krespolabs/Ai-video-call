@@ -1,0 +1,2421 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title data-i18n="pay_index.meta_title">three.ws · pay-per-call (x402)</title>
+<meta name="description" content="Live x402 demo: an agent pays $0.001 USDC on Solana per request to call MCP tools, render glTF/GLB models, and inspect 3D assets. No keys, no signup, on-chain settlement per call."  data-i18n-attr="content:pay_index.meta_description"/>
+<meta property="og:title" content="three.ws · pay-per-call (x402)"  data-i18n-attr="content:pay_index.meta_og_title"/>
+<meta property="og:description" content="Live x402 demo: an agent pays $0.001 USDC on Solana per MCP tool call. Settled on-chain, rendered live."  data-i18n-attr="content:pay_index.meta_og_description"/>
+<meta property="og:type" content="website" />
+<meta property="og:url" content="https://three.ws/pay" />
+<meta property="og:image" content="https://three.ws/api/x402-pay/og" />
+<meta property="og:image:width" content="1200" />
+<meta property="og:image:height" content="630" />
+<meta name="twitter:card" content="summary_large_image" />
+<meta name="twitter:image" content="https://three.ws/api/x402-pay/og" />
+<meta name="theme-color" content="#0b0b0b" />
+<link rel="preconnect" href="https://api.mainnet-beta.solana.com" />
+<script type="module" src="https://cdn.jsdelivr.net/npm/@google/model-viewer@4.4.0/dist/model-viewer.min.js" integrity="sha384-wjsPzEO+lXOf7d9csIDfAQpPt2OKuUU3m0K9qsdKIuzX4N8czSF6hdh23eAbZa3p" crossorigin="anonymous"></script>
+<style>
+  :root {
+    --bg: #0b0b0b;
+    --bg-2: #111111;
+    --panel: #161616;
+    --panel-2: #1d1d1d;
+    --border: #272727;
+    --border-strong: #343434;
+    --text: #e6e8f0;
+    --muted: #8a90a8;
+    --accent: #ffffff;
+    --accent-2: #ffffff;
+    --green: #22c55e;
+    --orange: #f59e0b;
+    --red: #ef4444;
+    --mono: ui-monospace, "JetBrains Mono", "Fira Code", Menlo, monospace;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; background: var(--bg); color: var(--text); }
+  html, body { height: 100%; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    height: 100vh;
+    height: 100dvh;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    -webkit-font-smoothing: antialiased;
+  }
+  a { color: var(--accent-2); }
+  a:hover { color: #67e8f9; }
+
+  /* Header */
+  header {
+    padding: 16px 28px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    border-bottom: 1px solid var(--border);
+    background: linear-gradient(180deg, rgba(255,255,255,0.04), transparent);
+  }
+  .brand { display: flex; align-items: center; gap: 12px; min-width: 0; }
+  .brand .logo {
+    width: 32px; height: 32px;
+    background: conic-gradient(from 230deg, var(--accent), var(--accent-2), var(--accent));
+    border-radius: 9px;
+    box-shadow: 0 0 24px rgba(255, 255, 255, 0.5);
+    flex: 0 0 auto;
+  }
+  .brand .title { margin: 0; font-weight: 700; font-size: 16px; letter-spacing: -0.01em; white-space: nowrap; }
+  .brand .sub { font-size: 12px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .header-right { display: flex; gap: 8px; align-items: center; }
+  .pill {
+    display: inline-flex; align-items: center; gap: 8px;
+    background: var(--panel); border: 1px solid var(--border);
+    padding: 6px 12px; border-radius: 99px;
+    font-family: var(--mono); font-size: 12px;
+    color: var(--text);
+    transition: border-color 0.2s;
+  }
+  .pill .dot {
+    width: 6px; height: 6px; border-radius: 50%;
+    background: var(--green); box-shadow: 0 0 8px var(--green);
+    animation: pulse 2s ease-in-out infinite;
+  }
+  .pill.ticker .dot { background: var(--accent-2); box-shadow: 0 0 8px var(--accent-2); }
+  .pill .label { color: var(--muted); }
+  @keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.5; }
+  }
+  .pill.flash {
+    border-color: var(--accent-2);
+    animation: flash 0.6s ease-out;
+  }
+  @keyframes flash {
+    0% { background: var(--accent-2); color: #0b0b0b; }
+    100% { background: var(--panel); }
+  }
+
+  /* Main */
+  main {
+    flex: 1 1 0; display: grid;
+    grid-template-columns: 1.55fr 1fr;
+    gap: 0; min-height: 0;
+    overflow: hidden;
+  }
+  @media (max-width: 980px) {
+    main { grid-template-columns: 1fr; overflow-y: auto; }
+    aside.status { border-left: none !important; border-top: 1px solid var(--border); }
+  }
+  section.chat { display: flex; flex-direction: column; min-height: 0; }
+  .conv {
+    flex: 1; overflow-y: auto;
+    padding: 22px 28px;
+    display: flex; flex-direction: column; gap: 14px;
+    scroll-behavior: smooth;
+  }
+  .msg { display: flex; gap: 12px; align-items: flex-start; animation: fade 0.18s ease-out; }
+  @keyframes fade {
+    from { opacity: 0; transform: translateY(4px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+  .msg .av {
+    width: 28px; height: 28px; border-radius: 8px;
+    flex: 0 0 auto;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 13px; font-weight: 700;
+  }
+  .msg.user .av { background: #2f2f2f; color: #fff; }
+  .msg.agent .av {
+    background: conic-gradient(from 200deg, var(--accent), var(--accent-2));
+    color: #0b0b0b;
+  }
+  .msg .body {
+    flex: 1; min-width: 0;
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 12px 14px;
+    font-size: 14px; line-height: 1.55;
+  }
+  .msg.user .body { background: var(--panel-2); }
+  .msg .body code {
+    font-family: var(--mono); font-size: 12px;
+    background: rgba(255,255,255,0.06); padding: 2px 6px; border-radius: 4px;
+  }
+  .msg .body pre {
+    margin: 8px 0 0; padding: 10px 12px;
+    background: var(--bg); border: 1px solid var(--border);
+    border-radius: 8px; overflow-x: auto;
+    font-family: var(--mono); font-size: 12px; line-height: 1.5;
+    max-height: 320px;
+  }
+
+  /* Composer */
+  .composer {
+    border-top: 1px solid var(--border);
+    padding: 14px 28px;
+    background: linear-gradient(to bottom, transparent, rgba(0,0,0,0.2));
+  }
+  .quick {
+    display: flex; gap: 8px; margin-bottom: 12px; flex-wrap: wrap;
+  }
+  .quick button {
+    background: var(--panel); border: 1px solid var(--border);
+    color: var(--text);
+    padding: 6px 12px; border-radius: 99px;
+    font-size: 12px; cursor: pointer;
+    transition: border-color 0.15s, background 0.15s, transform 0.05s;
+  }
+  .quick button:hover { border-color: var(--accent); background: rgba(255, 255, 255, 0.08); }
+  .quick button:active { transform: translateY(1px); }
+  .quick button:disabled { opacity: 0.4; cursor: not-allowed; }
+  .input-row { display: flex; gap: 10px; align-items: stretch; }
+  .input-row input {
+    flex: 1;
+    background: var(--panel);
+    border: 1px solid var(--border);
+    color: var(--text);
+    padding: 12px 14px; border-radius: 10px;
+    font-size: 14px; font-family: inherit;
+    outline: none;
+    transition: border-color 0.15s;
+  }
+  .input-row input:focus { border-color: var(--accent); }
+  /* Every control on this page is custom-styled, so pin one high-contrast ring
+     rather than leaving each to whatever the UA would have drawn. */
+  a:focus-visible,
+  button:focus-visible,
+  input:focus-visible,
+  summary:focus-visible,
+  [tabindex]:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+    border-radius: 6px;
+  }
+  .input-row .send {
+    background: var(--accent); color: #000000;
+    border: none; padding: 0 22px; border-radius: 10px;
+    font-weight: 600; font-size: 14px; cursor: pointer;
+    transition: background 0.15s, transform 0.05s;
+  }
+  .input-row .send:hover { background: #e0e0e0; }
+  .input-row .send:active { transform: translateY(1px); }
+  .input-row .send:disabled { opacity: 0.5; cursor: not-allowed; }
+
+  /* Status sidebar */
+  aside.status {
+    border-left: 1px solid var(--border);
+    padding: 22px 24px;
+    background: var(--panel);
+    overflow-y: auto;
+  }
+  aside.status h2 {
+    font-size: 11px; text-transform: uppercase; letter-spacing: 0.08em;
+    color: var(--muted); margin: 0 0 12px;
+    display: flex; align-items: center; gap: 8px;
+  }
+  aside.status h2::before {
+    content: '';
+    width: 4px; height: 12px; background: var(--accent); border-radius: 2px;
+  }
+  .step {
+    display: flex; align-items: flex-start; gap: 12px;
+    padding: 10px 12px;
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    margin-bottom: 6px;
+    background: var(--panel-2);
+    font-size: 13px;
+    transition: border-color 0.2s, background 0.2s;
+  }
+  .step .icon {
+    width: 22px; height: 22px; flex: 0 0 auto;
+    border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 12px; background: var(--bg);
+    border: 1px solid var(--border);
+    transition: all 0.2s;
+  }
+  .step.active {
+    border-color: var(--accent);
+    background: linear-gradient(180deg, rgba(255,255,255,0.06), var(--panel-2));
+  }
+  .step.active .icon {
+    background: var(--accent); color: #000000; border-color: var(--accent);
+    animation: spin 1.2s linear infinite;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .step.done .icon { background: var(--green); color: #0b0b0b; border-color: var(--green); animation: none; }
+  .step.error { border-color: var(--red); }
+  .step.error .icon { background: var(--red); color: #fff; border-color: var(--red); animation: none; }
+  .step .label { font-weight: 500; }
+  .step .meta { color: var(--muted); font-family: var(--mono); font-size: 11px; margin-top: 2px; }
+
+  /* Receipt */
+  .receipt {
+    margin-top: 14px;
+    padding: 14px;
+    border-radius: 10px;
+    background: linear-gradient(180deg, rgba(255, 255, 255, 0.06), transparent);
+    border: 1px solid rgba(255, 255, 255, 0.3);
+    animation: receiptIn 0.4s ease-out;
+  }
+  @keyframes receiptIn {
+    from { opacity: 0; transform: translateY(8px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+  .receipt h3 {
+    margin: 0 0 8px; font-size: 11px; text-transform: uppercase;
+    letter-spacing: 0.08em; color: var(--accent-2);
+  }
+  .receipt .row {
+    display: flex; justify-content: space-between; gap: 12px;
+    font-size: 12px; margin-bottom: 6px;
+    font-family: var(--mono);
+  }
+  .receipt .row .k { color: var(--muted); }
+  .receipt .row .v { color: var(--text); word-break: break-all; text-align: right; }
+  .receipt a { color: var(--accent-2); text-decoration: none; }
+  .receipt a:hover { text-decoration: underline; }
+  .receipt .actions {
+    display: flex; gap: 6px; margin-top: 10px; flex-wrap: wrap;
+  }
+  .receipt .actions a, .receipt .actions button {
+    flex: 1;
+    background: var(--panel-2); border: 1px solid var(--border);
+    color: var(--text); padding: 6px 10px; border-radius: 6px;
+    font-size: 11px; text-decoration: none; text-align: center;
+    cursor: pointer; transition: border-color 0.15s, background 0.15s;
+    font-family: inherit;
+  }
+  .receipt .actions a:hover, .receipt .actions button:hover {
+    border-color: var(--accent-2);
+  }
+  .copied { background: rgba(34, 197, 94, 0.15) !important; color: var(--green) !important; }
+
+  /* Curl drawer */
+  details.curl { margin-top: 14px; }
+  details.curl summary {
+    cursor: pointer; font-size: 11px; color: var(--muted);
+    text-transform: uppercase; letter-spacing: 0.08em;
+    padding: 6px 0;
+    list-style: none;
+  }
+  details.curl summary::-webkit-details-marker { display: none; }
+  details.curl summary::before { content: '▸ '; }
+  details.curl[open] summary::before { content: '▾ '; }
+  details.curl pre {
+    margin: 6px 0 0; padding: 10px 12px;
+    background: var(--bg); border: 1px solid var(--border);
+    border-radius: 8px; overflow-x: auto;
+    font-family: var(--mono); font-size: 11px; line-height: 1.5;
+    color: var(--accent-2);
+  }
+
+  /* Errors */
+  .err {
+    color: var(--red); font-family: var(--mono); font-size: 12px;
+    padding: 10px 12px;
+    background: rgba(239, 68, 68, 0.08);
+    border: 1px solid rgba(239, 68, 68, 0.3);
+    border-radius: 8px;
+  }
+
+  /* Result chips */
+  .meta-grid {
+    display: grid; grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+    gap: 8px; margin-top: 10px;
+  }
+  .chip {
+    background: var(--bg); border: 1px solid var(--border);
+    border-radius: 8px; padding: 8px 10px;
+  }
+  .chip .k { font-size: 10px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.05em; }
+  .chip .v { font-size: 14px; font-family: var(--mono); margin-top: 2px; word-break: break-word; }
+
+  /* Tools list */
+  .tools-list { display: flex; flex-direction: column; gap: 6px; margin-top: 10px; }
+  .tool-row {
+    display: flex; justify-content: space-between; gap: 12px;
+    padding: 8px 10px; background: var(--bg);
+    border: 1px solid var(--border); border-radius: 8px;
+    font-size: 12px;
+  }
+  .tool-row .name { font-family: var(--mono); color: var(--accent-2); }
+  .tool-row .desc { color: var(--muted); }
+  .tool-row .price {
+    font-family: var(--mono); font-size: 11px; color: var(--orange);
+    background: rgba(245, 158, 11, 0.1);
+    border: 1px solid rgba(245, 158, 11, 0.3);
+    padding: 2px 6px; border-radius: 4px; flex: 0 0 auto;
+  }
+
+  /* Avatars */
+  .avatars-grid {
+    display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+    gap: 10px; margin-top: 10px;
+  }
+  .avatar-card {
+    background: var(--bg); border: 1px solid var(--border);
+    border-radius: 10px; overflow: hidden;
+    transition: border-color 0.2s, transform 0.15s;
+  }
+  .avatar-card:hover { border-color: var(--accent); transform: translateY(-1px); }
+  .avatar-card model-viewer {
+    width: 100%; height: 140px;
+    background: linear-gradient(180deg, #1d1d1d, #0b0b0b);
+    --poster-color: transparent;
+  }
+  .avatar-card .body { padding: 8px 10px; }
+  .avatar-card .name { font-weight: 600; font-size: 12px; }
+  .avatar-card .slug { color: var(--muted); font-family: var(--mono); font-size: 10px; }
+
+  /* Model viewer block */
+  .mv-block {
+    margin-top: 10px;
+    border: 1px solid var(--border);
+    border-radius: 10px; overflow: hidden;
+    background: linear-gradient(180deg, #1d1d1d, #0b0b0b);
+  }
+  .mv-block model-viewer {
+    width: 100%; height: 320px; display: block;
+    --progress-bar-color: var(--accent);
+  }
+  .mv-block .caption {
+    padding: 6px 10px; font-size: 11px; color: var(--muted);
+    border-top: 1px solid var(--border);
+    font-family: var(--mono);
+    display: flex; justify-content: space-between; gap: 12px;
+  }
+
+  /* Optimize / inspect cards */
+  .opt-list { display: flex; flex-direction: column; gap: 8px; margin-top: 10px; }
+  .opt-row {
+    display: flex; gap: 10px;
+    padding: 10px 12px; background: var(--bg);
+    border-left: 3px solid var(--border);
+    border-radius: 4px;
+  }
+  .opt-row.high { border-left-color: var(--red); background: rgba(239,68,68,0.05); }
+  .opt-row.medium { border-left-color: var(--orange); background: rgba(245,158,11,0.05); }
+  .opt-row.low { border-left-color: var(--green); background: rgba(34,197,94,0.05); }
+  .opt-row .opt-icon {
+    flex: 0 0 auto; width: 24px; height: 24px;
+    border-radius: 50%; display: flex; align-items: center; justify-content: center;
+    font-size: 14px;
+  }
+  .opt-row.high .opt-icon { background: rgba(239,68,68,0.15); color: var(--red); }
+  .opt-row.medium .opt-icon { background: rgba(245,158,11,0.15); color: var(--orange); }
+  .opt-row.low .opt-icon { background: rgba(34,197,94,0.15); color: var(--green); }
+  .opt-row .opt-body { flex: 1; min-width: 0; font-size: 13px; line-height: 1.5; }
+  .opt-row .opt-title { font-weight: 600; }
+  .opt-row .opt-detail { color: var(--muted); margin-top: 2px; font-size: 12px; }
+
+  /* Tree (inspect) */
+  .tree { margin-top: 8px; font-family: var(--mono); font-size: 12px; line-height: 1.6; }
+  .tree-node { padding-left: 14px; border-left: 1px dashed var(--border); margin-left: 4px; }
+  .tree-node .tag { color: var(--accent-2); }
+  .tree-node .stat { color: var(--muted); }
+
+  /* Footer & activity feed */
+  footer.feed {
+    border-top: 1px solid var(--border);
+    padding: 8px 28px;
+    background: var(--bg-2);
+    display: flex; align-items: center; gap: 12px;
+    font-size: 11px; font-family: var(--mono);
+    overflow: hidden;
+  }
+  .feed-label {
+    color: var(--muted); flex: 0 0 auto;
+    text-transform: uppercase; letter-spacing: 0.06em;
+  }
+  .feed-track {
+    flex: 1; overflow: hidden; position: relative;
+    height: 18px;
+  }
+  .feed-strip {
+    display: flex; gap: 28px;
+    white-space: nowrap;
+    animation: marquee 60s linear infinite;
+  }
+  .feed-strip:hover { animation-play-state: paused; }
+  @keyframes marquee {
+    from { transform: translateX(0); }
+    to { transform: translateX(-50%); }
+  }
+  .feed-item { color: var(--text); }
+  .feed-item .tool { color: var(--accent-2); }
+  .feed-item .ago { color: var(--muted); }
+
+  /* Walkthrough overlay */
+  .overlay {
+    position: fixed; inset: 0; background: rgba(0,0,0,0.7);
+    backdrop-filter: blur(8px);
+    display: none; align-items: center; justify-content: center;
+    z-index: 100;
+  }
+  .overlay.show { display: flex; }
+  .walkthrough {
+    background: var(--panel);
+    border: 1px solid var(--border-strong);
+    border-radius: 16px;
+    padding: 28px 32px;
+    max-width: 480px; width: calc(100% - 32px);
+    animation: walkIn 0.25s ease-out;
+  }
+  @keyframes walkIn {
+    from { opacity: 0; transform: scale(0.96); }
+    to { opacity: 1; transform: scale(1); }
+  }
+  .walkthrough h2 { margin: 0 0 4px; font-size: 22px; letter-spacing: -0.01em; }
+  .walkthrough p { color: var(--muted); margin: 0 0 18px; font-size: 14px; }
+  .walkthrough .steps { display: flex; flex-direction: column; gap: 10px; margin-bottom: 18px; }
+  .walkthrough .step-item {
+    display: flex; gap: 12px; align-items: flex-start;
+    padding: 10px 12px;
+    border: 1px solid var(--border); border-radius: 10px;
+    background: var(--panel-2);
+  }
+  .walkthrough .step-item .num {
+    width: 24px; height: 24px; flex: 0 0 auto;
+    border-radius: 50%;
+    background: conic-gradient(from 200deg, var(--accent), var(--accent-2));
+    color: #0b0b0b; font-weight: 700;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 13px;
+  }
+  .walkthrough .step-item .text { font-size: 13px; line-height: 1.5; }
+  .walkthrough .step-item .text b { color: var(--accent-2); }
+  .walkthrough button {
+    background: var(--accent); color: #000000; border: none;
+    width: 100%; padding: 12px; border-radius: 10px;
+    font-weight: 600; font-size: 14px; cursor: pointer;
+  }
+  .walkthrough button:hover { background: #e0e0e0; }
+
+  /* Mobile polish */
+  @media (max-width: 640px) {
+    header { padding: 12px 16px; flex-wrap: wrap; gap: 8px; }
+    .brand .sub { display: none; }
+    .header-right { width: 100%; gap: 6px; }
+    .pill { font-size: 11px; padding: 5px 10px; flex: 1; justify-content: center; min-width: 0; overflow: hidden; }
+    .pill #walletText, .pill #tickerText { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .conv { padding: 16px 16px; }
+    .composer { padding: 12px 16px; }
+    aside.status { padding: 16px 16px; }
+    .quick { gap: 6px; }
+    /* >=44px tap target; full-width chips wrap cleanly */
+    .quick button { font-size: 12px; padding: 9px 12px; min-height: 40px; }
+    footer.feed { padding: 6px 14px; gap: 8px; font-size: 10px; }
+    .feed-label { display: none; }
+    .walkthrough { padding: 22px 22px; }
+    .walkthrough h2 { font-size: 19px; }
+    .mv-block model-viewer { height: 280px; }
+    .avatars-grid { grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); }
+    .avatar-card model-viewer { height: 110px; }
+
+    /* Inputs: 16px prevents iOS focus-zoom; comfortable tap height */
+    .input-row { gap: 8px; }
+    .input-row input { font-size: 16px; padding: 13px 14px; min-height: 48px; }
+    .input-row .send { font-size: 15px; padding: 0 18px; min-height: 48px; flex: 0 0 auto; }
+
+    /* Containers that kept desktop 28px gutters — pull in so nothing overflows 320px */
+    .chain-tabs { padding: 10px 16px 0; gap: 6px; overflow-x: auto; flex-wrap: nowrap; -webkit-overflow-scrolling: touch; }
+    .chain-tab { padding: 10px 12px; font-size: 13px; white-space: nowrap; flex: 0 0 auto; }
+    .agent-bar { padding: 10px 16px; gap: 8px; }
+    .bsc-panel .bsc-header { padding: 16px 16px 8px; flex-wrap: wrap; }
+    .bsc-panel .bsc-header > div { min-width: 0; }
+    .bsc-connect { width: 100%; padding: 12px 16px; min-height: 44px; font-size: 14px; }
+    .bsc-info { padding: 6px 16px 12px; gap: 12px; }
+    .bsc-info code { word-break: break-all; }
+    .bsc-quick { padding: 4px 16px 14px; }
+    .bsc-chip { padding: 8px 12px; min-height: 40px; display: inline-flex; align-items: center; }
+    .bsc-log { padding: 16px 16px; }
+
+    /* Receipt + actions stay inside the panel, tappable */
+    .receipt .actions a, .receipt .actions button { padding: 10px 10px; min-height: 40px; font-size: 12px; display: flex; align-items: center; justify-content: center; }
+    /* Code/mono drawers wrap instead of forcing page scroll */
+    details.curl pre, .msg .body pre { white-space: pre-wrap; word-break: break-word; }
+    /* Long addresses/hashes in inline code must wrap, never scroll the page */
+    .msg .body code, .bsc-step code { overflow-wrap: anywhere; word-break: break-word; }
+    .bsc-info span { min-width: 0; }
+  }
+  @media (max-width: 420px) {
+    .quick button[data-cmd="search_public_avatars:"] { display: none; }
+    .pill .label { display: none; }
+    /* Stack the composer so the Pay button is full-width and finger-friendly */
+    .input-row { flex-direction: column; }
+    .input-row .send { width: 100%; }
+    .chain-tab .chip { display: none; }
+  }
+
+  /* Agent picker */
+  .agent-bar {
+    border-bottom: 1px solid var(--border);
+    background: var(--bg-2);
+    padding: 10px 28px;
+    display: flex; gap: 10px; align-items: center; flex-wrap: wrap;
+    font-size: 13px;
+  }
+  .agent-bar .label { color: var(--muted); white-space: nowrap; }
+  .agent-list { display: flex; gap: 8px; flex-wrap: wrap; flex: 1; min-width: 0; }
+  .agent-card {
+    display: flex; gap: 8px; align-items: center;
+    padding: 7px 12px;
+    border: 1px solid var(--border); border-radius: 10px;
+    cursor: pointer; background: var(--panel);
+    transition: border-color 0.15s, background 0.15s;
+    /* Rendered as <button>, so reset the UA's font and text alignment. */
+    color: inherit; font-family: inherit; font-size: 12px; text-align: left;
+  }
+  .agent-card:active { transform: translateY(1px); }
+  .agent-card:hover { border-color: var(--accent); background: rgba(255,255,255,0.06); }
+  .agent-card.selected { border-color: var(--accent-2); background: rgba(34,211,238,0.07); }
+  .agent-card .av {
+    width: 24px; height: 24px; border-radius: 6px;
+    background: conic-gradient(from 200deg, var(--accent), var(--accent-2));
+    display: flex; align-items: center; justify-content: center;
+    font-size: 10px; font-weight: 700; color: #0b0b0b; flex: 0 0 auto;
+  }
+  .agent-card .av img { width: 24px; height: 24px; border-radius: 6px; object-fit: cover; }
+  .agent-card > span:last-child { display: flex; flex-direction: column; align-items: flex-start; gap: 1px; }
+  .agent-card .name { font-weight: 600; }
+  .agent-card .bal { color: var(--muted); font-family: var(--mono); font-size: 11px; }
+  .agent-card .no-wallet {
+    color: var(--orange); font-size: 10px; font-family: var(--mono);
+    background: rgba(245,158,11,0.1); border: 1px solid rgba(245,158,11,0.3);
+    padding: 2px 6px; border-radius: 4px;
+  }
+  .agent-bar .login-cta {
+    color: var(--muted); font-size: 12px;
+  }
+  .agent-bar .login-cta a { color: var(--accent-2); }
+  .agent-bar .login-cta .demo-note { font-style: italic; }
+
+  /* Generate wallet modal */
+  .gen-overlay {
+    position: fixed; inset: 0; background: rgba(0,0,0,0.7);
+    backdrop-filter: blur(8px);
+    display: none; align-items: center; justify-content: center; z-index: 100;
+  }
+  .gen-overlay.show { display: flex; }
+  .gen-modal {
+    background: var(--panel); border: 1px solid var(--border-strong);
+    border-radius: 16px; padding: 28px 32px; max-width: 420px; width: calc(100% - 32px);
+    animation: walkIn 0.25s ease-out;
+  }
+  .gen-modal h2 { margin: 0 0 6px; font-size: 18px; }
+  .gen-modal p { color: var(--muted); margin: 0 0 18px; font-size: 13px; }
+  .gen-modal .actions { display: flex; flex-direction: column; gap: 8px; }
+  .gen-modal button {
+    padding: 12px 16px; border-radius: 10px;
+    border: 1px solid var(--border); background: var(--panel-2);
+    color: var(--text); cursor: pointer; font-size: 13px; font-family: inherit;
+    display: flex; align-items: center; gap: 10px;
+    transition: border-color 0.15s;
+  }
+  .gen-modal button:hover { border-color: var(--accent); }
+  .gen-modal button.primary { background: var(--accent); color: #000000; border-color: var(--accent); }
+  .gen-modal button.primary:hover { background: #e0e0e0; }
+  .login-cta .cta-link {
+    background: none; border: none; padding: 0;
+    color: var(--accent-2); font: inherit; text-decoration: underline; cursor: pointer;
+  }
+  .login-cta .cta-link:hover { opacity: 0.8; }
+  .gen-modal .cancel {
+    display: block; width: 100%; margin-top: 8px;
+    background: none; border: none; padding: 6px;
+    color: var(--muted); font: inherit; font-size: 12px; text-align: center; cursor: pointer;
+    transition: color 0.15s;
+  }
+  .gen-modal .cancel:hover { color: var(--text); }
+  .gen-modal .cancel:hover { color: var(--text); }
+  .gen-modal .spinner { font-size: 18px; animation: spin 1.2s linear infinite; }
+
+  /* Chain tabs — Solana (default) vs BNB Chain. Toggles which payment surface
+     the .chat section renders. */
+  .chain-tabs {
+    display: flex; gap: 8px;
+    padding: 10px 28px 0;
+    border-bottom: 1px solid var(--border);
+  }
+  .chain-tab {
+    background: transparent; border: 1px solid transparent;
+    color: var(--muted); font-size: 13px; font-weight: 600;
+    padding: 8px 14px; border-radius: 8px 8px 0 0;
+    cursor: pointer; transition: color .15s, background .15s, border-color .15s;
+    border-bottom: 1px solid var(--border);
+    margin-bottom: -1px;
+  }
+  .chain-tab:hover { color: var(--text); }
+  .chain-tab.active {
+    color: var(--text);
+    background: var(--panel);
+    border-color: var(--border-strong) var(--border-strong) var(--panel);
+  }
+  .chain-tab .chip {
+    /* No opacity dim: .7 over --muted measured 3.6:1 (AA needs 4.5:1). */
+    font-family: var(--mono); font-size: 10px; color: var(--muted);
+    margin-left: 6px;
+  }
+
+  /* BSC panel — sits inside section.chat as a sibling of .conv + .composer.
+     Hidden by default; .active flips display:flex when the BSC tab is chosen. */
+  .bsc-panel { display: none; flex-direction: column; min-height: 0; flex: 1; }
+  .bsc-panel.active { display: flex; }
+  .bsc-panel .bsc-header {
+    display: flex; align-items: center; justify-content: space-between;
+    gap: 16px; padding: 18px 28px 8px;
+  }
+  .bsc-panel .bsc-header strong { font-size: 15px; }
+  .bsc-panel .bsc-sub { font-size: 12px; color: var(--muted); margin-top: 4px; }
+  .bsc-connect {
+    background: linear-gradient(135deg, #F3BA2F, #E89C0C);
+    color: #1d1d1d; font-weight: 700; font-size: 13px;
+    padding: 9px 16px; border-radius: 8px; border: none;
+    cursor: pointer; transition: filter .15s;
+    white-space: nowrap;
+  }
+  .bsc-connect:hover { filter: brightness(1.08); }
+  .bsc-connect:disabled { opacity: .5; cursor: not-allowed; }
+  .bsc-info {
+    display: flex; flex-wrap: wrap; gap: 18px;
+    padding: 6px 28px 12px;
+    font-size: 12px; color: var(--muted);
+  }
+  .bsc-info code { color: var(--text); font-family: var(--mono); }
+  .bsc-quick {
+    display: flex; flex-wrap: wrap; gap: 8px;
+    padding: 4px 28px 14px;
+    border-bottom: 1px solid var(--border);
+  }
+  .bsc-chip {
+    background: var(--panel-2); color: var(--text);
+    border: 1px solid var(--border); border-radius: 999px;
+    padding: 6px 12px; font-size: 12px; font-family: var(--mono);
+    cursor: pointer; transition: border-color .15s;
+  }
+  .bsc-chip:hover { border-color: var(--accent-2); }
+  .bsc-log {
+    flex: 1; overflow-y: auto;
+    padding: 18px 28px;
+    display: flex; flex-direction: column; gap: 10px;
+  }
+  .bsc-step {
+    font-size: 13px; line-height: 1.55;
+    padding: 10px 14px;
+    background: var(--panel); border: 1px solid var(--border);
+    border-radius: 10px;
+    word-break: break-all;
+  }
+  .bsc-step.muted { color: var(--muted); border-style: dashed; }
+  .bsc-step.err { border-color: var(--red); color: #fca5a5; }
+  .bsc-step.result { background: var(--bg-2); }
+  .bsc-step.result pre {
+    margin: 0; font-size: 11.5px; line-height: 1.5;
+    color: var(--text); white-space: pre-wrap; word-break: break-all;
+  }
+  .bsc-step code { font-family: var(--mono); font-size: 11.5px; }
+  .bsc-step a { color: var(--accent-2); }
+</style>
+
+	<link rel="canonical" href="https://three.ws/pay">
+	<meta property="og:site_name" content="three.ws">
+	<meta name="twitter:title" content="Pay (x402) · three.ws" data-i18n-attr="content:pay_index.meta_twitter_title">
+	<meta name="twitter:description" content="Pay-per-call gateway: invoke any x402-protocol paid API with a USDC micro-transaction." data-i18n-attr="content:pay_index.meta_twitter_description">
+	<script type="application/ld+json">{"@context":"https://schema.org","@type":"WebPage","name":"Pay (x402)","description":"Pay-per-call gateway: invoke any x402-protocol paid API with a USDC micro-transaction.","url":"https://three.ws/pay","isPartOf":{"@type":"WebSite","name":"three.ws","url":"https://three.ws"}}</script>
+
+	<meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1">
+	<meta property="og:locale" content="en_US">
+	<meta property="og:image:alt" content="Pay (x402) on three.ws">
+	<meta name="twitter:site" content="@trythreews">
+	<script src="/model-viewer-meshopt.js"></script>
+</head>
+<body>
+
+<header>
+  <div id="nav-container"></div>
+</header>
+<script src="/nav.js"></script>
+
+<header class="page-header">
+  <div class="brand">
+    <div class="logo"></div>
+    <div>
+      <h1 class="title">three.ws · pay-per-call</h1>
+      <div class="sub">Live x402 demo: an agent pays USDC on Solana per request</div>
+    </div>
+  </div>
+  <div class="header-right">
+    <div class="pill ticker" id="tickerPill" title="USDC settled this session">
+      <span class="dot"></span>
+      <span class="label" data-i18n="pay_index.session">session</span>
+      <span id="tickerText" data-i18n="pay_index.0_000_usdc">0.000 USDC</span>
+    </div>
+    <div class="pill" id="walletPill" title="Agent wallet on Solana mainnet">
+      <span class="dot"></span>
+      <span id="walletText" data-i18n="pay_index.loading">loading…</span>
+    </div>
+  </div>
+</header>
+
+<main>
+  <section class="chat">
+    <div class="chain-tabs" id="chainTabs">
+      <button class="chain-tab active" data-chain="solana" data-i18n-html="pay_index.solana_usdc">⚡ Solana <span class="chip">USDC</span></button>
+      <button class="chain-tab" data-chain="bsc" data-i18n-html="pay_index.bnb_chain_usdc">⛓ BNB Chain <span class="chip">USDC</span></button>
+    </div>
+    <div class="agent-bar" id="agentBar">
+      <span class="label" data-i18n="pay_index.pay_with">pay with</span>
+      <div class="agent-list" id="agentList">
+        <span class="login-cta" id="agentLoginCta" style="display:none" data-i18n-html="pay_index.sign_in_to_use_your_own_agent">
+          <a href="/login?redirect=/pay">Sign in</a> to use your own agent's wallet.
+          <span class="demo-note">Using shared demo wallet for now.</span>
+        </span>
+        <span id="agentLoading" style="color:var(--muted);font-size:12px" data-i18n="pay_index.loading_agents">loading agents…</span>
+        <!-- Browser wallet cards, protected from renderAgentCards() by data-wallet -->
+        <button type="button" class="agent-card" id="phantomCard" data-wallet="phantom" aria-pressed="false" style="display:none">
+          <span class="av" style="background:linear-gradient(135deg,#ab9ff2,#534bb1);color:#fff;font-size:11px">P</span>
+          <span><span class="name">Phantom</span><span class="bal" id="phantomBalLabel" data-i18n="pay_index.solana_usdc_2">Solana USDC</span></span>
+        </button>
+        <button type="button" class="agent-card" id="evmCard" data-wallet="evm" aria-pressed="false" style="display:none">
+          <span class="av" style="background:linear-gradient(135deg,#f6851b,#e2761b);color:#fff;font-size:11px">M</span>
+          <span><span class="name">EVM wallet</span><span class="bal" id="evmBalLabel" data-i18n="pay_index.base_usdc">Base USDC</span></span>
+        </button>
+      </div>
+    </div>
+    <div class="conv" id="conv">
+      <div class="msg agent">
+        <div class="av">3</div>
+        <div class="body">
+          Hi. I'm the three.ws agent. Every request below triggers a real <strong data-i18n="pay_index.x402">x402</strong> paid API call to <code>three.ws/api/mcp</code>: I sign a Solana SPL transfer for <strong data-i18n="pay_index.0_001_usdc">$0.001 USDC</strong>, the facilitator settles on-chain, the MCP tool runs, and I render the result, including <em data-i18n="pay_index.actual_3d_models">actual 3D models</em> when the tool processes one.
+          <br/><br/>
+          Try one of the chips below, or paste a glTF/GLB URL.
+        </div>
+      </div>
+    </div>
+    <div class="composer" id="composer">
+      <div class="quick" id="quick">
+        <button data-cmd="tools/list" data-i18n="pay_index.list_tools">/list_tools</button>
+        <button data-cmd="validate_model:demo" data-i18n="pay_index.validate_damagedhelmet_glb">/validate DamagedHelmet.glb</button>
+        <button data-cmd="inspect_model:demo" data-i18n="pay_index.inspect_damagedhelmet_glb">/inspect DamagedHelmet.glb</button>
+        <button data-cmd="optimize_model:demo" data-i18n="pay_index.optimize_damagedhelmet_glb">/optimize DamagedHelmet.glb</button>
+        <button data-cmd="search_public_avatars:" data-i18n="pay_index.search_avatars">/search_avatars</button>
+      </div>
+      <div class="input-row">
+        <input id="prompt" placeholder='Try: validate https://example.com/model.glb' autocomplete="off" />
+        <button id="send" class="send" data-i18n="pay_index.pay_run">Pay & Run</button>
+      </div>
+    </div>
+
+    <div class="bsc-panel" id="bscPanel">
+      <div class="bsc-header">
+        <div>
+          <strong data-i18n="pay_index.pay_on_bnb_smart_chain">Pay on BNB Smart Chain</strong>
+          <div class="bsc-sub">You sign the payment in MetaMask. <code>ThreeWSPayments.pay($0.001 USDC)</code> on-chain, with no facilitator and no server-held key.</div>
+        </div>
+        <button class="bsc-connect" id="bscConnect" data-i18n="pay_index.connect_metamask">Connect MetaMask</button>
+      </div>
+      <div class="bsc-info" id="bscInfo" style="display:none">
+        <span data-i18n-html="pay_index.wallet">wallet <code id="bscAddr">…</code></span>
+        <span data-i18n-html="pay_index.usdc">USDC <code id="bscBal">…</code></span>
+        <span data-i18n-html="pay_index.allowance">allowance <code id="bscAllow">…</code></span>
+        <span data-i18n-html="pay_index.contract">contract <a target="_blank" rel="noopener" href="https://bscscan.com/address/0x00000000381f09742a30a5a49975514AeC1B72Cc"><code>0x00000000…1B72Cc</code></a></span>
+      </div>
+      <div class="bsc-quick">
+        <button class="bsc-chip" data-bsctool="validate_model" data-i18n="pay_index.validate_damagedhelmet_glb_2">/validate DamagedHelmet.glb</button>
+        <button class="bsc-chip" data-bsctool="inspect_model" data-i18n="pay_index.inspect_damagedhelmet_glb_2">/inspect DamagedHelmet.glb</button>
+        <button class="bsc-chip" data-bsctool="search_public_avatars" data-i18n="pay_index.search_avatars_2">/search_avatars</button>
+        <button class="bsc-chip" data-bsctool="tools_list" data-i18n="pay_index.list_tools_2">/list_tools</button>
+      </div>
+      <div class="bsc-log" id="bscLog">
+        <div class="bsc-step muted">Connect MetaMask, then click a tool above. You'll sign two transactions: one <code>approve</code> (once per wallet) and one <code>pay(bytes32)</code> per MCP call. The page then POSTs <code>/api/mcp</code> with an <code>X-PAYMENT</code> header proving the on-chain payment.</div>
+      </div>
+    </div>
+  </section>
+
+  <aside class="status">
+    <h2 data-i18n="pay_index.x402_settlement_timeline">x402 settlement timeline</h2>
+    <div id="steps"></div>
+    <div id="receipt"></div>
+  </aside>
+</main>
+
+<footer class="feed">
+  <span class="feed-label" data-i18n="pay_index.recent_paid_calls">recent paid calls</span>
+  <div class="feed-track">
+    <div class="feed-strip" id="feedStrip" aria-live="polite">
+      <span class="feed-item"><span class="ago" data-i18n="pay_index.loading_recent_calls">loading recent calls…</span></span>
+    </div>
+  </div>
+</footer>
+
+<div class="gen-overlay" id="genOverlay" role="dialog" aria-modal="true" aria-labelledby="genTitle" aria-hidden="true">
+  <div class="gen-modal">
+    <h2 id="genTitle" data-i18n="pay_index.set_up_solana_wallet">Set up Solana wallet</h2>
+    <p id="genBody" data-i18n="pay_index.your_agent_needs_a_solana_wallet_to">Your agent needs a Solana wallet to pay for tool calls. Generate one now or import a vanity address.</p>
+    <div class="actions">
+      <button class="primary" id="genBtn" data-i18n-html="pay_index.generate_wallet_instantly">
+        <span id="genSpinner" style="display:none" class="spinner">↻</span>
+        ⚡ Generate wallet instantly
+      </button>
+      <button id="vanityBtn" data-i18n="pay_index.grind_a_vanity_address_instead">🎨 Grind a vanity address instead</button>
+    </div>
+    <button type="button" class="cancel" id="genCancel" data-i18n="pay_index.cancel">cancel</button>
+  </div>
+</div>
+
+<div class="overlay" id="walkthrough" role="dialog" aria-modal="true" aria-labelledby="walkthroughTitle" aria-hidden="true">
+  <div class="walkthrough">
+    <h2 id="walkthroughTitle" data-i18n="pay_index.how_this_works">How this works</h2>
+    <p data-i18n="pay_index.every_action_on_this_page_costs_the">Every action on this page costs the agent $0.001 USDC. Settled per call. No keys, no signup.</p>
+    <div class="steps">
+      <div class="step-item"><div class="num">1</div><div class="text">You click. The page POSTs to <b data-i18n="pay_index.api_mcp">/api/mcp</b>. The server replies <b data-i18n="pay_index.402_payment_required">402 Payment Required</b> with the price.</div></div>
+      <div class="step-item"><div class="num">2</div><div class="text">The agent wallet builds an <b data-i18n="pay_index.spl_transferchecked">SPL transferChecked</b> on Solana, signs it, and re-sends the request with an <b data-i18n="pay_index.x_payment">X-PAYMENT</b> header.</div></div>
+      <div class="step-item"><div class="num">3</div><div class="text">The facilitator <b data-i18n="pay_index.verifies_settles">verifies + settles</b> on-chain. The MCP tool runs. You see the result + a Solscan tx link in &lt;2s.</div></div>
+    </div>
+    <button id="closeWalk" data-i18n="pay_index.got_it_let_s_go">Got it, let's go</button>
+  </div>
+</div>
+
+<script type="module">
+import { apiFetch } from '/src/api.js';
+const $ = (id) => document.getElementById(id);
+const conv = $('conv'), stepsEl = $('steps'), receiptEl = $('receipt');
+const promptEl = $('prompt'), sendBtn = $('send'), quickEl = $('quick');
+const walletText = $('walletText'), walletPill = $('walletPill');
+const tickerText = $('tickerText'), tickerPill = $('tickerPill');
+const feedStrip = $('feedStrip'), walkthrough = $('walkthrough'), closeWalk = $('closeWalk');
+const agentList = $('agentList'), agentLoading = $('agentLoading'), agentLoginCta = $('agentLoginCta');
+const genOverlay = $('genOverlay'), genCancel = $('genCancel'), genBtn = $('genBtn'), vanityBtn = $('vanityBtn');
+const genSpinner = $('genSpinner');
+
+// The runtime i18n pass (src/i18n.js) rewrites every [data-i18n] / [data-i18n-html]
+// node once its catalog lands, several hundred ms after boot. Half the pills and
+// modal copy on this page are live slots the script fills in, so that pass raced
+// the first balance fetch and put "loading…" back over a wallet balance that had
+// already rendered. The platform's opt-out is data-i18n-owned; claim it the
+// moment the script writes, and up front for the markup slots whose value is a
+// runtime address or amount rather than translatable copy.
+function ownText(el, text) {
+  el.dataset.i18nOwned = '1';
+  el.textContent = text;
+}
+for (const slot of document.querySelectorAll('[data-i18n-html] > code[id], [data-i18n-html] > span[id]')) {
+  slot.parentElement.dataset.i18nOwned = '1';
+}
+
+// ---- Agent state --------------------------------------------------------
+let selectedAgent = null;         // { id, name, solana_address, usdc, sol }
+let selectedBrowserWallet = null; // 'phantom' | 'evm' | null
+let pendingGenAgentId = null;
+
+function setSelectedAgent(agent) {
+  selectedAgent = agent;
+  selectedBrowserWallet = null;
+  // update wallet pill to show selected agent's balance
+  if (agent) {
+    ownText(walletText, `${agent.name} · ${
+      agent.usdc != null ? agent.usdc.toFixed(3) + ' USDC' : '? USDC'
+    } · ${agent.sol != null ? agent.sol.toFixed(4) + ' SOL' : ''} · ${
+      agent.solana_address ? agent.solana_address.slice(0,4)+'…'+agent.solana_address.slice(-4) : '?'
+    }`);
+  }
+  // re-render agent cards to highlight selected
+  renderAgentCards(window._agentCache || []);
+  updateBrowserWalletCards();
+}
+
+function setSelectedBrowserWallet(type) {
+  selectedAgent = null;
+  selectedBrowserWallet = type;
+  ownText(walletText, type === 'phantom' ? 'Phantom wallet' : 'EVM wallet');
+  // De-select any agent card without re-rendering the whole list
+  for (const el of agentList.querySelectorAll('.agent-card[data-agent-id].selected')) {
+    el.classList.remove('selected');
+    el.setAttribute('aria-pressed', 'false');
+  }
+  updateBrowserWalletCards();
+}
+
+function updateBrowserWalletCards() {
+  const phantomCard = $('phantomCard');
+  const evmCard = $('evmCard');
+  for (const [card, kind] of [[phantomCard, 'phantom'], [evmCard, 'evm']]) {
+    if (!card) continue;
+    const on = selectedBrowserWallet === kind;
+    card.classList.toggle('selected', on);
+    card.setAttribute('aria-pressed', String(on));
+  }
+}
+
+// ---- Utility helpers ----------------------------------------------------
+function b64decode(str) {
+  if (!str) return null;
+  try { return JSON.parse(atob(str)); } catch { return null; }
+}
+function base64ToUint8Array(b64) {
+  const bin = atob(b64);
+  const arr = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) arr[i] = bin.charCodeAt(i);
+  return arr;
+}
+function uint8ArrayToBase64(arr) {
+  let bin = '';
+  for (const b of arr) bin += String.fromCharCode(b);
+  return btoa(bin);
+}
+function buildJsonRpc(call) {
+  return JSON.stringify({
+    jsonrpc: '2.0', id: 1,
+    method: call.tool === 'tools/list' ? 'tools/list' : 'tools/call',
+    params: call.tool === 'tools/list' ? undefined : { name: call.tool, arguments: call.args || {} },
+  });
+}
+function isSolanaAccept(accept) {
+  return /solana/i.test(accept?.network || '');
+}
+function isEip3009Accept(accept) {
+  return /base|evm|ethereum/i.test(accept?.network || '') || accept?.scheme === 'eip3009';
+}
+
+// The CTA slot is the agent picker's empty / signed-out / unavailable state.
+// Mark it i18n-owned so the catalog pass on a non-English locale cannot stomp
+// the message the script just wrote back to the markup's English default.
+function setLoginCta(html) {
+  agentLoading.style.display = 'none';
+  agentLoginCta.style.display = 'block';
+  agentLoginCta.dataset.i18nOwned = '1';
+  agentLoginCta.innerHTML = html;
+  agentLoginCta.querySelector('[data-retry-agents]')?.addEventListener('click', () => {
+    agentLoginCta.style.display = 'none';
+    agentLoading.style.display = '';
+    loadAgents();
+  });
+}
+
+function renderAgentCards(agents) {
+  window._agentCache = agents;
+  agentLoading.style.display = 'none';
+  // remove existing cards
+  for (const el of agentList.querySelectorAll('.agent-card[data-agent-id]')) el.remove();
+  if (!agents.length) {
+    setLoginCta(`No agents yet. <a href="/create">Create your first agent →</a>`);
+    return;
+  }
+  agents.forEach(agent => {
+    const el = document.createElement('button');
+    el.type = 'button';
+    el.className = 'agent-card' + (selectedAgent?.id === agent.id ? ' selected' : '');
+    el.dataset.agentId = agent.id;
+    el.setAttribute('aria-pressed', String(selectedAgent?.id === agent.id));
+    // The thumbnail URL comes from the API (R2, public/unlisted avatars only).
+    // There is no /avatars/<id>/thumbnail.png route on this origin, so deriving
+    // one from avatar_id only ever 404'd and painted the fallback anyway.
+    const avatarHtml = agent.avatar_thumbnail_url
+      ? `<img src="${attr(agent.avatar_thumbnail_url)}" data-fallback="sibling" alt="" /><span style="display:none">${escape(agent.name[0]||'?')}</span>`
+      : `<span>${escape(agent.name[0]||'?')}</span>`;
+    const walletHtml = agent.solana_address
+      ? `<span class="bal">${agent.usdc != null ? agent.usdc.toFixed(3)+' USDC' : ''}</span>`
+      : `<span class="no-wallet">no wallet</span>`;
+    el.innerHTML = `<span class="av">${avatarHtml}</span><span><span class="name">${escape(agent.name)}</span>${walletHtml}</span>`;
+    el.addEventListener('click', () => {
+      if (!agent.solana_address) {
+        openGenOverlay(agent);
+      } else {
+        setSelectedAgent(agent);
+      }
+    });
+    agentList.appendChild(el);
+  });
+}
+
+async function loadAgents() {
+  try {
+    const r = await fetch('/api/x402-pay?agents=1');
+    if (r.status === 401) {
+      // Signed out: the markup's own sign-in copy is the right message here.
+      agentLoading.style.display = 'none';
+      agentLoginCta.style.display = 'block';
+      return;
+    }
+    if (!r.ok) throw new Error('load_failed');
+    const payload = await r.json();
+    // The endpoint answers 200 with `configured:false` when the agent-wallet
+    // lane is unreachable. Treating that as an empty list told a signed-out
+    // visitor to "create your first agent", which is not what went wrong.
+    if (payload.configured === false || (payload.error && !payload.agents?.length)) {
+      setLoginCta(`Agent wallets are unavailable right now. <button type="button" class="cta-link" data-retry-agents>Retry</button> or <a href="/login?redirect=/pay">sign in</a> once they are back.`);
+      return;
+    }
+    const agents = payload.agents || [];
+    renderAgentCards(agents);
+    // auto-select first agent with a wallet
+    if (!selectedAgent) {
+      const withWallet = agents.find(a => a.solana_address);
+      if (withWallet) setSelectedAgent(withWallet);
+    }
+  } catch (err) {
+    console.warn('[pay] loadAgents failed:', err?.message || err);
+    setLoginCta(`Could not load your agents. <button type="button" class="cta-link" data-retry-agents>Retry</button> or <a href="/login?redirect=/pay">sign in</a>.`);
+  }
+}
+
+// Both overlays on this page are modal. Keep `aria-hidden` in step with the
+// `show` class so a screen reader never reaches a closed dialog, move focus in
+// on open, hand it back to whatever opened the dialog on close, and let Escape
+// dismiss it the way every other modal on the platform does.
+let overlayReturnFocus = null;
+function anyOverlayOpen() {
+  return !!document.querySelector('.overlay.show, .gen-overlay.show');
+}
+// The composer grabs focus on boot and after every call. When a modal is up
+// that yanked the caret out from behind the dialog, so the first-visit
+// walkthrough opened with focus already on the input underneath it.
+function focusComposer() {
+  if (anyOverlayOpen()) return;
+  promptEl.focus();
+}
+function showOverlay(overlay, focusTarget) {
+  overlayReturnFocus = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+  overlay.classList.add('show');
+  overlay.setAttribute('aria-hidden', 'false');
+  (focusTarget || overlay.querySelector('button'))?.focus();
+}
+function hideOverlay(overlay) {
+  overlay.classList.remove('show');
+  overlay.setAttribute('aria-hidden', 'true');
+  overlayReturnFocus?.focus();
+  overlayReturnFocus = null;
+}
+document.addEventListener('keydown', (e) => {
+  if (e.key !== 'Escape') return;
+  const open = document.querySelector('.overlay.show, .gen-overlay.show');
+  if (!open) return;
+  e.preventDefault();
+  if (open === walkthrough) closeWalk.click();
+  else genCancel.click();
+});
+
+function openGenOverlay(agent) {
+  pendingGenAgentId = agent.id;
+  ownText($('genTitle'), `Set up wallet for "${agent.name}"`);
+  $('genBody').dataset.i18nOwned = '1';
+  $('genBody').textContent = `This agent needs a Solana wallet to pay $0.001 USDC per tool call. Generate one now (instant) or grind a vanity address.`;
+  showOverlay(genOverlay, genBtn);
+}
+
+genCancel.addEventListener('click', () => { hideOverlay(genOverlay); pendingGenAgentId = null; });
+vanityBtn.addEventListener('click', () => {
+  window.open(`/vanity-wallet?agent=${pendingGenAgentId}`, '_blank', 'noopener');
+  hideOverlay(genOverlay);
+});
+genBtn.addEventListener('click', async () => {
+  if (!pendingGenAgentId) return;
+  genBtn.disabled = true;
+  genSpinner.style.display = '';
+  genBtn.dataset.i18nOwned = '1';
+  genBtn.childNodes[1].textContent = ' Generating…';
+  try {
+    const r = await apiFetch(`/api/agents/${pendingGenAgentId}/solana`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: '{}', allowAnonymous: true });
+    if (!r.ok) throw new Error((await r.json()).error || 'gen_failed');
+    hideOverlay(genOverlay);
+    // reload agents to get the new address
+    await loadAgents();
+    const agent = (window._agentCache || []).find(a => a.id === pendingGenAgentId);
+    if (agent) setSelectedAgent(agent);
+    pendingGenAgentId = null;
+    addMsg('agent', `✅ Wallet generated for <strong>${escape(agent?.name || 'your agent')}</strong>. Address: <code>${agent?.solana_address || ''}</code>. Fund it with USDC to start making paid calls.`);
+  } catch (err) {
+    addMsg('agent', `<div class="err">Failed to generate wallet: ${escape(err.message)}</div>`);
+  } finally {
+    genBtn.disabled = false;
+    genSpinner.style.display = 'none';
+    genBtn.childNodes[1].textContent = ' Generate wallet instantly';
+  }
+});
+
+// ---- Browser wallet cards -----------------------------------------------
+
+function getSolanaProvider() {
+  if (window.phantom?.solana?.isPhantom) return window.phantom.solana;
+  if (window.solana?.isPhantom) return window.solana;
+  if (window.backpack?.solana) return window.backpack.solana;
+  if (window.solflare?.isSolflare) return window.solflare;
+  return null;
+}
+function getEvmProvider() {
+  return window.ethereum || null;
+}
+
+function initBrowserWalletCards() {
+  const phantomCard = $('phantomCard');
+  const evmCard     = $('evmCard');
+  if (phantomCard) {
+    if (getSolanaProvider()) {
+      phantomCard.style.display = '';
+      phantomCard.addEventListener('click', () => setSelectedBrowserWallet('phantom'));
+    }
+  }
+  if (evmCard) {
+    if (getEvmProvider()) {
+      evmCard.style.display = '';
+      evmCard.addEventListener('click', () => setSelectedBrowserWallet('evm'));
+    }
+  }
+}
+
+// ---- Phantom (Solana) inline payment ------------------------------------
+
+async function runPhantomPayment(call, displayLabel) {
+  const provider = getSolanaProvider();
+  if (!provider) throw new Error('Phantom wallet not found. Install Phantom to continue.');
+
+  addMsg('user', escape(displayLabel || displayLabelFor(call)));
+  resetSteps();
+  const t0 = performance.now();
+  sendBtn.disabled = true;
+  for (const b of quickEl.querySelectorAll('button')) b.disabled = true;
+  promptEl.disabled = true;
+
+  try {
+    // 1. Pull payment challenge
+    setStep('challenge', 'active', 'probing MCP endpoint for 402…');
+    const probeRes = await fetch('/api/mcp', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: buildJsonRpc(call),
+    });
+    if (probeRes.status !== 402 && probeRes.status !== 401) {
+      const t = await probeRes.text();
+      throw new Error(`Endpoint returned ${probeRes.status}: ${t.slice(0, 120)}`);
+    }
+    // Parse challenge from body or payment-required header
+    let challenge = null;
+    try { challenge = await probeRes.clone().json(); } catch { /* fall through */ }
+    if (!challenge?.accepts?.length) {
+      const hdr = probeRes.headers.get('payment-required');
+      challenge = b64decode(hdr);
+    }
+    if (!challenge?.accepts?.length) throw new Error('No accepts array in payment challenge');
+
+    const solanaAccept = challenge.accepts.find(isSolanaAccept);
+    if (!solanaAccept) throw new Error('Server does not accept Solana payments');
+    setStep('challenge', 'done', `${(Number(solanaAccept.maxAmountRequired) / 1e6).toFixed(6)} USDC`);
+
+    // 2. Connect Phantom + prepare unsigned tx
+    setStep('built', 'active', 'connecting Phantom…');
+    // The provider existed at render time, but the user may have locked or
+    // disconnected the wallet since. Distinguish that from "no wallet installed"
+    // (handled at the top of this function) so the message is actionable.
+    let connectResp;
+    try {
+      connectResp = await provider.connect();
+    } catch (connectErr) {
+      if (connectErr?.code === 4001) throw new Error('Connection request rejected in Phantom. Approve it to pay.');
+      throw new Error('Phantom is locked or disconnected. Unlock the extension and try again.');
+    }
+    const buyerAddress = connectResp?.publicKey?.toString();
+    if (!buyerAddress) throw new Error('Phantom returned no account. Unlock the wallet and reconnect.');
+
+    const prepRes = await fetch('/api/x402-checkout?action=prepare', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ accept: solanaAccept, buyer: buyerAddress }),
+    });
+    if (!prepRes.ok) {
+      const e = await prepRes.json().catch(() => ({}));
+      throw new Error(e.error || `prepare failed: ${prepRes.status}`);
+    }
+    const { tx_base64 } = await prepRes.json();
+
+    // 3. Phantom signs
+    setStep('built', 'active', 'sign the transaction in Phantom…');
+    const { VersionedTransaction } = await loadCdnModule('https://esm.sh/@solana/web3.js@1');
+    const vtxBytes = base64ToUint8Array(tx_base64);
+    const vtx = VersionedTransaction.deserialize(vtxBytes);
+    const signedVtx = await provider.signTransaction(vtx);
+    const signedB64 = uint8ArrayToBase64(signedVtx.serialize());
+    setStep('built', 'done', 'signed');
+
+    // 4. Encode X-PAYMENT header
+    setStep('verified', 'active', 'encoding payment payload…');
+    const encRes = await fetch('/api/x402-checkout?action=encode', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ accept: solanaAccept, signed_tx_base64: signedB64, resource_url: '/api/mcp' }),
+    });
+    if (!encRes.ok) {
+      const e = await encRes.json().catch(() => ({}));
+      throw new Error(e.error || `encode failed: ${encRes.status}`);
+    }
+    const { x_payment } = await encRes.json();
+    setStep('verified', 'done', 'payload encoded');
+
+    // 5. Dispatch to MCP with X-PAYMENT
+    setStep('dispatched', 'active', 'running MCP tool…');
+    const dispatchRes = await fetch('/api/mcp', {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+        'X-PAYMENT': x_payment,
+      },
+      body: buildJsonRpc(call),
+    });
+    const xPayResp = dispatchRes.headers.get('x-payment-response');
+    let payResp = b64decode(xPayResp);
+    const dispatchJson = await dispatchRes.json().catch(() => null);
+    if (!dispatchRes.ok) {
+      const errMsg = dispatchJson?.error || `MCP responded ${dispatchRes.status}`;
+      throw new Error(errMsg);
+    }
+    setStep('dispatched', 'done', 'tool ran');
+
+    // 6. Settled
+    const totalMs = Math.round(performance.now() - t0);
+    const tx = payResp?.transaction || '';
+    setStep('settled', 'done', tx ? `${tx.slice(0,8)}…` : `${totalMs}ms`);
+
+    // Build synthetic payment + durations for renderReceipt
+    const payment = {
+      tx,
+      amount: solanaAccept.maxAmountRequired,
+      network: 'solana-mainnet',
+      payer: buyerAddress,
+      payTo: solanaAccept.payTo || '',
+    };
+    const durations = { total_ms: totalMs };
+
+    renderReceipt(call, payment, durations);
+    addMsg('agent', renderResult(call, dispatchJson));
+    bumpTicker(payment.amount);
+
+    // Refresh Phantom balance label
+    refreshPhantomBalance(buyerAddress);
+  } catch (err) {
+    const step = document.querySelector('.step.active')?.id?.replace('step-', '') || 'challenge';
+    setStep(step, 'error', err.message);
+    addMsg('agent', `<div class="err">Phantom payment failed: ${escape(err.message)}</div>`);
+  } finally {
+    const elapsed = Math.round(performance.now() - t0);
+    document.title = `${elapsed}ms · three.ws · pay-per-call`;
+    sendBtn.disabled = false;
+    for (const b of quickEl.querySelectorAll('button')) b.disabled = false;
+    promptEl.disabled = false;
+    focusComposer();
+  }
+}
+
+async function refreshPhantomBalance(address) {
+  if (!address) return;
+  const balLabel = $('phantomBalLabel');
+  if (balLabel) balLabel.textContent = `${address.slice(0,4)}…${address.slice(-4)} · Solana`;
+  try {
+    // Fetch USDC balance directly from Solana RPC
+    const USDC_MINT = 'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v';
+    const rpcRes = await fetch('https://api.mainnet-beta.solana.com', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        jsonrpc: '2.0', id: 1,
+        method: 'getTokenAccountsByOwner',
+        params: [address, { mint: USDC_MINT }, { encoding: 'jsonParsed' }],
+      }),
+    });
+    const rpcData = await rpcRes.json();
+    const accounts = rpcData?.result?.value || [];
+    let usdcAmount = 0;
+    for (const acc of accounts) {
+      const info = acc?.account?.data?.parsed?.info?.tokenAmount;
+      if (info) usdcAmount += Number(info.uiAmount || 0);
+    }
+    if (balLabel) balLabel.textContent = `${usdcAmount.toFixed(3)} USDC · Solana`;
+  } catch (err) {
+    // Surface the failure inline rather than silently leaving a stale label.
+    console.warn('[pay] Phantom balance read failed:', err?.message || err);
+    if (balLabel) {
+      balLabel.textContent = `couldn't read balance · ${address.slice(0,4)}…${address.slice(-4)}`;
+      balLabel.title = 'Solana RPC balance lookup failed. Payments still work.';
+    }
+  }
+}
+
+// ---- MetaMask / Base (EIP-3009) inline payment --------------------------
+
+const BASE_USDC_ADDRESS = '0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913'; // Base mainnet USDC
+const BASE_CHAIN_ID = 8453;
+
+async function runEvmPayment(call, displayLabel) {
+  const ethereum = getEvmProvider();
+  if (!ethereum) throw new Error('No EVM wallet detected. Install MetaMask to continue.');
+
+  addMsg('user', escape(displayLabel || displayLabelFor(call)));
+  resetSteps();
+  const t0 = performance.now();
+  sendBtn.disabled = true;
+  for (const b of quickEl.querySelectorAll('button')) b.disabled = true;
+  promptEl.disabled = true;
+
+  try {
+    // 1. Pull payment challenge
+    setStep('challenge', 'active', 'probing MCP endpoint for 402…');
+    const probeRes = await fetch('/api/mcp', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: buildJsonRpc(call),
+    });
+    if (probeRes.status !== 402 && probeRes.status !== 401) {
+      const t = await probeRes.text();
+      throw new Error(`Endpoint returned ${probeRes.status}: ${t.slice(0, 120)}`);
+    }
+    let challenge = null;
+    try { challenge = await probeRes.clone().json(); } catch { /* fall through */ }
+    if (!challenge?.accepts?.length) {
+      const hdr = probeRes.headers.get('payment-required');
+      challenge = b64decode(hdr);
+    }
+    if (!challenge?.accepts?.length) throw new Error('No accepts array in payment challenge');
+
+    const evmAccept = challenge.accepts.find(isEip3009Accept);
+    if (!evmAccept) throw new Error('Server does not accept EVM/Base payments');
+    setStep('challenge', 'done', `${(Number(evmAccept.maxAmountRequired) / 1e6).toFixed(6)} USDC`);
+
+    // 2. Connect wallet + switch to Base
+    setStep('built', 'active', 'connecting EVM wallet…');
+    const accounts = await ethereum.request({ method: 'eth_requestAccounts' });
+    const from = accounts[0];
+    if (!from) throw new Error('No account returned from wallet');
+
+    const chainHex = '0x' + BASE_CHAIN_ID.toString(16);
+    try {
+      await ethereum.request({ method: 'wallet_switchEthereumChain', params: [{ chainId: chainHex }] });
+    } catch (switchErr) {
+      if (switchErr.code === 4902) {
+        await ethereum.request({
+          method: 'wallet_addEthereumChain',
+          params: [{
+            chainId: chainHex,
+            chainName: 'Base',
+            nativeCurrency: { name: 'Ether', symbol: 'ETH', decimals: 18 },
+            rpcUrls: ['https://mainnet.base.org'],
+            blockExplorerUrls: ['https://basescan.org'],
+          }],
+        });
+      } else throw switchErr;
+    }
+
+    // 3. Build EIP-3009 typed data + sign
+    setStep('built', 'active', 'sign EIP-3009 transfer in wallet…');
+    const amount = evmAccept.maxAmountRequired; // in USDC micro-units (6 decimals)
+    const payTo  = evmAccept.payTo;
+    const validAfter  = 0;
+    const validBefore = Math.floor((Date.now() + 3600 * 1000) / 1000); // 1 hour
+    // Random 32-byte nonce — use crypto.getRandomValues
+    const nonceBytes = new Uint8Array(32);
+    crypto.getRandomValues(nonceBytes);
+    const nonce = '0x' + Array.from(nonceBytes).map(b => b.toString(16).padStart(2, '0')).join('');
+
+    const typedData = {
+      types: {
+        EIP712Domain: [
+          { name: 'name',              type: 'string' },
+          { name: 'version',           type: 'string' },
+          { name: 'chainId',           type: 'uint256' },
+          { name: 'verifyingContract', type: 'address' },
+        ],
+        TransferWithAuthorization: [
+          { name: 'from',        type: 'address' },
+          { name: 'to',         type: 'address' },
+          { name: 'value',      type: 'uint256' },
+          { name: 'validAfter', type: 'uint256' },
+          { name: 'validBefore',type: 'uint256' },
+          { name: 'nonce',      type: 'bytes32' },
+        ],
+      },
+      primaryType: 'TransferWithAuthorization',
+      domain: {
+        name:              'USD Coin',
+        version:           '2',
+        chainId:           BASE_CHAIN_ID,
+        verifyingContract: BASE_USDC_ADDRESS,
+      },
+      message: {
+        from:        from,
+        to:          payTo,
+        value:       String(amount),
+        validAfter:  String(validAfter),
+        validBefore: String(validBefore),
+        nonce,
+      },
+    };
+
+    const sig = await ethereum.request({
+      method: 'eth_signTypedData_v4',
+      params: [from, JSON.stringify(typedData)],
+    });
+    setStep('built', 'done', 'EIP-3009 signed');
+
+    // 4. Build x402 paymentPayload (EIP-3009 scheme)
+    setStep('verified', 'active', 'building payment payload…');
+    const payloadObj = {
+      scheme: 'eip3009',
+      network: 'base-mainnet',
+      payload: {
+        from,
+        to:          payTo,
+        value:       String(amount),
+        validAfter:  String(validAfter),
+        validBefore: String(validBefore),
+        nonce,
+        signature:   sig,
+      },
+    };
+    const x_payment = btoa(JSON.stringify(payloadObj));
+    setStep('verified', 'done', 'payload built');
+
+    // 5. Dispatch to MCP
+    setStep('dispatched', 'active', 'running MCP tool…');
+    const dispatchRes = await fetch('/api/mcp', {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+        'X-PAYMENT': x_payment,
+      },
+      body: buildJsonRpc(call),
+    });
+    const xPayResp = dispatchRes.headers.get('x-payment-response');
+    let payResp = b64decode(xPayResp);
+    const dispatchJson = await dispatchRes.json().catch(() => null);
+    if (!dispatchRes.ok) {
+      const errMsg = dispatchJson?.error || `MCP responded ${dispatchRes.status}`;
+      throw new Error(errMsg);
+    }
+    setStep('dispatched', 'done', 'tool ran');
+
+    // 6. Settlement
+    const totalMs = Math.round(performance.now() - t0);
+    const txHash = payResp?.transaction || '';
+    setStep('settled', 'done', txHash ? `${txHash.slice(0,10)}…` : `${totalMs}ms`);
+
+    const payment = {
+      tx:      txHash,
+      amount,
+      network: 'base-mainnet',
+      payer:   from,
+      payTo,
+    };
+    const durations = { total_ms: totalMs };
+
+    renderReceipt(call, payment, durations);
+    addMsg('agent', renderResult(call, dispatchJson));
+    bumpTicker(payment.amount);
+  } catch (err) {
+    const activeStep = document.querySelector('.step.active')?.id?.replace('step-', '') || 'challenge';
+    setStep(activeStep, 'error', err.message);
+    addMsg('agent', `<div class="err">EVM payment failed: ${escape(err.message)}</div>`);
+  } finally {
+    const elapsed = Math.round(performance.now() - t0);
+    document.title = `${elapsed}ms · three.ws · pay-per-call`;
+    sendBtn.disabled = false;
+    for (const b of quickEl.querySelectorAll('button')) b.disabled = false;
+    promptEl.disabled = false;
+    focusComposer();
+  }
+}
+
+const DEMO_MODEL = 'https://threejs.org/examples/models/gltf/DamagedHelmet/glTF-Binary/DamagedHelmet.glb';
+const TOOL_PRICE_USDC = 0.001;
+
+let sessionTotal = Number(sessionStorage.getItem('x402:total') || 0);
+const renderTicker = () => { ownText(tickerText, `${sessionTotal.toFixed(3)} USDC`); };
+renderTicker();
+
+function escape(s) { return String(s).replace(/[<>&]/g, c => ({'<':'&lt;','>':'&gt;','&':'&amp;'}[c])); }
+// Attribute context needs the quote characters escaped too; `escape` above is
+// text-node safe only.
+function attr(s) { return escape(s).replace(/"/g, '&quot;').replace(/'/g, '&#39;'); }
+function formatBytes(n) {
+  if (!Number.isFinite(n)) return 'unknown';
+  if (n < 1024) return `${n} B`;
+  if (n < 1024*1024) return `${(n/1024).toFixed(1)} KB`;
+  return `${(n/1024/1024).toFixed(1)} MB`;
+}
+function ago(ts) {
+  const d = Math.max(0, Date.now() - ts);
+  if (d < 60_000) return `${Math.floor(d/1000)}s ago`;
+  if (d < 3600_000) return `${Math.floor(d/60_000)}m ago`;
+  return `${Math.floor(d/3600_000)}h ago`;
+}
+
+function addMsg(role, html) {
+  const el = document.createElement('div');
+  el.className = `msg ${role}`;
+  const av = role === 'user' ? 'You' : '3';
+  el.innerHTML = `<div class="av">${av}</div><div class="body">${html}</div>`;
+  conv.appendChild(el);
+  conv.scrollTop = conv.scrollHeight;
+  return el;
+}
+
+const STEP_DEFS = [
+  { id: 'challenge',  label: 'Pull payment requirements (402)' },
+  { id: 'built',      label: 'Build & sign payment' },
+  { id: 'verified',   label: 'Facilitator verify (off-chain)' },
+  { id: 'dispatched', label: 'Run MCP tool in-process' },
+  { id: 'settled',    label: 'Facilitator settle (on-chain)' },
+];
+function resetSteps() {
+  stepsEl.innerHTML = '';
+  receiptEl.innerHTML = '';
+  for (const s of STEP_DEFS) {
+    const el = document.createElement('div');
+    el.className = 'step';
+    el.id = `step-${s.id}`;
+    el.innerHTML = `<div class="icon">·</div><div style="flex:1"><div class="label">${s.label}</div><div class="meta" data-meta></div></div>`;
+    stepsEl.appendChild(el);
+  }
+}
+// Third-party modules go through /load-module.js, which races the same package
+// version across esm.sh, jsdelivr and unpkg and rejects with a typed error
+// naming every host it tried. A bare import('https://esm.sh/...') meant one CDN
+// outage, one corporate proxy or one ad blocker stalled the payment at "sign
+// the transaction" with nothing on screen saying why. The error lands in the
+// caller's catch, which paints the failed step and the chat error line.
+// The specifier is held in a variable, not written inline. /load-module.js is a
+// public/ asset served at the site root, so it has no module graph for Rollup to
+// resolve at build time; a literal specifier makes the build fail outright
+// ("Rollup failed to resolve import /load-module.js"), and @vite-ignore does not
+// help because it only silences the warning for a specifier Rollup cannot
+// analyse, and a string literal is one it can. Indirection is what actually
+// defers the resolution to the browser, where the path is correct.
+const LOAD_MODULE_URL = '/load-module.js';
+async function loadCdnModule(url) {
+  const { loadModule } = await import(/* @vite-ignore */ LOAD_MODULE_URL);
+  return loadModule(url);
+}
+
+function setStep(id, state, meta) {
+  const el = $(`step-${id}`);
+  if (!el) return;
+  el.className = `step ${state}`;
+  const ic = el.querySelector('.icon');
+  if (state === 'active') ic.textContent = '…';
+  else if (state === 'done') ic.textContent = '✓';
+  else if (state === 'error') ic.textContent = '!';
+  if (meta != null) el.querySelector('[data-meta]').textContent = meta;
+}
+
+function curlSnippet(call) {
+  const body = JSON.stringify({
+    jsonrpc: '2.0', id: 1,
+    method: call.tool === 'tools/list' ? 'tools/list' : 'tools/call',
+    params: call.tool === 'tools/list' ? undefined : { name: call.tool, arguments: call.args || {} },
+  });
+  return [
+    `# 1) Get the 402 challenge`,
+    `curl -i -X POST https://three.ws/api/mcp \\`,
+    `  -H 'content-type: application/json' \\`,
+    `  -d '${body}'`,
+    ``,
+    `# 2) Build & sign a Solana transferChecked, base64-encode the v2 paymentPayload,`,
+    `#    then re-POST with X-PAYMENT: <base64>. See scripts/x402-pay-three-ws-sol.mjs.`,
+  ].join('\n');
+}
+
+function renderReceipt(call, payment, durations) {
+  const isEvm = payment.network && /base|evm|ethereum/i.test(payment.network);
+  const networkLabel = isEvm ? 'Base mainnet' : 'Solana mainnet';
+  const explorer = payment.tx
+    ? (isEvm ? `https://basescan.org/tx/${payment.tx}` : `https://solscan.io/tx/${payment.tx}`)
+    : null;
+  const explorerLabel = isEvm ? 'view on Basescan' : 'view on Solscan';
+  const permalink = payment.tx ? `${location.origin}/pay/calls/${payment.tx}` : null;
+  const decimals = isEvm ? 6 : 6;
+  const amountDisplay = (Number(payment.amount) / 10 ** decimals).toFixed(6);
+  receiptEl.innerHTML = `
+    <div class="receipt">
+      <h3>settlement receipt</h3>
+      <div class="row"><span class="k">amount</span><span class="v">${amountDisplay} USDC</span></div>
+      <div class="row"><span class="k">network</span><span class="v">${networkLabel}</span></div>
+      <div class="row"><span class="k">payer</span><span class="v">${payment.payer.slice(0,8)}…${payment.payer.slice(-4)}</span></div>
+      <div class="row"><span class="k">payTo</span><span class="v">${payment.payTo.slice(0,8)}…${payment.payTo.slice(-4)}</span></div>
+      <div class="row"><span class="k">total</span><span class="v">${durations.total_ms} ms</span></div>
+      ${explorer ? `<div class="row"><span class="k">tx</span><span class="v"><a href="${explorer}" target="_blank" rel="noopener">${payment.tx.slice(0,10)}…${payment.tx.slice(-6)} ↗</a></span></div>` : ''}
+      <div class="actions">
+        ${explorer ? `<a href="${explorer}" target="_blank" rel="noopener">${explorerLabel}</a>` : ''}
+        ${permalink ? `<button data-copy="${permalink}">copy permalink</button>` : ''}
+        <button data-replay>↻ replay</button>
+      </div>
+      <details class="curl">
+        <summary>show equivalent curl</summary>
+        <pre>${escape(curlSnippet(call))}</pre>
+      </details>
+    </div>`;
+  receiptEl.querySelector('[data-replay]')?.addEventListener('click', () => run(call, displayLabelFor(call)));
+  for (const btn of receiptEl.querySelectorAll('[data-copy]')) {
+    btn.addEventListener('click', async () => {
+      try { await navigator.clipboard.writeText(btn.dataset.copy); btn.classList.add('copied'); btn.textContent = '✓ copied'; }
+      catch { btn.textContent = 'copy failed'; }
+    });
+  }
+}
+
+function displayLabelFor(call) {
+  if (call.tool === 'tools/list') return '/list_tools';
+  if (call.tool === 'search_public_avatars') return call.args?.q ? `/search ${call.args.q}` : '/search_avatars';
+  const url = call.args?.url || '';
+  const short = url.split('/').pop() || url;
+  return `/${call.tool.replace('_model','')} ${short}`;
+}
+
+// ---- Result rendering ---------------------------------------------------
+
+function modelViewerBlock(url, captionExtra) {
+  return `
+    <div class="mv-block">
+      <model-viewer src="${escape(url)}" autoplay auto-rotate camera-controls
+        ar shadow-intensity="0.6" exposure="1.0" interaction-prompt="none"
+        loading="eager" reveal="auto"></model-viewer>
+      <div class="caption">
+        <span>rendered from <code>${escape(url.split('/').pop())}</code></span>
+        <span>drag to rotate · scroll to zoom</span>
+      </div>
+    </div>`;
+}
+
+function chip(k, v) { return `<div class="chip"><div class="k">${k}</div><div class="v">${v}</div></div>`; }
+
+function renderToolsList(result) {
+  const tools = result?.tools || [];
+  const rows = tools.map(t => {
+    const price = t.pricing?.amount_usdc;
+    const priceTag = price ? `<span class="price">${price} USDC</span>` : '';
+    return `<div class="tool-row">
+      <div><div class="name">${escape(t.name)}</div><div class="desc">${escape((t.description || '').slice(0, 90))}</div></div>
+      ${priceTag}
+    </div>`;
+  }).join('');
+  return `<div><strong>${tools.length} MCP tools</strong> exposed by three.ws:</div>
+    <div class="tools-list">${rows}</div>`;
+}
+
+function parseTextResult(result) {
+  const c = result?.content?.[0];
+  if (c?.type === 'text' && typeof c.text === 'string') {
+    try { return JSON.parse(c.text); } catch { return c.text; }
+  }
+  return null;
+}
+
+function renderValidate(args, result) {
+  const text = parseTextResult(result);
+  const url = args?.url || '';
+  if (!text || typeof text !== 'object') {
+    return `<div>Validation result:</div><pre>${escape(JSON.stringify(result, null, 2)).slice(0, 1500)}</pre>`;
+  }
+  const issues = text.issues || {};
+  const errs = Number(issues.numErrors ?? 0);
+  const warns = Number(issues.numWarnings ?? 0);
+  const infos = Number(issues.numInfos ?? 0);
+  const ok = errs === 0;
+  const meta = text.meta || {};
+  return `
+    <div><strong>${ok ? '✅ glTF spec-compliant' : '❌ has errors'}</strong>: ${errs} errors, ${warns} warnings, ${infos} infos</div>
+    <div class="meta-grid">
+      ${meta.vertices != null ? chip('vertices', Number(meta.vertices).toLocaleString()) : ''}
+      ${meta.triangles != null ? chip('triangles', Number(meta.triangles).toLocaleString()) : ''}
+      ${meta.meshes != null ? chip('meshes', meta.meshes) : ''}
+      ${meta.materials != null ? chip('materials', meta.materials) : ''}
+      ${meta.textures != null ? chip('textures', meta.textures) : ''}
+      ${meta.animations != null ? chip('animations', meta.animations) : ''}
+      ${meta.bytes != null ? chip('size', formatBytes(meta.bytes)) : ''}
+      ${meta.version ? chip('glTF', `v${meta.version}`) : ''}
+    </div>
+    ${url.startsWith('http') ? modelViewerBlock(url) : ''}`;
+}
+
+function renderInspect(args, result) {
+  const text = parseTextResult(result);
+  const url = args?.url || '';
+  if (!text || typeof text !== 'object') return defaultRender(result);
+  const meta = text.meta || text;
+  const exts = (text.extensions || meta.extensionsUsed || []);
+  const animations = text.animations || meta.animations || [];
+  const meshes = text.meshes || [];
+  return `
+    <div><strong>Inspection complete</strong> · ${meta.scenes || 1} scene${(meta.scenes||1)>1?'s':''}, ${meta.nodes || '?'} nodes, ${meta.meshes || '?'} meshes</div>
+    <div class="meta-grid">
+      ${meta.vertices != null ? chip('vertices', Number(meta.vertices).toLocaleString()) : ''}
+      ${meta.triangles != null ? chip('triangles', Number(meta.triangles).toLocaleString()) : ''}
+      ${meta.materials != null ? chip('materials', meta.materials) : ''}
+      ${meta.textures != null ? chip('textures', meta.textures) : ''}
+      ${(animations.length || meta.animations) != null ? chip('animations', Array.isArray(animations) ? animations.length : meta.animations) : ''}
+      ${meta.bytes != null ? chip('size', formatBytes(meta.bytes)) : ''}
+    </div>
+    ${exts.length ? `<div style="margin-top:10px;font-size:12px;color:var(--muted)">extensions: ${exts.map(e => `<code>${escape(e)}</code>`).join(' ')}</div>` : ''}
+    ${Array.isArray(meshes) && meshes.length ? `
+      <div class="tree" style="margin-top:10px;">
+        ${meshes.slice(0, 8).map(m => `<div class="tree-node"><span class="tag">${escape(m.name || 'mesh')}</span> <span class="stat">· ${Number(m.vertices||0).toLocaleString()} verts · ${Number(m.triangles||0).toLocaleString()} tris</span></div>`).join('')}
+        ${meshes.length > 8 ? `<div class="tree-node"><span class="stat">… ${meshes.length - 8} more</span></div>` : ''}
+      </div>` : ''}
+    ${url.startsWith('http') ? modelViewerBlock(url) : ''}`;
+}
+
+function renderOptimize(args, result) {
+  const text = parseTextResult(result);
+  const url = args?.url || '';
+  if (!text || typeof text !== 'object') return defaultRender(result);
+  const sugs = text.suggestions || text.recommendations || [];
+  const sevIcon = (s) => s === 'high' ? '!' : s === 'medium' ? '~' : '·';
+  const summary = text.summary || `${sugs.length} optimization suggestion${sugs.length===1?'':'s'}`;
+  return `
+    <div><strong>${escape(summary)}</strong></div>
+    <div class="opt-list">
+      ${sugs.slice(0, 12).map(s => {
+        const sev = (s.severity || s.priority || 'low').toLowerCase();
+        const title = s.title || s.name || s.kind || s.id || 'suggestion';
+        const detail = s.detail || s.description || s.message || s.recommendation || '';
+        const est = s.estimatedSavings || s.savings;
+        return `<div class="opt-row ${sev}">
+          <div class="opt-icon">${sevIcon(sev)}</div>
+          <div class="opt-body">
+            <div class="opt-title">${escape(title)}</div>
+            ${detail ? `<div class="opt-detail">${escape(detail)}${est ? ` · est. <strong>${escape(String(est))}</strong> saved` : ''}</div>` : ''}
+          </div>
+        </div>`;
+      }).join('')}
+    </div>
+    ${url.startsWith('http') ? modelViewerBlock(url) : ''}`;
+}
+
+function renderSearch(args, result) {
+  const text = parseTextResult(result);
+  const items = text?.items || text?.avatars || (Array.isArray(text) ? text : []);
+  if (!items?.length) return `<div>No avatars matched.</div>${defaultRender(result)}`;
+  const cards = items.map(a => {
+    const url = a.model_url || a.url;
+    return `<div class="avatar-card">
+      ${url ? `<model-viewer src="${escape(url)}" auto-rotate disable-zoom interaction-prompt="none" loading="lazy" camera-orbit="0deg 80deg 2.5m" reveal="auto"></model-viewer>` : ''}
+      <div class="body">
+        <div class="name">${escape(a.name || a.slug || 'avatar')}</div>
+        <div class="slug">${escape(a.slug || a.id || '')}</div>
+      </div>
+    </div>`;
+  }).join('');
+  return `<div><strong>${items.length} public avatar${items.length===1?'':'s'}</strong>${args?.q ? ` matching "${escape(args.q)}"` : ''}:</div>
+    <div class="avatars-grid">${cards}</div>`;
+}
+
+function defaultRender(result) {
+  return `<pre>${escape(JSON.stringify(result, null, 2)).slice(0, 1500)}</pre>`;
+}
+
+function renderResult(call, result) {
+  if (call.tool === 'tools/list') return renderToolsList(result);
+  if (call.tool === 'validate_model') return renderValidate(call.args, result);
+  if (call.tool === 'inspect_model') return renderInspect(call.args, result);
+  if (call.tool === 'optimize_model') return renderOptimize(call.args, result);
+  if (call.tool === 'search_public_avatars') return renderSearch(call.args, result);
+  return defaultRender(result);
+}
+
+// ---- Prompt parsing -----------------------------------------------------
+
+function parsePrompt(text) {
+  const t = text.trim();
+  if (!t) return null;
+  if (/^(\/?list_tools|tools\/list|list tools)$/i.test(t)) return { tool: 'tools/list', args: {} };
+  let m;
+  if ((m = t.match(/^\/?validate(?:_model)?\s+(\S+)/i))) return { tool: 'validate_model', args: { url: m[1] } };
+  if ((m = t.match(/^\/?inspect(?:_model)?\s+(\S+)/i))) return { tool: 'inspect_model', args: { url: m[1] } };
+  if ((m = t.match(/^\/?(?:optimize|fix|improve)(?:_model)?\s+(\S+)/i))) return { tool: 'optimize_model', args: { url: m[1] } };
+  if ((m = t.match(/^\/?search(?:_avatars|_public_avatars)?(?:\s+(.+))?/i))) {
+    return { tool: 'search_public_avatars', args: m[1] ? { q: m[1].trim(), limit: 12 } : { limit: 12 } };
+  }
+  if (t.startsWith('http')) return { tool: 'validate_model', args: { url: t } };
+  return { tool: 'search_public_avatars', args: { q: t, limit: 12 } };
+}
+
+// ---- SSE consumer -------------------------------------------------------
+
+async function* sseEvents(response) {
+  const reader = response.body.getReader();
+  const decoder = new TextDecoder();
+  let buf = '';
+  try {
+    while (true) {
+      const { value, done } = await reader.read();
+      if (done) break;
+      buf += decoder.decode(value, { stream: true });
+      let idx;
+      while ((idx = buf.indexOf('\n\n')) >= 0) {
+        const block = buf.slice(0, idx);
+        buf = buf.slice(idx + 2);
+        let event = 'message';
+        const dataLines = [];
+        for (const line of block.split('\n')) {
+          if (line.startsWith('event:')) event = line.slice(6).trim();
+          else if (line.startsWith('data:')) dataLines.push(line.slice(5).trim());
+        }
+        if (!dataLines.length) continue;
+        let data = null;
+        try {
+          data = JSON.parse(dataLines.join('\n'));
+        } catch (err) {
+          console.warn('[pay] SSE JSON parse failed:', err?.message || err);
+        }
+        yield { event, data };
+      }
+    }
+  } finally {
+    // Always release the lock and tear down the underlying stream, even if the
+    // consumer breaks early or the facilitator closes the connection mid-block.
+    try { await reader.cancel(); } catch { /* already closed */ }
+    try { reader.releaseLock(); } catch { /* lock already released */ }
+  }
+}
+
+async function run(call, displayLabel) {
+  if (!call) return;
+  // Dispatch to browser wallet flows which manage their own UI lifecycle
+  if (selectedBrowserWallet === 'phantom') {
+    return runPhantomPayment(call, displayLabel);
+  }
+  if (selectedBrowserWallet === 'evm') {
+    return runEvmPayment(call, displayLabel);
+  }
+
+  sendBtn.disabled = true;
+  for (const b of quickEl.querySelectorAll('button')) b.disabled = true;
+  promptEl.disabled = true;
+
+  addMsg('user', escape(displayLabel || displayLabelFor(call)));
+  resetSteps();
+  setStep('challenge', 'active', 'requesting paymentRequirements…');
+  const t0 = performance.now();
+  let final = null, errored = false;
+  let activeId = 'challenge';
+
+  // Tear down the SSE connection if the stream errors, the tab unloads, or the
+  // consumer exits early — otherwise the half-read reader leaks a held socket.
+  const ctrl = new AbortController();
+  const onUnload = () => ctrl.abort();
+  window.addEventListener('pagehide', onUnload, { once: true });
+
+  try {
+    // allowAnonymous: platform-mode demo calls work signed out; a 401 must
+    // render in the console below, not bounce the page to /login.
+    const res = await apiFetch('/api/x402-pay', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', accept: 'text/event-stream' },
+      body: JSON.stringify(selectedAgent ? { ...call, agentId: selectedAgent.id } : call),
+      signal: ctrl.signal,
+      allowAnonymous: true,
+    });
+    if (!res.ok || !res.body) {
+      const text = await res.text();
+      let parsed; try { parsed = JSON.parse(text); } catch { parsed = { error: text }; }
+      setStep(activeId, 'error', parsed.error || res.statusText);
+      addMsg('agent', `<div class="err">x402 call failed: ${escape(parsed.error || res.statusText)}</div>`);
+      return;
+    }
+    for await (const { event, data } of sseEvents(res)) {
+      if (event === 'challenge') {
+        setStep('challenge', 'done', `${(Number(data.amount)/1e6).toFixed(6)} USDC`);
+        activeId = 'built'; setStep('built', 'active', 'signing partial Solana tx…');
+      } else if (event === 'built') {
+        setStep('built', 'done', `${data.build_ms} ms`);
+        activeId = 'verified'; setStep('verified', 'active', 'facilitator /verify…');
+      } else if (event === 'verified') {
+        setStep('verified', 'done', `${data.verify_ms} ms`);
+        activeId = 'dispatched'; setStep('dispatched', 'active', 'running MCP tool…');
+      } else if (event === 'dispatched') {
+        setStep('dispatched', 'done', `${data.dispatch_ms} ms`);
+        activeId = 'settled'; setStep('settled', 'active', 'facilitator /settle (on-chain)…');
+      } else if (event === 'settled') {
+        setStep('settled', 'done', `${data.settle_ms} ms · ${data.tx ? data.tx.slice(0,8)+'…' : ''}`);
+      } else if (event === 'result') {
+        final = data;
+      } else if (event === 'error') {
+        setStep(activeId, 'error', data.error || 'failed');
+        addMsg('agent', `<div class="err">x402 call failed: ${escape(data.error || 'unknown')}${data.mcpError ? ` · MCP: ${escape(data.mcpError.message || '')}` : ''}</div>`);
+        errored = true;
+      }
+    }
+    if (errored) return;
+    if (!final) {
+      setStep(activeId, 'error', 'stream ended without result');
+      addMsg('agent', `<div class="err">Stream ended without a result event.</div>`);
+      return;
+    }
+    renderReceipt(call, final.payment, final.durations);
+    addMsg('agent', renderResult(call, final.result));
+    bumpTicker(final.payment?.amount);
+    refreshBalance();
+    refreshFeed();
+  } catch (err) {
+    if (err?.name !== 'AbortError') {
+      setStep(activeId, 'error', String(err.message || err));
+      addMsg('agent', `<div class="err">Network error: ${escape(String(err.message || err))}</div>`);
+    }
+  } finally {
+    // Abort the request/stream so the reader is never left half-read and remove
+    // the unload guard regardless of how the flow exited.
+    ctrl.abort();
+    window.removeEventListener('pagehide', onUnload);
+    const elapsed = Math.round(performance.now() - t0);
+    document.title = `${elapsed}ms · three.ws · pay-per-call`;
+    sendBtn.disabled = false;
+    for (const b of quickEl.querySelectorAll('button')) b.disabled = false;
+    promptEl.disabled = false;
+    focusComposer();
+  }
+}
+
+function bumpTicker(amountAtomics) {
+  // Increment the running session total by the ACTUAL settled amount (6-decimal
+  // USDC atomics from the on-chain receipt), never a hardcoded constant — so the
+  // ticker can't drift from what was really paid. TOOL_PRICE_USDC is only the
+  // last-resort fallback when a receipt somehow arrives without an amount.
+  const usd = Number(amountAtomics) > 0 ? Number(amountAtomics) / 1e6 : TOOL_PRICE_USDC;
+  sessionTotal += usd;
+  sessionStorage.setItem('x402:total', String(sessionTotal));
+  renderTicker();
+  tickerPill.classList.remove('flash');
+  void tickerPill.offsetWidth;
+  tickerPill.classList.add('flash');
+}
+
+// ---- Wallet balance + activity feed ------------------------------------
+
+async function refreshBalance() {
+  // Browser wallet — don't poll the server; balance shown per-call
+  if (selectedBrowserWallet) return;
+  // If using an agent wallet, reload agents to get fresh balances.
+  if (selectedAgent) {
+    try {
+      const r = await fetch('/api/x402-pay?agents=1');
+      if (r.ok) {
+        const { agents } = await r.json();
+        window._agentCache = agents;
+        const updated = agents.find(a => a.id === selectedAgent.id);
+        if (updated) { selectedAgent = updated; setSelectedAgent(updated); }
+        renderAgentCards(agents);
+      }
+    } catch (err) {
+      console.warn('[pay] refreshBalance(agent) failed:', err?.message || err);
+    }
+    return;
+  }
+  // Shared demo wallet
+  try {
+    const r = await fetch('/api/x402-pay?balance=1');
+    if (!r.ok) throw new Error('bal_fetch_failed');
+    const b = await r.json();
+    if (b.address) {
+      ownText(walletText, `${b.usdc.toFixed(3)} USDC · ${b.sol.toFixed(3)} SOL · ${b.address.slice(0,4)}…${b.address.slice(-4)}`);
+    } else {
+      ownText(walletText, 'shared wallet offline');
+    }
+  } catch (err) {
+    console.warn('[pay] refreshBalance(shared) failed:', err?.message || err);
+    ownText(walletText, 'balance unavailable');
+  }
+}
+
+// The strip is a marquee, so its three non-populated states have to be single
+// items in the same shape: it previously sat on the placeholder ellipsis
+// forever whenever the endpoint failed, which read as a hung page.
+function setFeedNotice(text) {
+  feedStrip.innerHTML = `<span class="feed-item"><span class="ago">${escape(text)}</span></span>`;
+}
+
+async function refreshFeed() {
+  try {
+    const r = await fetch('/api/x402-pay?feed=1');
+    if (!r.ok) { setFeedNotice('activity feed unavailable'); return; }
+    const f = await r.json();
+    const items = (f.items || []).slice(0, 25);
+    if (!items.length) { setFeedNotice(f.error ? 'activity feed unavailable' : 'no calls yet'); return; }
+    const make = () => items.map(it => `<span class="feed-item">
+      <span class="tool">${escape(it.tool)}</span>
+      <span class="ago">${ago(it.ts)}</span>
+      ${it.tx ? `· <a href="https://solscan.io/tx/${it.tx}" target="_blank" rel="noopener">${it.tx.slice(0,6)}…</a>` : ''}
+    </span>`).join('');
+    feedStrip.innerHTML = make() + make();
+  } catch (err) {
+    console.warn('[pay] refreshFeed failed:', err?.message || err);
+    setFeedNotice('activity feed unavailable');
+  }
+}
+
+// ---- Wire up ------------------------------------------------------------
+
+quickEl.addEventListener('click', (e) => {
+  const btn = e.target.closest('button');
+  if (!btn) return;
+  const cmd = btn.dataset.cmd;
+  if (cmd === 'tools/list') return run({ tool: 'tools/list', args: {} }, '/list_tools');
+  if (cmd === 'validate_model:demo') return run({ tool: 'validate_model', args: { url: DEMO_MODEL } }, `validate ${DEMO_MODEL.split('/').pop()}`);
+  if (cmd === 'inspect_model:demo') return run({ tool: 'inspect_model', args: { url: DEMO_MODEL } }, `inspect ${DEMO_MODEL.split('/').pop()}`);
+  if (cmd === 'optimize_model:demo') return run({ tool: 'optimize_model', args: { url: DEMO_MODEL } }, `optimize ${DEMO_MODEL.split('/').pop()}`);
+  if (cmd === 'search_public_avatars:') return run({ tool: 'search_public_avatars', args: { limit: 12 } }, '/search_avatars');
+});
+
+sendBtn.addEventListener('click', () => {
+  const text = promptEl.value.trim();
+  if (!text) return;
+  const call = parsePrompt(text);
+  if (!call) return;
+  promptEl.value = '';
+  run(call, text);
+});
+promptEl.addEventListener('keydown', (e) => {
+  if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendBtn.click(); }
+});
+
+closeWalk.addEventListener('click', () => {
+  hideOverlay(walkthrough);
+  try { localStorage.setItem('x402:seen-walk', '1'); } catch { /* private mode: show it again next visit */ }
+});
+const seenWalk = (() => { try { return localStorage.getItem('x402:seen-walk'); } catch { return null; } })();
+if (!seenWalk && !location.search.includes('skipwalk=1')) {
+  showOverlay(walkthrough, closeWalk);
+}
+
+// ---- Init ---------------------------------------------------------------
+
+resetSteps();
+refreshBalance();
+refreshFeed();
+setInterval(refreshBalance, 30_000);
+setInterval(refreshFeed, 20_000);
+
+// Browser wallet cards — show Phantom/MetaMask if installed
+initBrowserWalletCards();
+
+// Agent picker — try to load if there's any sign the user is logged in.
+// The localStorage hint is set by the main site on login.
+const authHint = (() => { try { return JSON.parse(localStorage.getItem('3dagent:auth-hint') || 'null'); } catch { return null; } })();
+if (authHint?.authed) {
+  loadAgents();
+} else {
+  // Not obviously logged in — try anyway (session cookie may exist).
+  loadAgents().catch(() => {});
+}
+
+// Deep-link prefill: /pay?validate=https://...glb auto-fires the call.
+const params = new URLSearchParams(location.search);
+for (const [tool, alias] of [
+  ['validate_model', 'validate'],
+  ['inspect_model',  'inspect'],
+  ['optimize_model', 'optimize'],
+]) {
+  const url = params.get(alias);
+  if (url) {
+    queueMicrotask(() => run({ tool, args: { url } }));
+    break;
+  }
+}
+if (params.get('list') === '1') queueMicrotask(() => run({ tool: 'tools/list', args: {} }));
+
+focusComposer();
+</script>
+
+<script type="module">
+// ---- BNB Smart Chain x402 "direct" flow --------------------------------
+//
+// The Solana script above pays from a server-held demo wallet. On BSC the
+// browser user is the payer: MetaMask signs USDC.approve + ThreeWSPayments.pay,
+// then the page POSTs /api/mcp with the resulting tx as an X-PAYMENT header.
+// Server-side verification happens in api/_lib/x402-bsc-direct.js.
+
+const BSC_CHAIN_HEX = '0x38'; // 56
+const BSC_USDC      = '0x8AC76a51cc950d9822D68b83fE1Ad97B32Cd580d';
+const BSC_PAYMENTS  = '0x00000000381f09742a30a5a49975514AeC1B72Cc';
+const BSC_RPC       = 'https://bsc-dataseed.binance.org';
+const PRICE         = 1000n; // $0.001 USDC (6 decimals)
+
+const $b = (id) => document.getElementById(id);
+const conv_       = $b('conv');
+const composer_   = $b('composer');
+const agentBar_   = $b('agentBar');
+const bscPanel_   = $b('bscPanel');
+
+function activateChain(chain) {
+  document.querySelectorAll('.chain-tab').forEach((b) => {
+    b.classList.toggle('active', b.dataset.chain === chain);
+  });
+  const bsc = chain === 'bsc';
+  if (agentBar_) agentBar_.style.display = bsc ? 'none' : '';
+  if (conv_)     conv_.style.display     = bsc ? 'none' : '';
+  if (composer_) composer_.style.display = bsc ? 'none' : '';
+  bscPanel_.classList.toggle('active', bsc);
+}
+
+document.querySelectorAll('.chain-tab').forEach((btn) => {
+  btn.addEventListener('click', () => activateChain(btn.dataset.chain));
+});
+
+// ---- low-level wallet helpers -----------------------------------------
+
+let bscAccount = null;
+
+async function eth(method, params = []) {
+  if (!window.ethereum) {
+    throw new Error('MetaMask not detected. Install it at metamask.io or use a wallet extension that exposes window.ethereum.');
+  }
+  return await window.ethereum.request({ method, params });
+}
+
+async function ensureBscNetwork() {
+  try {
+    await eth('wallet_switchEthereumChain', [{ chainId: BSC_CHAIN_HEX }]);
+  } catch (err) {
+    // 4902 = chain not added to the wallet.
+    if (err && (err.code === 4902 || err.code === -32603)) {
+      await eth('wallet_addEthereumChain', [{
+        chainId: BSC_CHAIN_HEX,
+        chainName: 'BNB Smart Chain',
+        nativeCurrency: { name: 'BNB', symbol: 'BNB', decimals: 18 },
+        rpcUrls: ['https://bsc-dataseed.binance.org'],
+        blockExplorerUrls: ['https://bscscan.com'],
+      }]);
+    } else {
+      throw err;
+    }
+  }
+}
+
+function pad32Addr(addr) {
+  return addr.toLowerCase().replace(/^0x/, '').padStart(64, '0');
+}
+
+async function readUsdcBalance(account) {
+  const data = '0x70a08231' + pad32Addr(account);
+  const raw = await eth('eth_call', [{ to: BSC_USDC, data }, 'latest']);
+  return BigInt(raw && raw !== '0x' ? raw : '0x0');
+}
+
+async function readUsdcAllowance(owner, spender) {
+  const data = '0xdd62ed3e' + pad32Addr(owner) + pad32Addr(spender);
+  const raw = await eth('eth_call', [{ to: BSC_USDC, data }, 'latest']);
+  return BigInt(raw && raw !== '0x' ? raw : '0x0');
+}
+
+function fmtUsdc(n) {
+  const s = n.toString().padStart(7, '0');
+  return s.slice(0, -6) + '.' + s.slice(-6, -2);
+}
+
+async function refreshBalances() {
+  if (!bscAccount) return;
+  try {
+    const [bal, allow] = await Promise.all([
+      readUsdcBalance(bscAccount),
+      readUsdcAllowance(bscAccount, BSC_PAYMENTS),
+    ]);
+    $b('bscBal').textContent   = '$' + fmtUsdc(bal) + ' USDC';
+    $b('bscAllow').textContent = allow >= PRICE ? '✓ ready' : 'needs approve';
+  } catch (err) {
+    $b('bscBal').textContent   = '—';
+    $b('bscAllow').textContent = '—';
+  }
+}
+
+function logStep(html, kind = 'info') {
+  const div = document.createElement('div');
+  div.className = 'bsc-step' + (kind !== 'info' ? ' ' + kind : '');
+  div.innerHTML = html;
+  $b('bscLog').appendChild(div);
+  div.scrollIntoView({ behavior: 'smooth', block: 'end' });
+  return div;
+}
+
+// Poll the public BSC RPC over HTTP so we can read a Retry-After header when the
+// node rate-limits us. Returns { receipt, retryAfterMs } — retryAfterMs is the
+// server-suggested backoff (null when none). Falls back to the wallet provider
+// (which can't surface headers) if the direct RPC is unreachable.
+async function fetchReceipt(txHash) {
+  try {
+    const res = await fetch(BSC_RPC, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'eth_getTransactionReceipt', params: [txHash] }),
+    });
+    const ra = res.headers.get('retry-after');
+    let retryAfterMs = null;
+    if (ra) {
+      const secs = Number(ra);
+      retryAfterMs = Number.isFinite(secs) ? secs * 1000 : Math.max(0, new Date(ra).getTime() - Date.now());
+      if (!Number.isFinite(retryAfterMs)) retryAfterMs = null;
+    }
+    if (res.status === 429 || res.status >= 500) return { receipt: null, retryAfterMs };
+    const json = await res.json();
+    return { receipt: json?.result || null, retryAfterMs };
+  } catch {
+    // Direct RPC unreachable — use the connected wallet's provider instead.
+    const receipt = await eth('eth_getTransactionReceipt', [txHash]);
+    return { receipt, retryAfterMs: null };
+  }
+}
+
+async function waitForReceipt(txHash, timeoutMs = 60000) {
+  const started = Date.now();
+  let delay = 1500;            // initial poll interval
+  const maxDelay = 12000;      // cap so we still poll a few times near the end
+  while (Date.now() - started < timeoutMs) {
+    const { receipt, retryAfterMs } = await fetchReceipt(txHash);
+    if (receipt) {
+      if (receipt.status !== '0x1') throw new Error(`tx ${txHash} reverted on-chain`);
+      return receipt;
+    }
+    // Honor a server-supplied Retry-After; otherwise apply exponential backoff
+    // with light jitter so we don't hammer the node in lockstep.
+    const remaining = timeoutMs - (Date.now() - started);
+    let wait = retryAfterMs != null ? retryAfterMs : delay + Math.floor(Math.random() * 300);
+    wait = Math.min(wait, Math.max(0, remaining));
+    if (wait <= 0) break;
+    await new Promise((r) => setTimeout(r, wait));
+    if (retryAfterMs == null) delay = Math.min(delay * 2, maxDelay);
+  }
+  throw new Error(`tx ${txHash} did not confirm within ${timeoutMs / 1000}s. Check BscScan.`);
+}
+
+async function bscConnect() {
+  const accts = await eth('eth_requestAccounts');
+  bscAccount = accts && accts[0];
+  if (!bscAccount) throw new Error('No account returned from wallet');
+  await ensureBscNetwork();
+  const short = bscAccount.slice(0, 6) + '…' + bscAccount.slice(-4);
+  $b('bscAddr').textContent = short;
+  $b('bscConnect').style.display = 'none';
+  $b('bscInfo').style.display = '';
+  logStep(`🔗 Connected as <code>${short}</code> on BNB Smart Chain.`);
+  await refreshBalances();
+}
+
+async function approveIfNeeded() {
+  const allow = await readUsdcAllowance(bscAccount, BSC_PAYMENTS);
+  if (allow >= PRICE) return false;
+  logStep('🔑 Approving USDC for ThreeWSPayments (one-time per wallet)…');
+  // approve(spender, type(uint256).max)
+  const data = '0x095ea7b3' + pad32Addr(BSC_PAYMENTS) + 'f'.repeat(64);
+  const txHash = await eth('eth_sendTransaction', [{
+    from: bscAccount, to: BSC_USDC, data,
+  }]);
+  logStep(`📝 Approve tx: <a target="_blank" rel="noopener" href="https://bscscan.com/tx/${txHash}"><code>${txHash}</code></a>`);
+  await waitForReceipt(txHash);
+  logStep('✅ Approval confirmed.');
+  return true;
+}
+
+function randomRef() {
+  const bytes = crypto.getRandomValues(new Uint8Array(32));
+  return '0x' + Array.from(bytes).map((b) => b.toString(16).padStart(2, '0')).join('');
+}
+
+async function payOnChain(ref) {
+  logStep(`💳 Calling <code>ThreeWSPayments.pay(${ref.slice(0, 10)}…)</code>. Sign it in MetaMask.`);
+  const data = '0x8609cad1' + ref.replace(/^0x/, '');
+  const txHash = await eth('eth_sendTransaction', [{
+    from: bscAccount, to: BSC_PAYMENTS, data,
+  }]);
+  const rowDiv = logStep(`📝 Pay tx: <a target="_blank" rel="noopener" href="https://bscscan.com/tx/${txHash}"><code>${txHash}</code></a> awaiting confirmation…`);
+  const rcpt = await waitForReceipt(txHash);
+  rowDiv.innerHTML = `✅ Payment confirmed in block ${parseInt(rcpt.blockNumber, 16)}: <a target="_blank" rel="noopener" href="https://bscscan.com/tx/${txHash}"><code>${txHash}</code></a>`;
+  return txHash;
+}
+
+async function callMcp(toolName, toolArgs, txHash, ref) {
+  const payload = {
+    scheme:  'direct',
+    network: 'eip155:56',
+    txHash,
+    ref,
+    payer:   bscAccount,
+  };
+  const xPayment = btoa(JSON.stringify(payload));
+  logStep(`🚀 POST <code>/api/mcp</code> with <code>X-PAYMENT</code> proving the BSC tx…`);
+
+  const isToolsList = toolName === 'tools/list';
+  const body = isToolsList
+    ? { jsonrpc: '2.0', id: 1, method: 'tools/list' }
+    : { jsonrpc: '2.0', id: 1, method: 'tools/call', params: { name: toolName, arguments: toolArgs } };
+
+  const res = await fetch('/api/mcp', {
+    method: 'POST',
+    headers: {
+      'content-type': 'application/json',
+      'accept':       'application/json',
+      'x-payment':    xPayment,
+    },
+    body: JSON.stringify(body),
+  });
+  if (!res.ok) {
+    const text = await res.text();
+    throw new Error(`MCP ${res.status}: ${text.slice(0, 300)}`);
+  }
+  const data = await res.json();
+  if (data.error) throw new Error(`MCP error: ${data.error.message || JSON.stringify(data.error)}`);
+  return data;
+}
+
+const BSC_TOOL_PRESETS = {
+  validate_model:        { name: 'validate_model',        args: { url: 'https://modelviewer.dev/shared-assets/models/DamagedHelmet/glTF-Binary/DamagedHelmet.glb' } },
+  inspect_model:         { name: 'inspect_model',         args: { url: 'https://modelviewer.dev/shared-assets/models/DamagedHelmet/glTF-Binary/DamagedHelmet.glb' } },
+  search_public_avatars: { name: 'search_public_avatars', args: { limit: 5 } },
+  tools_list:            { name: 'tools/list',            args: {} },
+};
+
+async function runBscFlow(toolKey) {
+  try {
+    if (!bscAccount) await bscConnect();
+    if (!bscAccount) return;
+    const preset = BSC_TOOL_PRESETS[toolKey];
+    if (!preset) throw new Error('Unknown tool: ' + toolKey);
+
+    await approveIfNeeded();
+    const ref = randomRef();
+    const txHash = await payOnChain(ref);
+    const result = await callMcp(preset.name, preset.args, txHash, ref);
+
+    const pretty = JSON.stringify(result, null, 2);
+    const truncated = pretty.length > 4000 ? pretty.slice(0, 4000) + '\n…(truncated)' : pretty;
+    logStep(`📦 MCP result:<pre>${escapeHtml(truncated)}</pre>`, 'result');
+    await refreshBalances();
+  } catch (err) {
+    const msg = err && (err.shortMessage || err.message) ? (err.shortMessage || err.message) : String(err);
+    logStep('❌ ' + escapeHtml(msg), 'err');
+  }
+}
+
+function escapeHtml(s) {
+  return String(s)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;');
+}
+
+$b('bscConnect').addEventListener('click', () => {
+  bscConnect().catch((err) => logStep('❌ ' + escapeHtml(err.message || String(err)), 'err'));
+});
+document.querySelectorAll('[data-bsctool]').forEach((btn) => {
+  btn.addEventListener('click', () => runBscFlow(btn.dataset.bsctool));
+});
+
+// Auto-switch into the BSC tab when navigated as /pay?chain=bsc — used by
+// the DappBay listing link so visitors land directly on the BNB-Chain flow.
+const bscParams = new URLSearchParams(location.search);
+if (bscParams.get('chain') === 'bsc') activateChain('bsc');
+</script>
+
+	<script src="/brand.js" defer></script>
+	<!-- Runtime i18n: detects locale, swaps annotated copy, mounts <lang-switcher>. -->
+	<script type="module" src="/i18n.js"></script>
+</body>
+</html>

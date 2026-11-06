@@ -1,0 +1,30 @@
+{
+  "capturedAt": "2026-07-20T22:56:35.608Z",
+  "chain": "Robinhood Chain mainnet (4663)",
+  "frames": [
+    {
+      "prompt": "hood price AAPL",
+      "output": "\u001b[38;5;79m◈\u001b[39m \u001b[1mAAPL\u001b[22m \u001b[2m· Robinhood Chain mainnet\u001b[22m\n\u001b[2mOracle\u001b[22m    \u001b[1m$326.49\u001b[22m\n\u001b[2mUpdated\u001b[22m   \u001b[2m3h 0m ago\u001b[22m\n\u001b[2mDEX\u001b[22m       $308.85\n\u001b[2mPremium\u001b[22m   \u001b[31m-5.40%\u001b[39m\n\u001b[2mToken\u001b[22m     \u001b[90m0xaF3D…93f9\u001b[39m"
+    },
+    {
+      "prompt": "hood stocks --sort premium --dex --limit 6",
+      "output": "\u001b[38;5;79m◈\u001b[39m \u001b[1mStock Tokens\u001b[22m \u001b[2m· mainnet · 6 shown · 6 priced\u001b[22m\n\u001b[2mSYMBOL\u001b[22m    \u001b[2mPRICE\u001b[22m      \u001b[2mDEX\u001b[22m  \u001b[2mPREMIUM\u001b[22m     \u001b[2mAGE\u001b[22m  \u001b[2mNAME\u001b[22m                      \u001b[2mADDRESS\u001b[22m    \n\u001b[90m────────────────────────────────────────────────────────────────────────────────\u001b[39m\n\u001b[1mCLSK\u001b[22m     $14.43   $14.67   \u001b[32m+1.65%\u001b[39m  \u001b[2m2h 50m\u001b[22m  \u001b[2mCleanSpark\u001b[22m                \u001b[90m0xcBB9…Cee3\u001b[39m\n\u001b[1mTSM\u001b[22m     $401.94  $398.48   \u001b[31m-0.86%\u001b[39m  \u001b[2m4h 10m\u001b[22m  \u001b[2mTaiwan Semiconductor Ma…\u001b[22m  \u001b[90m0x58Ff…e7AA\u001b[39m\n\u001b[1mSLV\u001b[22m      $50.97   $50.28   \u001b[31m-1.36%\u001b[39m  \u001b[2m2h 59m\u001b[22m  \u001b[2miShares Silver Trust\u001b[22m      \u001b[90m0x411e…D89f\u001b[39m\n\u001b[1mAMZN\u001b[22m    $249.88  $241.73   \u001b[31m-3.26%\u001b[39m  \u001b[2m4h 15m\u001b[22m  \u001b[2mAmazon\u001b[22m                    \u001b[90m0x12f1…bF54\u001b[39m\n\u001b[1mQQQ\u001b[22m     $697.50  $672.03   \u001b[31m-3.65%\u001b[39m  \u001b[2m3h 52m\u001b[22m  \u001b[2mInvesco QQQ\u001b[22m               \u001b[90m0xD5f3…de68\u001b[39m\n\u001b[1mAAPL\u001b[22m    $326.49  $308.85   \u001b[31m-5.40%\u001b[39m   \u001b[2m3h 0m\u001b[22m  \u001b[2mApple\u001b[22m                     \u001b[90m0xaF3D…93f9\u001b[39m"
+    },
+    {
+      "prompt": "hood launches --lookback 2000000 --limit 5 --names",
+      "output": "\u001b[38;5;79m◈\u001b[39m \u001b[1mLaunches\u001b[22m \u001b[2m· mainnet · 0\u001b[22m\n\u001b[2mNo launches in the scanned window. Widen it with --lookback, or --follow to stream new ones.\u001b[22m"
+    },
+    {
+      "prompt": "hood portfolio 0x9701fb0aDe1E269c8f64Ec0C7b3cfADB31A13A52",
+      "output": "\u001b[38;5;79m◈\u001b[39m \u001b[1mPortfolio\u001b[22m \u001b[2m· 0x9701…3A52 · mainnet\u001b[22m\n\u001b[2mETH\u001b[22m      0.003625\n\u001b[2mUSDG\u001b[22m     $0.0550\n\u001b[2mStocks\u001b[22m   $0.00\n\u001b[2mTotal\u001b[22m    \u001b[1m$0.0550\u001b[22m\n\n\u001b[2mNo Stock Token positions. Fund with `hood swap --sell USDG --buy <ticker>`.\u001b[22m"
+    },
+    {
+      "prompt": "hood swap --sell USDG --buy WETH --amount 250",
+      "output": "\u001b[38;5;79m◈\u001b[39m \u001b[1mSwap quote\u001b[22m \u001b[2m· mainnet · add --execute to send\u001b[22m\n\u001b[2mSell\u001b[22m            \u001b[1m250\u001b[22m USDG\n\u001b[2mBuy\u001b[22m             \u001b[1m~0.131861675469726043\u001b[22m WETH\n\u001b[2mMin. received\u001b[22m   \u001b[2m0.131202367092377412 WETH (0.50% slippage)\u001b[22m\n\u001b[2mRate\u001b[22m            1 USDG ≈ 0.000527 WETH\n\u001b[2mRoute\u001b[22m           \u001b[2mdirect pool\u001b[22m"
+    },
+    {
+      "prompt": "hood tx 0x870a3bee3070f10e3c4f34271cfde70fd5aa0dc2eade6f07d01ae6c9a00285bd",
+      "output": "\u001b[38;5;79m◈\u001b[39m \u001b[1mTransaction\u001b[22m \u001b[2m0x870a…85bd\u001b[22m  \u001b[32m● success\u001b[39m\n\u001b[2mFrom\u001b[22m       \u001b[90m0xdf65…c23e\u001b[39m\n\u001b[2mTo\u001b[22m         \u001b[90m0xd9ec…fccb\u001b[39m\n\u001b[2mValue\u001b[22m      \u001b[1m0.0505 ETH\u001b[22m\n\u001b[2mMethod\u001b[22m     \u001b[2m—\u001b[22m\n\u001b[2mBlock\u001b[22m      #5843692\n\u001b[2mWhen\u001b[22m       \u001b[2m2026-07-10 05:54:38Z\u001b[22m\n\u001b[2mGas used\u001b[22m   \u001b[2m6,845,934 @ 0.0485 gwei\u001b[22m\n\u001b[2mFee\u001b[22m        0.00033229 ETH\n\u001b[2mExplorer\u001b[22m   \u001b[90mhttps://robinhoodchain.blockscout.com/tx/0x870a3bee3070f10e3c4f34271cfde70fd5aa0dc2eade6f07d01ae6c9a00285bd\u001b[39m\n\n\u001b[2mToken transfers\u001b[22m\n  \u001b[90m0x0000…0000\u001b[39m \u001b[2m→\u001b[22m \u001b[90m0xD9eC…FCcB\u001b[39m  \u001b[1m1000000000\u001b[22m \u001b[38;5;79m💎👐\u001b[39m\n  \u001b[90m0xD9eC…FCcB\u001b[39m \u001b[2m→\u001b[22m \u001b[90m0x872B…14E7\u001b[39m  \u001b[1m999999999.999999\u001b[22m \u001b[38;5;79m💎👐\u001b[39m\n  \u001b[90m0x872B…14E7\u001b[39m \u001b[2m→\u001b[22m \u001b[90m0xdF65…C23e\u001b[39m  \u001b[1m35227361.211893\u001b[22m \u001b[38;5;79m💎👐\u001b[39m\n  \u001b[90m0x0000…0000\u001b[39m \u001b[2m→\u001b[22m \u001b[90m0xCaf6…5cb2\u001b[39m  \u001b[1m0.05\u001b[22m \u001b[38;5;79mWETH\u001b[39m\n  \u001b[90m0xCaf6…5cb2\u001b[39m \u001b[2m→\u001b[22m \u001b[90m0x872B…14E7\u001b[39m  \u001b[1m0.05\u001b[22m \u001b[38;5;79mWETH\u001b[39m"
+    }
+  ]
+}

@@ -1,0 +1,316 @@
+// GET /api/bazaar/arbitrage
+//
+// Surfaces cross-venue / cross-provider price disparities across the merged
+// x402 facilitator catalog. We group listings by a derived "capability key"
+// (MCP tool name, or normalized HTTP service name / URL tail), then keep
+// groups that (a) have at least two listings, (b) span more than one
+// provider host or facilitator, and (c) carry a non-zero USDC price spread.
+// The result is the x402 analog of a cross-venue arbitrage view: same
+// thing, different price.
+//
+// Query params:
+//   minSpreadPct: discard groups whose max/min - 1 is below this (default 0)
+//   minProviders: require at least this many distinct provider hosts (default 2)
+//   limit:        cap returned opportunities (default 100, max 500)
+
+import { cors, json, error, wrap, serverError } from '../_lib/http.js';
+import { allSourcesFailed, Bazaar, sourceErrorText } from '../_lib/x402/bazaar-client.js';
+
+// Two distinct provider hosts is the floor for calling a price gap arbitrage.
+const DEFAULT_MIN_PROVIDERS = 2;
+
+const STOP_WORDS = new Set([
+	'api', 'apis', 'service', 'endpoint', 'endpoints', 'paid', 'free',
+	'the', 'a', 'an', 'and', 'or', 'of', 'for', 'to', 'on', 'in', 'by',
+	'tool', 'tools', 'mcp', 'http',
+]);
+
+function normalizeWord(s) {
+	return String(s || '').toLowerCase().normalize('NFKD').replace(/[^a-z0-9]+/g, '').trim();
+}
+
+function tokenize(s) {
+	return String(s || '')
+		.toLowerCase()
+		.split(/[^a-z0-9]+/g)
+		.map((w) => w.trim())
+		.filter((w) => w && !STOP_WORDS.has(w) && w.length >= 2);
+}
+
+// A trailing segment that is a route placeholder names the ARGUMENT, not the
+// capability: `/api/token-safety/:solana_address` and
+// `/api/holder-analysis/:solana_address` are different products that happen to
+// take the same input. Treating the placeholder as the capability collapsed
+// ten unrelated deepnets endpoints into one bogus "solana address" opportunity
+// with a 1400% spread. Recognize the common placeholder spellings and walk
+// back to the last literal segment instead.
+const PLACEHOLDER_SEGMENT = /^(?::.+|\{.+\}|<.+>|\[.+\])$/;
+
+// URL percent-encodes brace and angle placeholders inside a pathname, so a
+// `{mint}` segment arrives as `%7Bmint%7D` and never matches the pattern above.
+function decodeSegment(segment) {
+	try { return decodeURIComponent(segment); } catch { return segment; }
+}
+
+// Many facilitators (orbisapi, hyreagent…) ship empty serviceName and put
+// the capability in the URL path with a random suffix:
+//   /proxy/who-to-contact-api-97ccc0  →  "who-to-contact-api"
+// Strip a single trailing hash-like segment so the same logical capability
+// hosted by different providers collapses to the same key. The suffix has to
+// carry a digit to count as a hash: an all-letter tail is the second half of
+// the capability's own name, and eating it turned "token-safety" into "token",
+// which then had too few tokens to key on at all.
+const HASH_SUFFIX = /-(?![a-z]+$)[a-z0-9]{4,12}$/i;
+
+export function tailFromUrl(url) {
+	try {
+		const u = new URL(url);
+		const segments = u.pathname.replace(/\/+$/, '').split('/').filter(Boolean).map(decodeSegment);
+		while (segments.length && PLACEHOLDER_SEGMENT.test(segments[segments.length - 1])) segments.pop();
+		const tail = segments.pop() || '';
+		return tail.replace(HASH_SUFFIX, '');
+	} catch {
+		return '';
+	}
+}
+
+export function capabilityKey(it) {
+	if (it.type === 'mcp' && it.toolName) {
+		const k = normalizeWord(it.toolName);
+		return k ? `mcp:${k}` : null;
+	}
+	// Prefer serviceName; single-token names are fine because the facilitator
+	// chose them deliberately. URL-derived keys are noisier: a single short
+	// path like /buy collides across totally unrelated services, so require
+	// at least two informative tokens before treating them as a capability.
+	const nameTokens = tokenize(it.serviceName).slice(0, 3);
+	if (nameTokens.length && nameTokens.join('-').length >= 3) return `http:${nameTokens.join('-')}`;
+	const urlTokens = tokenize(tailFromUrl(it.resource)).slice(0, 3);
+	if (urlTokens.length >= 2 && urlTokens.join('-').length >= 6) return `http:${urlTokens.join('-')}`;
+	return null;
+}
+
+function hostOf(url) {
+	try { return new URL(url).host; } catch { return ''; }
+}
+
+// The cross-venue case: one provider host, one resource, two facilitators
+// quoting it at different prices. Returns only the listings that are actually
+// part of such a gap, so a group that qualifies this way reports the venue
+// spread rather than the vendor's unrelated per-endpoint price tiers.
+export function venueSpreadListings(group) {
+	const byResource = new Map();
+	for (const entry of group) {
+		const resource = entry.it.resource;
+		if (!resource) continue;
+		let bucket = byResource.get(resource);
+		if (!bucket) {
+			bucket = { facilitators: new Set(), min: entry.usdc, max: entry.usdc, entries: [] };
+			byResource.set(resource, bucket);
+		}
+		bucket.facilitators.add(hostOf(entry.it.facilitator));
+		bucket.min = Math.min(bucket.min, entry.usdc);
+		bucket.max = Math.max(bucket.max, entry.usdc);
+		bucket.entries.push(entry);
+	}
+	const out = [];
+	for (const bucket of byResource.values()) {
+		if (bucket.facilitators.size >= 2 && bucket.max > bucket.min) out.push(...bucket.entries);
+	}
+	return out;
+}
+
+function usdcAccepts(accepts) {
+	return (accepts || []).filter((a) => {
+		const sym = String(a?.assetInfo?.symbol || '').toUpperCase();
+		return sym === 'USDC' || sym === '';
+	});
+}
+
+function minUsdcAtomic(item) {
+	const ok = usdcAccepts(item.accepts);
+	if (ok.length === 0) return null;
+	let min = null;
+	for (const a of ok) {
+		const n = Number(a.amountAtomic);
+		if (Number.isFinite(n) && n > 0 && (min == null || n < min)) min = n;
+	}
+	return min;
+}
+
+function priceLabel(atomic) {
+	const n = atomic / 1_000_000;
+	if (n < 0.01) return `${n.toFixed(6).replace(/0+$/, '').replace(/\.$/, '')} USDC`;
+	if (n < 1) return `${n.toFixed(4).replace(/0+$/, '').replace(/\.$/, '')} USDC`;
+	return `${n.toFixed(2)} USDC`;
+}
+
+async function handler(req, res) {
+	if (cors(req, res, { origins: '*', methods: 'GET,OPTIONS' })) return;
+	if (req.method !== 'GET') return error(res, 405, 'method_not_allowed', 'GET only');
+
+	const url = new URL(req.url, 'http://x');
+	const minSpreadPct = clampNum(url.searchParams.get('minSpreadPct'), 0, 0, 10000);
+	const minProviders = clampInt(url.searchParams.get('minProviders'), DEFAULT_MIN_PROVIDERS, 2, 10);
+	const limit = clampInt(url.searchParams.get('limit'), 100, 1, 500);
+
+	const baz = new Bazaar();
+	let httpRes, mcpRes;
+	try {
+		[httpRes, mcpRes] = await Promise.all([
+			baz.listCached({ type: 'http', maxItems: 3000 }),
+			baz.listCached({ type: 'mcp', maxItems: 3000 }),
+		]);
+	} catch (e) {
+		console.error('[bazaar] facilitator error', e?.message || e);
+		return serverError(res, 502, 'facilitator_error', e);
+	}
+
+	if (allSourcesFailed(httpRes, mcpRes)) {
+		return error(res, 502, 'facilitator_error', sourceErrorText(httpRes, mcpRes));
+	}
+
+	const items = [...(httpRes.items || []), ...(mcpRes.items || [])];
+
+	const groups = new Map();
+	for (const it of items) {
+		const k = capabilityKey(it);
+		if (!k) continue;
+		const usdc = minUsdcAtomic(it);
+		if (usdc == null) continue;
+		if (!groups.has(k)) groups.set(k, []);
+		groups.get(k).push({ it, usdc });
+	}
+
+	const opps = [];
+	for (const [key, group] of groups) {
+		if (group.length < 2) continue;
+		// Internal pricing tiers on a single host aren't arbitrage, so a group
+		// needs `minProviders` distinct hosts. At the default floor a single host
+		// also qualifies when the same resource is quoted at two prices by two
+		// facilitators, because that is a genuine cross-venue gap. A caller who
+		// raises the floor is asking for genuinely competing providers, so that
+		// escape hatch closes.
+		const spansEnoughHosts = new Set(group.map(({ it }) => hostOf(it.resource)).filter(Boolean)).size >= minProviders;
+		const list = spansEnoughHosts
+			? group
+			: (minProviders === DEFAULT_MIN_PROVIDERS ? venueSpreadListings(group) : []);
+		if (list.length < 2) continue;
+
+		const hosts = new Set(list.map(({ it }) => hostOf(it.resource)).filter(Boolean));
+		const facilitators = new Set(list.map(({ it }) => hostOf(it.facilitator)).filter(Boolean));
+
+		const prices = list.map((x) => x.usdc);
+		const minAtomic = Math.min(...prices);
+		const maxAtomic = Math.max(...prices);
+		if (maxAtomic === minAtomic) continue;
+		const spreadAtomic = maxAtomic - minAtomic;
+		const spreadPct = (spreadAtomic / minAtomic) * 100;
+		if (spreadPct < minSpreadPct) continue;
+
+		const cheapest = list.find((x) => x.usdc === minAtomic);
+		const expensive = list.find((x) => x.usdc === maxAtomic);
+		const ref = list.find((x) => x.it.serviceName) || list[0];
+		const ref_it = ref.it;
+
+		const providers = list
+			.slice()
+			.sort((a, b) => a.usdc - b.usdc)
+			.map(({ it, usdc }) => ({
+				host: hostOf(it.resource),
+				facilitator: hostOf(it.facilitator),
+				resource: it.resource,
+				toolName: it.toolName || null,
+				serviceName: it.serviceName || null,
+				type: it.type,
+				priceAtomic: usdc,
+				priceLabel: priceLabel(usdc),
+				networks: it.networks || [],
+				iconUrl: it.iconUrl || null,
+			}));
+
+		const tagSet = new Set();
+		for (const { it } of list) for (const t of it.tags || []) tagSet.add(t);
+
+		opps.push({
+			key,
+			type: ref_it.type,
+			capability: ref_it.toolName || ref_it.serviceName || key.split(':')[1].replace(/-/g, ' '),
+			serviceName: ref_it.serviceName || null,
+			description: ref_it.description || '',
+			iconUrl: ref_it.iconUrl || null,
+			tags: [...tagSet].slice(0, 6),
+			providerCount: hosts.size,
+			facilitatorCount: facilitators.size,
+			listingCount: list.length,
+			minPriceAtomic: minAtomic,
+			maxPriceAtomic: maxAtomic,
+			minPriceLabel: priceLabel(minAtomic),
+			maxPriceLabel: priceLabel(maxAtomic),
+			spreadAtomic,
+			spreadPct,
+			cheapest: {
+				host: hostOf(cheapest.it.resource),
+				facilitator: hostOf(cheapest.it.facilitator),
+				resource: cheapest.it.resource,
+				toolName: cheapest.it.toolName || null,
+				priceLabel: priceLabel(cheapest.usdc),
+			},
+			mostExpensive: {
+				host: hostOf(expensive.it.resource),
+				facilitator: hostOf(expensive.it.facilitator),
+				resource: expensive.it.resource,
+				toolName: expensive.it.toolName || null,
+				priceLabel: priceLabel(expensive.usdc),
+			},
+			providers,
+		});
+	}
+
+	// Largest absolute spread first; spread % is the tiebreaker so
+	// micro-priced groups with big ratios don't bury larger-stake ones.
+	opps.sort((a, b) => {
+		if (b.spreadAtomic !== a.spreadAtomic) return b.spreadAtomic - a.spreadAtomic;
+		return b.spreadPct - a.spreadPct;
+	});
+
+	const trimmed = opps.slice(0, limit);
+
+	res.setHeader('cache-control', 'public, max-age=30, stale-while-revalidate=120');
+	return json(res, 200, {
+		count: trimmed.length,
+		totalGroups: opps.length,
+		opportunities: trimmed,
+		updatedAt: new Date().toISOString(),
+		sources: [
+			...(httpRes.sources || []).map((s) => ({ ...s, type: 'http' })),
+			...(mcpRes.sources || []).map((s) => ({ ...s, type: 'mcp' })),
+		],
+		// A partial outage leaves `sources` carrying ok:false rows and the
+		// opportunity list quietly shorter. Ship the reasons alongside so the
+		// page can name which facilitator dropped out instead of presenting a
+		// degraded view as the whole market.
+		errors: [
+			...(httpRes.errors || []).map((e) => ({ ...e, type: 'http' })),
+			...(mcpRes.errors || []).map((e) => ({ ...e, type: 'mcp' })),
+		],
+	});
+}
+
+// An absent query param arrives as null, and Number(null) is 0, not NaN: the
+// unguarded version returned min instead of the fallback, so every default
+// here silently collapsed to 1 (one catalog item per facilitator page).
+function clampInt(v, fallback, min, max) {
+	if (v == null || v === '') return fallback;
+	const n = Number(v);
+	if (!Number.isFinite(n)) return fallback;
+	return Math.max(min, Math.min(max, Math.floor(n)));
+}
+function clampNum(v, fallback, min, max) {
+	if (v == null || v === '') return fallback;
+	const n = Number(v);
+	if (!Number.isFinite(n)) return fallback;
+	return Math.max(min, Math.min(max, n));
+}
+
+export default wrap(handler);

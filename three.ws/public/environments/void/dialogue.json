@@ -1,0 +1,25 @@
+{
+	"$schema": "NPC dialogue table for the walk scene (Task 19). Slots: greeter, guide-wait, guide-arrive ({landmark} token). landmarks steer the guide NPC.",
+	"greeter": [
+		"Welcome to the void — nothing here but focus.",
+		"Hey. Pure grid, pure quiet. Wander as far as you like.",
+		"Glad you came. Sometimes empty space is the point.",
+		"Welcome in. No distractions out here — just you."
+	],
+	"guide-wait": [
+		"Take your time — I'll wait on the grid.",
+		"No rush. There's nowhere to be but here.",
+		"I'll hold this spot until you catch up."
+	],
+	"guide-arrive": [
+		"Here — {landmark}.",
+		"This is {landmark}, such as it is.",
+		"We've reached {landmark}. Breathe it in."
+	],
+	"landmarks": [
+		{ "name": "the grid's edge", "pos": [0, 0, -8] },
+		{ "name": "the far marker", "pos": [8, 0, 0] },
+		{ "name": "the quiet corner", "pos": [0, 0, 8] },
+		{ "name": "the open expanse", "pos": [-8, 0, 0] }
+	]
+}

@@ -1,0 +1,145 @@
+<!doctype html>
+<html lang="en">
+	<head>
+		<script>/* three.ws theme boot - no-flash; runtime in /theme-switcher.js */(function(){try{var m=localStorage.getItem('twx_theme');var l=m==='auto'?(window.matchMedia&&window.matchMedia('(prefers-color-scheme: light)').matches):m==='light';document.documentElement.setAttribute('data-theme',l?'light':'dark');}catch(e){document.documentElement.setAttribute('data-theme','dark');}})();</script>
+		<meta charset="utf-8" />
+		<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+		<title data-i18n="spotlight.page_title">Agent Spotlight · three.ws</title>
+		<meta
+			name="description"
+			data-i18n-attr="content:spotlight.meta_desc"
+			content="The three.ws community showcase: real agents people built, written up by the people who built them, ranked by community upvotes. Browse by category, open any agent in 3D, and submit your own."
+		/>
+		<meta name="theme-color" content="#0a0a0a" />
+		<link rel="canonical" href="https://three.ws/spotlight" />
+		<link rel="icon" href="/favicon.ico" sizes="any" />
+		<link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+		<link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+		<link rel="manifest" href="/manifest.webmanifest" />
+		<link rel="stylesheet" href="/fonts/fonts.css" />
+		<link rel="stylesheet" href="/nav.css" />
+		<link rel="stylesheet" href="/src/spotlight.css" />
+		<link rel="stylesheet" href="/footer.css" />
+		<script defer src="/footer-newsletter.js"></script>
+	
+	<meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1">
+	<meta property="og:type" content="website">
+	<meta property="og:site_name" content="three.ws">
+	<meta property="og:locale" content="en_US">
+	<meta property="og:title" data-i18n-attr="content:spotlight.share_title" content="Agent Spotlight · three.ws">
+	<meta property="og:description" data-i18n-attr="content:spotlight.share_desc" content="The three.ws community showcase: agents people actually built something with, written up by the builder and ranked by community upvotes. Filter by category, open any entry in 3D, upvote what you like, and submit your own.">
+	<meta property="og:url" content="https://three.ws/spotlight">
+	<meta property="og:image" content="https://three.ws/api/page-og?s=agent-tools&amp;t=Agent+Spotlight&amp;d=The+three.ws+community+showcase%3A+agents+people+actually+built+something+with%2C+written+up+by+the+builder+and+ranked+by+community+upvotes.+Filter+by+category&amp;p=%2Fspotlight">
+	<meta property="og:image:width" content="1200">
+	<meta property="og:image:height" content="630">
+	<meta property="og:image:type" content="image/png">
+	<meta property="og:image:alt" content="Agent Spotlight - three.ws">
+	<meta name="twitter:card" content="summary_large_image">
+	<meta name="twitter:site" content="@trythreews">
+	<meta name="twitter:title" data-i18n-attr="content:spotlight.share_title" content="Agent Spotlight · three.ws">
+	<meta name="twitter:description" data-i18n-attr="content:spotlight.share_desc" content="The three.ws community showcase: agents people actually built something with, written up by the builder and ranked by community upvotes. Filter by category, open any entry in 3D, upvote what you like, and submit your own.">
+	<meta name="twitter:image" content="https://three.ws/api/page-og?s=agent-tools&amp;t=Agent+Spotlight&amp;d=The+three.ws+community+showcase%3A+agents+people+actually+built+something+with%2C+written+up+by+the+builder+and+ranked+by+community+upvotes.+Filter+by+category&amp;p=%2Fspotlight">
+	<script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"WebPage","name":"Agent Spotlight","description":"The three.ws community showcase: agents people actually built something with, written up by the builder and ranked by community upvotes. Filter by category, open any entry in 3D, upvote what you like, and submit your own.","url":"https://three.ws/spotlight","isPartOf":{"@type":"WebSite","name":"three.ws","url":"https://three.ws"},"primaryImageOfPage":"https://three.ws/api/page-og?s=agent-tools&t=Agent+Spotlight&d=The+three.ws+community+showcase%3A+agents+people+actually+built+something+with%2C+written+up+by+the+builder+and+ranked+by+community+upvotes.+Filter+by+category&p=%2Fspotlight"}]}</script>
+</head>
+	<body>
+		<header><div id="nav-container"></div></header>
+		<script src="/nav.js"></script>
+
+		<main class="sp-shell">
+			<section class="sp-hero">
+				<p class="sp-kicker" data-i18n-html="spotlight.kicker"><span class="sp-dot" aria-hidden="true"></span> Community showcase</p>
+				<h1 class="sp-title" data-i18n-html="spotlight.title">Agent <em>Spotlight</em></h1>
+				<p class="sp-sub" data-i18n="spotlight.sub">
+					The agents index lists everything anyone ever registered. This is the other thing:
+					agents people actually built something with, written up by the builder, ranked by
+					what the community votes up. Open any one of them, talk to it, fork it, or put
+					your own in front of everybody.
+				</p>
+				<div class="sp-ctas">
+					<button
+						type="button"
+						class="sp-btn sp-btn-primary"
+						id="sp-submit-toggle"
+						aria-expanded="false"
+						aria-controls="sp-submit-panel"
+						data-i18n="spotlight.submit_toggle"
+					>
+						Showcase your agent
+					</button>
+					<a class="sp-btn" href="/agents" data-i18n="spotlight.browse_all">Browse every agent</a>
+					<a class="sp-btn" href="/docs/spotlight" data-i18n="spotlight.how_ranking">How the ranking works</a>
+				</div>
+				<dl class="sp-stats" id="sp-stats" aria-live="polite"></dl>
+			</section>
+
+			<!-- Submission. Server-validated on POST /api/spotlight/submit; the client
+			     mirrors the same bounds so a builder learns about a too-long tagline
+			     while typing it rather than after a round trip. -->
+			<form class="sp-panel" id="sp-submit-panel" hidden>
+				<div class="sp-panel-head">
+					<h2 class="sp-h2" data-i18n="spotlight.panel_h2">Put an agent in the spotlight</h2>
+					<p class="sp-panel-note" data-i18n="spotlight.panel_note">
+						Pick one of your public agents and say what it does. Everything else on the card
+						(its name, avatar, skills, on-chain identity, live chat count) is read from the
+						agent itself, so your entry never goes stale.
+					</p>
+				</div>
+
+				<div id="sp-submit-auth" class="sp-inline-state" hidden></div>
+
+				<!-- Fields are built by src/spotlight-form.js, the same module the edit
+				     form on /spotlight/:id uses, so the two can never drift apart. -->
+				<div id="sp-fields"></div>
+
+				<div class="sp-ctas">
+					<button type="submit" class="sp-btn sp-btn-primary" id="sp-submit" data-i18n="spotlight.publish_btn">Publish to the showcase</button>
+					<button type="button" class="sp-btn" id="sp-cancel" data-i18n="spotlight.cancel_btn">Cancel</button>
+				</div>
+				<p class="sp-form-note" id="sp-form-note" role="status" aria-live="polite"></p>
+			</form>
+
+			<!-- Editor's picks. Rendered only when at least one entry is featured, so
+			     the page never shows an empty rail with a heading over it. -->
+			<section class="sp-featured" id="sp-featured" hidden aria-labelledby="sp-featured-head">
+				<h2 class="sp-h2" id="sp-featured-head" data-i18n="spotlight.featured_h2">Featured</h2>
+				<div class="sp-featured-body" id="sp-featured-body"></div>
+			</section>
+
+			<section class="sp-controls" aria-label="Filter the showcase" data-i18n-attr="aria-label:spotlight.controls_aria">
+				<div class="sp-sorts" role="tablist" aria-label="Sort" data-i18n-attr="aria-label:spotlight.sort_aria">
+					<button type="button" class="sp-sort is-active" role="tab" aria-selected="true" data-sort="trending" data-i18n="spotlight.sort_trending">Trending</button>
+					<button type="button" class="sp-sort" role="tab" aria-selected="false" data-sort="new" data-i18n="spotlight.sort_new">Newest</button>
+					<button type="button" class="sp-sort" role="tab" aria-selected="false" data-sort="top" data-i18n="spotlight.sort_top">Most upvoted</button>
+				</div>
+				<div class="sp-search">
+					<label class="sr-only" for="sp-q" data-i18n="spotlight.search_label">Search the showcase</label>
+					<input
+						class="sp-input"
+						id="sp-q"
+						type="search"
+						placeholder="Search agents, write-ups, builders…"
+						autocomplete="off"
+						data-i18n-attr="placeholder:spotlight.search_placeholder"
+					/>
+					<kbd class="sp-kbd" aria-hidden="true">/</kbd>
+				</div>
+			</section>
+
+			<nav class="sp-cats" id="sp-cats" aria-label="Categories" data-i18n-attr="aria-label:spotlight.cats_aria"></nav>
+
+			<section class="sp-grid" id="sp-grid" aria-label="Showcased agents" aria-busy="true" data-i18n-attr="aria-label:spotlight.grid_aria"></section>
+			<div id="sp-state"></div>
+			<div class="sp-more-wrap">
+				<button type="button" class="sp-btn" id="sp-more" hidden data-i18n="spotlight.load_more">Load more</button>
+			</div>
+		</main>
+
+		<div id="sp-live" class="sr-only" role="status" aria-live="polite"></div>
+
+		<script type="module" src="/src/spotlight.js"></script>
+		<script src="/brand.js" defer></script>
+		<div id="footer-container"></div>
+		<script src="/footer.js"></script>
+		<script type="module" src="/i18n.js"></script>
+	</body>
+</html>

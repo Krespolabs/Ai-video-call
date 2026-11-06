@@ -1,0 +1,1 @@
+One iframe tag puts a rigged 3D avatar on any site, walking in one of six live worlds picked by a query param. No SDK, no build step: three.ws/walk

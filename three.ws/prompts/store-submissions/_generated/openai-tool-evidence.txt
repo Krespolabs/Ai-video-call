@@ -1,0 +1,51 @@
+
+===== forge_free — real generation (45913ms) =====
+{
+  "jsonrpc": "2.0",
+  "id": 1,
+  "result": {
+    "content": [
+      {
+        "type": "text",
+        "text": "Generated a 3D model (GLB). View it: https://three.ws/viewer?src=https%3A%2F%2Fpub-2534e921bf9c4314addcd4d8a6e98b7b.r2.dev%2Fforge%2Fanon%2F456f0f83-597d-4746-8fff-38933a1d695f.glb\nDownload: https://pub-2534e921bf9c4314addcd4d8a6e98b7b.r2.dev/forge/anon/456f0f83-597d-4746-8fff-38933a1d695f.glb"
+      }
+    ],
+    "structuredContent": {
+      "kind": "model",
+      "glbUrl": "https://pub-2534e921bf9c4314addcd4d8a6e98b7b.r2.dev/forge/anon/456f0f83-597d-4746-8fff-38933a1d695f.glb",
+      "viewerUrl": "https://three.ws/viewer?src=https%3A%2F%2Fpub-2534e921bf9c4314addcd4d8a6e98b7b.r2.dev%2Fforge%2Fanon%2F456f0f83-597d-4746-8fff-38933a1d695f.glb",
+      "format": "glb",
+      "prompt": "a small ceramic teapot with a bamboo handle, glossy celadon glaze"
+    }
+  }
+}
+
+===== forge_free — safety refusal (explicit prompt) (1ms) =====
+{
+  "jsonrpc": "2.0",
+  "id": 2,
+  "result": {
+    "content": [
+      {
+        "type": "text",
+        "text": "This 3D Studio is rated for ages 13+ and cannot generate sexual or adult content. Try describing a character, creature, or object without explicit themes."
+      }
+    ],
+    "structuredContent": {
+      "error": true,
+      "message": "This 3D Studio is rated for ages 13+ and cannot generate sexual or adult content. Try describing a character, creature, or object without explicit themes."
+    },
+    "isError": true
+  }
+}
+{"lvl":"warn","name":"mcp-studio","msg":"rpc_error","method":"tools/call","code":-32602,"message":"invalid params for forge_free: /prompt must NOT have fewer than 3 characters"}
+
+===== forge_free — validation (empty prompt) (0ms) =====
+{
+  "jsonrpc": "2.0",
+  "id": 3,
+  "error": {
+    "code": -32602,
+    "message": "invalid params for forge_free: /prompt must NOT have fewer than 3 characters"
+  }
+}

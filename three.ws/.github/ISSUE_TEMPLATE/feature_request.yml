@@ -1,0 +1,45 @@
+name: Feature request
+description: Suggest an improvement or new capability for three.ws.
+title: "[Feature]: "
+labels: ["enhancement", "triage"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Have an idea? We build for the end user first. The more you tell us about *who benefits and how*, the faster we can act.
+  - type: textarea
+    id: problem
+    attributes:
+      label: What problem does this solve?
+      description: Describe the user need or the gap you hit. Who is the user, and what are they trying to accomplish?
+      placeholder: As an agent creator, I want to ... so that I can ...
+    validations:
+      required: true
+  - type: textarea
+    id: solution
+    attributes:
+      label: Proposed solution
+      description: What would the best version of this look like? Describe the ideal experience, not just the quickest fix.
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+      description: Other approaches you weighed, or how you work around this today.
+    validations:
+      required: false
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area
+      options:
+        - Web app (viewer / studio / dashboard)
+        - API (api/ functions)
+        - SDK (avatar / payments / protocol / ui)
+        - MCP server
+        - Wallet / payments (x402)
+        - Docs / changelog
+        - Other
+    validations:
+      required: true

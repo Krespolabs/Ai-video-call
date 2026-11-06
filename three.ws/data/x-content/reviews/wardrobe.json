@@ -1,0 +1,115 @@
+{
+	"id": "wardrobe",
+	"contentHash": "af85eddd5c806acc9d07f91dbfbbe6c526cd887187e5f0b094f72de7ea2b6be5",
+	"reviewedAt": "2026-09-29T07:49:21.095Z",
+	"passed": true,
+	"blockers": [],
+	"texts": [
+		"Your avatar has a wardrobe now.\n\n59 pieces so far: jackets, jeans, hair, glasses. Each one is a rigged 3D garment, not a texture painted on a body, and it binds to any humanoid avatar at the moment you put it on. No fixed skeleton to match.\n\nOpen a piece in 3D and turn it around before you wear it.",
+		"When nothing in the catalog fits, describe the garment in a sentence. The forge builds the mesh, rigs it, validates it, and publishes it to the catalog in about seven minutes, where anyone can wear it.\n\nthree.ws/wardrobe"
+	],
+	"lint": [],
+	"verification": {
+		"ok": true,
+		"checks": [
+			{
+				"claim": "59 pieces",
+				"kind": "evidence:proof",
+				"target": "pieces",
+				"ok": true,
+				"detail": "the run read pieces = \"59\""
+			},
+			{
+				"claim": "Each one is a rigged 3D garment",
+				"kind": "evidence:page",
+				"target": "https://three.ws/wardrobe",
+				"ok": true,
+				"detail": "live page shows \"Every piece here is a real, rigged 3D garment\""
+			},
+			{
+				"claim": "binds to any humanoid avatar",
+				"kind": "evidence:page",
+				"target": "https://three.ws/wardrobe",
+				"ok": true,
+				"detail": "live page shows \"humanoid avatar at runtime\""
+			},
+			{
+				"claim": "No fixed skeleton",
+				"kind": "evidence:page",
+				"target": "https://three.ws/wardrobe",
+				"ok": true,
+				"detail": "live page shows \"no fixed skeleton\""
+			},
+			{
+				"claim": "The forge builds the mesh, rigs it, validates it, and publishes it to the catalog in about seven minutes",
+				"kind": "evidence:page",
+				"target": "https://three.ws/wardrobe",
+				"ok": true,
+				"detail": "live page shows \"the forge will build, rig, validate, and publish it in about seven minutes\""
+			},
+			{
+				"claim": "where anyone can wear it",
+				"kind": "evidence:page",
+				"target": "https://three.ws/wardrobe",
+				"ok": true,
+				"detail": "live page shows \"instantly wearable by anyone\""
+			},
+			{
+				"kind": "probe:scenario",
+				"target": "the filmed scenario",
+				"ok": true,
+				"detail": "10 steps passed against the live product, facts unchanged (pieces 59)"
+			},
+			{
+				"kind": "probe:api",
+				"target": "the catalog still holds the 59 pieces the post counts",
+				"ok": true,
+				"detail": "HTTP 200, expectations met"
+			},
+			{
+				"kind": "link",
+				"target": "https://three.ws/wardrobe",
+				"ok": true,
+				"detail": "HTTP 200"
+			}
+		]
+	},
+	"editor": {
+		"verdict": "publish",
+		"scores": {
+			"accuracy": 5,
+			"clarity": 5,
+			"specificity": 5,
+			"voice": 5,
+			"professionalism": 5,
+			"visual": 5
+		},
+		"issues": [
+			{
+				"severity": "minor",
+				"area": "visual",
+				"quote": "altText",
+				"problem": "No alt text is supplied on the reel, and it is required by the house standard.",
+				"fix": "Attach the alt text provided in the rewrite field."
+			}
+		],
+		"rewrite": {
+			"posts": [
+				"Your avatar has a wardrobe now.\n\n59 pieces so far: jackets, jeans, hair, glasses. Each one is a rigged 3D garment, not a texture painted on a body, and it binds to any humanoid avatar at the moment you put it on. No fixed skeleton to match.\n\nOpen a piece in 3D and turn it around before you wear it.",
+				"When nothing in the catalog fits, describe the garment in a sentence. The forge builds the mesh, rigs it, validates it, and publishes it to the catalog in about seven minutes, where anyone can wear it.\n\nthree.ws/wardrobe"
+			],
+			"altText": [
+				"Screen recording of the three.ws wardrobe page. A garment catalog shows 59 pieces with category filters for Tops, Bottoms, Footwear, Outerwear, Hair, Headwear, Glasses, and Accessories. The user filters to Outerwear and opens a black leather jacket in a 3D viewer, turning the mesh around to inspect it. Captions read: An open catalog of clothes for 3D avatars. Every piece is a rigged 3D garment, not a texture. Open one before you wear it. It is a real mesh. Turn it around."
+			]
+		},
+		"summary": "Every claim, including the 59-piece count, the runtime binding, and the seven-minute forge pipeline, is verified against the live page and the filmed end-to-end run, and the reel frames match the copy and captions exactly. Voice and structure pass all gate rules; the only gap is the missing alt text, which is supplied, so this is ready to ship.",
+		"model": "nvidia:moonshotai/kimi-k3",
+		"fallbacks": [
+			"Vertex 403: {\n  \"error\": {\n    \"code\": 403,\n    \"message\": \"Request had insufficient authentication scopes.\",\n    \"status\": \"PERMISSION_DENIED\",\n    \"details\": [\n      {\n        \"@type\": \"type.googleapis.com/goog",
+			"openrouter 402: {\"error\":{\"message\":\"Insufficient credits. Add more using https://openrouter.ai/settings/credits\",\"code\":402,\"metadata\":{\"limit_source\":\"openrouter_credits\",\"remedy_hint\":\"Add credits at https://openr",
+			"openai 429: {\n    \"error\": {\n        \"message\": \"Your account is not active, please check your billing details on our website.\",\n        \"type\": \"billing_not_active\",\n        \"param\": null,\n        \"code\": \"billi"
+		],
+		"rewriteFindings": []
+	},
+	"editorError": null
+}
