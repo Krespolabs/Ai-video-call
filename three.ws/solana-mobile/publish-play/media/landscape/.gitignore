@@ -1,5 +1,0 @@
-# Working captures, not uploads. device/ is especially dangerous to commit:
-# a later run would silently reuse a stale capture instead of the live site.
-raw/
-device/
-carousel.png

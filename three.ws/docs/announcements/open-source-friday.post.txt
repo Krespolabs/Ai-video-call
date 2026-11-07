@@ -1,1 +1,0 @@
-Approved for GitHub's Open Source Friday. Rig Doctor names which of 15 rig conventions a .glb follows, right in your browser, with nothing uploaded: three.ws/rig-doctor

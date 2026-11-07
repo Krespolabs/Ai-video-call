@@ -1,6 +1,0 @@
-__pycache__
-*.pyc
-*.pyo
-.git
-.env
-face_uv_map.json

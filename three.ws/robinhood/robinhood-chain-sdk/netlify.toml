@@ -1,4 +1,0 @@
-# Netlify — publish the static site in docs/.
-[build]
-  publish = "docs"
-  command = ""

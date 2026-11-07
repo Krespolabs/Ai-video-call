@@ -1,1 +1,0 @@
-Our agents spend against budgets, never private keys. How we authorize that spending, and the $THREE token layer behind it, on @awscloud's Builder Center: https://builder.aws.com/content/3JAVvvItd3ZSVjYCDb4qjj5VBb9/budgets-entitlements-and-the-dollarthree-token-layer-how-we-authorize-autonomous-agent-spending-or-threews-an-aws-partner

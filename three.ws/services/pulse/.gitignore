@@ -1,7 +1,0 @@
-node_modules/
-dist/
-data/pglite/
-data/exports/
-.env
-.env.local
-*.log

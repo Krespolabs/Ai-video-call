@@ -1,6 +1,0 @@
-{
-  "name": "3d-ar-studio",
-  "version": "0.3.2",
-  "homepage": "https://nirholas.github.io/3D-AR-Studio/",
-  "bundle": "./ar-studio.min.js"
-}

@@ -1,6 +1,0 @@
-dist/
-node_modules/
-media/viewer.js
-media/viewer.js.map
-media/vendor/
-*.vsix

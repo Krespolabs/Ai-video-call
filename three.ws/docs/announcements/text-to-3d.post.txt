@@ -1,7 +1,0 @@
-Type a sentence. Get a 3D model.
-
-It is free, with no account and no API key.
-
-We typed "a worn leather armchair with brass studs" and had a textured 3D model 106 seconds later. Download it and use it anywhere.
-
-three.ws/forge
