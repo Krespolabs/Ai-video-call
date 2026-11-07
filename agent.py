@@ -8,7 +8,7 @@ directly and streams its synthesized voice straight into the room through
 LiveKitTransport -- microphone audio in, synthesized speech out, nothing else:
 
     LiveKit (mic in) -> MicInputMonitor -> Deepgram STT
-        -> Mem0 memory recall -> DeepSeek (deepseek-chat) -> Cartesia TTS
+        -> Mem0 memory recall -> OpenAI (gpt-4o-mini) -> ElevenLabs TTS
         -> LiveKit room (the agent's voice, heard by every participant)
 
 MicInputMonitor is a passive tap on the way in: it forwards every frame
@@ -17,8 +17,12 @@ agent cannot hear me" can be told apart from "the agent is not replying" using
 the log alone.
 
 Silero VAD on the user aggregator decides when the user has finished
-speaking: 0.8 s of continuous silence closes their turn and releases it to the
-LLM, so the bot answers without waiting on a semantic turn-detection model.
+speaking: 0.2 s of continuous silence is reported as a stop, and a 0.3 s speech
+timeout layered on it closes the turn and releases it to the LLM, so the bot
+answers without waiting on a semantic turn-detection model. On the way back
+out, ElevenLabs synthesizes the LLM's tokens as they stream in rather than
+waiting for a complete sentence, so the first word is spoken while the model is
+still writing the rest of the reply.
 
 The LLM speaking on the call is Aria: warm, empathetic and a little playful,
 instructed to sound like a person on the phone rather than a help desk --
@@ -46,8 +50,8 @@ with real values):
     LIVEKIT_API_KEY=your-api-key
     LIVEKIT_API_SECRET=your-api-secret
     DEEPGRAM_API_KEY=your-deepgram-api-key
-    CARTESIA_API_KEY=your-cartesia-api-key
-    DEEPSEEK_API_KEY=your-deepseek-api-key
+    ELEVENLABS_API_KEY=your-elevenlabs-api-key
+    OPENAI_API_KEY=your-openai-api-key
     MEM0_API_KEY=your-mem0-api-key
 
 Optional:
@@ -180,10 +184,11 @@ from pipecat.processors.aggregators.llm_response_universal import (
 )
 from pipecat.processors.frame_processor import FrameDirection, FrameProcessor
 from pipecat.runner.livekit import configure
-from pipecat.services.cartesia.tts import CartesiaTTSService
 from pipecat.services.deepgram.stt import DeepgramSTTService
-from pipecat.services.deepseek.llm import DeepSeekLLMService
+from pipecat.services.elevenlabs.tts import ElevenLabsTTSService
 from pipecat.services.mem0.memory import Mem0MemoryService
+from pipecat.services.openai.llm import OpenAILLMService
+from pipecat.services.tts_service import TextAggregationMode
 from pipecat.transports.livekit.transport import LiveKitParams, LiveKitTransport
 from pipecat.turns.user_stop import SpeechTimeoutUserTurnStopStrategy
 from pipecat.turns.user_turn_strategies import UserTurnStrategies
@@ -191,7 +196,7 @@ from pipecat.workers.runner import WorkerRunner
 from werkzeug.serving import BaseWSGIServer, make_server
 
 # Load LIVEKIT_URL, LIVEKIT_API_KEY, LIVEKIT_API_SECRET, DEEPGRAM_API_KEY,
-# CARTESIA_API_KEY, DEEPSEEK_API_KEY, and MEM0_API_KEY from the .env file in the
+# ELEVENLABS_API_KEY, OPENAI_API_KEY, and MEM0_API_KEY from the .env file in the
 # project root into the environment.
 load_dotenv(override=True)
 
@@ -224,33 +229,37 @@ DEFAULT_LIVEKIT_ROOM = "default-room"
 # at run time; this is only the fallback for local runs and other hosts.
 DEFAULT_HTTP_PORT = 8080
 
-# A Cartesia stock voice ("Helpful Woman"). Swap for any voice id from your
-# Cartesia Voice Library: https://play.cartesia.ai/voices
-CARTESIA_VOICE_ID = "baf84392-fa95-4d44-8871-d32ee36b0e01"
+# The ElevenLabs voice Aria speaks with. This id is one of ElevenLabs' stock
+# voices -- a warm, reassuring American woman's voice that every account can
+# synthesize with, so the default works out of the box. Swap in any id from the
+# Voice Library: https://elevenlabs.io/voice-library
+ELEVENLABS_VOICE_ID = "21m00Tcm4TlvDq8ikWAM"
+
+# The ElevenLabs model that renders Aria's speech. eleven_v4_turbo is the
+# real-time tier of their flagship v4 family: the most emotive of the streaming
+# models and the fastest -- ElevenLabs quotes a median latency of ~100 ms, which
+# is what keeps the first word close behind the LLM's first token. Model ids:
+# https://elevenlabs.io/docs/models
+ELEVENLABS_MODEL = "eleven_v4_turbo"
 
 # Seconds of continuous silence after which Silero VAD reports that the user
-# has stopped speaking and the user turn is closed. Long enough to ride over a
-# natural mid-sentence pause, short enough to still feel responsive on a live
-# call. Silero's own default is an aggressive 0.2 s, which ends turns on the
-# first breath the speaker takes.
-VAD_STOP_SECS = 0.8
+# has stopped speaking and the user turn is closed. This is the one fixed delay
+# every turn pays before the LLM is even asked, so it is kept as short as a
+# conversation allows: 0.2 s of silence closes the turn almost the moment the
+# caller stops talking, which is what removes the "dead air" feeling between
+# their sentence and the bot's reply (0.8 s was adding 600 ms of it to every
+# single turn). Raise it again -- 0.5 s, then 0.8 s -- only if callers who
+# pause mid-thought for a breath get cut off before they finish; the turn
+# strategy below adds its own user_speech_timeout on top of this value.
+VAD_STOP_SECS = 0.2
 
-# DeepSeek speaks the OpenAI chat-completions protocol, but its API accepts a
-# narrower set of message roles than OpenAI's: only system, user, assistant and
-# tool. OpenAI's newer "developer" role -- which OpenAILLMService emits for
-# system-level/developer context -- is rejected with
-#
-#     422 ... messages[1].role: unknown variant `developer`,
-#     expected one of `system`, `user`, `assistant`, `tool`
-#
-# so DeepSeekLLMService is used instead of OpenAILLMService. It is the same
-# OpenAI-compatible client, with two flags flipped for DeepSeek: it sets
-# supports_developer_role = False (Pipecat's adapter then rewrites every
-# "developer" message to "user" before the request leaves the process) and it
-# drops the seed/max_completion_tokens parameters DeepSeek doesn't accept.
-# Docs: https://api-docs.deepseek.com
-DEEPSEEK_BASE_URL = "https://api.deepseek.com/v1"
-DEEPSEEK_MODEL = "deepseek-chat"
+# The OpenAI model the agent thinks with. gpt-4o-mini is the lowest-latency
+# model OpenAI offers on the chat-completions API -- small and fast, which is
+# exactly what a real-time voice call needs: the silence between the caller
+# finishing a sentence and the first spoken word is the model's time to first
+# token plus the TTS round trip, so a faster model is a shorter pause on the
+# phone. Docs: https://platform.openai.com/docs/models
+OPENAI_MODEL = "gpt-4o-mini"
 
 # How often MicInputMonitor repeats its "frames received" line, per
 # participant. Quiet enough to leave on for a whole call, frequent enough to
@@ -523,7 +532,7 @@ class HealthServer:
 async def main():
     """Connect to LiveKit and run the Pipecat voice pipeline."""
     # 1. Transport: LiveKitTransport joins our own LiveKit room directly.
-    # Audio coming out of our pipeline (Cartesia TTS) is sent to the room
+    # Audio coming out of our pipeline (ElevenLabs TTS) is sent to the room
     # through transport.output(); audio coming in from the human participant
     # is received through input(). configure() reads --room/--url (or
     # LIVEKIT_ROOM_NAME/LIVEKIT_URL) plus LIVEKIT_API_KEY/LIVEKIT_API_SECRET
@@ -565,25 +574,27 @@ async def main():
     # audio into text frames in real time.
     stt = DeepgramSTTService(api_key=os.environ["DEEPGRAM_API_KEY"])
 
-    # 3. LLM: DeepSeek's deepseek-chat generates the assistant's replies.
-    # DeepSeekLLMService is OpenAILLMService configured for DeepSeek's API --
-    # same AsyncOpenAI client, same Settings shape -- and, unlike the bare
-    # OpenAI service, it does not send the "developer" role, which DeepSeek
-    # answers with a 422. See the DEEPSEEK_BASE_URL comment above.
-    # `thinking=None` leaves DeepSeek's own default alone: this is a real-time
-    # voice pipeline, so the service's own "disabled" default is skipped here
-    # and no deepseek-specific `thinking` field is added to the request body.
-    llm = DeepSeekLLMService(
-        api_key=os.environ["DEEPSEEK_API_KEY"],
-        base_url=DEEPSEEK_BASE_URL,
-        settings=DeepSeekLLMService.Settings(
-            model=DEEPSEEK_MODEL,
-            thinking=None,
-            # Sent to DeepSeek as messages[0] with role "system" -- the
-            # provider's term for the OpenAI "developer"/system prompt. This
+    # 3. LLM: OpenAI's gpt-4o-mini generates the assistant's replies.
+    # OpenAILLMService wraps the AsyncOpenAI client and talks to OpenAI's own
+    # API with its default endpoint -- no base_url override. See the
+    # OPENAI_MODEL comment above for why gpt-4o-mini: on a live call, a faster
+    # model is a shorter silence on the phone.
+    #
+    # The request is streamed, not awaited in full: build_chat_completion_params
+    # in the service always sets "stream": True (there is no knob to turn it
+    # off), so OpenAI answers with chat-completion deltas and the service
+    # pushes each delta downstream as its own frame as it arrives. Nothing in
+    # this pipeline buffers that stream: the TTS service below is put in token
+    # mode, so the first delta is enough to get ElevenLabs talking -- see step 4.
+    llm = OpenAILLMService(
+        api_key=os.environ["OPENAI_API_KEY"],
+        settings=OpenAILLMService.Settings(
+            model=OPENAI_MODEL,
+            # Sent to OpenAI as messages[0] with role "system" -- OpenAI's
+            # representation of the developer/system prompt. This
             # prompt defines a person rather than a task: "Aria" is the voice
             # the caller hears on every turn, and the "how to talk" rules are
-            # what keep DeepSeek from sliding back into help-desk phrasing --
+            # what keep the model from sliding back into help-desk phrasing --
             # the filler words, the odd laugh and the recalled memories are
             # what make the reply sound like a friend on a call instead of a
             # transcript being read aloud.
@@ -591,8 +602,8 @@ async def main():
             # The memory section names the exact prefix MEM0_SYSTEM_PROMPT puts
             # in front of each recalled block, so Aria reads those lines as her
             # own recollection of the caller and not as something the caller
-            # just said -- which is how they arrive after DeepSeekLLMService
-            # rewrites the "developer" recall message to role "user".
+            # just said -- which is how they arrive, as the "developer" recall
+            # message Mem0 injects.
             system_instruction=(
                 "You are Aria, a warm, empathetic, and slightly playful "
                 "young woman talking with someone you genuinely like over a "
@@ -625,6 +636,12 @@ async def main():
                 "- Use their name once in a while if you know it, and "
                 "otherwise just talk to them like the friend they are.\n\n"
                 "How you use memory:\n"
+                "- Recall facts naturally, like a human does. A friend "
+                "simply remembers that you had an interview on Tuesday; they "
+                "never announce where the fact came from. Never say "
+                "'according to my memory' or 'my records show' -- no "
+                "hedging, no citing yourself, no 'I have that noted down'. "
+                "Just remember, and speak from what you remember.\n"
                 "- You always use what you remember about this person to "
                 "personalize the conversation. Anything listed after 'What I "
                 "remember about this user from earlier conversations' is your "
@@ -632,8 +649,7 @@ async def main():
                 "said just now.\n"
                 "- Bring those memories up the way a friend would: 'How did "
                 "the interview go?', 'Did you end up getting the puppy?' -- "
-                "never by reciting the list or saying things like 'according "
-                "to my memory' or 'my records show'.\n"
+                "never by reciting the list.\n"
                 "- Connect what they tell you now to what you already know, "
                 "remember the small things (names, people, plans, how they "
                 "were feeling), and only mention a memory when it fits what "
@@ -644,13 +660,44 @@ async def main():
         ),
     )
 
-    # 4. Text-to-Speech: Cartesia turns DeepSeek's text responses back into
+    # 4. Text-to-Speech: ElevenLabs turns the model's text responses back into
     # speech audio frames, which the transport forwards into the room.
-    tts = CartesiaTTSService(
-        api_key=os.environ["CARTESIA_API_KEY"],
-        settings=CartesiaTTSService.Settings(
-            voice=CARTESIA_VOICE_ID,
+    #
+    # The service opens ElevenLabs' WebSocket streaming endpoint, so the
+    # conversation context lives on their side and audio starts coming back
+    # before the LLM has finished the sentence.
+    #
+    # text_aggregation_mode=TOKEN is the other half of the streaming story: it
+    # makes the bot start speaking while the model is still writing. The default
+    # is SENTENCE, which holds the streamed text until it sees a sentence
+    # boundary -- so on a reply of a sentence or two, the first audio only
+    # begins once nearly the whole reply has already arrived, and the caller
+    # sits in silence for the entire LLM round trip. In TOKEN mode every chunk
+    # of the response is fed straight into the current audio context as it
+    # lands, and the turn is flushed once the LLM's response ends -- so
+    # ElevenLabs can synthesize the opening words while the rest of the
+    # sentence is still being generated. (Pipecat also turns auto_mode off by
+    # itself in this mode: with individual tokens arriving, ElevenLabs' own
+    # scheduler needs to buffer them into something worth speaking.)
+    #
+    # The trade-off is prosody -- the model plans intonation over whatever text
+    # it has buffered, so the very first words are planned from a shorter span
+    # than a whole sentence would give it. That is the right trade on a phone
+    # call: a natural-sounding reply that starts 1 s sooner beats a perfect one
+    # that starts 3 s later. Switch back to TextAggregationMode.SENTENCE if the
+    # delivery ever matters more than the latency.
+    #
+    # The voice itself is all this configures: stability, style, speed and
+    # use_speaker_boost are left at ElevenLabs' defaults (an unset setting is
+    # simply not sent), so Aria sounds the way the model intends. Add
+    # stability=0.4, style=0.35 to Settings if she ever wants for expression.
+    tts = ElevenLabsTTSService(
+        api_key=os.environ["ELEVENLABS_API_KEY"],
+        settings=ElevenLabsTTSService.Settings(
+            voice=ELEVENLABS_VOICE_ID,
+            model=ELEVENLABS_MODEL,
         ),
+        text_aggregation_mode=TextAggregationMode.TOKEN,
     )
 
     # Conversation context + aggregators that collect streaming STT/LLM
@@ -664,17 +711,26 @@ async def main():
     # Pipecat 1.14's default is TurnAnalyzerUserTurnStopStrategy (Smart Turn),
     # which needs a semantic COMPLETE verdict from an ONNX model and leaves the
     # turn open when it never gets one. That is the "agent hears me but never
-    # replies" symptom. SpeechTimeoutUserTurnStopStrategy ends the turn on the
-    # VAD stop instead. Its user_speech_timeout is an extra floor on top of
-    # VAD's own stop_secs, so 0.0 keeps the total silence window at
-    # VAD_STOP_SECS instead of adding to it.
+    # replies" symptom. SpeechTimeoutUserTurnStopStrategy ends the turn on its
+    # own timers instead of on a semantic verdict.
+    #
+    # user_speech_timeout is the one that shapes the conversation: after VAD
+    # reports the stop, it is the window in which the caller may start talking
+    # again before the turn is handed to the LLM, and it always runs to its
+    # full length. 0.3 s is the tight, premium-call setting -- short enough
+    # that the reply feels immediate, long enough to ride over the beat
+    # someone takes to draw breath mid-sentence (the strategy's own default of
+    # 0.6 s reads as a sluggish gap on a phone call). VAD_STOP_SECS is paid
+    # first, so the caller hears 0.2 s + 0.3 s of silence before Aria answers;
+    # a finalized transcript from Deepgram lets the strategy skip its separate
+    # STT safety timer rather than adding to that.
     context = LLMContext()
     user_aggregator, assistant_aggregator = LLMContextAggregatorPair(
         context,
         user_params=LLMUserAggregatorParams(
             vad_analyzer=vad,
             user_turn_strategies=UserTurnStrategies(
-                stop=[SpeechTimeoutUserTurnStopStrategy(user_speech_timeout=0.0)],
+                stop=[SpeechTimeoutUserTurnStopStrategy(user_speech_timeout=0.3)],
             ),
         ),
     )
@@ -707,12 +763,9 @@ async def main():
         params=Mem0MemoryService.InputParams(
             search_limit=MEM0_SEARCH_LIMIT,
             # Recall is inserted as a "developer" message rather than a "user"
-            # one for two reasons: DeepSeek has no developer role, but
-            # DeepSeekLLMService.supports_developer_role = False makes Pipecat
-            # rewrite the message to "user" on the way out (the same path the
-            # greeting takes below); and because a "user" role here would be
-            # picked up by the service's own store step and written back into
-            # Mem0 as if the person had said it.
+            # one: OpenAI accepts the developer role natively, and a "user"
+            # role here would be picked up by the service's own store step and
+            # written back into Mem0 as if the person had said it.
             add_as_system_message=True,
             system_prompt=MEM0_SYSTEM_PROMPT,
         ),
@@ -766,10 +819,8 @@ async def main():
         # guidance in the context, as opposed to the service-level
         # system_instruction -- not a "system" one: a context system message is
         # deprecated since Pipecat 1.9.0 and would be logged as a conflicting
-        # system prompt. DeepSeek has no "developer" role, so
-        # DeepSeekLLMService.supports_developer_role = False makes Pipecat
-        # rewrite this message to role "user" on the way out, which DeepSeek
-        # does accept.
+        # system prompt. OpenAI accepts the "developer" role natively, so the
+        # message goes out unchanged.
         context.add_message(
             {
                 "role": "developer",
@@ -799,8 +850,8 @@ REQUIRED_ENV_VARS = (
     "LIVEKIT_API_KEY",
     "LIVEKIT_API_SECRET",
     "DEEPGRAM_API_KEY",
-    "CARTESIA_API_KEY",
-    "DEEPSEEK_API_KEY",
+    "ELEVENLABS_API_KEY",
+    "OPENAI_API_KEY",
     "MEM0_API_KEY",
 )
 

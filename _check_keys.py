@@ -28,12 +28,9 @@ probe(
     {"Authorization": f"Token {os.environ.get('DEEPGRAM_API_KEY', '')}"},
 )
 probe(
-    "cartesia",
-    "https://api.cartesia.ai/voices",
-    {
-        "X-API-Key": os.environ.get("CARTESIA_API_KEY", ""),
-        "Cartesia-Version": "2024-06-10",
-    },
+    "elevenlabs",
+    "https://api.elevenlabs.io/v1/models",
+    {"xi-api-key": os.environ.get("ELEVENLABS_API_KEY", "")},
 )
 probe(
     "anthropic",

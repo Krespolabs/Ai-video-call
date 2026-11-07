@@ -3,4 +3,4 @@ livekit-agents
 flask
 flask-cors
 python-dotenv
-pipecat-ai[deepgram,cartesia,openai,deepseek,livekit,mem0]
+pipecat-ai[deepgram,elevenlabs,openai,livekit,mem0]
