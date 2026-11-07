@@ -56,20 +56,24 @@ with real values):
 
 Optional:
     LIVEKIT_ROOM_NAME   Room the agent joins (default: default-room)
-    PORT                Port the health server binds (default: 8080)
+    PORT                Port the health server binds (default: 10000)
 
 The agent joins default-room on its own, so --room is only needed to point it
 at a different room; LIVEKIT_ROOM_NAME does the same job without a flag, which
 is what a host with no command line (Render) needs.
 
-Next to the pipeline, a tiny Flask health server listens on $PORT (8080 when
-unset) and answers GET /, /health and /healthz with 200 -- the probe a PaaS
-uses to decide the service is up -- while the Pipecat pipeline keeps running
-continuously on the asyncio event loop of the main thread.
+Next to the pipeline, a tiny Flask health server binds 0.0.0.0 on
+os.environ.get("PORT", 10000) -- 10000 is Render's own default -- and answers
+GET /, /health and /healthz with 200: the probe a PaaS uses to decide the
+service is up. It serves from a daemon thread, so the Pipecat pipeline keeps
+the asyncio event loop of the main thread to itself, and it is brought up
+before pipecat itself is imported, because a host starts scanning for an open
+port in the first seconds and gives up long before onnxruntime and the neural
+models have finished loading.
 
 Run:
     pip install -r requirements.txt
-    python agent.py      # joins default-room, health server on 8080
+    python agent.py      # joins default-room, health server on 10000
 
 On Render, set the start command to `python agent.py` and the health check
 path to /health. Render injects PORT itself; nothing else has to change.
@@ -171,6 +175,207 @@ os.environ.setdefault(
 from dotenv import load_dotenv
 from flask import Flask, jsonify
 from loguru import logger
+from werkzeug.serving import BaseWSGIServer, make_server
+
+# Load LIVEKIT_URL, LIVEKIT_API_KEY, LIVEKIT_API_SECRET, DEEPGRAM_API_KEY,
+# ELEVENLABS_API_KEY, OPENAI_API_KEY, and MEM0_API_KEY from the .env file in the
+# project root into the environment. This runs before anything reads it: the
+# health server below takes PORT from here, and every service further down takes
+# its credentials from here.
+load_dotenv(override=True)
+
+logger.remove(0)
+logger.add(sys.stderr, level="DEBUG")
+
+# Report what the AVX2 CPU patch decided, so a crash or a slow VAD frame on an
+# unfamiliar machine can be diagnosed from the log alone.
+logger.info(
+    f"AVX2 CPU patch: natives capped at '{CPU_ISA}' kernels "
+    f"(avx={CPU_ISA_FEATURES['avx']}, avx2={CPU_ISA_FEATURES['avx2']}, "
+    f"avx512={CPU_ISA_FEATURES['avx512']})"
+)
+if not CPU_ISA_FEATURES["avx2"]:
+    logger.warning(
+        "AVX2 CPU patch: this CPU reports no AVX2; Pipecat's neural VAD and "
+        "Smart Turn models run on lower-tier kernels. Expect extra latency."
+    )
+
+# ── health server ──────────────────────────────────────────────────────────
+# A host (Render included) starts scanning for an open port the moment the
+# container starts and gives up after about a minute: a service whose port is
+# still closed by then is reported as "No open ports detected" and killed.
+# Importing pipecat loads onnxruntime, numpy and the neural models -- tens of
+# seconds on a small instance, longer than that scan waits -- so this server
+# lives up here, above those imports, and is built from the stdlib, dotenv,
+# flask and werkzeug alone. It answers a flat 200 OK from a daemon thread, so
+# the Pipecat pipeline keeps the asyncio event loop of the main thread (and
+# every audio frame on it) entirely to itself.
+
+# The port the health server binds when PORT is absent:
+# os.environ.get("PORT", 10000) is the rule, and 10000 is the port Render opens
+# by default, so even a host that injects nothing gets a port its scanner looks
+# at. The real value is always read from the environment at run time.
+DEFAULT_HTTP_PORT = 10000
+
+
+def _health_port() -> int:
+    """Return the port the health server should bind.
+
+    PaaS providers (Render included) put the port the service must listen on in
+    ``PORT`` and route traffic -- health checks among it -- to that port only,
+    so the environment value is used whenever it is present. A missing,
+    unparsable or out-of-range value falls back to DEFAULT_HTTP_PORT instead of
+    killing an otherwise healthy agent over a typo.
+
+    Returns:
+        The TCP port to listen on.
+    """
+    raw = os.environ.get("PORT", "").strip()
+    if not raw:
+        return DEFAULT_HTTP_PORT
+    try:
+        port = int(raw)
+    except ValueError:
+        logger.warning(
+            f"Health server: PORT='{raw}' is not a number; falling back to "
+            f"{DEFAULT_HTTP_PORT}."
+        )
+        return DEFAULT_HTTP_PORT
+    if not 1 <= port <= 65535:
+        logger.warning(
+            f"Health server: PORT={port} is outside 1-65535; falling back to "
+            f"{DEFAULT_HTTP_PORT}."
+        )
+        return DEFAULT_HTTP_PORT
+    return port
+
+
+def create_health_app() -> Flask:
+    """Build the tiny Flask app that tells a host the agent is up.
+
+    It serves nothing but a static "ok". What the pipeline is actually doing
+    lives in the LiveKit room and cannot be probed over HTTP, and all a host
+    needs is a 200 on the port it opened -- so that a process with a live event
+    loop streaming audio is never marked unhealthy and restarted mid-call.
+
+    GET /, /health and /healthz all answer, because health-check paths differ
+    between hosts (Render defaults to /) and this way any of them works.
+
+    Returns:
+        The Flask application, ready to be served.
+    """
+    app = Flask(__name__)
+
+    @app.route("/", methods=["GET"])
+    @app.route("/health", methods=["GET"])
+    @app.route("/healthz", methods=["GET"])
+    def health():
+        """Report 200 OK for as long as the process is running."""
+        return jsonify({"status": "ok", "service": "aria-voice-agent"}), 200
+
+    return app
+
+
+class HealthServer:
+    """The liveness port for the voice agent, served on its own thread.
+
+    The Pipecat pipeline owns the asyncio event loop in the main thread for the
+    entire life of the process, so the HTTP server a host polls cannot live on
+    that loop: it gets a daemon thread of its own and blocks there in werkzeug's
+    ``serve_forever``, untouched by anything the pipeline does. ``make_server``
+    is used rather than ``app.run()`` because it hands back the server object,
+    which is what lets ``stop()`` close the socket cleanly instead of leaving a
+    thread and a port behind.
+    """
+
+    def __init__(self, port: int | None = None, host: str = "0.0.0.0") -> None:
+        """Initialize the server without binding anything yet.
+
+        Args:
+            port: Port to listen on. Defaults to os.environ.get("PORT", 10000).
+            host: Interface to bind. 0.0.0.0 is what makes the port reachable
+                from outside the container, which is how Render probes it.
+        """
+        self._host = host
+        self._port = _health_port() if port is None else port
+        self._server: BaseWSGIServer | None = None
+        self._thread: threading.Thread | None = None
+
+    @property
+    def port(self) -> int:
+        """The port this server listens on."""
+        return self._port
+
+    @property
+    def running(self) -> bool:
+        """Whether the server is currently accepting connections."""
+        return self._server is not None
+
+    def start(self) -> bool:
+        """Bind the port and serve requests on a background thread.
+
+        Returns:
+            True once the server is accepting connections. A bind failure --
+            usually the port being held by something else -- is logged and
+            returned as False: a health check that cannot be answered is worth
+            reporting, but it is no reason to drop a working voice pipeline.
+        """
+        if self._server is not None:
+            return True
+        try:
+            self._server = make_server(
+                self._host, self._port, create_health_app(), threaded=True
+            )
+        except OSError as exc:
+            logger.error(
+                f"Health server: could not bind {self._host}:{self._port} "
+                f"({exc}) -- the agent keeps running, but a host's health "
+                "check on that port will fail."
+            )
+            return False
+
+        self._thread = threading.Thread(
+            target=self._server.serve_forever,
+            name="health-server",
+            daemon=True,
+        )
+        self._thread.start()
+        logger.info(
+            f"Health server listening on http://{self._host}:{self._port} "
+            "(GET /, /health, /healthz) -- the pipeline runs on the main "
+            "thread's event loop, independently of it."
+        )
+        return True
+
+    def stop(self) -> None:
+        """Stop serving and join the background thread."""
+        if self._server is None:
+            return
+        self._server.shutdown()
+        self._server.server_close()
+        if self._thread is not None:
+            self._thread.join(timeout=5.0)
+        self._server = None
+        self._thread = None
+        logger.info("Health server stopped")
+
+
+# The one instance the rest of this module uses, bound as early as possible:
+# right here, before the pipecat imports below, so the port is already open
+# while those imports spend their seconds loading onnxruntime and the models.
+# When this file is imported rather than run (a test, a REPL) nothing binds and
+# nothing serves.
+_health_server = HealthServer()
+if __name__ == "__main__":
+    _health_server.start()
+
+
+# ── pipecat ────────────────────────────────────────────────────────────────
+# Imported only after the health port is open. Pulling pipecat in pulls
+# onnxruntime, numpy, the service SDKs and their model runtimes -- tens of
+# seconds of start-up on a small instance, which is exactly the window a host's
+# port scan is waiting out. Nothing above this line needs any of it; everything
+# below does, including the FrameProcessor subclass further down.
 
 from pipecat.audio.vad.silero import SileroVADAnalyzer
 from pipecat.audio.vad.vad_analyzer import VADParams
@@ -193,28 +398,7 @@ from pipecat.transports.livekit.transport import LiveKitParams, LiveKitTransport
 from pipecat.turns.user_stop import SpeechTimeoutUserTurnStopStrategy
 from pipecat.turns.user_turn_strategies import UserTurnStrategies
 from pipecat.workers.runner import WorkerRunner
-from werkzeug.serving import BaseWSGIServer, make_server
 
-# Load LIVEKIT_URL, LIVEKIT_API_KEY, LIVEKIT_API_SECRET, DEEPGRAM_API_KEY,
-# ELEVENLABS_API_KEY, OPENAI_API_KEY, and MEM0_API_KEY from the .env file in the
-# project root into the environment.
-load_dotenv(override=True)
-
-logger.remove(0)
-logger.add(sys.stderr, level="DEBUG")
-
-# Report what the AVX2 CPU patch decided, so a crash or a slow VAD frame on an
-# unfamiliar machine can be diagnosed from the log alone.
-logger.info(
-    f"AVX2 CPU patch: natives capped at '{CPU_ISA}' kernels "
-    f"(avx={CPU_ISA_FEATURES['avx']}, avx2={CPU_ISA_FEATURES['avx2']}, "
-    f"avx512={CPU_ISA_FEATURES['avx512']})"
-)
-if not CPU_ISA_FEATURES["avx2"]:
-    logger.warning(
-        "AVX2 CPU patch: this CPU reports no AVX2; Pipecat's neural VAD and "
-        "Smart Turn models run on lower-tier kernels. Expect extra latency."
-    )
 
 # Room the agent joins when nothing else names one. Render (and every other
 # host that starts the process from a dashboard) passes no command line, so the
@@ -223,11 +407,6 @@ if not CPU_ISA_FEATURES["avx2"]:
 # value, which keeps flag > live environment > this default as the precedence
 # order: pointing the deployed agent at another room stays a config change.
 DEFAULT_LIVEKIT_ROOM = "default-room"
-
-# Port the health server binds when PORT is absent. Render injects PORT and
-# routes its health check there, so the real value is read from the environment
-# at run time; this is only the fallback for local runs and other hosts.
-DEFAULT_HTTP_PORT = 8080
 
 # The ElevenLabs voice Aria speaks with. This id is one of ElevenLabs' stock
 # voices -- a warm, reassuring American woman's voice that every account can
@@ -385,148 +564,6 @@ class MicInputMonitor(FrameProcessor):
         if peak < 200:
             return "very quiet -- check the input device and its level"
         return "audio is flowing"
-
-
-def _health_port() -> int:
-    """Return the port the health server should bind.
-
-    PaaS providers (Render included) put the port the service must listen on in
-    ``PORT`` and route traffic -- health checks among it -- to that port only,
-    so the environment value is used whenever it is present. A missing,
-    unparsable or out-of-range value falls back to DEFAULT_HTTP_PORT instead of
-    killing an otherwise healthy agent over a typo.
-
-    Returns:
-        The TCP port to listen on.
-    """
-    raw = os.environ.get("PORT", "").strip()
-    if not raw:
-        return DEFAULT_HTTP_PORT
-    try:
-        port = int(raw)
-    except ValueError:
-        logger.warning(
-            f"Health server: PORT='{raw}' is not a number; falling back to "
-            f"{DEFAULT_HTTP_PORT}."
-        )
-        return DEFAULT_HTTP_PORT
-    if not 1 <= port <= 65535:
-        logger.warning(
-            f"Health server: PORT={port} is outside 1-65535; falling back to "
-            f"{DEFAULT_HTTP_PORT}."
-        )
-        return DEFAULT_HTTP_PORT
-    return port
-
-
-def create_health_app() -> Flask:
-    """Build the tiny Flask app that tells a host the agent is up.
-
-    It serves nothing but a static "ok". What the pipeline is actually doing
-    lives in the LiveKit room and cannot be probed over HTTP, and all a host
-    needs is a 200 on the port it opened -- so that a process with a live event
-    loop streaming audio is never marked unhealthy and restarted mid-call.
-
-    GET /, /health and /healthz all answer, because health-check paths differ
-    between hosts (Render defaults to /) and this way any of them works.
-
-    Returns:
-        The Flask application, ready to be served.
-    """
-    app = Flask(__name__)
-
-    @app.route("/", methods=["GET"])
-    @app.route("/health", methods=["GET"])
-    @app.route("/healthz", methods=["GET"])
-    def health():
-        """Report 200 for as long as the process is running."""
-        return jsonify({"status": "ok", "service": "aria-voice-agent"})
-
-    return app
-
-
-class HealthServer:
-    """The liveness port for the voice agent, served on its own thread.
-
-    The Pipecat pipeline owns the asyncio event loop in the main thread for the
-    entire life of the process, so the HTTP server a host polls cannot live on
-    that loop: it gets a daemon thread of its own and blocks there in werkzeug's
-    ``serve_forever``, untouched by anything the pipeline does. ``make_server``
-    is used rather than ``app.run()`` because it hands back the server object,
-    which is what lets ``stop()`` close the socket cleanly instead of leaving a
-    thread and a port behind.
-    """
-
-    def __init__(self, port: int | None = None, host: str = "0.0.0.0") -> None:
-        """Initialize the server without binding anything yet.
-
-        Args:
-            port: Port to listen on. Defaults to $PORT, then DEFAULT_HTTP_PORT.
-            host: Interface to bind. 0.0.0.0 is what makes the port reachable
-                from outside the container, which is how Render probes it.
-        """
-        self._host = host
-        self._port = _health_port() if port is None else port
-        self._server: BaseWSGIServer | None = None
-        self._thread: threading.Thread | None = None
-
-    @property
-    def port(self) -> int:
-        """The port this server listens on."""
-        return self._port
-
-    @property
-    def running(self) -> bool:
-        """Whether the server is currently accepting connections."""
-        return self._server is not None
-
-    def start(self) -> bool:
-        """Bind the port and serve requests on a background thread.
-
-        Returns:
-            True once the server is accepting connections. A bind failure --
-            usually the port being held by something else -- is logged and
-            returned as False: a health check that cannot be answered is worth
-            reporting, but it is no reason to drop a working voice pipeline.
-        """
-        if self._server is not None:
-            return True
-        try:
-            self._server = make_server(
-                self._host, self._port, create_health_app(), threaded=True
-            )
-        except OSError as exc:
-            logger.error(
-                f"Health server: could not bind {self._host}:{self._port} "
-                f"({exc}) -- the agent keeps running, but a host's health "
-                "check on that port will fail."
-            )
-            return False
-
-        self._thread = threading.Thread(
-            target=self._server.serve_forever,
-            name="health-server",
-            daemon=True,
-        )
-        self._thread.start()
-        logger.info(
-            f"Health server listening on http://{self._host}:{self._port} "
-            "(GET /, /health, /healthz) -- the pipeline runs on the main "
-            "thread's event loop, independently of it."
-        )
-        return True
-
-    def stop(self) -> None:
-        """Stop serving and join the background thread."""
-        if self._server is None:
-            return
-        self._server.shutdown()
-        self._server.server_close()
-        if self._thread is not None:
-            self._thread.join(timeout=5.0)
-        self._server = None
-        self._thread = None
-        logger.info("Health server stopped")
 
 
 async def main():
@@ -862,8 +899,9 @@ def _validate_env() -> None:
     if missing:
         logger.error(
             "Missing required environment variables: "
-            f"{', '.join(missing)}. Add them to the .env file in the "
-            "project root (see the docstring at the top of this file)."
+            f"{', '.join(missing)}. Set them for this service -- the Environment "
+            "tab of the Render dashboard, or the .env file in the project root "
+            "for local runs (see the docstring at the top of this file)."
         )
         sys.exit(1)
 
@@ -871,15 +909,14 @@ def _validate_env() -> None:
 if __name__ == "__main__":
     _validate_env()
 
-    # Bring the HTTP port up before the pipeline: a host scans for an open
-    # port as the container starts, and the pipeline's own start-up (ONNX model
-    # loads, the LiveKit connect) takes long enough to look like a service that
-    # never listened. The server then answers from its own daemon thread while
-    # asyncio.run() keeps the pipeline on this one, for as long as the process
-    # lives -- on Render, until the next deploy or restart.
-    health_server = HealthServer()
-    health_server.start()
+    # The HTTP port is already open -- see the early start above, before the
+    # pipecat imports -- so a host's port scan found it while the models were
+    # still loading. asyncio.run() then keeps the pipeline on this thread's
+    # event loop for as long as the process lives: on Render, until the next
+    # deploy or restart. A pipeline that ends (an idle timeout, a fatal error)
+    # closes the port on the way out rather than leaving it answering for a
+    # process that no longer does anything.
     try:
         asyncio.run(main())
     finally:
-        health_server.stop()
+        _health_server.stop()
